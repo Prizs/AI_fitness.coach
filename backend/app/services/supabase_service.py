@@ -56,8 +56,13 @@ def check_supabase_connection() -> dict[str, str | int]:
         return {"status": "error", "message": "Falta la clave secreta."}
 
     try:
-        supabase_admin.table("usuarios").select("id").limit(1).execute()
-    except Exception:
+        supabase_admin.table("usuarios").select(
+            "id, cedula, nombre, apellido, edad, peso, patologia_o_alergias, "
+            "alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar"
+        ).limit(1).execute()
+    except Exception as error:
+        if "does not exist" in str(error):
+            return {"status": "error", "message": "Faltan columnas nuevas en public.usuarios. Ejecuta la migracion de Supabase."}
         return {"status": "error", "message": "La tabla usuarios no responde."}
 
     return {"status": "ok", "http_status": response.status_code}

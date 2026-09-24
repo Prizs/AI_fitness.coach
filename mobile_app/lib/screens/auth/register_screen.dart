@@ -32,8 +32,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
 
   bool _containsEmoji(String value) {
-    return RegExp(r'[\u{1F300}-\u{1FAFF}\u2600-\u27BF]', unicode: true)
-        .hasMatch(value);
+    return RegExp(
+      r'[\u{1F300}-\u{1FAFF}\u2600-\u27BF]',
+      unicode: true,
+    ).hasMatch(value);
   }
 
   String? _validateName(String? value) {
@@ -127,16 +129,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       pathologyOrAllergies: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
-        foodAllergies: _foodAllergiesController.text.trim().isEmpty
+      foodAllergies: _foodAllergiesController.text.trim().isEmpty
           ? null
           : _foodAllergiesController.text.trim(),
-        currentInjuries: _injuriesController.text.trim().isEmpty
+      currentInjuries: _injuriesController.text.trim().isEmpty
           ? null
           : _injuriesController.text.trim(),
-        motorDisability: _disabilityController.text.trim().isEmpty
+      motorDisability: _disabilityController.text.trim().isEmpty
           ? null
           : _disabilityController.text.trim(),
-        areasToAvoid: _avoidAreasController.text.trim().isEmpty
+      areasToAvoid: _avoidAreasController.text.trim().isEmpty
           ? null
           : _avoidAreasController.text.trim(),
     );
@@ -150,9 +152,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
     if (!registered) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ya existe un usuario registrado con esa cédula.'),
-        ),
+        SnackBar(content: Text(AuthService.instance.lastError ?? 'Error de registro.')),
       );
       return;
     }
@@ -173,18 +173,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 20),
                 const Text(
                   'Crear cuenta',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   'Completa tus datos para iniciar tu plan personalizado.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.white70,
-                  ),
+                  style: TextStyle(fontSize: 15, color: Colors.white70),
                 ),
                 const SizedBox(height: 24),
                 TextFormField(

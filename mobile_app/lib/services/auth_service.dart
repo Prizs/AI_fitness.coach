@@ -16,6 +16,7 @@ class AuthService {
 
   UserProfile? loggedInUser;
   String? accessToken;
+  String? lastError;
   final _storage = const FlutterSecureStorage();
 
   Future<bool> restoreSession() async {
@@ -25,7 +26,12 @@ class AuthService {
     final lastName = await _storage.read(key: 'last_name');
     final age = int.tryParse(await _storage.read(key: 'age') ?? '');
     final weight = double.tryParse(await _storage.read(key: 'weight') ?? '');
-    if (cedula == null || token == null || name == null || lastName == null || age == null || weight == null) {
+    if (cedula == null ||
+        token == null ||
+        name == null ||
+        lastName == null ||
+        age == null ||
+        weight == null) {
       return false;
     }
     accessToken = token;
@@ -45,6 +51,7 @@ class AuthService {
   }
 
   Future<bool> register(UserProfile profile) async {
+    lastError = null;
     late final http.Response response;
     try {
       response = await http.post(
@@ -65,10 +72,17 @@ class AuthService {
         }),
       );
     } on Exception {
+      lastError = 'No se pudo conectar con el servidor.';
       return false;
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      try {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        lastError = data['detail'] as String? ?? 'No se pudo completar el registro.';
+      } on Exception {
+        lastError = 'No se pudo completar el registro.';
+      }
       return false;
     }
 
@@ -80,6 +94,7 @@ class AuthService {
   }
 
   Future<bool> login(String cedula, String password) async {
+    lastError = null;
     late final http.Response response;
     try {
       response = await http.post(
@@ -88,10 +103,17 @@ class AuthService {
         body: jsonEncode({'cedula': cedula, 'password': password}),
       );
     } on Exception {
+      lastError = 'No se pudo conectar con el servidor.';
       return false;
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      try {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        lastError = data['detail'] as String? ?? 'Cédula o contraseña incorrectos.';
+      } on Exception {
+        lastError = 'Cédula o contraseña incorrectos.';
+      }
       return false;
     }
 
@@ -125,10 +147,19 @@ class AuthService {
       await _storage.write(key: 'last_name', value: profile.lastName);
       await _storage.write(key: 'age', value: profile.age.toString());
       await _storage.write(key: 'weight', value: profile.weight.toString());
-      await _storage.write(key: 'health_notes', value: profile.pathologyOrAllergies);
+      await _storage.write(
+        key: 'health_notes',
+        value: profile.pathologyOrAllergies,
+      );
       await _storage.write(key: 'food_allergies', value: profile.foodAllergies);
-      await _storage.write(key: 'current_injuries', value: profile.currentInjuries);
-      await _storage.write(key: 'motor_disability', value: profile.motorDisability);
+      await _storage.write(
+        key: 'current_injuries',
+        value: profile.currentInjuries,
+      );
+      await _storage.write(
+        key: 'motor_disability',
+        value: profile.motorDisability,
+      );
       await _storage.write(key: 'areas_to_avoid', value: profile.areasToAvoid);
     }
   }

@@ -86,12 +86,15 @@ def register(payload: RegisterRequest):
     except HTTPException:
         raise
     except Exception as error:
+        error_text = str(error).lower()
         if user_id:
             try:
                 admin_client.auth.admin.delete_user(user_id)
             except Exception:
                 pass
-        raise HTTPException(status_code=400, detail="No se pudo completar el registro.") from error
+        if "already registered" in error_text or "already exists" in error_text or "duplicate" in error_text:
+            raise HTTPException(status_code=409, detail="Esta cédula ya está registrada.") from error
+        raise HTTPException(status_code=500, detail="No se pudo guardar el perfil. Verifica el esquema de Supabase.") from error
 
 
 @router.post("/login")
