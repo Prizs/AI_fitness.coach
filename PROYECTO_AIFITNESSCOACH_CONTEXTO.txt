@@ -1,0 +1,76 @@
+AI FITNESS COACH - CONTEXTO DE PROGRESO Y CONTINUACION
+
+Proyecto base:
+- Nombre: AI Fitness Coach
+- Tipo: Monorepo con backend y app móvil
+- Objetivo: crear un entrenador personal inteligente con coach IA, rutinas, nutrición, progreso y recalibración
+
+Direcciones principales:
+- Raíz del proyecto: C:\Users\Usuario\ai_fitness_coach
+- Backend: C:\Users\Usuario\ai_fitness_coach\backend
+- App móvil: C:\Users\Usuario\ai_fitness_coach\mobile_app
+
+Estructura actual prevista:
+- backend/
+  - app/
+    - main.py
+    - routers/
+      - coach.py
+      - workouts.py
+      - recalibration.py
+  - requirements.txt
+  - tests/
+- mobile_app/
+  - lib/
+    - main.dart
+    - screens/
+      - home_screen.dart
+      - coach_screen.dart
+      - workouts_screen.dart
+      - progress_screen.dart
+
+Estado del proyecto:
+1. Se reconstituyó la carpeta raíz del proyecto en C:\Users\Usuario\ai_fitness_coach.
+2. Se dejó el backend con estructura FastAPI base para coach, rutinas y recalibración.
+3. Se creó la app móvil Flutter con una base visual funcional para preview de módulos.
+4. Se activó autoguardado del editor para minimizar pérdida de avances.
+
+Flujo funcional principal:
+- Pantalla principal: resumen del usuario, módulos principales y objetivo.
+- Coach IA: respuesta del entrenador, apoyos, recomendaciones y preguntas rápidas.
+- Rutinas: planes y días de entrenamiento con actividades específicas.
+- Progreso: métricas del rendimiento, tendencias y nivel de recuperación.
+- Futura integración: consumo real del backend con endpoints HTTP para coach, rutinas y recalibración.
+
+Módulos a desarrollar luego:
+- Autenticación de usuario
+- Perfil del atleta
+- Objetivos, nivel, restricciones médicas
+- Plan semanal con carga y recuperación
+- Nutrición recomendada adaptada a la meta
+- Chat con asistente IA
+- Historial de ejercicios y progreso
+- Recalibración del plan según resultados
+
+Reglas clave del sistema:
+- No priorizar cantidad de funcionalidad por encima de la calidad del flujo.
+- Mantener una arquitectura clara y escalable para backend y frontend.
+- Usar un diseño con módulos separados para facilitar pruebas y extensión.
+- Priorizar un MVP funcional antes de personalizar mucho la UI.
+
+Siguientes pasos recomendados para continuar con otra IA:
+1. Verificar el backend con endpoints reales y validación de datos.
+2. Añadir modelos Pydantic más completos para usuario, plans y progreso.
+3. Conectar la app móvil al backend con HTTP client.
+4. Implementar el flujo de chat con IA y almacenamiento del histórico.
+5. Añadir una pantalla de perfil y una pantalla de plan nutricional.
+6. Preparar una capa de servicios para adaptar la lógica del coach.
+
+Contexto de diseño:
+- Estilo visual: app deportiva moderna, enfoque en fuerza, salud, rendimiento y motivación.
+- Tema principal: oscuro, sobrio, premium, con acentos verdes/azules para representar energía y bienestar.
+
+Resumen operativo:
+Este proyecto fue reconstituido para poder seguir desarrollando desde la carpeta principal del workspace, sin depender de otra sesión no persistida. La idea es trabajar desde esta base y mantener el proyecto en historial y con autoguardado activo.
+
+Si otra IA retoma este proyecto, debe seguir desde aquí y mantener la estructura actual sin reescribir todo desde cero.

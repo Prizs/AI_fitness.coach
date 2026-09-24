@@ -1,0 +1,56 @@
+STACK TECNOLÓGICO - AI FITNESS COACH
+
+1) FRONTEND MÓVIL
+- Flutter + Dart
+- Objetivo: crear la app móvil con una interfaz moderna, clara y adaptable a Android
+- Motivo: buen rendimiento, diseño atractivo, despliegue fácil y compatibilidad con APK
+- Herramienta recomendada: Android Studio + emuladores
+
+2) BACKEND
+- Python + FastAPI
+- Objetivo: manejar autenticación, rutinas, nutrición, coach IA y APIs REST
+- Motivo: rapidez para desarrollar, validación con Pydantic, integración con IA
+- Herramienta recomendada: VS Code + Uvicorn + FastAPI
+
+3) BASE DE DATOS
+- PostgreSQL 17
+- Objetivo: guardar usuarios, perfiles, rutinas, comidas, coach y progreso
+- Motivo: es relacional, robusto, excelente para trabajo académico y escalabilidad futura
+- Herramienta recomendada: PostgreSQL local + DBeaver Community
+
+4) GESTOR DE BASE DE DATOS
+- DBeaver Community
+- Objetivo: crear tablas, revisar relaciones, exportar diagramas y documentar la BD
+- Motivo: sencillo de usar, visual, compatible con PostgreSQL y MySQL
+
+5) AUTENTICACIÓN Y SEGURIDAD
+- JWT o sesiones con backend seguro
+- Objetivo: proteger el acceso del usuario y sus datos personales
+- Futuro: utilizar autenticación con tokens para despliegue online
+
+6) IA / ASISTENTE
+- OpenAI o modelo generativo compatible con Python
+- Objetivo: coach inteligente, sugerencias de entrenamiento, nutrición y adaptación
+- Motivo: ayuda a personalizar la experiencia del usuario
+
+7) DESPLIEGUE FUTURO
+- Backend: Render, Railway o Fly.io
+- Base de datos: PostgreSQL cloud o Supabase
+- App móvil: APK generado con Flutter para Android
+- Objetivo: que la aplicación pueda usarse online desde cualquier usuario
+
+8) CONTROL DE VERSIONES
+- Git + GitHub
+- Objetivo: llevar trazabilidad del proyecto y trabajo académico
+- Motivo: facilita la colaboración y el manejo del proyecto
+
+9) DOCUMENTACIÓN Y TESIS
+- Documentar en texto, diagramas ER y explicaciones de relaciones
+- Objetivo: explicar la arquitectura, decisiones y funcionamiento del sistema
+- Motivo: ayuda a presentar una solución clara y profesional
+
+Resumen recomendado:
+- Local: PostgreSQL + DBeaver + FastAPI + Flutter
+- Futura versión online: PostgreSQL cloud + backend desplegado + APK Android
+
+Esto mantiene una arquitectura simple, entendible y escalable para una tesis universitaria.

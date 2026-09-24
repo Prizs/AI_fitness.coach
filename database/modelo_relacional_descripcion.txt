@@ -1,0 +1,60 @@
+MODELO RELACIONAL - AI FITNESS COACH
+
+El proyecto está pensado en una base de datos relacional para mantener la información de forma ordenada y con relaciones claras.
+
+1) usuarios
+- Guarda la identidad de acceso del sistema.
+- Tiene: cédula, contraseña cifrada y estado del usuario.
+- Relación: 1 a 1 con perfil_usuario.
+
+2) perfil_usuario
+- Guarda la información personal del atleta.
+- Tiene: nombre, apellido, edad, peso, alergias o patologías.
+- Relación: muchos perfiles pertenecen a un usuario; en este diseño es 1 a 1.
+
+3) objetivos
+- Guarda la meta principal del usuario.
+- Ejemplo: perder grasa, ganar masa muscular, mejorar resistencia.
+- Relación: muchos objetivos por usuario.
+
+4) rutinas
+- Contiene los planes de entrenamiento.
+- Relación: varias rutinas por usuario.
+
+5) ejercicios
+- Catalogo base de ejercicios disponibles.
+- Relación: muchos ejercicios pueden estar dentro de muchas rutinas.
+
+6) rutina_ejercicios
+- Tabla intermedia para asociar ejercicios con rutinas.
+- Guarda día de la semana, orden, repeticiones y descanso.
+
+7) dieta_diaria
+- Guarda el plan alimenticio del día.
+- Relación: una dieta diaria por usuario y fecha.
+
+8) alimentos
+- Catalogo de alimentos disponibles para la dieta.
+
+9) dieta_alimentos
+- Tabla intermedia que asocia comidas con alimentos.
+- Guarda tipo de comida, hora sugerida y porción.
+
+10) coach_mensajes
+- Guarda conversaciones del coach IA.
+- Relación: muchos mensajes por usuario.
+
+11) progreso_semanal
+- Guarda rendimiento semanal del usuario.
+- Relación: muchos registros por usuario.
+
+Relaciones clave:
+- usuarios -> perfil_usuario
+- usuarios -> objetivos
+- usuarios -> rutinas
+- rutinas -> rutina_ejercicios -> ejercicios
+- usuarios -> dieta_diaria -> dieta_alimentos -> alimentos
+- usuarios -> coach_mensajes
+- usuarios -> progreso_semanal
+
+Esto permite luego escalar el sistema a una versión online, sin cambiar completamente la lógica de negocio.
