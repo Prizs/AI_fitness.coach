@@ -11,7 +11,7 @@ class AuthService {
 
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'http://127.0.0.1:8000',
   );
 
   UserProfile? loggedInUser;
@@ -79,7 +79,8 @@ class AuthService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       try {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        lastError = data['detail'] as String? ?? 'No se pudo completar el registro.';
+        lastError =
+            data['detail'] as String? ?? 'No se pudo completar el registro.';
       } on Exception {
         lastError = 'No se pudo completar el registro.';
       }
@@ -110,7 +111,8 @@ class AuthService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       try {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        lastError = data['detail'] as String? ?? 'Cédula o contraseña incorrectos.';
+        lastError =
+            data['detail'] as String? ?? 'Cédula o contraseña incorrectos.';
       } on Exception {
         lastError = 'Cédula o contraseña incorrectos.';
       }
