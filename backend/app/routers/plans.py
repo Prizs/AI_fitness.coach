@@ -1,10 +1,15 @@
 import json
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.services.supabase_service import get_supabase_admin_client
+
 router = APIRouter()
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 
 class PlanRequest(BaseModel):
@@ -18,6 +23,15 @@ class PlanRequest(BaseModel):
     current_injuries: str | None = Field(default=None, max_length=1000)
     motor_disability: str | None = Field(default=None, max_length=1000)
     areas_to_avoid: str | None = Field(default=None, max_length=500)
+    learning_consent: bool = False
+
+
+class PlanFeedback(BaseModel):
+    plan_provider: str = Field(..., max_length=30)
+    rating: int = Field(..., ge=1, le=5)
+    restriction_category: str | None = Field(default=None, max_length=40)
+    safe_outcome: bool = False
+    learning_consent: bool = False
 
 
 def _fallback_plan(payload: PlanRequest) -> dict:
@@ -64,7 +78,7 @@ def _ai_plan(payload: PlanRequest) -> dict | None:
         import google.generativeai as genai
 
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         prompt = f"""Genera un plan fitness y nutricional seguro en JSON valido.
 Objetivo: {payload.goal}; nivel: {payload.level}; dias: {payload.days_per_week}; edad: {payload.age}; peso: {payload.weight}; notas: {payload.health_notes or 'ninguna'}; alergias alimentarias: {payload.food_allergies or 'ninguna'}; lesiones: {payload.current_injuries or 'ninguna'}; discapacidad motora: {payload.motor_disability or 'ninguna'}; zonas a evitar: {payload.areas_to_avoid or 'ninguna'}.
 Devuelve exactamente provider, goal, level, sessions, nutrition y safety_note.
@@ -81,3 +95,21 @@ Cada ejercicio debe tener name, sets, reps y animation_key en kebab-case. No dia
 @router.post("/generate")
 def generate_plan(payload: PlanRequest):
     return _ai_plan(payload) or _fallback_plan(payload)
+
+
+@router.post("/feedback")
+def record_feedback(payload: PlanFeedback):
+    if payload.learning_consent:
+        get_supabase_admin_client().table("aprendizaje_plan_anonimo").insert(
+            {
+                "proveedor": payload.plan_provider,
+                "categoria_restriccion": payload.restriction_category,
+                "calificacion": payload.rating,
+                "resultado_seguro": payload.safe_outcome,
+            }
+        ).execute()
+    return {
+        "recorded": payload.learning_consent,
+        "scope": "anonymous_aggregate" if payload.learning_consent else "disabled",
+        "message": "Solo se guardan señales agregadas y no diagnósticos ni texto médico personal.",
+    }
