@@ -1,0 +1,196 @@
+# AI Fitness Coach - Handoff para Cline
+
+Fecha del traspaso: 2026-09-24
+Repositorio: https://github.com/Prizs/AI_fitness.coach
+Rama activa: `main`
+Raiz local: `C:\Users\Usuario\ai_fitness_coach`
+
+## Instruccion principal
+
+Continua el desarrollo desde el estado existente. No reescribas el proyecto desde cero. Antes de editar, lee los archivos afectados y revisa `git status`. Hay modificaciones locales pendientes en varias pantallas Flutter; no las reviertas ni las sobrescribas sin entenderlas.
+
+Despues de cada cambio funcional:
+
+1. Ejecuta una validacion enfocada.
+2. Ejecuta `flutter analyze` o compilacion backend segun corresponda.
+3. Ejecuta los tests disponibles.
+4. Haz `git add`, `git commit` y `git push` a `origin/main`, excepto si hay cambios ajenos sin resolver que puedan entrar en el commit.
+5. Nunca incluyas `.env`, contrasenas, claves API ni tokens.
+
+## Arquitectura
+
+- `backend/`: FastAPI + Python 3.11.
+- `mobile_app/`: Flutter/Dart para Android y Web.
+- `database/supabase_schema.sql`: esquema idempotente de Supabase.
+- `backend/scripts/migrate_supabase.py`: aplica el esquema mediante PostgreSQL usando `DATABASE_URL`.
+- `docker/`: configuracion local opcional.
+- Supabase: Auth, PostgreSQL y Data API.
+- Gemini: generacion opcional de planes mediante el backend.
+
+## Backend
+
+Entrada: `backend/app/main.py`
+
+Rutas actuales:
+
+- `GET /health`
+- `GET /health/supabase`
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/plans/generate`
+- `POST /api/plans/feedback`
+- `POST /api/coach/chat`
+- `POST /api/workout/routine`
+- `POST /api/recalibration/evaluate`
+
+Entorno Python recomendado:
+
+```powershell
+cd C:\Users\Usuario\ai_fitness_coach\backend
+..\.venv\Scripts\python.exe -m pip install -r requirements.txt
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Dependencia importante: `supabase==2.31.0`, necesaria para claves modernas `sb_publishable_` y `sb_secret_`.
+
+## Supabase
+
+El esquema ya fue aplicado correctamente mediante el Session Pooler. Tablas verificadas:
+
+- `public.usuarios`
+- `public.aprendizaje_plan_anonimo`
+
+`usuarios` contiene perfil, alergias alimentarias, lesiones actuales, discapacidad motora y zonas a evitar.
+
+Para volver a aplicar migraciones:
+
+```powershell
+cd C:\Users\Usuario\ai_fitness_coach\backend
+..\.venv\Scripts\python.exe scripts\migrate_supabase.py
+```
+
+`.env` esta en la raiz y esta ignorado por Git. Nunca imprimir ni copiar sus valores a archivos rastreados.
+
+## Autenticacion
+
+La app usa cedula venezolana como identificador visible. El backend crea un correo tecnico valido para Supabase Auth:
+
+```text
+cedula.<cedula>@aifitnesscoach.app
+```
+
+El registro usa Auth Admin en el backend y guarda el perfil en `public.usuarios`. El login usa `sign_in_with_password`. La respuesta de errores ya distingue duplicado `409` de error de esquema `500`.
+
+Flutter persiste la sesion en `flutter_secure_storage` sin guardar la contrasena.
+
+## Planes IA
+
+`backend/app/routers/plans.py` acepta:
+
+- `goal`
+- `level`
+- `days_per_week`
+- `age`
+- `weight`
+- `health_notes`
+- `food_allergies`
+- `current_injuries`
+- `motor_disability`
+- `areas_to_avoid`
+- `learning_consent`
+
+Gemini se usa solo desde backend. Si falla o no esta configurado, responde un fallback seguro. El fallback conserva `constraints_applied` y no debe recomendar alimentos alergicos ni ejercicios que carguen zonas restringidas.
+
+El aprendizaje debe ser consentido y agregado. No uses textos medicos privados de un usuario para entrenar o revelar informacion a otro. `POST /api/plans/feedback` guarda solo categoria, calificacion, proveedor y resultado seguro cuando `learning_consent=true`.
+
+La clave de Gemini que esta localmente en `.env` fue compartida en conversaciones; antes de produccion debe rotarse.
+
+## Flutter Web y Brave
+
+Para ejecutar en Brave:
+
+Terminal 1:
+
+```powershell
+cd C:\Users\Usuario\ai_fitness_coach\backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Terminal 2:
+
+```powershell
+cd C:\Users\Usuario\ai_fitness_coach\mobile_app
+flutter pub get
+flutter build web --dart-define=API_BASE_URL=http://127.0.0.1:8000
+..\.venv\Scripts\python.exe -m http.server 52491 --bind 127.0.0.1 --directory build/web
+```
+
+Abrir:
+
+```text
+http://127.0.0.1:52491
+```
+
+El valor por defecto de Flutter Web es `http://127.0.0.1:8000`. Para Android emulator usa `--dart-define=API_BASE_URL=http://10.0.2.2:8000`. Para telefono fisico usa la IP LAN del PC.
+
+## Registro actual
+
+`mobile_app/lib/screens/auth/register_screen.dart` tiene:
+
+- Seccion visual de perfil.
+- Seccion de salud y adaptacion.
+- Chips para alergias, lesiones, discapacidad y zonas a evitar.
+- Enter o coma para agregar varias etiquetas.
+- Eliminacion individual de chips.
+- Correcciones locales como `nuezes -> Nueces`, `camarrones -> Camarones`, `lacteos -> Lacteos`.
+- Envio de etiquetas limpias al backend.
+
+La autocorreccion debe seguir siendo una ayuda, no una validacion medica. Para casos desconocidos, conserva el texto del usuario y permite corregirlo manualmente.
+
+## Validacion minima
+
+```powershell
+cd C:\Users\Usuario\ai_fitness_coach\backend
+..\.venv\Scripts\python.exe -m compileall -q app scripts
+
+cd ..\mobile_app
+flutter analyze
+flutter test
+```
+
+Pruebas verificadas recientemente:
+
+- Registro temporal Supabase: HTTP 200.
+- Login temporal Supabase: HTTP 200.
+- `GET /health/supabase`: `ok`, HTTP 200.
+- Flutter tests: todos aprobados.
+- Flutter Web build: correcto.
+
+## Trabajo prioritario siguiente
+
+1. Corregir y validar completamente el formulario de etiquetas en Web y Android.
+2. Agregar pantalla de detalle de ejercicio con demostracion 3D/GLB y `animation_key`.
+3. Persistir planes generados en Supabase por usuario.
+4. Agregar feedback consentido desde Flutter hacia `/api/plans/feedback`.
+5. Implementar refresco seguro de sesiones y logout remoto.
+6. Mejorar mensajes de error del login y registro.
+7. Agregar tests backend para Auth, planes, restricciones y feedback.
+8. No incorporar modelos 3D sin licencia; usar assets propios o con licencia compatible.
+
+## Estado Git al crear este documento
+
+El commit publicado mas reciente es `e792202 Add corrected health tags to registration`.
+Hay cambios locales no incluidos en ese commit en:
+
+- `mobile_app/analysis_options.yaml`
+- `mobile_app/lib/screens/auth/login_screen.dart`
+- `mobile_app/lib/screens/auth/register_screen.dart`
+- `mobile_app/lib/screens/coach_screen.dart`
+- `mobile_app/lib/screens/home_screen.dart`
+- `mobile_app/lib/screens/nutrition_screen.dart`
+- `mobile_app/lib/screens/progress_screen.dart`
+- `mobile_app/lib/screens/workouts_screen.dart`
+- `mobile_app/lib/services/auth_service.dart`
+- `mobile_app/lib/services/plan_service.dart`
+
+Cline debe revisar esos cambios antes de agruparlos en un commit. No usar `git reset --hard` ni `git checkout --`.
