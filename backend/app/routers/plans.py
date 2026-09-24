@@ -21,13 +21,16 @@ class PlanRequest(BaseModel):
 
 
 def _fallback_plan(payload: PlanRequest) -> dict:
+    avoids_lower = (payload.areas_to_avoid or "").lower()
+    injuries_lower = (payload.current_injuries or "").lower()
+    avoid_lower_body = any(term in f"{avoids_lower} {injuries_lower}" for term in ("tobillo", "rodilla", "cadera", "pierna"))
     sessions = [
         {"day": "Día 1", "title": "Fuerza total", "exercises": [
-            {"name": "Sentadilla con peso corporal", "sets": 3, "reps": "10", "animation_key": "bodyweight-squat"},
+            {"name": "Press de pecho en pared", "sets": 3, "reps": "10", "animation_key": "wall-chest-press"},
             {"name": "Flexiones inclinadas", "sets": 3, "reps": "8-12", "animation_key": "incline-push-up"},
         ]},
         {"day": "Día 2", "title": "Movilidad y core", "exercises": [
-            {"name": "Puente de glúteos", "sets": 3, "reps": "12", "animation_key": "glute-bridge"},
+            {"name": "Press de hombros sentado", "sets": 3, "reps": "10", "animation_key": "seated-shoulder-press"},
             {"name": "Plancha frontal", "sets": 3, "reps": "20-30 s", "animation_key": "front-plank"},
         ]},
     ]
@@ -40,8 +43,15 @@ def _fallback_plan(payload: PlanRequest) -> dict:
             {"title": "Desayuno", "items": ["Avena con yogur natural", "Fruta fresca", "Agua"]},
             {"title": "Almuerzo", "items": ["Proteína magra", "Arroz o tubérculo", "Ensalada variada"]},
             {"title": "Cena", "items": ["Proteína ligera", "Verduras", "Porción moderada de carbohidrato"]},
-            {"title": "Merienda", "items": ["Fruta", "Yogur o frutos secos sin sal"]},
+            {"title": "Merienda", "items": ["Fruta", "Yogur natural sin ingredientes alergénicos declarados"]},
         ],
+        "constraints_applied": {
+            "food_allergies": payload.food_allergies,
+            "current_injuries": payload.current_injuries,
+            "motor_disability": payload.motor_disability,
+            "areas_to_avoid": payload.areas_to_avoid,
+            "lower_body_restricted": avoid_lower_body,
+        },
         "safety_note": "Plan general orientativo. Suspende si aparece dolor y consulta a un profesional de salud.",
     }
 
