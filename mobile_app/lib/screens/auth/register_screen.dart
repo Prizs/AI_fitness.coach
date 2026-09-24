@@ -3,11 +3,7 @@ import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({
-    super.key,
-    required this.onRegisterSuccess,
-    required this.onBackToLogin,
-  });
+  const RegisterScreen({super.key, required this.onRegisterSuccess, required this.onBackToLogin});
 
   final VoidCallback onRegisterSuccess;
   final VoidCallback onBackToLogin;
@@ -18,298 +14,189 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _cedulaController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _ageController = TextEditingController();
-  final _weightController = TextEditingController();
-  final _notesController = TextEditingController();
-  final _foodAllergiesController = TextEditingController();
-  final _injuriesController = TextEditingController();
-  final _disabilityController = TextEditingController();
-  final _avoidAreasController = TextEditingController();
+  final _cedula = TextEditingController();
+  final _password = TextEditingController();
+  final _name = TextEditingController();
+  final _lastName = TextEditingController();
+  final _age = TextEditingController();
+  final _weight = TextEditingController();
+  final _notes = TextEditingController();
+  final _allergyInput = TextEditingController();
+  final _injuryInput = TextEditingController();
+  final _disabilityInput = TextEditingController();
+  final _avoidInput = TextEditingController();
+  final _allergies = <String>[];
+  final _injuries = <String>[];
+  final _disabilities = <String>[];
+  final _avoidAreas = <String>[];
   bool _isLoading = false;
 
-  bool _containsEmoji(String value) {
-    return RegExp(
-      r'[\u{1F300}-\u{1FAFF}\u2600-\u27BF]',
-      unicode: true,
-    ).hasMatch(value);
+  static const _corrections = <String, String>{
+    'nuezes': 'nueces',
+    'nuez': 'nueces',
+    'camarrones': 'camarones',
+    'camaron': 'camarones',
+    'lacteo': 'lácteos',
+    'lacteos': 'lácteos',
+    'tobillo ': 'tobillo',
+    'rodilla ': 'rodilla',
+  };
+
+  String _correct(String value) {
+    final clean = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (clean.isEmpty) return clean;
+    final corrected = _corrections[clean.toLowerCase()] ?? clean;
+    return corrected[0].toUpperCase() + corrected.substring(1);
   }
 
-  String? _validateName(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Este campo es obligatorio';
-    }
-    if (_containsEmoji(value)) {
-      return 'No se permiten emojis';
-    }
-    if (!RegExp(r'^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$').hasMatch(value.trim())) {
-      return 'Solo se permiten letras, espacios, tildes y ñ';
-    }
-    return null;
+  void _addTags(TextEditingController input, List<String> target) {
+    final values = input.text.split(',').map(_correct).where((value) => value.isNotEmpty);
+    setState(() {
+      for (final value in values) {
+        if (!target.any((item) => item.toLowerCase() == value.toLowerCase())) target.add(value);
+      }
+      input.clear();
+    });
   }
 
-  String? _validateCedula(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'La cédula es obligatoria';
-    }
-    final clean = value.trim();
-    if (!RegExp(r'^\d{6,9}$').hasMatch(clean)) {
-      return 'Debe ser una cédula venezolana válida';
-    }
-    return null;
+  String _join(List<String> values) => values.join(', ');
+
+  String? _required(String? value) => value == null || value.trim().isEmpty ? 'Este campo es obligatorio' : null;
+
+  String? _nameValidator(String? value) {
+    if (_required(value) != null) return _required(value);
+    return RegExp(r'^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$').hasMatch(value!.trim()) ? null : 'Solo se permiten letras y espacios';
   }
 
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'La contraseña es obligatoria';
-    }
-    if (value.length < 8) {
-      return 'La contraseña debe tener mínimo 8 caracteres';
-    }
-    if (_containsEmoji(value)) {
-      return 'No se permiten emojis';
-    }
-    return null;
+  String? _cedulaValidator(String? value) => value != null && RegExp(r'^\d{6,9}$').hasMatch(value.trim()) ? null : 'Cédula de 6 a 9 dígitos';
+  String? _passwordValidator(String? value) => value != null && value.length >= 8 ? null : 'Mínimo 8 caracteres';
+  String? _ageValidator(String? value) {
+    final parsed = int.tryParse(value?.trim() ?? '');
+    return parsed != null && parsed >= 12 && parsed <= 100 ? null : 'Edad entre 12 y 100 años';
+  }
+  String? _weightValidator(String? value) {
+    final parsed = double.tryParse(value?.trim() ?? '');
+    return parsed != null && parsed > 0 && parsed <= 300 ? null : 'Ingrese un peso válido';
   }
 
-  String? _validateAge(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'La edad es obligatoria';
-    }
-    final parsed = int.tryParse(value.trim());
-    if (parsed == null || parsed < 12 || parsed > 100) {
-      return 'Ingrese una edad válida entre 12 y 100 años';
-    }
-    return null;
-  }
-
-  String? _validateWeight(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'El peso es obligatorio';
-    }
-    final parsed = double.tryParse(value.trim());
-    if (parsed == null || parsed <= 0 || parsed > 300) {
-      return 'Ingrese un peso válido';
-    }
-    return null;
-  }
-
-  String? _validateOptionalNotes(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return null;
-    }
-    if (_containsEmoji(value)) {
-      return 'No se permiten emojis';
-    }
-    if (!RegExp(r'^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9 ,./-]+$').hasMatch(value.trim())) {
-      return 'Solo se permiten letras, números y caracteres básicos';
-    }
-    return null;
-  }
+  InputDecoration _decoration(String label, IconData icon) => InputDecoration(
+    labelText: label,
+    prefixIcon: Icon(icon),
+    filled: true,
+    fillColor: const Color(0xFF101B2D),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+  );
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    if (!_formKey.currentState!.validate()) return;
+    _addTags(_allergyInput, _allergies);
+    _addTags(_injuryInput, _injuries);
+    _addTags(_disabilityInput, _disabilities);
+    _addTags(_avoidInput, _avoidAreas);
+    setState(() => _isLoading = true);
     final profile = UserProfile(
-      cedula: _cedulaController.text.trim(),
-      password: _passwordController.text,
-      name: _nameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      age: int.parse(_ageController.text.trim()),
-      weight: double.parse(_weightController.text.trim()),
-      pathologyOrAllergies: _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
-      foodAllergies: _foodAllergiesController.text.trim().isEmpty
-          ? null
-          : _foodAllergiesController.text.trim(),
-      currentInjuries: _injuriesController.text.trim().isEmpty
-          ? null
-          : _injuriesController.text.trim(),
-      motorDisability: _disabilityController.text.trim().isEmpty
-          ? null
-          : _disabilityController.text.trim(),
-      areasToAvoid: _avoidAreasController.text.trim().isEmpty
-          ? null
-          : _avoidAreasController.text.trim(),
+      cedula: _cedula.text.trim(),
+      password: _password.text,
+      name: _name.text.trim(),
+      lastName: _lastName.text.trim(),
+      age: int.parse(_age.text.trim()),
+      weight: double.parse(_weight.text.trim()),
+      pathologyOrAllergies: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+      foodAllergies: _join(_allergies),
+      currentInjuries: _join(_injuries),
+      motorDisability: _join(_disabilities),
+      areasToAvoid: _join(_avoidAreas),
     );
-
     final registered = await AuthService.instance.register(profile);
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _isLoading = false;
-    });
+    if (!mounted) return;
+    setState(() => _isLoading = false);
     if (!registered) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AuthService.instance.lastError ?? 'Error de registro.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AuthService.instance.lastError ?? 'Error de registro.')));
       return;
     }
-
     widget.onRegisterSuccess();
+  }
+
+  @override
+  void dispose() {
+    for (final controller in [_cedula, _password, _name, _lastName, _age, _weight, _notes, _allergyInput, _injuryInput, _disabilityInput, _avoidInput]) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              children: [
-                const SizedBox(height: 20),
-                const Text(
-                  'Crear cuenta',
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Completa tus datos para iniciar tu plan personalizado.',
-                  style: TextStyle(fontSize: 15, color: Colors.white70),
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _cedulaController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Cédula venezolana',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateCedula,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Contraseña',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validatePassword,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateName,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _lastNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Apellido',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateName,
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _ageController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Edad',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: _validateAge,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _weightController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Peso (kg)',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: _validateWeight,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _notesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Patología o alergias (opcional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateOptionalNotes,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _foodAllergiesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Alergias alimentarias (opcional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateOptionalNotes,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _injuriesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Lesiones o dolor actual (opcional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateOptionalNotes,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _disabilityController,
-                  decoration: const InputDecoration(
-                    labelText: 'Deficiencia o discapacidad motora (opcional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateOptionalNotes,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _avoidAreasController,
-                  decoration: const InputDecoration(
-                    labelText: 'Zonas a evitar temporalmente (opcional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateOptionalNotes,
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: _isLoading ? null : _submit,
-                  icon: const Icon(Icons.person_add_rounded),
-                  label: Text(_isLoading ? 'Creando cuenta...' : 'Registrarme'),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: widget.onBackToLogin,
-                  child: const Text('Ya tengo cuenta. Iniciar sesión'),
-                ),
-              ],
-            ),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+            children: [
+              _hero(),
+              const SizedBox(height: 18),
+              _section('Tu perfil', Icons.person_outline_rounded, [
+                TextFormField(controller: _cedula, keyboardType: TextInputType.number, decoration: _decoration('Cédula venezolana', Icons.badge_outlined), validator: _cedulaValidator),
+                const SizedBox(height: 12),
+                TextFormField(controller: _password, obscureText: true, decoration: _decoration('Contraseña', Icons.lock_outline_rounded), validator: _passwordValidator),
+                const SizedBox(height: 12),
+                Row(children: [Expanded(child: TextFormField(controller: _name, decoration: _decoration('Nombre', Icons.person_outline), validator: _nameValidator)), const SizedBox(width: 10), Expanded(child: TextFormField(controller: _lastName, decoration: _decoration('Apellido', Icons.person_outline), validator: _nameValidator))]),
+                const SizedBox(height: 12),
+                Row(children: [Expanded(child: TextFormField(controller: _age, keyboardType: TextInputType.number, decoration: _decoration('Edad', Icons.cake_outlined), validator: _ageValidator)), const SizedBox(width: 10), Expanded(child: TextFormField(controller: _weight, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _decoration('Peso kg', Icons.monitor_weight_outlined), validator: _weightValidator))]),
+              ]),
+              const SizedBox(height: 14),
+              _section('Salud y adaptación', Icons.accessibility_new_rounded, [
+                TextFormField(controller: _notes, maxLines: 2, decoration: _decoration('Patología o alergias generales', Icons.health_and_safety_outlined)),
+                const SizedBox(height: 12),
+                _TagField(label: 'Alergias alimentarias', hint: 'camarones, nuezes + Enter', icon: Icons.no_food_rounded, controller: _allergyInput, tags: _allergies, onAdd: () => _addTags(_allergyInput, _allergies), onRemove: (tag) => setState(() => _allergies.remove(tag))),
+                const SizedBox(height: 12),
+                _TagField(label: 'Lesiones o dolor actual', hint: 'tobillo derecho + Enter', icon: Icons.healing_rounded, controller: _injuryInput, tags: _injuries, onAdd: () => _addTags(_injuryInput, _injuries), onRemove: (tag) => setState(() => _injuries.remove(tag))),
+                const SizedBox(height: 12),
+                _TagField(label: 'Discapacidad o limitación motora', hint: 'movilidad reducida + Enter', icon: Icons.accessible_rounded, controller: _disabilityInput, tags: _disabilities, onAdd: () => _addTags(_disabilityInput, _disabilities), onRemove: (tag) => setState(() => _disabilities.remove(tag))),
+                const SizedBox(height: 12),
+                _TagField(label: 'Zonas a evitar temporalmente', hint: 'rodilla, saltos + Enter', icon: Icons.block_rounded, controller: _avoidInput, tags: _avoidAreas, onAdd: () => _addTags(_avoidInput, _avoidAreas), onRemove: (tag) => setState(() => _avoidAreas.remove(tag))),
+              ]),
+              const SizedBox(height: 20),
+              FilledButton.icon(onPressed: _isLoading ? null : _submit, icon: const Icon(Icons.person_add_alt_1_rounded), label: Text(_isLoading ? 'Creando cuenta...' : 'Crear mi perfil')),
+              const SizedBox(height: 8),
+              TextButton(onPressed: widget.onBackToLogin, child: const Text('Ya tengo cuenta. Iniciar sesión')),
+            ],
           ),
         ),
       ),
     );
   }
+
+  Widget _hero() => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(color: const Color(0xFF173B45), borderRadius: BorderRadius.circular(24)),
+    child: Row(children: [Container(width: 64, height: 64, decoration: BoxDecoration(color: const Color(0xFF8BE0C0), borderRadius: BorderRadius.circular(20)), child: const Icon(Icons.fitness_center_rounded, color: Color(0xFF0B1220), size: 34)), const SizedBox(width: 16), const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Tu plan empieza aquí', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w800)), SizedBox(height: 5), Text('Cuéntanos cómo cuidarte mejor.', style: TextStyle(color: Colors.white70))]))]),
+  );
+
+  Widget _section(String title, IconData icon, List<Widget> children) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(color: const Color(0xFF0F192B), borderRadius: BorderRadius.circular(22), border: Border.all(color: Colors.white10)),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Icon(icon, color: const Color(0xFF8BE0C0)), const SizedBox(width: 8), Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))]), const SizedBox(height: 14), ...children]),
+  );
+}
+
+class _TagField extends StatelessWidget {
+  const _TagField({required this.label, required this.hint, required this.icon, required this.controller, required this.tags, required this.onAdd, required this.onRemove});
+  final String label;
+  final String hint;
+  final IconData icon;
+  final TextEditingController controller;
+  final List<String> tags;
+  final VoidCallback onAdd;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) => InputDecorator(
+    decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon), filled: true, fillColor: const Color(0xFF101B2D), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+    child: Wrap(spacing: 6, runSpacing: 4, children: [
+      ...tags.map((tag) => Chip(label: Text(tag), deleteIcon: const Icon(Icons.close, size: 16), onDeleted: () => onRemove(tag))),
+      SizedBox(width: 190, child: TextField(controller: controller, textInputAction: TextInputAction.done, onSubmitted: (_) => onAdd(), decoration: InputDecoration(hintText: hint, border: InputBorder.none, suffixIcon: IconButton(onPressed: onAdd, icon: const Icon(Icons.add_rounded))))),
+    ]),
+  );
 }
