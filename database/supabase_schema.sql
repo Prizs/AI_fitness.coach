@@ -9,6 +9,10 @@ create table if not exists public.usuarios (
     edad integer not null check (edad between 12 and 100),
     peso numeric(5,2) not null check (peso > 0),
     patologia_o_alergias text,
+    alergias_alimentarias text,
+    lesiones_actuales text,
+    discapacidad_motora text,
+    zonas_a_evitar text,
     activo boolean not null default true,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
@@ -39,3 +43,8 @@ create index if not exists idx_usuarios_cedula on public.usuarios(cedula);
 
 grant usage on schema public to authenticated;
 grant select, insert, update on public.usuarios to authenticated;
+
+alter table public.usuarios add column if not exists alergias_alimentarias text;
+alter table public.usuarios add column if not exists lesiones_actuales text;
+alter table public.usuarios add column if not exists discapacidad_motora text;
+alter table public.usuarios add column if not exists zonas_a_evitar text;

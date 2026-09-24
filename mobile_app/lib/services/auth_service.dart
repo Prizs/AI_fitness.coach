@@ -36,6 +36,10 @@ class AuthService {
       age: age,
       weight: weight,
       pathologyOrAllergies: await _storage.read(key: 'health_notes'),
+      foodAllergies: await _storage.read(key: 'food_allergies'),
+      currentInjuries: await _storage.read(key: 'current_injuries'),
+      motorDisability: await _storage.read(key: 'motor_disability'),
+      areasToAvoid: await _storage.read(key: 'areas_to_avoid'),
     );
     return true;
   }
@@ -54,6 +58,10 @@ class AuthService {
           'edad': profile.age,
           'peso': profile.weight,
           'patologia_o_alergias': profile.pathologyOrAllergies,
+          'alergias_alimentarias': profile.foodAllergies,
+          'lesiones_actuales': profile.currentInjuries,
+          'discapacidad_motora': profile.motorDisability,
+          'zonas_a_evitar': profile.areasToAvoid,
         }),
       );
     } on Exception {
@@ -98,6 +106,10 @@ class AuthService {
       age: user['edad'] as int? ?? 0,
       weight: (user['peso'] as num?)?.toDouble() ?? 0,
       pathologyOrAllergies: user['patologia_o_alergias'] as String?,
+      foodAllergies: user['alergias_alimentarias'] as String?,
+      currentInjuries: user['lesiones_actuales'] as String?,
+      motorDisability: user['discapacidad_motora'] as String?,
+      areasToAvoid: user['zonas_a_evitar'] as String?,
     );
     await _saveSession(loggedInUser!.cedula, accessToken);
     return true;
@@ -114,6 +126,10 @@ class AuthService {
       await _storage.write(key: 'age', value: profile.age.toString());
       await _storage.write(key: 'weight', value: profile.weight.toString());
       await _storage.write(key: 'health_notes', value: profile.pathologyOrAllergies);
+      await _storage.write(key: 'food_allergies', value: profile.foodAllergies);
+      await _storage.write(key: 'current_injuries', value: profile.currentInjuries);
+      await _storage.write(key: 'motor_disability', value: profile.motorDisability);
+      await _storage.write(key: 'areas_to_avoid', value: profile.areasToAvoid);
     }
   }
 

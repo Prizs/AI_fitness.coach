@@ -20,6 +20,10 @@ class RegisterRequest(BaseModel):
     edad: int = Field(..., ge=12, le=100)
     peso: float = Field(..., gt=0, le=300)
     patologia_o_alergias: str | None = Field(default=None, max_length=1000)
+    alergias_alimentarias: str | None = Field(default=None, max_length=1000)
+    lesiones_actuales: str | None = Field(default=None, max_length=1000)
+    discapacidad_motora: str | None = Field(default=None, max_length=1000)
+    zonas_a_evitar: str | None = Field(default=None, max_length=500)
 
 
 class LoginRequest(BaseModel):
@@ -72,6 +76,10 @@ def register(payload: RegisterRequest):
             "edad": payload.edad,
             "peso": payload.peso,
             "patologia_o_alergias": payload.patologia_o_alergias,
+            "alergias_alimentarias": payload.alergias_alimentarias,
+            "lesiones_actuales": payload.lesiones_actuales,
+            "discapacidad_motora": payload.discapacidad_motora,
+            "zonas_a_evitar": payload.zonas_a_evitar,
         }
         admin_client.table("usuarios").insert(profile).execute()
         return _session_response(auth_response, profile)
@@ -96,7 +104,7 @@ def login(payload: LoginRequest):
         )
         profile_result = (
             admin_client.table("usuarios")
-            .select("id, cedula, nombre, apellido, edad, peso, patologia_o_alergias")
+            .select("id, cedula, nombre, apellido, edad, peso, patologia_o_alergias, alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar")
             .eq("id", auth_response.user.id)
             .single()
             .execute()

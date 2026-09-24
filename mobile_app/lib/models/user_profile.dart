@@ -7,6 +7,10 @@ class UserProfile {
     required this.age,
     required this.weight,
     this.pathologyOrAllergies,
+    this.foodAllergies,
+    this.currentInjuries,
+    this.motorDisability,
+    this.areasToAvoid,
   });
 
   final String cedula;
@@ -16,4 +20,8 @@ class UserProfile {
   final int age;
   final double weight;
   final String? pathologyOrAllergies;
+  final String? foodAllergies;
+  final String? currentInjuries;
+  final String? motorDisability;
+  final String? areasToAvoid;
 }

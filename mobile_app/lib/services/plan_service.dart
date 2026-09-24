@@ -19,6 +19,10 @@ class PlanService {
           'age': profile.age,
           'weight': profile.weight,
           'health_notes': profile.pathologyOrAllergies,
+          'food_allergies': profile.foodAllergies,
+          'current_injuries': profile.currentInjuries,
+          'motor_disability': profile.motorDisability,
+          'areas_to_avoid': profile.areasToAvoid,
         }),
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {

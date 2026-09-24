@@ -25,6 +25,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _ageController = TextEditingController();
   final _weightController = TextEditingController();
   final _notesController = TextEditingController();
+  final _foodAllergiesController = TextEditingController();
+  final _injuriesController = TextEditingController();
+  final _disabilityController = TextEditingController();
+  final _avoidAreasController = TextEditingController();
   bool _isLoading = false;
 
   bool _containsEmoji(String value) {
@@ -123,6 +127,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       pathologyOrAllergies: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
+        foodAllergies: _foodAllergiesController.text.trim().isEmpty
+          ? null
+          : _foodAllergiesController.text.trim(),
+        currentInjuries: _injuriesController.text.trim().isEmpty
+          ? null
+          : _injuriesController.text.trim(),
+        motorDisability: _disabilityController.text.trim().isEmpty
+          ? null
+          : _disabilityController.text.trim(),
+        areasToAvoid: _avoidAreasController.text.trim().isEmpty
+          ? null
+          : _avoidAreasController.text.trim(),
     );
 
     final registered = await AuthService.instance.register(profile);
@@ -244,6 +260,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   maxLines: 3,
                   decoration: const InputDecoration(
                     labelText: 'Patología o alergias (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: _validateOptionalNotes,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _foodAllergiesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Alergias alimentarias (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: _validateOptionalNotes,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _injuriesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Lesiones o dolor actual (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: _validateOptionalNotes,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _disabilityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Deficiencia o discapacidad motora (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: _validateOptionalNotes,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _avoidAreasController,
+                  decoration: const InputDecoration(
+                    labelText: 'Zonas a evitar temporalmente (opcional)',
                     border: OutlineInputBorder(),
                   ),
                   validator: _validateOptionalNotes,
