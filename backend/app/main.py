@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, coach, workouts, recalibration
+from app.routers import auth, coach, plans, workouts, recalibration
 from app.services.supabase_service import check_supabase_connection
 
 app = FastAPI(
@@ -20,6 +20,7 @@ app.add_middleware(
 
 app.include_router(coach.router, prefix="/api/coach", tags=["coach"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(plans.router, prefix="/api/plans", tags=["plans"])
 app.include_router(workouts.router, prefix="/api/workout", tags=["workout"])
 app.include_router(recalibration.router, prefix="/api/recalibration", tags=["recalibration"])
 

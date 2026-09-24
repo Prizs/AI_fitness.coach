@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile_app/models/user_profile.dart';
 
 class AuthService {
@@ -15,6 +16,29 @@ class AuthService {
 
   UserProfile? loggedInUser;
   String? accessToken;
+  final _storage = const FlutterSecureStorage();
+
+  Future<bool> restoreSession() async {
+    final cedula = await _storage.read(key: 'cedula');
+    final token = await _storage.read(key: 'access_token');
+    final name = await _storage.read(key: 'name');
+    final lastName = await _storage.read(key: 'last_name');
+    final age = int.tryParse(await _storage.read(key: 'age') ?? '');
+    final weight = double.tryParse(await _storage.read(key: 'weight') ?? '');
+    if (cedula == null || token == null || name == null || lastName == null || age == null || weight == null) {
+      return false;
+    }
+    accessToken = token;
+    loggedInUser = UserProfile(
+      cedula: cedula,
+      name: name,
+      lastName: lastName,
+      age: age,
+      weight: weight,
+      pathologyOrAllergies: await _storage.read(key: 'health_notes'),
+    );
+    return true;
+  }
 
   Future<bool> register(UserProfile profile) async {
     late final http.Response response;
@@ -43,6 +67,7 @@ class AuthService {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     accessToken = data['access_token'] as String?;
     loggedInUser = profile;
+    await _saveSession(profile.cedula, accessToken);
     return true;
   }
 
@@ -74,11 +99,27 @@ class AuthService {
       weight: (user['peso'] as num?)?.toDouble() ?? 0,
       pathologyOrAllergies: user['patologia_o_alergias'] as String?,
     );
+    await _saveSession(loggedInUser!.cedula, accessToken);
     return true;
+  }
+
+  Future<void> _saveSession(String cedula, String? token) async {
+    if (token == null) return;
+    await _storage.write(key: 'cedula', value: cedula);
+    await _storage.write(key: 'access_token', value: token);
+    final profile = loggedInUser;
+    if (profile != null) {
+      await _storage.write(key: 'name', value: profile.name);
+      await _storage.write(key: 'last_name', value: profile.lastName);
+      await _storage.write(key: 'age', value: profile.age.toString());
+      await _storage.write(key: 'weight', value: profile.weight.toString());
+      await _storage.write(key: 'health_notes', value: profile.pathologyOrAllergies);
+    }
   }
 
   void logout() {
     loggedInUser = null;
     accessToken = null;
+    _storage.deleteAll();
   }
 }

@@ -44,6 +44,16 @@ class _AuthGateState extends State<AuthGate> {
   bool _showLogin = true;
   bool _isAuthenticated = false;
 
+  @override
+  void initState() {
+    super.initState();
+    AuthService.instance.restoreSession().then((restored) {
+      if (mounted && restored) {
+        setState(() => _isAuthenticated = true);
+      }
+    });
+  }
+
   void _handleLoginSuccess() {
     setState(() {
       _isAuthenticated = true;

@@ -1,7 +1,7 @@
 class UserProfile {
   UserProfile({
     required this.cedula,
-    required this.password,
+    this.password = '',
     required this.name,
     required this.lastName,
     required this.age,
