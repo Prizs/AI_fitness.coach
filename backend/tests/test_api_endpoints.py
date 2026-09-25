@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.routers.plans import _normalize_meals, _normalize_sessions
@@ -87,3 +88,77 @@ def test_normalize_meals_accepts_dict_and_list_forms():
     )
     assert from_list[0] == {"title": "Almuerzo", "items": ["Pollo con arroz"]}
     assert from_list[1] == {"title": "Cena", "items": ["Sopa"]}
+
+
+AI_KEY_ENVS = (
+    "GEMINI_API_KEY",
+    "GROQ_API_KEY",
+    "OPENROUTER_API_KEY",
+    "MISTRAL_API_KEY",
+)
+
+
+def _clear_ai_keys(monkeypatch):
+    for name in AI_KEY_ENVS:
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_ai_health_reports_provider_order():
+    response = client.get("/health/ai")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["attempt_order"] == ["gemini", "groq", "openrouter", "mistral"]
+    assert isinstance(data["configured_providers"], list)
+    assert data["available"] == bool(data["configured_providers"])
+
+
+def test_configured_providers_follows_env(monkeypatch):
+    from app.services import ai_providers
+
+    _clear_ai_keys(monkeypatch)
+    assert ai_providers.configured_providers() == []
+
+    monkeypatch.setenv("GROQ_API_KEY", "clave-de-prueba")
+    monkeypatch.setenv("GEMINI_API_KEY", "clave-de-prueba")
+    assert ai_providers.configured_providers() == ["gemini", "groq"]
+
+
+def test_generate_json_text_without_providers_fails(monkeypatch):
+    from app.services import ai_providers
+
+    _clear_ai_keys(monkeypatch)
+    with pytest.raises(ai_providers.AllProvidersFailed):
+        ai_providers.generate_json_text("hola")
+
+
+def test_coach_returns_503_when_no_providers(monkeypatch):
+    _clear_ai_keys(monkeypatch)
+    response = client.post("/api/coach/chat", json={"message": "hola"})
+    assert response.status_code == 503
+    assert "proveedor" in response.json()["detail"].lower()
+
+
+def test_coach_accepts_history_and_health_profile():
+    """El contrato de entrada debe validar historial y restricciones."""
+    payload = {
+        "message": "Ajusta la rutina",
+        "history": [
+            {"role": "user", "content": "Quiero resistencia"},
+            {"role": "assistant", "content": "Propongo intervalos"},
+        ],
+        "injuries": "rodilla derecha",
+        "motor_disability": "ninguna",
+        "areas_to_avoid": "hombro",
+        "rpe_feedback": 7,
+    }
+    _clear_ai_keys(_FakeEnv())
+    response = client.post("/api/coach/chat", json=payload)
+    # Sin proveedores configurados falla con 503, pero nunca con 422 de validacion.
+    assert response.status_code == 503
+
+
+class _FakeEnv:
+    def delenv(self, name, raising=True):
+        import os
+
+        os.environ.pop(name, None)

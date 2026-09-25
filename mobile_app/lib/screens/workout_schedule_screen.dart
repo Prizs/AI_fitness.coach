@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/models/schedule_models.dart';
+import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
 
 class WorkoutScheduleScreen extends StatefulWidget {
   const WorkoutScheduleScreen({super.key});
@@ -379,24 +380,18 @@ class _Interactive3DViewer extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A101D),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF173B45)),
-            ),
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.view_in_ar_rounded, size: 64, color: Color(0xFF8BE0C0)),
-                  SizedBox(height: 8),
-                  Text('Vista 360° Rotativa y Zoom Táctil Activos', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                  Text('Tempo Sugerido: 3s Excéntrico - 1s Isometría - 1s Concéntrico', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                ],
-              ),
-            ),
+          Exercise3DViewer(
+            animationKey: exercise.animationKey,
+            primaryMuscle: exercise.primaryMuscle,
+            secondaryMuscle: exercise.secondaryMuscle,
+            height: 300,
+            showMuscleLegend: false,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Tempo sugerido: 3s excéntrico - 1s isometría - 1s concéntrico',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white54, fontSize: 11),
           ),
           const SizedBox(height: 16),
           FilledButton(

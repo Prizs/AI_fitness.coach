@@ -9,15 +9,60 @@ class AuthService {
 
   static final AuthService instance = AuthService._internal();
 
-  static const apiBaseUrl = String.fromEnvironment(
+  /// Valor incluido al compilar con `--dart-define=API_BASE_URL=...`.
+  static const String compiledApiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://127.0.0.1:8000',
   );
+
+  static const String _serverKey = 'api_base_url';
+
+  static String _apiBaseUrl = compiledApiBaseUrl;
+
+  /// URL base efectiva. Puede cambiarse en tiempo de ejecucion desde la app,
+  /// de modo que un mismo APK sirva para varias redes o telefonos.
+  static String get apiBaseUrl => _apiBaseUrl;
+
+  static set apiBaseUrl(String value) => _apiBaseUrl = normalizeBaseUrl(value);
+
+  /// Normaliza una URL escrita por el usuario (http/https, sin barra final).
+  static String normalizeBaseUrl(String raw) {
+    var url = raw.trim();
+    if (url.isEmpty) return compiledApiBaseUrl;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'http://$url';
+    }
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    return url;
+  }
 
   UserProfile? loggedInUser;
   String? accessToken;
   String? lastError;
   final _storage = const FlutterSecureStorage();
+
+  /// Carga la URL del servidor guardada en el dispositivo, si existe.
+  Future<void> loadServerConfig() async {
+    try {
+      final stored = await _storage.read(key: _serverKey);
+      if (stored != null && stored.trim().isNotEmpty) {
+        _apiBaseUrl = stored;
+      }
+    } on Exception {
+      // En Web el almacenamiento seguro puede no estar disponible.
+    }
+  }
+
+  Future<void> saveServerConfig(String value) async {
+    _apiBaseUrl = normalizeBaseUrl(value);
+    try {
+      await _storage.write(key: _serverKey, value: _apiBaseUrl);
+    } on Exception {
+      // Se mantiene solo en memoria durante la sesion.
+    }
+  }
 
   Future<bool> restoreSession() async {
     final cedula = await _storage.read(key: 'cedula');

@@ -48,8 +48,7 @@ class _CoachScreenState extends State<CoachScreen> {
         .toList();
 
     try {
-      final baseUrl = const String.fromEnvironment('API_BASE_URL',
-          defaultValue: 'http://127.0.0.1:8000');
+      final baseUrl = AuthService.apiBaseUrl;
       final profile = AuthService.instance.loggedInUser;
       final response = await http
           .post(

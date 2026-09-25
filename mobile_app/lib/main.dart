@@ -9,7 +9,10 @@ import 'package:mobile_app/screens/workouts_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 
 void main() {
-  runApp(const AiFitnessCoachApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  AuthService.instance.loadServerConfig().then((_) {
+    runApp(const AiFitnessCoachApp());
+  });
 }
 
 class AiFitnessCoachApp extends StatelessWidget {

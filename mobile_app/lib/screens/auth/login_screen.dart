@@ -90,6 +90,53 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
 
+  /// Permite cambiar la direccion del backend sin reinstalar la app, util
+  /// cuando el mismo APK se instala en varios telefonos con redes distintas.
+  Future<void> _editServer() async {
+    final controller = TextEditingController(text: AuthService.apiBaseUrl);
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Dirección del servidor'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                hintText: 'http://192.168.1.10:8000',
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'En un telefono real usa la IP local de tu computadora, '
+              'por ejemplo http://192.168.1.10:8000',
+              style: TextStyle(fontSize: 12, color: Colors.white54),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (saved == null) return;
+    await AuthService.instance.saveServerConfig(saved);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Servidor actualizado: ${AuthService.apiBaseUrl}')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -226,6 +273,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: widget.onGoToRegister,
                     icon: const Icon(Icons.person_add_alt_1_rounded),
                     label: const Text('¿No tienes cuenta? Regístrate aquí'),
+                  ),
+                  const SizedBox(height: 4),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _editServer,
+                      icon: const Icon(Icons.dns_rounded, size: 16),
+                      label: Text(
+                        'Servidor: ${AuthService.apiBaseUrl}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),

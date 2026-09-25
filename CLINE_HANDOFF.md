@@ -220,6 +220,72 @@ Validacion ejecutada:
 - Conversacion real con Gemini: turno 1 HTTP 200 con `provider=gemini` y plan con 3
   ejercicios; el turno 2 inmediato devuelve 429 por cuota del tier gratuito.
 
+## IA multi-proveedor con failover (2026-09-25, segunda tanda)
+
+`backend/app/services/ai_providers.py` centraliza las llamadas de IA. Intenta los
+proveedores configurados en este orden y se detiene en el primero que responda:
+
+| Orden | Proveedor | Variable | Tier gratuito (sin tarjeta) |
+| --- | --- | --- | --- |
+| 1 | Google Gemini | `GEMINI_API_KEY` | Buena calidad; cuota por proyecto en AI Studio |
+| 2 | Groq | `GROQ_API_KEY` | 30 RPM, 1000 RPD, 200k tokens/dia |
+| 3 | OpenRouter | `OPENROUTER_API_KEY` | ~20 modelos `:free` |
+| 4 | Mistral | `MISTRAL_API_KEY` | Modo gratuito con topes por proyecto |
+
+- Todos son accesibles desde Venezuela y no exigen tarjeta.
+- Groq y OpenRouter son la mejor combinacion con Gemini: cada uno tiene su propia
+  cuota, asi que la capacidad total se suma y los cortes por cuota desaparecen.
+- Si todos fallan se lanza `AllProvidersFailed` y la API responde 503 con un
+  mensaje claro. Nunca se simula una respuesta de IA.
+- Diagnostico: `GET /health/ai` devuelve los proveedores configurados y el orden.
+- Si Gemini agota cuota y no hay mas claves, la app sigue arrancando con el plan
+  local seguro de `plans.py` (rutinas y nutricin no se rompen).
+
+Recomendacion: registrar al menos `GROQ_API_KEY` y `OPENROUTER_API_KEY` para
+eliminar los errores intermitentes.
+
+## Visor 3D real en movil
+
+`mobile_app/lib/widgets/exercise_3d_viewer.dart` sustituye a los animadores falsos.
+
+- Motor 3D propio en Dart puro: rotacion por matrices, proyeccion en perspectiva,
+  orden por profundidad y sombreado por distancia.
+- Esqueleto humanoide de 16 articulaciones con poses por ejercicio: sentadilla,
+  flexion, plancha, press de banca, remo, kettlebell swing, caminata y generica.
+- Interaccion: giro automatico, arrastre con un dedo y zoom con pinza de dos.
+- Resalta en rojo el musculo agonista y en ambar el sinergista, leyendo
+  `primary_muscle` y `secondary_muscle` del plan generado por la IA.
+- Sin WebView, sin OpenGL, sin assets y sin licencias de modelos 3D: funciona en
+  cualquier Android, desde telefonos gama baja hasta los mas recientes.
+- Se usa en `workouts_screen.dart` y `workout_schedule_screen.dart`.
+
+## Servidor configurable desde la app
+
+- `AuthService.apiBaseUrl` paso a ser dinamico (antes era una constante).
+- El valor por defecto sigue siendo `--dart-define=API_BASE_URL=...`, pero ahora
+  la pantalla de login muestra `Servidor: <url>` y permite cambiarlo.
+- Se guarda con `flutter_secure_storage`, de modo que un mismo APK funciona en
+  varios telefonos y redes sin recompilar.
+- El backend debe escuchar en `0.0.0.0` para ser alcanzable desde el movil:
+  `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+
+## Compilar el APK para telefonos Android
+
+```powershell
+cd C:\Users\Usuario\ai_fitness_coach\backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+cd C:\Users\Usuario\ai_fitness_coach\mobile_app
+flutter build apk --release --dart-define=API_BASE_URL=http://<IP-LOCAL>:8000
+```
+
+El APK queda en `mobile_app/build/app/outputs/flutter-apk/app-release.apk` y se
+instala copiandolo al telefono o con `adb install`. La app pide permiso de
+`INTERNET` y permite trafico en claro, ambos ya configurados en el manifiesto.
+
+Requisitos para ver el Coach en el movil: PC y telefono en la misma red WiFi y
+el firewall de Windows permitiendo el puerto 8000.
+
 ## Estado Git al crear este documento
 
 El commit publicado mas reciente es `e792202 Add corrected health tags to registration`.

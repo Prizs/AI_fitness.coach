@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/plan_service.dart';
+import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -187,25 +188,7 @@ class _Exercise3DPreviewSheet extends StatefulWidget {
       _Exercise3DPreviewSheetState();
 }
 
-class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-
-  @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
-  }
-
+class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet> {
   @override
   Widget build(BuildContext context) {
     final name = widget.exercise['name'] as String? ?? 'Ejercicio';
@@ -262,96 +245,11 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
             ],
           ),
           const SizedBox(height: 20),
-          Container(
-            height: 240,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A101D),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF173B45), width: 1.5),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                AnimatedBuilder(
-                  animation: _animController,
-                  builder: (context, child) {
-                    final progress = _animController.value;
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Transform.translate(
-                          offset: Offset(0, -15 * progress),
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                colors: [
-                                  const Color(0xFF8BE0C0).withValues(alpha: 0.8),
-                                  const Color(0xFF173B45),
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF8BE0C0)
-                                      .withValues(alpha: 0.3 * progress),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.accessibility_new_rounded,
-                              size: 60,
-                              color: Color(0xFF0B1220),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Tutorial Guiado: $animKey',
-                          style: const TextStyle(
-                            color: Color(0xFF8BE0C0),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Fase: ${(progress * 100).toInt()}% de recorrido',
-                          style: const TextStyle(
-                              color: Colors.white60, fontSize: 12),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF173B45),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.threed_rotation_rounded,
-                            size: 16, color: Color(0xFF8BE0C0)),
-                        SizedBox(width: 4),
-                        Text('Vista 3D Activa',
-                            style:
-                                TextStyle(fontSize: 11, color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          Exercise3DViewer(
+            animationKey: animKey,
+            primaryMuscle: widget.exercise['primary_muscle'] as String?,
+            secondaryMuscle: widget.exercise['secondary_muscle'] as String?,
+            height: 300,
           ),
           const SizedBox(height: 20),
           FilledButton.icon(

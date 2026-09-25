@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import auth, coach, plans, workouts, recalibration
+from app.services.ai_providers import PROVIDER_ORDER, configured_providers
 from app.services.supabase_service import check_supabase_connection
 
 app = FastAPI(
@@ -33,3 +34,17 @@ def health_check() -> dict:
 @app.get("/health/supabase")
 def supabase_health_check() -> dict:
     return check_supabase_connection()
+
+
+@app.get("/health/ai")
+def ai_health_check() -> dict:
+    providers = configured_providers()
+    return {
+        "available": bool(providers),
+        "configured_providers": providers,
+        "attempt_order": list(PROVIDER_ORDER),
+        "note": (
+            "Solo se intentan los proveedores con clave configurada. "
+            "Si el primero agota su cuota, se pasa automaticamente al siguiente."
+        ),
+    }

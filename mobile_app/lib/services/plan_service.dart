@@ -5,7 +5,7 @@ import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
 
 class PlanService {
-  static const apiBaseUrl = AuthService.apiBaseUrl;
+  static String get apiBaseUrl => AuthService.apiBaseUrl;
 
   String? lastError;
 

@@ -1,15 +1,20 @@
 import json
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.services.ai_providers import (
+    AllProvidersFailed,
+    configured_providers,
+    generate_json_text,
+)
+
 router = APIRouter()
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-GEMINI_TIMEOUT_SEC = 15.0
+AI_TIMEOUT_SEC = 18.0
 MAX_HISTORY_TURNS = 20
 
 
@@ -91,15 +96,9 @@ def _conversation_history(history: list[ChatTurn]) -> str:
     return "\n".join(lines)
 
 
-def _call_gemini_coach(payload: ChatMessage) -> dict:
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY no esta configurada.")
-
-    import google.generativeai as genai
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+def _call_ai_coach(payload: ChatMessage) -> dict:
+    if not configured_providers():
+        raise AllProvidersFailed({})
 
     prompt = (
         "Eres un Coach de Fitness y Nutricion. Responde en espanol, de forma tecnica y motivadora.\n"
@@ -128,25 +127,15 @@ def _call_gemini_coach(payload: ChatMessage) -> dict:
         "Devuelve SOLO JSON."
     )
 
-    response = model.generate_content(
-        prompt,
-        request_options={"timeout": GEMINI_TIMEOUT_SEC},
-    )
-    raw = (
-        response.text.strip()
-        .removeprefix("```json")
-        .removeprefix("```")
-        .removesuffix("```")
-        .strip()
-    )
-    data = json.loads(raw)
+    result = generate_json_text(prompt, timeout=AI_TIMEOUT_SEC)
+    data = json.loads(result.text)
     if not isinstance(data, dict) or not data.get("reply"):
-        raise ValueError("Respuesta de Gemini sin campo reply.")
+        raise ValueError("Respuesta del proveedor de IA sin campo reply.")
 
     structured_plan = _normalize_structured_plan(data.get("structured_plan"))
     has_plan = bool(data.get("has_plan")) and structured_plan is not None
     return {
-        "provider": "gemini",
+        "provider": result.provider,
         "reply": str(data.get("reply")),
         "category": str(data.get("category") or "Acondicionamiento general"),
         "duration_weeks": int(data.get("duration_weeks") or 4),
@@ -167,7 +156,16 @@ TIMEOUT_ERRORS = ("DeadlineExceeded", "TimeoutError", "ReadTimeout", "ConnectTim
 @router.post("/chat")
 def chat_with_coach(payload: ChatMessage):
     try:
-        return _call_gemini_coach(payload)
+        return _call_ai_coach(payload)
+    except AllProvidersFailed as error:
+        print("Coach IA: todos los proveedores fallaron:", error)
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Ningun proveedor de IA pudo responder. Revisa las claves de IA "
+                "en el servidor o intenta de nuevo en unos segundos."
+            ),
+        )
     except Exception as error:  # noqa: BLE001 - se reporta al cliente
         print("Coach IA error:", error.__class__.__name__, error)
         if error.__class__.__name__ in RATE_LIMIT_ERRORS:

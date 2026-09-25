@@ -1,11 +1,11 @@
 import json
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.services.ai_providers import configured_providers, generate_json_text
 from app.services.supabase_service import get_supabase_admin_client
 
 router = APIRouter()
@@ -137,31 +137,22 @@ def _normalize_sessions(raw_sessions) -> list[dict]:
 
 
 def _ai_plan(payload: PlanRequest) -> dict | None:
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
+    if not configured_providers():
         return None
     try:
-        import google.generativeai as genai
-
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
         prompt = f"""Genera un plan fitness y nutricional seguro en JSON valido.
 Objetivo: {payload.goal}; nivel: {payload.level}; dias: {payload.days_per_week}; edad: {payload.age}; peso: {payload.weight}; notas: {payload.health_notes or 'ninguna'}; alergias alimentarias: {payload.food_allergies or 'ninguna'}; lesiones: {payload.current_injuries or 'ninguna'}; discapacidad motora: {payload.motor_disability or 'ninguna'}; zonas a evitar: {payload.areas_to_avoid or 'ninguna'}.
 Devuelve exactamente provider, goal, level, sessions, nutrition y safety_note.
 "sessions" DEBE ser una lista de objetos con las claves day, title y exercises (lista de objetos con name, sets, reps, animation_key, primary_muscle, secondary_muscle).
 "nutrition" DEBE ser una lista de objetos con las claves title e items (lista de textos).
 No diagnostiques ni prescribas tratamientos."""
-        response = model.generate_content(
-            prompt,
-            request_options={"timeout": GEMINI_TIMEOUT_SEC},
-        )
-        text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-        plan = json.loads(text)
+        result = generate_json_text(prompt, timeout=GEMINI_TIMEOUT_SEC)
+        plan = json.loads(result.text)
         sessions = _normalize_sessions(plan.get("sessions"))
         meals = _normalize_meals(plan.get("nutrition"))
         if not sessions or not meals:
             return None
-        plan["provider"] = "gemini"
+        plan["provider"] = result.provider
         plan["sessions"] = sessions
         plan["nutrition"] = meals
         plan["safety_note"] = plan.get("safety_note") or (
