@@ -16,9 +16,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
   void initState() {
     super.initState();
     final profile = AuthService.instance.loggedInUser;
-    _plan = profile == null
-        ? Future.value(null)
-        : PlanService().generate(profile);
+    _plan = PlanService().generate(profile);
   }
 
   @override
