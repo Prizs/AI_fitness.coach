@@ -11,12 +11,19 @@ class NutritionScreen extends StatefulWidget {
 
 class _NutritionScreenState extends State<NutritionScreen> {
   late Future<Map<String, dynamic>?> _plan;
+  final PlanService _service = PlanService();
 
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void _load() {
     final profile = AuthService.instance.loggedInUser;
-    _plan = PlanService().generate(profile);
+    setState(() {
+      _plan = _service.generate(profile);
+    });
   }
 
   @override
@@ -34,8 +41,10 @@ class _NutritionScreenState extends State<NutritionScreen> {
               final meals =
                   (snapshot.data?['nutrition'] as List<dynamic>?) ?? [];
               if (meals.isEmpty) {
-                return const Center(
-                  child: Text('No se pudo cargar la nutrición.'),
+                return _ErrorState(
+                  message:
+                      _service.lastError ?? 'No se pudo cargar la nutrición.',
+                  onRetry: _load,
                 );
               }
               return ListView(
@@ -66,6 +75,40 @@ class _NutritionScreenState extends State<NutritionScreen> {
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              size: 46, color: Color(0xFFFF7A7A)),
+          const SizedBox(height: 12),
+          Text(message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70)),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF8BE0C0),
+              foregroundColor: const Color(0xFF0B1220),
+            ),
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Reintentar'),
+          ),
+        ],
       ),
     );
   }

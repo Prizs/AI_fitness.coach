@@ -170,12 +170,55 @@ Pruebas verificadas recientemente:
 
 1. Corregir y validar completamente el formulario de etiquetas en Web y Android.
 2. Agregar pantalla de detalle de ejercicio con demostracion 3D/GLB y `animation_key`.
+   El visor actual es un prototipo animado, **no** un visor 3D real con GLB.
 3. Persistir planes generados en Supabase por usuario.
 4. Agregar feedback consentido desde Flutter hacia `/api/plans/feedback`.
 5. Implementar refresco seguro de sesiones y logout remoto.
 6. Mejorar mensajes de error del login y registro.
-7. Agregar tests backend para Auth, planes, restricciones y feedback.
+7. Agregar tests backend para Auth, restricciones y feedback.
 8. No incorporar modelos 3D sin licencia; usar assets propios o con licencia compatible.
+9. Revisar limite de cuota de Gemini: el tier gratuito devuelve `ResourceExhausted`
+   (HTTP 429) al hacer varias consultas seguidas. El backend ya lo informa, pero
+   conviene evaluar un plan pago o cachear respuestas.
+
+## Correcciones aplicadas (2026-09-25)
+
+Contrato de planes (`backend/app/routers/plans.py`):
+
+- `_normalize_sessions` y `_normalize_meals` convierten cualquier forma de respuesta
+  de Gemini en el contrato estable que consume Flutter.
+- `sessions`: lista de `{day, title, exercises:[{name, sets, reps, animation_key,
+  primary_muscle, secondary_muscle}]}`.
+- `nutrition`: lista de `{title, items:[str]}`.
+- Si Gemini no entrega sesiones o comidas utilizables, se usa el fallback seguro.
+- Tiempo limite efectivo de 20 s en la llamada a Gemini (`request_options`).
+
+Coach (`backend/app/routers/coach.py`):
+
+- Se elimino el `ThreadPoolExecutor` que no cancelaba la peticion.
+- `request_options={"timeout": 15}` aplica un tiempo limite real.
+- Nuevo campo `history` (lista de `{role, content}`) para conversacion multi-turno.
+- Contexto ampliado: discapacidad motora, zonas a evitar, RPE y alergias.
+- Se elimino el fallback que simulaba respuestas de IA. Ahora, si Gemini falla,
+  se informa un error real: 429 (cuota), 504 (timeout) o 503 (no disponible).
+
+Flutter:
+
+- `plan_service.dart` ya no inventa un perfil; exige perfil real y expone `lastError`.
+- `workouts_screen.dart` y `nutrition_screen.dart` muestran el error con boton
+  "Reintentar" en lugar de un texto generico.
+- `coach_screen.dart` envia el historial y el perfil real (alergias, lesiones,
+  discapacidad, zonas a evitar) y muestra el detalle del error del backend.
+
+Validacion ejecutada:
+
+- `python -m compileall -q app scripts`: OK.
+- `pytest tests`: 4 aprobadas (incluye contrato de planes y normalizadores).
+- `flutter analyze`: sin problemas.
+- `flutter test`: aprobado (prueba de login actualizada a los textos actuales).
+- `flutter build web --dart-define=API_BASE_URL=http://127.0.0.1:8000`: OK.
+- Conversacion real con Gemini: turno 1 HTTP 200 con `provider=gemini` y plan con 3
+  ejercicios; el turno 2 inmediato devuelve 429 por cuota del tier gratuito.
 
 ## Estado Git al crear este documento
 

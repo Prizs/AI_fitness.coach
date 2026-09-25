@@ -11,12 +11,19 @@ class WorkoutsScreen extends StatefulWidget {
 
 class _WorkoutsScreenState extends State<WorkoutsScreen> {
   late Future<Map<String, dynamic>?> _plan;
+  final PlanService _service = PlanService();
 
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void _load() {
     final profile = AuthService.instance.loggedInUser;
-    _plan = PlanService().generate(profile);
+    setState(() {
+      _plan = _service.generate(profile);
+    });
   }
 
   @override
@@ -34,7 +41,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
               final sessions =
                   (snapshot.data?['sessions'] as List<dynamic>?) ?? [];
               if (sessions.isEmpty) {
-                return const Center(child: Text('No se pudo cargar el plan.'));
+                return _ErrorState(
+                  message: _service.lastError ?? 'No se pudo cargar el plan.',
+                  onRetry: _load,
+                );
               }
               return ListView(
                 children: [
@@ -57,6 +67,40 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              size: 46, color: Color(0xFFFF7A7A)),
+          const SizedBox(height: 12),
+          Text(message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70)),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF8BE0C0),
+              foregroundColor: const Color(0xFF0B1220),
+            ),
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Reintentar'),
+          ),
+        ],
       ),
     );
   }
@@ -91,7 +135,8 @@ class _SessionCard extends StatelessWidget {
                     color: const Color(0xFF173B45),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.view_in_ar_rounded, color: Color(0xFF8BE0C0)),
+                  child: const Icon(Icons.view_in_ar_rounded,
+                      color: Color(0xFF8BE0C0)),
                 ),
                 title: Text(
                   item['name'] as String? ?? 'Ejercicio',
@@ -105,7 +150,8 @@ class _SessionCard extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF101B2D),
                     foregroundColor: const Color(0xFF8BE0C0),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
                   label: const Text('Ver 3D'),
@@ -137,7 +183,8 @@ class _Exercise3DPreviewSheet extends StatefulWidget {
   final Map<String, dynamic> exercise;
 
   @override
-  State<_Exercise3DPreviewSheet> createState() => _Exercise3DPreviewSheetState();
+  State<_Exercise3DPreviewSheet> createState() =>
+      _Exercise3DPreviewSheetState();
 }
 
 class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
@@ -164,7 +211,8 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
     final name = widget.exercise['name'] as String? ?? 'Ejercicio';
     final sets = widget.exercise['sets']?.toString() ?? '3';
     final reps = widget.exercise['reps']?.toString() ?? '12';
-    final animKey = widget.exercise['animation_key'] as String? ?? 'generic_exercise';
+    final animKey =
+        widget.exercise['animation_key'] as String? ?? 'generic_exercise';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -191,7 +239,8 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
                   color: const Color(0xFF8BE0C0),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.fitness_center_rounded, color: Color(0xFF0B1220)),
+                child: const Icon(Icons.fitness_center_rounded,
+                    color: Color(0xFF0B1220)),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -200,7 +249,8 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w800),
                     ),
                     Text(
                       '$sets series · $reps repeticiones',
@@ -244,7 +294,8 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF8BE0C0).withValues(alpha: 0.3 * progress),
+                                  color: const Color(0xFF8BE0C0)
+                                      .withValues(alpha: 0.3 * progress),
                                   blurRadius: 20,
                                   spreadRadius: 5,
                                 ),
@@ -269,7 +320,8 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
                         const SizedBox(height: 4),
                         Text(
                           'Fase: ${(progress * 100).toInt()}% de recorrido',
-                          style: const TextStyle(color: Colors.white60, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.white60, fontSize: 12),
                         ),
                       ],
                     );
@@ -279,7 +331,8 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
                   top: 12,
                   right: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFF173B45),
                       borderRadius: BorderRadius.circular(12),
@@ -287,9 +340,12 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.threed_rotation_rounded, size: 16, color: Color(0xFF8BE0C0)),
+                        Icon(Icons.threed_rotation_rounded,
+                            size: 16, color: Color(0xFF8BE0C0)),
                         SizedBox(width: 4),
-                        Text('Vista 3D Activa', style: TextStyle(fontSize: 11, color: Colors.white)),
+                        Text('Vista 3D Activa',
+                            style:
+                                TextStyle(fontSize: 11, color: Colors.white)),
                       ],
                     ),
                   ),
@@ -302,11 +358,13 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet>
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF8BE0C0),
               foregroundColor: const Color(0xFF0B1220),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.check_circle_outline_rounded),
-            label: const Text('Entendido, continuar rutina', style: TextStyle(fontWeight: FontWeight.w700)),
+            label: const Text('Entendido, continuar rutina',
+                style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),

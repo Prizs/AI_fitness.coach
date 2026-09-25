@@ -13,7 +13,8 @@ void main() {
   testWidgets('login screen renders', (WidgetTester tester) async {
     await tester.pumpWidget(const AiFitnessCoachApp());
 
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.text('Tu plan empieza aquí'), findsOneWidget);
     expect(find.text('Cédula venezolana'), findsOneWidget);
+    expect(find.text('Entrar a entrenar'), findsOneWidget);
   });
 }

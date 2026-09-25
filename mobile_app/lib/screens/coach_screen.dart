@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/screens/workout_schedule_screen.dart';
 import 'package:mobile_app/screens/user_profile_screen.dart';
+import 'package:mobile_app/services/auth_service.dart';
 
 class CoachScreen extends StatefulWidget {
   const CoachScreen({super.key});
@@ -38,43 +39,68 @@ class _CoachScreenState extends State<CoachScreen> {
     });
     _controller.clear();
 
+    final history = _messages
+        .where((m) => (m['text'] as String?)?.isNotEmpty ?? false)
+        .map((m) => {
+              'role': (m['isUser'] as bool) ? 'user' : 'assistant',
+              'content': m['text'] as String,
+            })
+        .toList();
+
     try {
-      final baseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'http://127.0.0.1:8000');
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/coach/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'message': text,
-          'user_goal': 'Resistencia Pulmonar',
-          'user_level': 'Intermedio',
-        }),
-      );
+      final baseUrl = const String.fromEnvironment('API_BASE_URL',
+          defaultValue: 'http://127.0.0.1:8000');
+      final profile = AuthService.instance.loggedInUser;
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/coach/chat'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'message': text,
+              'history': history,
+              'user_goal': 'Rendimiento general',
+              'user_level': 'Intermedio',
+              'allergies': profile?.foodAllergies,
+              'injuries': profile?.currentInjuries,
+              'motor_disability': profile?.motorDisability,
+              'areas_to_avoid': profile?.areasToAvoid,
+            }),
+          )
+          .timeout(const Duration(seconds: 25));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         setState(() {
           _messages.add({
             'isUser': false,
-            'text': data['reply'] ?? 'Plan actualizado según tus metas.',
-            'plan': data['structured_plan'],
+            'text': data['reply'] ?? 'Sin respuesta del Coach.',
+            'plan': data['has_plan'] == true ? data['structured_plan'] : null,
             'category': data['category'],
             'rule': data['progression_rule'],
           });
         });
       } else {
+        String detail =
+            'El motor IA respondió con un error (${response.statusCode}).';
+        try {
+          final errorBody = jsonDecode(response.body);
+          if (errorBody is Map && errorBody['detail'] is String) {
+            detail = errorBody['detail'] as String;
+          }
+        } catch (_) {}
         setState(() {
           _messages.add({
             'isUser': false,
-            'text': 'Hubo un inconveniente al conectar con el motor IA. Intenta nuevamente.',
+            'text': detail,
             'plan': null,
           });
         });
       }
-    } catch (_) {
+    } catch (error) {
       setState(() {
         _messages.add({
           'isUser': false,
-          'text': 'No se pudo comunicar con el servidor backend.',
+          'text': 'No se pudo comunicar con el servidor backend (${error.runtimeType}).',
           'plan': null,
         });
       });

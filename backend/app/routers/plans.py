@@ -11,6 +11,8 @@ from app.services.supabase_service import get_supabase_admin_client
 router = APIRouter()
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
+GEMINI_TIMEOUT_SEC = 20.0
+
 
 class PlanRequest(BaseModel):
     goal: str = Field(..., min_length=2, max_length=120)
@@ -70,6 +72,70 @@ def _fallback_plan(payload: PlanRequest) -> dict:
     }
 
 
+def _normalize_meals(raw_nutrition) -> list[dict]:
+    """Convierte cualquier forma de respuesta de nutricion en una lista de comidas.
+
+    El contrato que consume Flutter es: [{"title": str, "items": [str, ...]}].
+    """
+    meals: list[dict] = []
+    if isinstance(raw_nutrition, list):
+        for entry in raw_nutrition:
+            if isinstance(entry, dict):
+                title = entry.get("title") or entry.get("meal") or entry.get("name") or "Comida"
+                items = entry.get("items") or entry.get("description") or entry.get("foods")
+                if isinstance(items, str):
+                    items = [items]
+                if not isinstance(items, list):
+                    items = []
+                meals.append({"title": str(title), "items": [str(i) for i in items]})
+            elif isinstance(entry, str):
+                meals.append({"title": "Comida", "items": [entry]})
+    elif isinstance(raw_nutrition, dict):
+        for title, value in raw_nutrition.items():
+            if isinstance(value, list):
+                items = [str(v) for v in value]
+            elif value is None:
+                items = []
+            else:
+                items = [str(value)]
+            meals.append({"title": str(title), "items": items})
+    return meals
+
+
+def _normalize_sessions(raw_sessions) -> list[dict]:
+    """Garantiza que sessions sea una lista de dias con ejercicios bien formados."""
+    sessions: list[dict] = []
+    if not isinstance(raw_sessions, list):
+        return sessions
+    for index, entry in enumerate(raw_sessions, start=1):
+        if not isinstance(entry, dict):
+            continue
+        exercises = entry.get("exercises")
+        normalized_exercises: list[dict] = []
+        if isinstance(exercises, list):
+            for exercise in exercises:
+                if not isinstance(exercise, dict):
+                    continue
+                normalized_exercises.append(
+                    {
+                        "name": str(exercise.get("name") or exercise.get("exercise") or "Ejercicio"),
+                        "sets": exercise.get("sets") or exercise.get("series") or 3,
+                        "reps": str(exercise.get("reps") or exercise.get("repetitions") or "10"),
+                        "animation_key": str(exercise.get("animation_key") or "generic-exercise"),
+                        "primary_muscle": str(exercise.get("primary_muscle") or "General"),
+                        "secondary_muscle": str(exercise.get("secondary_muscle") or "Secundario"),
+                    }
+                )
+        sessions.append(
+            {
+                "day": str(entry.get("day") or f"Dia {index}"),
+                "title": str(entry.get("title") or entry.get("focus") or "Sesion"),
+                "exercises": normalized_exercises,
+            }
+        )
+    return sessions
+
+
 def _ai_plan(payload: PlanRequest) -> dict | None:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -82,11 +148,25 @@ def _ai_plan(payload: PlanRequest) -> dict | None:
         prompt = f"""Genera un plan fitness y nutricional seguro en JSON valido.
 Objetivo: {payload.goal}; nivel: {payload.level}; dias: {payload.days_per_week}; edad: {payload.age}; peso: {payload.weight}; notas: {payload.health_notes or 'ninguna'}; alergias alimentarias: {payload.food_allergies or 'ninguna'}; lesiones: {payload.current_injuries or 'ninguna'}; discapacidad motora: {payload.motor_disability or 'ninguna'}; zonas a evitar: {payload.areas_to_avoid or 'ninguna'}.
 Devuelve exactamente provider, goal, level, sessions, nutrition y safety_note.
-Cada ejercicio debe tener name, sets, reps y animation_key en kebab-case. No diagnostiques ni prescribas tratamientos."""
-        response = model.generate_content(prompt)
+"sessions" DEBE ser una lista de objetos con las claves day, title y exercises (lista de objetos con name, sets, reps, animation_key, primary_muscle, secondary_muscle).
+"nutrition" DEBE ser una lista de objetos con las claves title e items (lista de textos).
+No diagnostiques ni prescribas tratamientos."""
+        response = model.generate_content(
+            prompt,
+            request_options={"timeout": GEMINI_TIMEOUT_SEC},
+        )
         text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
         plan = json.loads(text)
+        sessions = _normalize_sessions(plan.get("sessions"))
+        meals = _normalize_meals(plan.get("nutrition"))
+        if not sessions or not meals:
+            return None
         plan["provider"] = "gemini"
+        plan["sessions"] = sessions
+        plan["nutrition"] = meals
+        plan["safety_note"] = plan.get("safety_note") or (
+            "Plan general orientativo. Suspende si aparece dolor y consulta a un profesional de salud."
+        )
         return plan
     except Exception:
         return None
