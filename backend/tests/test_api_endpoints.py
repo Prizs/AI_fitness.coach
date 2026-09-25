@@ -107,7 +107,7 @@ def test_ai_health_reports_provider_order():
     response = client.get("/health/ai")
     assert response.status_code == 200
     data = response.json()
-    assert data["attempt_order"] == ["gemini", "groq", "openrouter", "mistral"]
+    assert data["attempt_order"] == ["gemini", "openrouter", "mistral", "groq"]
     assert isinstance(data["configured_providers"], list)
     assert data["available"] == bool(data["configured_providers"])
 

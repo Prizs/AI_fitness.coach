@@ -241,8 +241,54 @@ proveedores configurados en este orden y se detiene en el primero que responda:
 - Si Gemini agota cuota y no hay mas claves, la app sigue arrancando con el plan
   local seguro de `plans.py` (rutinas y nutricin no se rompen).
 
-Recomendacion: registrar al menos `GROQ_API_KEY` y `OPENROUTER_API_KEY` para
-eliminar los errores intermitentes.
+Recomendacion: registrar al menos `OPENROUTER_API_KEY` para eliminar los errores
+intermitentes.
+
+### Hallazgo real: Groq esta bloqueado desde Venezuela (2026-09-25)
+
+Se probo la clave de Groq del usuario y **no es un problema de la clave**:
+
+```
+GET https://api.groq.com/                      -> 403 Forbidden (sin clave)
+GET https://api.groq.com/openai/v1/models      -> 403 Forbidden (clave invalida)
+```
+
+Un 403 tambien con clave ficticia y en la raiz del dominio indica bloqueo por
+red o pais, no credenciales invalidas. La clave quedo comentada en `.env`.
+
+Alcance real medido desde esta red:
+
+| Proveedor | Respuesta | Estado |
+| --- | --- | --- |
+| OpenRouter | 200 (modelos publicos) | Accesible |
+| Mistral | 401 (pide clave) | Accesible |
+| Cohere | 401 (pide clave) | Accesible |
+| DeepSeek | 401 (pide clave) | Accesible |
+| NVIDIA | 200 | Accesible |
+| Gemini | responde con contenido real | Accesible, cuota corta |
+| Groq | 403 siempre | **Bloqueado** |
+| HuggingFace | sin conexion | Inaccesible |
+
+Por eso el orden de intento quedo como `gemini -> openrouter -> mistral -> groq`
+y el modelo por defecto de OpenRouter cambio a `google/gemma-4-31b-it:free`
+(los modelos `:free` rotan; `meta-llama/llama-3.3-70b-instruct:free` ya no existe).
+
+Con solo Gemini configurado el Coach agota la cuota y responde 503 con mensaje
+claro. Para uso sostenido hace falta `OPENROUTER_API_KEY` (o `MISTRAL_API_KEY`).
+
+### Emulador Android no disponible en esta maquina
+
+`emulator -avd medium_phone` falla con:
+
+```
+x86_64 emulation currently requires hardware acceleration!
+Android Emulator hypervisor driver is not installed on this machine
+```
+
+La virtualizacion de firmware esta activa, pero falta instalar el driver
+hypervisor de Android, que requiere permisos de administrador y reiniciar.
+Para probar en el telefono real hay dos rutas: USB con depuracion autorizada o
+depuracion inalambrica mediante `adb pair` + `adb connect`.
 
 ## Visor 3D real en movil
 

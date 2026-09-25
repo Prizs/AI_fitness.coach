@@ -1,13 +1,15 @@
 """Cadena de proveedores de IA con failover.
 
-Proveedores gratuitos (sin tarjeta de credito) y accesibles desde Venezuela:
+Proveedores gratuitos (sin tarjeta de credito). El orden de intento se define en
+`PROVIDER_ORDER` y solo se usan los que tengan clave configurada en `.env`.
 
-1. Google Gemini  - `GEMINI_API_KEY`      (mayor calidad)
-2. Groq           - `GROQ_API_KEY`        (30 RPM, 1000 RPD, muy rapido)
-3. OpenRouter     - `OPENROUTER_API_KEY`  (modelos `:free`)
-4. Mistral        - `MISTRAL_API_KEY`     (modo gratuito)
+Verificado desde Venezuela el 2026-09-25:
 
-Solo se usan los proveedores cuyas claves esten configuradas en `.env`.
+- Google Gemini  - `GEMINI_API_KEY`     accesible, buena calidad, cuota corta.
+- OpenRouter     - `OPENROUTER_API_KEY` accesible, ~17 modelos `:free`.
+- Mistral        - `MISTRAL_API_KEY`    accesible, modo gratuito.
+- Groq           - `GROQ_API_KEY`       devuelve HTTP 403 desde esta red.
+
 Si todos fallan se lanza `AllProvidersFailed` con el detalle de cada error,
 de modo que la API pueda responder un error real y no una respuesta simulada.
 """
@@ -29,7 +31,9 @@ OPENAI_COMPATIBLE_BASE_URLS = {
 
 DEFAULT_MODELS = {
     "groq": "openai/gpt-oss-120b",
-    "openrouter": "meta-llama/llama-3.3-70b-instruct:free",
+    # Los modelos :free de OpenRouter rotan con frecuencia; se verifica que
+    # `google/gemma-4-31b-it:free` siga disponible antes de depender de el.
+    "openrouter": "google/gemma-4-31b-it:free",
     "mistral": "mistral-small-latest",
 }
 
@@ -47,7 +51,13 @@ MODEL_ENV = {
 }
 
 # Orden de intento: primero calidad, luego volumen.
-PROVIDER_ORDER = ("gemini", "groq", "openrouter", "mistral")
+#
+# Nota sobre Venezuela (verificado 2026-09-25 desde esta red):
+#   - Groq responde HTTP 403 en `api.groq.com` incluso sin clave, lo que indica
+#     un bloqueo por red/pais. Se deja al final y solo se usa si hay clave.
+#   - OpenRouter, Mistral, Cohere y DeepSeek si responden y validan la clave.
+#   - Gemini funciona, pero su cuota gratuita se agota con rapidez.
+PROVIDER_ORDER = ("gemini", "openrouter", "mistral", "groq")
 
 
 @dataclass(frozen=True)
