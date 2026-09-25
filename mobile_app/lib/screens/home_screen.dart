@@ -8,7 +8,8 @@ class HomeScreen extends StatelessWidget {
     final modules = [
       _ModuleTile(
         title: 'Coach IA',
-        subtitle: 'Asistente adaptativo para objetivos, energía y recuperación.',
+        subtitle:
+            'Asistente adaptativo para objetivos, energía y recuperación.',
         icon: Icons.smart_toy_rounded,
         accent: const Color(0xFF2DD4BF),
       ),
@@ -26,7 +27,8 @@ class HomeScreen extends StatelessWidget {
       ),
       _ModuleTile(
         title: 'Nutrición',
-        subtitle: 'Recomendaciones simples y adaptadas a la meta y tolerancias.',
+        subtitle:
+            'Recomendaciones simples y adaptadas a la meta y tolerancias.',
         icon: Icons.restaurant_rounded,
         accent: const Color(0xFFFB7185),
       ),
@@ -41,18 +43,12 @@ class HomeScreen extends StatelessWidget {
             children: [
               const Text(
                 'Tu entrenador inteligente',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
               const Text(
                 'Seguimiento deportivo, nutrición, descanso y adaptación continua.',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.white70,
-                ),
+                style: TextStyle(fontSize: 15, color: Colors.white70),
               ),
               const SizedBox(height: 24),
               Row(
@@ -127,10 +123,7 @@ class _ModuleTile extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.white70,
-                  ),
+                  style: const TextStyle(fontSize: 13, color: Colors.white70),
                 ),
               ],
             ),
@@ -143,10 +136,7 @@ class _ModuleTile extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({
-    super.key,
-    required this.label,
-  });
+  const _StatusChip({super.key, required this.label});
 
   final String label;
 

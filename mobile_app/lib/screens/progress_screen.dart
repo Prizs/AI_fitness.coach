@@ -20,10 +20,7 @@ class ProgressScreen extends StatelessWidget {
             children: [
               const Text(
                 'Progreso',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 18),
               Row(
@@ -41,10 +38,7 @@ class ProgressScreen extends StatelessWidget {
               const SizedBox(height: 24),
               const Text(
                 'Avance semanal',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 14),
               Container(
@@ -98,26 +92,17 @@ class _MetricCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white70,
-            ),
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
           const SizedBox(height: 10),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           Text(
             delta,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF2DD4BF),
-            ),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF2DD4BF)),
           ),
         ],
       ),
@@ -126,11 +111,7 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _ProgressRow extends StatelessWidget {
-  const _ProgressRow({
-    super.key,
-    required this.label,
-    required this.value,
-  });
+  const _ProgressRow({super.key, required this.label, required this.value});
 
   final String label;
   final String value;
@@ -144,10 +125,7 @@ class _ProgressRow extends StatelessWidget {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label),
-            Text(value),
-          ],
+          children: [Text(label), Text(value)],
         ),
         const SizedBox(height: 8),
         ClipRRect(

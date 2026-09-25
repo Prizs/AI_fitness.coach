@@ -13,6 +13,10 @@ analyzer:
   exclude:
     - build/**
     - android/**
+    - web/**
+  errors:
+    unused_element_parameter: ignore
+    unnecessary_underscores: ignore
 
 linter:
   # The lint rules applied to this project can be customized in the
