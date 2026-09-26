@@ -1,7 +1,175 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:mobile_app/services/app_update_service.dart';
+import 'package:flutter/material.dart';
+
+/// Panel de actualizaciones para la pantalla de perfil.
+///
+/// Muestra la version instalada, consulta la publicada en el servidor y
+/// permite instalar la nueva sin salir de la app.
+class AppUpdatePanel extends StatefulWidget {
+  const AppUpdatePanel({super.key});
+
+  @override
+  State<AppUpdatePanel> createState() => _AppUpdatePanelState();
+}
+
+class _AppUpdatePanelState extends State<AppUpdatePanel> {
+  final AppUpdateService _service = AppUpdateService();
+
+  late Future<InstalledVersion> _installed;
+  bool _checking = false;
+  RemoteVersion? _remote;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _installed = _service.installedVersion();
+    _loadRemote(silent: true);
+  }
+
+  Future<void> _loadRemote({bool silent = false}) async {
+    setState(() => _checking = true);
+    final remote = await _service.checkForUpdate();
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      _remote = remote;
+      if (!silent) {
+        _message = remote == null
+            ? (_service.lastError ?? 'Tu app ya esta actualizada.')
+            : 'Hay una version mas nueva disponible.';
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUpdate = _remote != null;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F192B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: hasUpdate ? const Color(0xFF8BE0C0) : Colors.white10,
+          width: hasUpdate ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                hasUpdate
+                    ? Icons.system_update_alt_rounded
+                    : Icons.verified_rounded,
+                color: const Color(0xFF8BE0C0),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Actualizaciones de la app',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FutureBuilder<InstalledVersion>(
+            future: _installed,
+            builder: (context, snapshot) {
+              final version = snapshot.data;
+              return Row(
+                children: [
+                  const Text(
+                    'Version instalada:',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    version == null
+                        ? '...'
+                        : '${version.versionName} (${version.versionCode})',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          if (_remote != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Text(
+                  'Ultima publicada:',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${_remote!.versionName} (${_remote!.versionCode})',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF8BE0C0),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (_message != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _message!,
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: hasUpdate
+                ? FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF8BE0C0),
+                      foregroundColor: const Color(0xFF0B1220),
+                    ),
+                    onPressed: () => checkForAppUpdate(context),
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    label: const Text(
+                      'Descargar e instalar',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF8BE0C0),
+                      side: const BorderSide(color: Color(0xFF173B45)),
+                    ),
+                    onPressed: _checking
+                        ? null
+                        : () => _loadRemote(silent: false),
+                    icon: _checking
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded, size: 18),
+                    label: Text(
+                      _checking ? 'Verificando...' : 'Buscar actualizaciones',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 /// Revisa el backend y, si hay una version mas nueva, ofrece instalarla.
 ///

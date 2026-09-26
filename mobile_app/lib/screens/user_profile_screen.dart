@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/widgets/app_update.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -240,6 +241,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 20),
+
+            // Verificador de actualizaciones de la app
+            const AppUpdatePanel(),
+            const SizedBox(height: 20),
           ],
         ),
       ),

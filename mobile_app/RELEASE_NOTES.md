@@ -1,15 +1,25 @@
-# AI Fitness Coach 1.0.3
+# AI Fitness Coach 1.0.4
 
-## Correccion: el boton de actualizaciones no se veia
-- El control antes vivia solo al final del scroll de la pantalla de login, asi
-  que no aparecia si ya estabas registrado.
-- Ahora hay **tres** puntos de acceso:
-  1. **Al abrir la app** se comprueba solo y aparece el dialogo si hay version
-     nueva (sin molestar si ya estas al dia).
-  2. **Pantalla de Coach**: icono de actualizacion en la barra superior.
-  3. **Pantalla de login**: chip fijo en la esquina superior derecha con la
-     version instalada (p. ej. `v1.0.2`), siempre visible sin desplazar.
-- Se refactorizo la pantalla de login para que el boton no dependa del scroll.
+## Correccion: el enlace de descarga servia una version vieja
+- La pagina de descarga apuntaba a un archivo "instalador" que se creo una sola
+  vez y quedo congelado en la 1.0.0, por eso nunca aparecia la version nueva.
+- Ahora apunta siempre a `app-release.apk`, que es el archivo que se regenera en
+  cada compilacion.
+- Nuevo script `scripts/update_download_page.py`: se ejecuta despues de
+  `flutter build apk` y escribe la pagina con la version y tamano reales, ademas
+  de borrar los APK obsoletos. Evita que el error se repita.
+
+## El verificador de actualizaciones vive en el Perfil
+- Inicio ahora tiene el boton **Mi Perfil y Salud** (antes solo se llegaba desde
+  el Coach).
+- Al final del perfil esta el panel **Actualizaciones de la app**: muestra la
+  version instalada, consulta la publicada y ofrece **Descargar e instalar**.
+- El panel se auto-comprueba al abrirlo y el boton permite forzar la consulta.
+
+## Sigue funcionando ademas
+- Comprobacion automatica al abrir la app.
+- Icono de actualizacion en la barra del Coach.
+- Chip fijo con la version en la pantalla de login.
 
 ## Atlas anatomico de musculos
 - Nueva pestana **Musculos** con un atlas anatomico real del cuerpo humano

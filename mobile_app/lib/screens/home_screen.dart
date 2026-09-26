@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_app/screens/user_profile_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -59,6 +60,31 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 26),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF8BE0C0),
+                    side: const BorderSide(color: Color(0xFF173B45)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
+                  ),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const UserProfileScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.person_rounded, size: 18),
+                  label: const Text(
+                    'Mi Perfil y Salud',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
               Expanded(
                 child: ListView.separated(
                   itemCount: modules.length,
