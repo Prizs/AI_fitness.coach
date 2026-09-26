@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_app/services/app_update_service.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/widgets/app_update.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -286,6 +288,36 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.white54,
                         ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => checkForAppUpdate(context),
+                      icon: const Icon(Icons.system_update_rounded, size: 16),
+                      label: const Text(
+                        'Buscar actualizaciones',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: FutureBuilder<InstalledVersion>(
+                      future: AppUpdateService().installedVersion(),
+                      builder: (context, snapshot) {
+                        final version = snapshot.data;
+                        return Text(
+                          version == null
+                              ? ''
+                              : 'Version ${version.versionName} '
+                                  '(${version.versionCode})',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white38,
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],

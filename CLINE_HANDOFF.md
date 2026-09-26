@@ -353,6 +353,56 @@ instala copiandolo al telefono o con `adb install`. La app pide permiso de
 Requisitos para ver el Coach en el movil: PC y telefono en la misma red WiFi y
 el firewall de Windows permitiendo el puerto 8000.
 
+## Actualizacion desde la propia app (2026-09-26)
+
+La app ya no depende de reinstalar el APK a mano.
+
+Backend (`backend/app/routers/app_updates.py`):
+
+- `GET /api/app/latest` -> version publicada, tamano, fecha y notas de la release.
+  Lee `mobile_app/pubspec.yaml` (`version: 1.0.1+2`) y las notas de
+  `mobile_app/RELEASE_NOTES.md`.
+- `GET /api/app/download` -> sirve el APK compilado con el MIME correcto
+  (`application/vnd.android.package-archive`). Asi el movil solo necesita el
+  puerto 8000, sin depender del servidor auxiliar del puerto 8080.
+
+Flutter:
+
+- `lib/services/app_update_service.dart`: consulta la version instalada por canal
+  nativo, compara `versionCode` con el del servidor, descarga el APK mostrando
+  progreso y lanza el instalador.
+- `lib/widgets/app_update.dart`: dialogo con notas de la release, barra de
+  progreso y manejo de errores.
+- El boton **"Buscar actualizaciones"** esta en la pantalla de login, junto al
+  indicador `Version 1.0.1 (2)`.
+
+Android nativo:
+
+- `MainActivity.kt` expone el canal `com.example.mobile_app/app_update` con
+  `getAppInfo`, `getCacheDir` e `installApk`.
+- El manifiesto declara `REQUEST_INSTALL_PACKAGES` y un `FileProvider`
+  (`${applicationId}.fileprovider`) con `res/xml/file_paths.xml`.
+- No se anadio ninguna dependencia de pub: el cache se obtiene por el canal.
+
+Flujo probado de extremo a extremo:
+
+1. El usuario instala `ai-fitness-coach-instalador.apk` (1.0.0, codigo 1) desde
+   `http://192.168.31.94:8080/`.
+2. Abre la app y toca "Buscar actualizaciones".
+3. La app detecta la 1.0.1 (codigo 2), la descarga y abre el instalador.
+
+Workflow para el siguiente cambio:
+
+1. Editar codigo.
+2. Subir `version:` en `mobile_app/pubspec.yaml` (el numero despues del `+`).
+3. Actualizar `mobile_app/RELEASE_NOTES.md`.
+4. `flutter build apk --release --dart-define=API_BASE_URL=http://<IP>:8000`.
+5. El backend ya publica la version nueva; los telefonos la detectan solas.
+
+**Limitacion:** la actualizacion conserva los datos porque el APK se firma con la
+misma clave de depuracion. Si se cambia la clave, Android rechaza el APK y habria
+que desinstalar antes.
+
 ## Estado Git al crear este documento
 
 El commit publicado mas reciente es `e792202 Add corrected health tags to registration`.

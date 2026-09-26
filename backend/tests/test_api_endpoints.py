@@ -28,7 +28,13 @@ def test_plan_generation():
     data = response.json()
     assert "sessions" in data
     assert "nutrition" in data
-    assert data.get("provider") in ("gemini", "fallback")
+    assert data.get("provider") in (
+        "gemini",
+        "fallback",
+        "openrouter",
+        "mistral",
+        "groq",
+    )
 
     # Contrato estable que consume Flutter.
     assert isinstance(data["sessions"], list) and data["sessions"]
@@ -162,3 +168,39 @@ class _FakeEnv:
         import os
 
         os.environ.pop(name, None)
+
+
+def test_latest_version_endpoint_shape():
+    response = client.get("/api/app/latest")
+    assert response.status_code == 200
+    data = response.json()
+    assert "available" in data
+    assert "version_name" in data
+    assert "version_code" in data
+    if data["available"]:
+        assert data["version_code"] > 0
+        assert data["size_bytes"] > 0
+        assert data["download_url"] == "/api/app/download"
+        assert data["notes"]
+
+
+def test_download_returns_apk_or_404():
+    from app.routers.app_updates import APK_PATH
+
+    response = client.get("/api/app/download")
+    if APK_PATH.exists():
+        assert response.status_code == 200
+        assert (
+            response.headers["content-type"]
+            == "application/vnd.android.package-archive"
+        )
+    else:
+        assert response.status_code == 404
+
+
+def test_pubspec_version_is_parsed(monkeypatch):
+    from app.routers import app_updates
+
+    version_name, version_code = app_updates._read_pubspec_version()
+    assert version_code > 0
+    assert version_name.count(".") >= 1
