@@ -31,10 +31,22 @@ OPENAI_COMPATIBLE_BASE_URLS = {
 
 DEFAULT_MODELS = {
     "groq": "openai/gpt-oss-120b",
-    # Los modelos :free de OpenRouter rotan con frecuencia; se verifica que
-    # `google/gemma-4-31b-it:free` siga disponible antes de depender de el.
     "openrouter": "google/gemma-4-31b-it:free",
     "mistral": "mistral-small-latest",
+}
+
+# Los modelos `:free` de OpenRouter comparten un pool de limite global
+# (`upstream_provider_shared_pool`) muy congestionado, asi que fallan de forma
+# intermitente con HTTP 429. Se prueban en orden hasta que uno responda.
+MODEL_CANDIDATES = {
+    "openrouter": (
+        "qwen/qwen3.8-27b:free",
+        "google/gemma-4-26b-a4b-it:free",
+        "google/gemma-4-31b-it:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "inclusionai/ling-3.0-flash-sante:free",
+        "liquid/lfm-2.5-2.6b:free",
+    ),
 }
 
 API_KEY_ENV = {
@@ -46,7 +58,7 @@ API_KEY_ENV = {
 
 MODEL_ENV = {
     "groq": "GROQ_MODEL",
-    "openrouter": "OPENROUTER_MODEL",
+    "openrouter": "OPENROUTER_MODELS",
     "mistral": "MISTRAL_MODEL",
 }
 
@@ -79,8 +91,14 @@ def configured_providers() -> list[str]:
     return [name for name in PROVIDER_ORDER if (os.getenv(API_KEY_ENV[name]) or "").strip()]
 
 
-def _model_for(provider: str) -> str:
-    return (os.getenv(MODEL_ENV.get(provider, ""), "") or "").strip() or DEFAULT_MODELS[provider]
+def _model_candidates(provider: str) -> list[str]:
+    """Modelos a probar para un proveedor, en orden de preferencia."""
+    override = (os.getenv(MODEL_ENV.get(provider, ""), "") or "").strip()
+    if override:
+        return [model.strip() for model in override.split(",") if model.strip()]
+    if provider in MODEL_CANDIDATES:
+        return list(MODEL_CANDIDATES[provider])
+    return [DEFAULT_MODELS[provider]]
 
 
 def _strip_code_fences(text: str) -> str:
@@ -108,13 +126,9 @@ def _call_gemini(prompt: str, timeout: float) -> str:
 
 
 def _call_openai_compatible(provider: str, prompt: str, timeout: float) -> str:
+    """Llama a un proveedor compatible con OpenAI probando sus modelos en orden."""
     api_key = os.getenv(API_KEY_ENV[provider], "")
     base_url = OPENAI_COMPATIBLE_BASE_URLS[provider]
-    payload = {
-        "model": _model_for(provider),
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.4,
-    }
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -123,23 +137,34 @@ def _call_openai_compatible(provider: str, prompt: str, timeout: float) -> str:
         headers["HTTP-Referer"] = "https://aifitnesscoach.app"
         headers["X-Title"] = "AI Fitness Coach"
 
-    with httpx.Client(timeout=timeout) as client:
-        response = client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
-        if response.status_code >= 400:
-            # Algunos proveedores rechazan `response_format`; reintentamos sin el.
-            raise httpx.HTTPStatusError(
-                f"{response.status_code}: {response.text[:200]}",
-                request=response.request,
-                response=response,
-            )
-        data = response.json()
-    choices = data.get("choices") or []
-    if not choices:
-        raise ValueError("Respuesta sin 'choices'.")
-    content = (choices[0].get("message") or {}).get("content")
-    if not content:
-        raise ValueError("Respuesta sin contenido.")
-    return _strip_code_fences(content)
+    last_error: Exception | None = None
+    per_model_timeout = max(timeout / 2, 5.0)
+
+    for model in _model_candidates(provider):
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.4,
+        }
+        try:
+            with httpx.Client(timeout=per_model_timeout) as client:
+                response = client.post(
+                    f"{base_url}/chat/completions", json=payload, headers=headers
+                )
+                response.raise_for_status()
+                data = response.json()
+            choices = data.get("choices") or []
+            if not choices:
+                raise ValueError("Respuesta sin 'choices'.")
+            content = (choices[0].get("message") or {}).get("content")
+            if not content:
+                raise ValueError("Respuesta sin contenido.")
+            return _strip_code_fences(content)
+        except Exception as error:  # noqa: BLE001 - se prueba el siguiente modelo
+            last_error = error
+            continue
+
+    raise last_error or RuntimeError("Sin modelos configurados.")
 
 
 def generate_json_text(prompt: str, *, timeout: float = GEMINI_TIMEOUT_SEC) -> ProviderResult:

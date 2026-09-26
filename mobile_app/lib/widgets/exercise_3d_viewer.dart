@@ -152,8 +152,25 @@ Map<String, _V3> _poseFor(String animationKey, double t) {
       headLift: 0.2,
       forearmDown: true,
     );
-  } else if (key.contains('bench') || key.contains('press')) {
+  } else if (key.contains('bench')) {
     return _lyingBody(armExtension: 0.35 + 0.5 * phase);
+  } else if (key.contains('shoulder') ||
+      key.contains('hombro') ||
+      key.contains('military') ||
+      key.contains('press')) {
+    // Press de hombros: los brazos suben por encima de la cabeza.
+    final push = phase;
+    shoulderY += 0.03 * push;
+    elbowY = 1.3 + 0.16 * push;
+    wristY = 1.24 + 0.42 * push;
+    armSpread = 0.19;
+  } else if (key.contains('mountain') || key.contains('climber')) {
+    return _horizontalBody(
+      armAngle: 1.45,
+      legAngle: 1.5,
+      headLift: 0.25,
+      legDrive: phase,
+    );
   } else if (key.contains('row') ||
       key.contains('remo') ||
       key.contains('swing')) {
@@ -163,9 +180,41 @@ Map<String, _V3> _poseFor(String animationKey, double t) {
     armZ = -0.1;
     elbowY = 1.1 + pull * 0.25;
     wristY = 0.95 + pull * 0.3;
+  } else if (key.contains('lunge') || key.contains('zancada')) {
+    final step = phase;
+    hipY -= 0.2 * step;
+    kneeY -= 0.1 * step;
+    kneeZ += 0.32 * step;
+    ankleZ += 0.48 * step;
+    shoulderY -= 0.2 * step;
+    elbowY -= 0.17 * step;
+    wristY -= 0.15 * step;
+    armZ = -0.18 * step;
+    armSpread = 0.12;
+    torsoLean = 0.12 * step;
+  } else if (key.contains('jump') || key.contains('jack')) {
+    // Jumping jack: los brazos suben y las piernas se abren.
+    final open = phase;
+    shoulderY += 0.05 * open;
+    elbowY = 1.34 + 0.3 * open;
+    wristY = 1.28 + 0.46 * open;
+    armSpread = 0.24 + 0.18 * open;
+    kneeZ += 0.26 * open;
+    ankleZ += 0.3 * open;
+  } else if (key.contains('breath') ||
+      key.contains('respir') ||
+      key.contains('diaphragm')) {
+    // Respiracion diafragmatica: manos sobre el abdomen y pecho quieto.
+    final calm = phase;
+    shoulderY -= 0.015 * calm;
+    elbowY = 1.06 + 0.04 * calm;
+    wristY = 0.94 + 0.06 * calm;
+    armSpread = 0.11;
+    armZ = 0.16;
   } else if (key.contains('walk') ||
       key.contains('caminata') ||
-      key.contains('trote') ||
+      key.contains('jog') ||
+      key.contains('trot') ||
       key.contains('run')) {
     final swing = math.sin(t * 2 * math.pi);
     kneeZ += 0.22 * swing;
@@ -227,6 +276,7 @@ Map<String, _V3> _horizontalBody({
   required double legAngle,
   required double headLift,
   bool forearmDown = false,
+  double legDrive = 0,
 }) {
   const bodyLength = 1.0;
   const hip = _V3(0, 0.55, 0);
@@ -255,6 +305,7 @@ Map<String, _V3> _horizontalBody({
 
   final knee = _V3(0, hip.y - 0.45 * math.sin(legAngle), -0.45 * math.cos(legAngle));
   final ankle = _V3(0, knee.y - 0.42, knee.z);
+  final drive = 0.34 * legDrive;
 
   return {
     'head': head,
@@ -270,10 +321,10 @@ Map<String, _V3> _horizontalBody({
     'wristR': _V3(0.24, wrist.y, wrist.z),
     'hipL': _V3(-0.12, hip.y, hip.z),
     'hipR': _V3(0.12, hip.y, hip.z),
-    'kneeL': _V3(-0.13, knee.y, knee.z),
-    'kneeR': _V3(0.13, knee.y, knee.z),
-    'ankleL': _V3(-0.13, ankle.y, ankle.z),
-    'ankleR': _V3(0.13, ankle.y, ankle.z),
+    'kneeL': _V3(-0.13, knee.y, knee.z - drive),
+    'kneeR': _V3(0.13, knee.y, knee.z + drive),
+    'ankleL': _V3(-0.13, ankle.y, ankle.z - drive * 1.25),
+    'ankleR': _V3(0.13, ankle.y, ankle.z + drive * 1.25),
   };
 }
 

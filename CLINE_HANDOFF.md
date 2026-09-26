@@ -276,6 +276,27 @@ y el modelo por defecto de OpenRouter cambio a `google/gemma-4-31b-it:free`
 Con solo Gemini configurado el Coach agota la cuota y responde 503 con mensaje
 claro. Para uso sostenido hace falta `OPENROUTER_API_KEY` (o `MISTRAL_API_KEY`).
 
+### OpenRouter: la clave es valida, pero los modelos :free son intermitentes
+
+Con la clave `OPENROUTER_API_KEY` del usuario la autenticacion funciona (no hay
+401), pero las llamadas fallan con 429 del propio proveedor:
+
+```
+google/gemma-4-31b-it:free  -> 429
+  "google/gemma-4-31b-it:free is temporarily rate-limited upstream"
+  "limit_source": "upstream_provider_shared_pool"
+```
+
+Los modelos `:free` comparten un pool de limite global entre todos los usuarios
+de OpenRouter, asi que un mismo modelo alterna entre responder y devolver 429.
+`_call_openai_compatible` ahora itera una lista de candidatos
+(`MODEL_CANDIDATES["openrouter"]`) y devuelve el primero que responde, con
+`per_model_timeout = timeout / 2`. Se puede sobrescribir con
+`OPENROUTER_MODELS` (lista separada por comas).
+
+Verificado extremo a extremo: con la cuota de Gemini agotada, el Coach responde
+`provider: "openrouter"` con plan completo de 5 ejercicios y nutricion.
+
 ### Emulador Android no disponible en esta maquina
 
 `emulator -avd medium_phone` falla con:
