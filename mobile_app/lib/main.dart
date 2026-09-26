@@ -7,6 +7,7 @@ import 'package:mobile_app/screens/nutrition_screen.dart';
 import 'package:mobile_app/screens/progress_screen.dart';
 import 'package:mobile_app/screens/workouts_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/widgets/app_update.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +55,10 @@ class _AuthGateState extends State<AuthGate> {
       if (mounted && restored) {
         setState(() => _isAuthenticated = true);
       }
+    });
+    // Busca actualizaciones al abrir la app, sin molestar si ya esta al dia.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) checkForUpdatesOnStart(context);
     });
   }
 

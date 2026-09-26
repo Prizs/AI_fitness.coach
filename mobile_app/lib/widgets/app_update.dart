@@ -5,23 +5,36 @@ import 'package:mobile_app/services/app_update_service.dart';
 
 /// Revisa el backend y, si hay una version mas nueva, ofrece instalarla.
 ///
-/// Se puede llamar desde cualquier pantalla; si la app ya esta al dia avisa
-/// mediante un `SnackBar` con el motivo de la consulta.
-Future<void> checkForAppUpdate(BuildContext context) async {
+/// Con [silent] en true (usado al abrir la app) no avisa cuando ya estas al
+/// dia: solo aparece el dialogo si hay algo nuevo.
+Future<void> checkForAppUpdate(
+  BuildContext context, {
+  bool silent = false,
+}) async {
   final service = AppUpdateService();
   final remote = await service.checkForUpdate();
 
   if (!context.mounted) return;
 
   if (remote == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(service.lastError ?? 'Tu app ya esta actualizada.'),
-      ),
-    );
+    if (!silent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(service.lastError ?? 'Tu app ya esta actualizada.'),
+        ),
+      );
+    }
     return;
   }
 
+  await _promptUpdate(context, remote);
+}
+
+/// Comprobacion silenciosa al arrancar la app.
+Future<void> checkForUpdatesOnStart(BuildContext context) =>
+    checkForAppUpdate(context, silent: true);
+
+Future<void> _promptUpdate(BuildContext context, RemoteVersion remote) async {
   final shouldInstall = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(

@@ -1,4 +1,15 @@
-# AI Fitness Coach 1.0.2
+# AI Fitness Coach 1.0.3
+
+## Correccion: el boton de actualizaciones no se veia
+- El control antes vivia solo al final del scroll de la pantalla de login, asi
+  que no aparecia si ya estabas registrado.
+- Ahora hay **tres** puntos de acceso:
+  1. **Al abrir la app** se comprueba solo y aparece el dialogo si hay version
+     nueva (sin molestar si ya estas al dia).
+  2. **Pantalla de Coach**: icono de actualizacion en la barra superior.
+  3. **Pantalla de login**: chip fijo en la esquina superior derecha con la
+     version instalada (p. ej. `v1.0.2`), siempre visible sin desplazar.
+- Se refactorizo la pantalla de login para que el boton no dependa del scroll.
 
 ## Atlas anatomico de musculos
 - Nueva pestana **Musculos** con un atlas anatomico real del cuerpo humano

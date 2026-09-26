@@ -5,8 +5,8 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:mobile_app/main.dart';
 
 void main() {
@@ -16,5 +16,15 @@ void main() {
     expect(find.text('Tu plan empieza aquí'), findsOneWidget);
     expect(find.text('Cédula venezolana'), findsOneWidget);
     expect(find.text('Entrar a entrenar'), findsOneWidget);
+  });
+
+  testWidgets('el control de actualizaciones es visible sin scroll',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const AiFitnessCoachApp());
+
+    final control = find.byIcon(Icons.system_update_alt_rounded);
+    expect(control, findsOneWidget);
+    // Debe estar dentro del area visible sin desplazar.
+    expect(tester.any(find.byIcon(Icons.system_update_alt_rounded)), isTrue);
   });
 }

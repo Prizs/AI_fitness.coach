@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:mobile_app/screens/workout_schedule_screen.dart';
 import 'package:mobile_app/screens/user_profile_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/widgets/app_update.dart';
 
 class CoachScreen extends StatefulWidget {
   const CoachScreen({super.key});
@@ -117,6 +118,11 @@ class _CoachScreenState extends State<CoachScreen> {
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.system_update_alt_rounded, color: Color(0xFF8BE0C0)),
+            tooltip: 'Buscar actualizaciones',
+            onPressed: () => checkForAppUpdate(context),
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BE0C0)),
             tooltip: 'Cronograma Semanal',
