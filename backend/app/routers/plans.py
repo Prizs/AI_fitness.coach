@@ -1,4 +1,6 @@
+import hashlib
 import json
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -34,6 +36,39 @@ class PlanFeedback(BaseModel):
     restriction_category: str | None = Field(default=None, max_length=40)
     safe_outcome: bool = False
     learning_consent: bool = False
+
+
+# Cache en memoria: evita volver a llamar a la IA cuando el mismo perfil pide
+# el plan varias veces seguidas (por ejemplo al abrir Rutinas y Nutricion).
+PLAN_CACHE_TTL_SEC = 1800
+PLAN_CACHE_MAX_ENTRIES = 50
+_PLAN_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _cache_key(payload: PlanRequest) -> str:
+    data = payload.model_dump()
+    data.pop("learning_consent", None)
+    return hashlib.sha256(
+        json.dumps(data, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def _cached_plan(key: str) -> dict | None:
+    entry = _PLAN_CACHE.get(key)
+    if entry is None:
+        return None
+    created_at, plan = entry
+    if time.time() - created_at > PLAN_CACHE_TTL_SEC:
+        _PLAN_CACHE.pop(key, None)
+        return None
+    return dict(plan)
+
+
+def _store_plan(key: str, plan: dict) -> None:
+    if len(_PLAN_CACHE) >= PLAN_CACHE_MAX_ENTRIES:
+        oldest = min(_PLAN_CACHE.items(), key=lambda item: item[1][0])[0]
+        _PLAN_CACHE.pop(oldest, None)
+    _PLAN_CACHE[key] = (time.time(), plan)
 
 
 def _fallback_plan(payload: PlanRequest) -> dict:
@@ -165,7 +200,15 @@ No diagnostiques ni prescribas tratamientos."""
 
 @router.post("/generate")
 def generate_plan(payload: PlanRequest):
-    return _ai_plan(payload) or _fallback_plan(payload)
+    key = _cache_key(payload)
+    cached = _cached_plan(key)
+    if cached is not None:
+        cached["cached"] = True
+        return cached
+
+    plan = _ai_plan(payload) or _fallback_plan(payload)
+    _store_plan(key, plan)
+    return {**plan, "cached": False}
 
 
 @router.post("/feedback")

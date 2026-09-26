@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/models/schedule_models.dart';
-import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
+import 'package:mobile_app/widgets/exercise_detail.dart';
 
 class WorkoutScheduleScreen extends StatefulWidget {
   const WorkoutScheduleScreen({super.key});
@@ -380,12 +380,11 @@ class _Interactive3DViewer extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Exercise3DViewer(
+          ExerciseDetailView(
             animationKey: exercise.animationKey,
             primaryMuscle: exercise.primaryMuscle,
             secondaryMuscle: exercise.secondaryMuscle,
             height: 300,
-            showMuscleLegend: false,
           ),
           const SizedBox(height: 8),
           const Text(

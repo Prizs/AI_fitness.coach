@@ -353,6 +353,67 @@ instala copiandolo al telefono o con `adb install`. La app pide permiso de
 Requisitos para ver el Coach en el movil: PC y telefono en la misma red WiFi y
 el firewall de Windows permitiendo el puerto 8000.
 
+## Atlas anatomico de musculos (2026-09-26, v1.0.2)
+
+El figureto 3D dibujado con `CustomPainter` se veia amateur. Se evaluaron tres
+alternativas y se eligio `flutter_body_atlas`:
+
+| Opcion | Licencia | Tamano | Decision |
+| --- | --- | --- | --- |
+| `flutter_body_atlas` (SVG anatomico) | CC BY 4.0 (Ryan Graves) | ~1 MB en la app | **Elegida** |
+| `human-anatomy.glb` de Sketchfab | CC BY | 521k triangulos (~20 MB) | Descartada: pesa demasiado |
+| Open 3D Model de anatomytool.org | CC BY-SA, no comercial | muy grande | Descartada: licencia restrictiva |
+
+Implementacion:
+
+- `lib/services/muscle_map.dart`: traduce el texto del musculo que devuelve la
+  IA a los IDs del atlas. Los 134 IDs se verificaron leyendo el catalogo del
+  paquete, no de memoria, para no referenciar musculos inexistentes.
+- `lib/widgets/muscle_map_view.dart`: atlas con vista frontal/posterior,
+  agonista en rojo, sinergista en ambar y toque para ver el nombre anatomico.
+- `lib/widgets/exercise_detail.dart`: pestanas **3D** y **Musculos**. Abre en
+  Musculos cuando el ejercicio tiene musculos reconocidos.
+- Atribucion visible en la propia vista: "Atlas anatomico CC BY 4.0".
+
+## Rendimiento de Rutinas y Nutricion (2026-09-26)
+
+Causa raiz: cada apertura de pestaña pedia `/api/plans/generate`, que hace una
+llamada a la IA de 11 a 30 segundos.
+
+Solucion en dos capas:
+
+1. Backend (`plans.py`): cache en memoria con TTL de 30 minutos, clave por hash
+   del perfil y tope de 50 entradas. La respuesta incluye `cached: true/false`.
+2. Flutter (`plan_service.dart`): guarda el plan en `flutter_secure_storage`
+   durante 6 horas, con una firma del perfil para invalidarlo si el usuario
+   cambia de datos. `generate(..., forceRefresh: true)` lo salta.
+
+Medicion real contra el backend:
+
+```
+Llamada 1 (sin cache)  -> 11.07 s
+Llamada 2 (cache)      ->  0.003 s
+Llamada 3 (cache)      ->  0.003 s
+```
+
+La pantalla de Rutinas muestra un boton de refrescar para forzar un plan nuevo.
+
+## Chat del Coach (2026-09-26)
+
+El `TextField` era de una sola linea. Ahora usa `minLines: 1`, `maxLines: null` y
+`maxHeight: 150`, de modo que el cuadro crece hacia abajo mientras se escribe y
+empuja la lista de mensajes hacia arriba. Enter inserta salto de linea y el
+envio queda en el boton, que se deshabilita cuando el texto esta vacio.
+
+## Publicar una version nueva
+
+1. Editar el codigo.
+2. Subir `version:` en `mobile_app/pubspec.yaml` (el numero tras el `+`).
+3. Actualizar `mobile_app/RELEASE_NOTES.md`.
+4. `flutter build apk --release --dart-define=API_BASE_URL=http://<IP>:8000`.
+5. El backend publica la version nueva en `/api/app/latest` automaticamente.
+6. Los telefonos la detectan con "Buscar actualizaciones".
+
 ## Actualizacion desde la propia app (2026-09-26)
 
 La app ya no depende de reinstalar el APK a mano.

@@ -247,36 +247,58 @@ class _CoachScreenState extends State<CoachScreen> {
               ),
             ),
 
-            // Barra de Entrada de Texto
+            // Barra de entrada: el cuadro crece hacia abajo al escribir y
+            // empuja los mensajes hacia arriba para poder leerlos.
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
               decoration: const BoxDecoration(
                 color: Color(0xFF0F192B),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      decoration: InputDecoration(
-                        hintText: 'Pregunta o pide un objetivo a tu Coach...',
-                        hintStyle: const TextStyle(color: Colors.white38),
-                        filled: true,
-                        fillColor: const Color(0xFF0A0F1D),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 150),
+                      child: TextField(
+                        controller: _controller,
+                        minLines: 1,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          hintText: _controller.text.isEmpty
+                              ? 'Escribe tu pregunta...'
+                              : null,
+                          hintStyle: const TextStyle(color: Colors.white38),
+                          filled: true,
+                          fillColor: const Color(0xFF0A0F1D),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
                       ),
-                      onSubmitted: _sendMessage,
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
                     style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFF8BE0C0),
+                      backgroundColor: _controller.text.trim().isEmpty
+                          ? const Color(0xFF2A3A4A)
+                          : const Color(0xFF8BE0C0),
                       foregroundColor: const Color(0xFF0B1220),
+                      minimumSize: const Size(48, 48),
                     ),
                     icon: const Icon(Icons.send_rounded),
-                    onPressed: () => _sendMessage(_controller.text),
+                    onPressed: _controller.text.trim().isEmpty
+                        ? null
+                        : () => _sendMessage(_controller.text),
                   ),
                 ],
               ),

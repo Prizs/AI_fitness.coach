@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/plan_service.dart';
-import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
+import 'package:mobile_app/widgets/exercise_detail.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -20,10 +20,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     _load();
   }
 
-  void _load() {
+  void _load({bool forceRefresh = false}) {
     final profile = AuthService.instance.loggedInUser;
     setState(() {
-      _plan = _service.generate(profile);
+      _plan = _service.generate(profile, forceRefresh: forceRefresh);
     });
   }
 
@@ -49,14 +49,31 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
               }
               return ListView(
                 children: [
-                  const Text(
-                    'Rutinas',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Rutinas',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Generar un plan nuevo',
+                        onPressed: () => _load(forceRefresh: true),
+                        icon: const Icon(Icons.refresh_rounded,
+                            color: Color(0xFF8BE0C0)),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Generado por ${snapshot.data?['provider'] ?? 'IA'}',
-                    style: const TextStyle(color: Colors.white70),
+                    _service.lastFromCache
+                        ? 'Mostrando tu plan guardado · toca el icono para generar uno nuevo'
+                        : 'Generado por ${snapshot.data?['provider'] ?? 'IA'}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                   const SizedBox(height: 18),
                   ...sessions.map(
@@ -245,7 +262,7 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet> {
             ],
           ),
           const SizedBox(height: 20),
-          Exercise3DViewer(
+          ExerciseDetailView(
             animationKey: animKey,
             primaryMuscle: widget.exercise['primary_muscle'] as String?,
             secondaryMuscle: widget.exercise['secondary_muscle'] as String?,
