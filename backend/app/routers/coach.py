@@ -1,4 +1,4 @@
-﻿import json
+import json
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -33,6 +33,8 @@ class ChatMessage(BaseModel):
     motor_disability: str | None = Field(default=None, max_length=1000)
     areas_to_avoid: str | None = Field(default=None, max_length=500)
     rpe_feedback: int | None = Field(default=None, ge=1, le=10)
+    age: int | None = Field(default=None, ge=12, le=100)
+    weight: float | None = Field(default=None, gt=0, le=300)
 
 
 def _normalize_exercises(raw_exercises) -> list[dict]:
@@ -76,6 +78,8 @@ def _normalize_structured_plan(raw_plan) -> dict | None:
 
 def _profile_context(payload: ChatMessage) -> str:
     return (
+        f"Edad: {payload.age if payload.age is not None else 'No indicada'}. "
+        f"Peso: {payload.weight if payload.weight is not None else 'No indicado'} kg. "
         f"Meta: {payload.user_goal or 'Rendimiento general'}. "
         f"Nivel: {payload.user_level or 'Intermedio'}. "
         f"Alergias: {payload.allergies or 'Ninguna'}. "
@@ -101,7 +105,11 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
         raise AllProvidersFailed({})
 
     prompt = (
-        "Eres un Coach de Fitness y Nutricion altamente interactivo y empatico. Responde en espanol, de forma tecnica y motivadora.\n" "REGLA DE ORO: Al inicio de cualquier solicitud, siempre pregÃºntale al usuario cÃ³mo se siente hoy fÃ­sicamente: si tiene alguna molestia, dolor, incomodidad o malestar. " "Dependiendo de su respuesta o si manifiesta molestias, decide si es mejor recomendarle un descanso, modificar la rutina para evitar la zona afectada, o continuar con normalidad.\n" "Ademas, si pide una rutina pero faltan datos (edad, peso, equipo, tiempo libre), hazle preguntas para personalizarla al 100%.\n"
+        "Eres un Coach de Fitness y Nutricion altamente interactivo y empatico. Responde en espanol, de forma tecnica y motivadora.\n"
+        "REGLA DE ORO: Al inicio de cualquier solicitud de entrenamiento, siempre preguntale al usuario COMO SE SIENTE HOY FISICAMENTE (si tiene dolores, molestias, nivel de energia o cansancio). "
+        "Dependiendo de su respuesta, decide si es mejor darle descanso, modificar la rutina o continuar con normalidad.\n"
+        "IMPORTANTE: El usuario ya proporciono su EDAD y PESO en su perfil (leelos en los Datos del usuario abajo). NO le preguntes su edad. El peso solo preguntalo ocasionalmente (cada 3-7 dias) si es relevante para su progreso, pero NUNCA en la primera interaccion.\n"
+        "Pregunta por equipo disponible o tiempo si no lo ha mencionado.\n"
         "Respeta estrictamente las lesiones, alergias, discapacidad motora y zonas a evitar indicadas: "
         "no propongas ejercicios ni alimentos que las contradigan y aclaralo si aplica.\n"
         "Retorna EXCLUSIVAMENTE un objeto JSON valido con esta estructura:\n"
