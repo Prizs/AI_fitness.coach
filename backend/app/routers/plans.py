@@ -9,11 +9,26 @@ from pydantic import BaseModel, Field
 
 from app.services.ai_providers import configured_providers, generate_json_text
 from app.services.supabase_service import get_supabase_admin_client
+from app.services.weekly_plan import build_weekly_plan
 
 router = APIRouter()
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 GEMINI_TIMEOUT_SEC = 20.0
+
+# Cache de la semana: la app la pide al abrir, asi que se evita regenerarla.
+WEEK_CACHE_TTL_SEC = 3600
+WEEK_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+class WeeklyRequest(BaseModel):
+    goal: str = Field(default="mejorar condicion fisica", max_length=120)
+    level: str = Field(default="intermedio", max_length=40)
+    age: int = Field(default=25, ge=12, le=100)
+    weight: float = Field(default=70, gt=0, le=300)
+    food_allergies: str | None = Field(default=None, max_length=1000)
+    current_injuries: str | None = Field(default=None, max_length=1000)
+    areas_to_avoid: str | None = Field(default=None, max_length=500)
 
 
 class PlanRequest(BaseModel):
@@ -22,12 +37,20 @@ class PlanRequest(BaseModel):
     days_per_week: int = Field(..., ge=1, le=7)
     age: int = Field(..., ge=12, le=100)
     weight: float = Field(..., gt=0, le=300)
+    height: float | None = Field(default=None, gt=0, le=260)
+    sex: str | None = Field(default=None, max_length=20)
     health_notes: str | None = Field(default=None, max_length=1000)
     food_allergies: str | None = Field(default=None, max_length=1000)
     current_injuries: str | None = Field(default=None, max_length=1000)
     motor_disability: str | None = Field(default=None, max_length=1000)
     areas_to_avoid: str | None = Field(default=None, max_length=500)
     learning_consent: bool = False
+
+
+# Dias de la semana en el orden que usa el telefono (DateTime.weekday).
+WEEKDAY_NAMES = [
+    "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo",
+]
 
 
 class PlanFeedback(BaseModel):
@@ -209,6 +232,24 @@ def generate_plan(payload: PlanRequest):
     plan = _ai_plan(payload) or _fallback_plan(payload)
     _store_plan(key, plan)
     return {**plan, "cached": False}
+
+
+@router.post("/weekly")
+def weekly_plan(payload: WeeklyRequest):
+    """Devuelve la semana completa: 7 dias con rutina, nutricion y sinergia.
+
+    Es lo que consume el telefono al abrir, para que Rutinas y Nutricion
+    muestren el dia actual sin tener que esperar a una IA.
+    """
+    profile = payload.model_dump()
+    key = _cache_key(payload)
+    entry = WEEK_CACHE.get(key)
+    if entry is not None and time.time() - entry[0] <= WEEK_CACHE_TTL_SEC:
+        return {**entry[1], "cached": True}
+
+    week = build_weekly_plan(profile)
+    WEEK_CACHE[key] = (time.time(), week)
+    return {**week, "cached": False}
 
 
 @router.post("/feedback")

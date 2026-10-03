@@ -1,7 +1,8 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import app_updates, auth, coach, plans, workouts, recalibration
+from app.routers import app_updates, auth, coach, plans, workouts, recalibration, exercises
 from app.services.ai_providers import PROVIDER_ORDER, configured_providers
 from app.services.supabase_service import check_supabase_connection
 
@@ -11,6 +12,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.mount('/static', StaticFiles(directory='app/static'), name='static')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,6 +27,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(plans.router, prefix="/api/plans", tags=["plans"])
 app.include_router(workouts.router, prefix="/api/workout", tags=["workout"])
 app.include_router(recalibration.router, prefix="/api/recalibration", tags=["recalibration"])
+app.include_router(exercises.router, prefix="/api/exercises", tags=["exercises"])
 
 
 @app.get("/health")
