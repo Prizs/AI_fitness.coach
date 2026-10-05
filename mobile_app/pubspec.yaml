@@ -1,4 +1,4 @@
-name: mobile_app
+﻿name: mobile_app
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.4+5
+version: 1.0.39+40
 
 environment:
   sdk: ^3.13.4
@@ -38,6 +38,12 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   # Atlas anatomico de musculos (SVG, CC BY 4.0 - atribucion a Ryan Graves).
   flutter_body_atlas: ^0.2.1
+
+  # Visor 3D del modelo anatomico (glTF/GLB) con controles tactiles.
+  model_viewer_plus: ^1.7.0
+  lottie: ^3.6.1
+  sqflite: ^2.4.4
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:
