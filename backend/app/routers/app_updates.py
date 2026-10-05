@@ -21,7 +21,7 @@ def latest_version() -> dict:
 
 @router.get("/download")
 def download_apk():
-    """Redirige directamente al APK alojado en GitHub para descarga ultra-rapida."""
+    """Redirige directamente al APK."""
     return RedirectResponse(
-        url="https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/releases/app-release.apk"
+        url="https://files.catbox.moe/9ywvgr.apk"
     )
