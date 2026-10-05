@@ -24,6 +24,8 @@ WEEK_CACHE: dict[str, tuple[float, dict]] = {}
 class WeeklyRequest(BaseModel):
     goal: str = Field(default="mejorar condicion fisica", max_length=120)
     level: str = Field(default="intermedio", max_length=40)
+    experience_level: str = Field(default="Intermedio", max_length=40)
+    intensity_preference: str = Field(default="Medio", max_length=40)
     age: int = Field(default=25, ge=12, le=100)
     weight: float = Field(default=70, gt=0, le=300)
     food_allergies: str | None = Field(default=None, max_length=1000)
