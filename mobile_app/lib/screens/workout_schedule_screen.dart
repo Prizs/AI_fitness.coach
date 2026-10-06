@@ -1,6 +1,11 @@
+import 'package:mobile_app/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_app/models/schedule_models.dart';
 import 'package:mobile_app/widgets/exercise_detail.dart';
+import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/models/anatomy_exercise.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class WorkoutScheduleScreen extends StatefulWidget {
   const WorkoutScheduleScreen({super.key});
@@ -13,152 +18,137 @@ class _WorkoutScheduleScreenState extends State<WorkoutScheduleScreen> {
   int _selectedDayIndex = 0;
   final List<String> _days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
-  late List<DaySchedule> _weeklySchedule;
+  final WeeklyPlanService _service = WeeklyPlanService.instance;
 
   @override
   void initState() {
     super.initState();
-    _weeklySchedule = [
-      DaySchedule(
-        dayName: 'Lunes',
-        title: 'Fase Cardio-Pulmonar & Resistencia',
-        focus: 'Zona 2 & Umbral Anaeróbico',
-        exercises: [
-          ExerciseItem(name: 'Intervalos aeróbicos en remo/carrera', sets: 4, reps: '3 min ritmo vivo', animationKey: 'row-intervals', primaryMuscle: 'Cardio', secondaryMuscle: 'Piernas'),
-          ExerciseItem(name: 'Sentadillas con tempo 3-1-1', sets: 4, reps: '15 reps', animationKey: 'squat', primaryMuscle: 'Cuádriceps', secondaryMuscle: 'Glúteos'),
-          ExerciseItem(name: 'Plancha con respiración diafragmática', sets: 3, reps: '45 seg', animationKey: 'front-plank', primaryMuscle: 'Core', secondaryMuscle: 'Hombros'),
-        ],
-        meals: {
-          'Desayuno': 'Avena con leche vegetal, frutos rojos y zumo de remolacha (rico en nitratos).',
-          'Almuerzo': 'Pechuga a la plancha con quinoa, espinacas y zanahoria al vapor.',
-          'Cena': 'Tortilla de claras con espárragos y aguacate.',
-          'Snack': 'Plátano maduro con un puñado de nueces.',
-        },
-      ),
-      DaySchedule(
-        dayName: 'Martes',
-        title: 'Recuperación Activa & Movilidad',
-        focus: 'Movilidad articular y descanso',
-        isRestDay: true,
-        exercises: [
-          ExerciseItem(name: 'Caminata suave / Movilidad torácica', sets: 1, reps: '30 min', animationKey: 'walk', primaryMuscle: 'Oxigenación', secondaryMuscle: 'Articular'),
-        ],
-        meals: {
-          'Desayuno': 'Yogur natural con semillas de chía y papaya.',
-          'Almuerzo': 'Lentejas guisadas con verduras variadas y arroz integral.',
-          'Cena': 'Crema de calabacín y filete de merluza al vapor.',
-        },
-      ),
-      DaySchedule(
-        dayName: 'Miércoles',
-        title: 'Potencia & Capacidad Muscular',
-        focus: 'Fuerza funcional y respiración',
-        exercises: [
-          ExerciseItem(name: 'Kettlebell swings / Zancadas', sets: 4, reps: '12 reps', animationKey: 'swing', primaryMuscle: 'Isquiotibiales', secondaryMuscle: 'Glúteos'),
-          ExerciseItem(name: 'Press de pecho inclinado', sets: 3, reps: '12 reps', animationKey: 'incline-push-up', primaryMuscle: 'Pectoral', secondaryMuscle: 'Tríceps'),
-        ],
-        meals: {
-          'Desayuno': 'Batido de proteína vegetal, espinacas tiernas, plátano y agua de coco.',
-          'Almuerzo': 'Salmón a la plancha con batata asada y ensalada con aceite de oliva.',
-          'Cena': 'Wok de verduras con tofu o pollo troceado.',
-        },
-      ),
-      DaySchedule(
-        dayName: 'Jueves',
-        title: 'Descanso Total',
-        focus: 'Regeneración celular y mitocondrial',
-        isRestDay: true,
-        exercises: [],
-        meals: {
-          'Desayuno': 'Tostadas integrales con tomate rallado y aceite de oliva.',
-          'Almuerzo': 'Arroz salvaje con pavo y ensalada mixta.',
-          'Cena': 'Sopa ligera de verduras y huevo cocido.',
-        },
-      ),
-      DaySchedule(
-        dayName: 'Viernes',
-        title: 'Circuito HIIT de Alta Eficiencia',
-        focus: 'VO2 Max y resistencia al lactato',
-        exercises: [
-          ExerciseItem(name: 'Burpees adaptados o Jumping jacks', sets: 4, reps: '40 seg trabajo', animationKey: 'burpee', primaryMuscle: 'Cardio', secondaryMuscle: 'Cuerpo entero'),
-          ExerciseItem(name: 'Remo con mancuernas', sets: 4, reps: '12 reps', animationKey: 'dumbbell-row', primaryMuscle: 'Dorsal ancho', secondaryMuscle: 'Bíceps'),
-        ],
-        meals: {
-          'Desayuno': 'Pancakes de avena y plátano con miel pura.',
-          'Almuerzo': 'Pasta integral con atún al natural y salsa de tomate casera.',
-          'Cena': 'Pechuga a la plancha con brócoli y champiñones.',
-        },
-      ),
-      DaySchedule(
-        dayName: 'Sábado',
-        title: 'Fuerza de Tronco y Postura',
-        focus: 'Cadena posterior y respiración diafragmática',
-        exercises: [
-          ExerciseItem(name: 'Puente de glúteos unilateral', sets: 3, reps: '12 por pierna', animationKey: 'glute-bridge', primaryMuscle: 'Glúteo mayor', secondaryMuscle: 'Core'),
-          ExerciseItem(name: 'Press militar con mancuernas', sets: 3, reps: '10 reps', animationKey: 'seated-shoulder-press', primaryMuscle: 'Deltoides', secondaryMuscle: 'Tríceps'),
-        ],
-        meals: {
-          'Desayuno': 'Huevos revueltos con espinacas y pan de centeno.',
-          'Almuerzo': 'Guiso de garbanzos con verduras y ternera magra.',
-          'Cena': 'Ensalada completa con queso fresco desnatado y semillas de sésamo.',
-        },
-      ),
-      DaySchedule(
-        dayName: 'Domingo',
-        title: 'Descanso y Recalibración IA',
-        focus: 'Evaluación del progreso semanal',
-        isRestDay: true,
-        exercises: [],
-        meals: {
-          'Desayuno': 'Macedonia de frutas de temporada con yogur griego.',
-          'Almuerzo': 'Paella de verduras o arroz con pollo campero.',
-          'Cena': 'Crema de verduras y pescado blanco.',
-        },
-      ),
-    ];
-  }
-
-  void _markExerciseFeedback(ExerciseItem exercise) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF101B2D),
-        title: Text('Feedback: ${exercise.name}', style: const TextStyle(fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('¿Pudiste completar todas las series y repeticiones?', style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 14),
-            const Text('Nivel de esfuerzo percibido (RPE):', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [6, 7, 8, 9, 10].map((rpe) => ActionChip(
-                backgroundColor: exercise.rpe == rpe ? const Color(0xFF8BE0C0) : const Color(0xFF173B45),
-                label: Text('RPE $rpe', style: TextStyle(color: exercise.rpe == rpe ? Colors.black : Colors.white)),
-                onPressed: () {
-                  setState(() {
-                    exercise.isCompleted = true;
-                    exercise.rpe = rpe;
-                  });
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(rpe <= 7 ? '¡Excelente! La IA programará +2.5kg o +2 reps la próxima sesión.' : 'Registrado. El Coach mantendrá el volumen para evitar fatiga excesiva.'),
-                    ),
-                  );
-                },
-              )).toList(),
-            ),
-          ],
-        ),
-      ),
-    );
+    _selectedDayIndex = _service.todayIndex;
+    _service.addListener(_onServiceUpdate);
+    _service.ensureLoaded(AuthService.instance.loggedInUser);
   }
 
   @override
+  void dispose() {
+    _service.removeListener(_onServiceUpdate);
+    super.dispose();
+  }
+
+  void _onServiceUpdate() {
+    if (mounted) setState(() {});
+  }
+
+  void _markExerciseFeedback(ExerciseItem ex) {
+    setState(() {
+      ex.isCompleted = !ex.isCompleted;
+    });
+  }
+
+  List<DaySchedule> get _weeklySchedule {
+    if (_service.week == null) return [];
+    
+    List<DaySchedule> schedule = [];
+    try {
+      final dynamic daysData = _service.week!['days'];
+      List<dynamic> days = [];
+      if (daysData is List) {
+        days = daysData;
+      } else if (daysData is Map) {
+        days = daysData.values.toList();
+      }
+      
+      for (int i = 0; i < 7; i++) {
+        dynamic dayData;
+        try {
+          dayData = days.firstWhere((d) => (d is Map) && (d['weekday'] == i || d['weekday'] == i.toString()), orElse: () => null);
+        } catch (_) {}
+        
+        if (dayData != null && dayData is Map) {
+          List<ExerciseItem> exercises = [];
+          if (dayData['exercises'] is List) {
+            for (var ex in dayData['exercises']) {
+              try {
+                if (ex is Map<String, dynamic>) {
+                  exercises.add(ExerciseItem.fromJson(ex));
+                } else if (ex is Map) {
+                  exercises.add(ExerciseItem.fromJson(Map<String, dynamic>.from(ex)));
+                }
+              } catch (e) {
+                // Ignore invalid exercise
+              }
+            }
+          }
+          
+          Map<String, String> meals = {};
+          if (dayData['nutrition'] is Map) {
+            final nut = dayData['nutrition'];
+            if (nut['desayuno'] != null) meals['Desayuno'] = nut['desayuno'].toString();
+            if (nut['almuerzo'] != null) meals['Almuerzo'] = nut['almuerzo'].toString();
+            if (nut['cena'] != null) meals['Cena'] = nut['cena'].toString();
+            if (nut['snack'] != null) meals['Snack'] = nut['snack'].toString();
+          }
+          
+          schedule.add(DaySchedule(
+            dayName: _days[i],
+            title: dayData['title']?.toString() ?? 'Rutina del Día',
+            focus: 'Enfoque General',
+            exercises: exercises,
+            meals: meals,
+          ));
+        } else {
+          schedule.add(DaySchedule(
+            dayName: _days[i],
+            title: 'Día de Descanso',
+            focus: 'Recuperación Activa',
+            exercises: [],
+            meals: {},
+            isRestDay: true,
+          ));
+        }
+      }
+    } catch (e) {
+      // If parsing fails completely, just return 7 rest days
+      for (int i = 0; i < 7; i++) {
+        schedule.add(DaySchedule(
+          dayName: _days[i],
+          title: 'Error de Formato',
+          focus: 'Recuperación Activa',
+          exercises: [],
+          meals: {},
+          isRestDay: true,
+        ));
+      }
+    }
+    return schedule;
+  }
+
+@override
   Widget build(BuildContext context) {
+    if (_service.isLoading && _service.week == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0A0F1D),
+        appBar: AppBar(
+          title: const Text('Cronograma Interactivo', style: TextStyle(fontWeight: FontWeight.w800)),
+          backgroundColor: const Color(0xFF0F192B),
+          elevation: 0,
+        ),
+        body: const Center(child: CircularProgressIndicator(color: Color(0xFF8BE0C0))),
+      );
+    }
+    
+    if (_weeklySchedule.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0A0F1D),
+        appBar: AppBar(
+          title: const Text('Cronograma Interactivo', style: TextStyle(fontWeight: FontWeight.w800)),
+          backgroundColor: const Color(0xFF0F192B),
+          elevation: 0,
+        ),
+        body: const Center(
+          child: Text('No hay rutina generada.\nPide a tu coach que genere un plan.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+        ),
+      );
+    }
     final currentDay = _weeklySchedule[_selectedDayIndex];
 
     return Scaffold(
@@ -286,14 +276,38 @@ class _WorkoutScheduleScreenState extends State<WorkoutScheduleScreen> {
                       ),
                       icon: const Icon(Icons.threed_rotation_rounded, size: 16),
                       label: const Text('3D', style: TextStyle(fontSize: 12)),
-                      onPressed: () {
-                        // Modal 3D didáctico
+                      onPressed: () async {
+                        showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+                        List<AnatomyExercise> dyn = [];
+                        for (var e in currentDay.exercises) {
+                          String url = '';
+                          try {
+                            final res = await http.get(Uri.parse('https://ai-fitness-coach-818a.onrender.com/api/exercises/gif?query=' + Uri.encodeComponent(e.name)));
+                            if (res.statusCode == 200) {
+                              url = jsonDecode(res.body)['url'] ?? '';
+                            }
+                          } catch (_) {}
+                          dyn.add(AnatomyExercise(
+                            id: e.name,
+                            name: e.name,
+                            shortName: e.name,
+                            gifUrl: url,
+                            agonist: e.primaryMuscle,
+                            synergists: [e.secondaryMuscle],
+                            biomechanics: e.biomechanics,
+                            tempo: '3-1-1',
+                            posture: e.posture,
+                            warning: 'Consulta a tu entrenador si sientes dolor.'
+                          ));
+                        }
+                        if (!mounted) return;
+                        Navigator.pop(context); // close dialog
                         showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
                           backgroundColor: const Color(0xFF0F192B),
                           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-                          builder: (ctx) => _Interactive3DViewer(exercise: ex),
+                          builder: (ctx) => _Interactive3DViewer(exercise: ex, dynamicExercises: dyn),
                         );
                       },
                     ),
@@ -351,8 +365,10 @@ class _WorkoutScheduleScreenState extends State<WorkoutScheduleScreen> {
 }
 
 class _Interactive3DViewer extends StatelessWidget {
-  const _Interactive3DViewer({required this.exercise});
+  const _Interactive3DViewer({required this.exercise, this.dynamicExercises});
+  final List<AnatomyExercise>? dynamicExercises;
   final ExerciseItem exercise;
+
 
   @override
   Widget build(BuildContext context) {
@@ -381,10 +397,11 @@ class _Interactive3DViewer extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           ExerciseDetailView(
-            animationKey: exercise.animationKey,
+            animationKey: exercise.name, // Use name as ID to match dynamicExercises
             primaryMuscle: exercise.primaryMuscle,
             secondaryMuscle: exercise.secondaryMuscle,
             height: 300,
+            dynamicExercises: dynamicExercises,
           ),
           const SizedBox(height: 8),
           const Text(

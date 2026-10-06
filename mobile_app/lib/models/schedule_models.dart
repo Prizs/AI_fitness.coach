@@ -5,6 +5,8 @@
   final String animationKey;
   final String primaryMuscle;
   final String secondaryMuscle;
+  final String biomechanics;
+  final String posture;
   bool isCompleted;
   int? rpe;
 
@@ -15,6 +17,8 @@
     required this.animationKey,
     this.primaryMuscle = 'General',
     this.secondaryMuscle = 'Secundario',
+    this.biomechanics = 'Activación dinámica sugerida por IA.',
+    this.posture = 'Mantén la postura natural.',
     this.isCompleted = false,
     this.rpe,
   });
@@ -27,6 +31,8 @@
       animationKey: json['animation_key'] as String? ?? 'generic',
       primaryMuscle: json['primary_muscle'] as String? ?? 'General',
       secondaryMuscle: json['secondary_muscle'] as String? ?? 'Secundario',
+      biomechanics: json['biomechanics'] as String? ?? 'Activación dinámica sugerida por IA.',
+      posture: json['posture'] as String? ?? 'Mantén la postura natural.',
       isCompleted: json['is_completed'] as bool? ?? false,
       rpe: json['rpe'] as int?,
     );
@@ -39,6 +45,8 @@
     'animation_key': animationKey,
     'primary_muscle': primaryMuscle,
     'secondary_muscle': secondaryMuscle,
+    'biomechanics': biomechanics,
+    'posture': posture,
     'is_completed': isCompleted,
     'rpe': rpe,
   };

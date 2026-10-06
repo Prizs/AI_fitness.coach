@@ -2,8 +2,59 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.routers.plans import _normalize_meals, _normalize_sessions
+from app.services.weekly_plan import WEEKDAY_NAMES, _fallback_week
 
 client = TestClient(app)
+
+
+def test_weekly_plan_returns_seven_days():
+    """La semana siempre trae los 7 dias, con rutina y nutricion en cada uno."""
+    week = _fallback_week({"age": 30, "weight": 70})
+    assert len(week["days"]) == 7
+    for index, day in enumerate(week["days"]):
+        assert day["weekday"] == index
+        assert day["weekday_name"] == WEEKDAY_NAMES[index]
+        assert day["exercises"], f"el dia {index} no tiene ejercicios"
+        assert day["nutrition"], f"el dia {index} no tiene nutricion"
+        assert day["synergy"], f"el dia {index} no explica la sinergia"
+
+
+def test_weekly_nutrition_varia_por_dia():
+    """La comida cambia cada dia: no se repite el mismo menu."""
+    week = _fallback_week({"age": 30, "weight": 70})
+    menus = {json_key(day["nutrition"]) for day in week["days"]}
+    assert len(menus) > 1, "todos los dias traen el mismo menu"
+
+
+def json_key(nutrition):
+    """Huella simple del menu, para comparar dias distintos."""
+    return "|".join(
+        meal["title"] + ":" + ",".join(meal["items"])
+        for meal in nutrition
+    )
+
+
+def test_weekly_respects_lower_body_restriction():
+    """Si se evita la pierna o la rodilla, no llegan ejercicios de tren inferior."""
+    week = _fallback_week({
+        "age": 60,
+        "weight": 80,
+        "areas_to_avoid": "rodilla",
+    })
+    prohibidos = ("Cuadriceps", "Gluteos", "Gemelos")
+    for day in week["days"]:
+        for exercise in day["exercises"]:
+            assert exercise["primary_muscle"] not in prohibidos
+
+
+def test_weekly_training_days_marked():
+    """Los dias de recuperacion no se marcan como entrenamiento."""
+    week = _fallback_week({"age": 30, "weight": 70})
+    flags = {day["weekday"]: day["is_training"] for day in week["days"]}
+    assert flags[0] is True
+    assert flags[5] is False
+    assert flags[6] is False
+
 
 def test_health():
     response = client.get("/health")

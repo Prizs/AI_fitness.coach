@@ -1,3 +1,46 @@
+# AI Fitness Coach 1.0.7
+
+## Correccion: la app no encontraba el servidor (ClientSocketException)
+- El APK se estaba compilando sin `--dart-define=API_BASE_URL=...`, por lo que
+  quedaba con el valor por defecto `http://127.0.0.1:8000`. En un telefono
+  `127.0.0.1` apunta al propio telefono, no a la computadora, y por eso la
+  consulta de version fallaba con `ClientSocketException`.
+- La PC ya estaba bien: backend escuchando en `0.0.0.0:8000` y respondiendo.
+- Nuevo script `scripts/build_and_publish.py`: sube la version, compila con la
+  IP local correcta y regenera la pagina, todo en un solo comando.
+  ```
+  python scripts/build_and_publish.py
+  AIFITNESS_HOST=192.168.31.50 python scripts/build_and_publish.py
+  ```
+- Como el APK guarda la URL en `flutter_secure_storage`, tambien se puede
+  cambiar en caliente desde **Login -> "Servidor: ..."**.
+
+---
+
+# AI Fitness Coach 1.0.6
+
+## El icono de perfil vive solo en Inicio
+- Inicio tiene ahora una barra superior con el **icono de perfil** en la esquina
+  superior derecha: ahi se entra a **Mi Perfil y Salud**.
+- Se quito el icono de perfil de la barra del Coach y el boton que estaba en el
+  cuerpo de Inicio, para que el acceso al perfil exista en un solo lugar.
+- La barra del Coach conserva solo el boton de **Cronograma Semanal**.
+
+## Sigue funcionando el control de actualizaciones
+- Panel **Actualizaciones de la app** al final del Perfil, con el boton
+  **Descargar e instalar**.
+- Comprobacion automatica al abrir la app.
+- Chip con la version en la pantalla de login.
+
+---
+
+# AI Fitness Coach 1.0.5
+
+## El icono de perfil se unifica
+- El acceso a **Mi Perfil y Salud** quedo disponible tambien desde Inicio.
+
+---
+
 # AI Fitness Coach 1.0.4
 
 ## Correccion: el enlace de descarga servia una version vieja
@@ -10,15 +53,12 @@
   de borrar los APK obsoletos. Evita que el error se repita.
 
 ## El verificador de actualizaciones vive en el Perfil
-- Inicio ahora tiene el boton **Mi Perfil y Salud** (antes solo se llegaba desde
-  el Coach).
 - Al final del perfil esta el panel **Actualizaciones de la app**: muestra la
   version instalada, consulta la publicada y ofrece **Descargar e instalar**.
 - El panel se auto-comprueba al abrirlo y el boton permite forzar la consulta.
 
 ## Sigue funcionando ademas
 - Comprobacion automatica al abrir la app.
-- Icono de actualizacion en la barra del Coach.
 - Chip fijo con la version en la pantalla de login.
 
 ## Atlas anatomico de musculos

@@ -7,6 +7,7 @@ import 'package:mobile_app/screens/nutrition_screen.dart';
 import 'package:mobile_app/screens/progress_screen.dart';
 import 'package:mobile_app/screens/workouts_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/widgets/app_update.dart';
 
 void main() {
@@ -111,6 +112,17 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Se pide la semana una sola vez al entrar, para que Rutinas y Nutricion
+    // abran de inmediato en lugar de esperar a la IA cada vez que se tocan.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WeeklyPlanService.instance
+          .ensureLoaded(AuthService.instance.loggedInUser);
+    });
+  }
 
   final List<Widget> _screens = const [
     HomeScreen(),

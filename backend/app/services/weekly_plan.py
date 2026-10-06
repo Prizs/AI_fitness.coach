@@ -277,8 +277,11 @@ def _ai_week(profile):
         "Cada objeto debe tener: weekday (0=Lunes ... 6=Domingo), title, "
         "is_training (true/false),\n"
         "exercises (lista con name, sets, reps, animation_key, primary_muscle, "
-        "secondary_muscle),\n"
-        "nutrition (diccionario con desayuno, almuerzo, cena, snack) y synergy.\n\n"
+        "secondary_muscle, biomechanics, posture),\n"
+        "nutrition (lista con objetos que tengan 'title' e 'items') y synergy.\n\n"
+        "'biomechanics' debe ser una explicacion detallada paso a paso de la tecnica del ejercicio.\n"
+        "'posture' debe ser una nota de seguridad o postura clave.\n"
+        "Usa SOLO nombres de ejercicios clasicos y estandar (ej. Sentadilla, Press de Banca) para que coincidan con nuestra base de datos.\n"
         '"synergy" explica en una frase como se combinan el entrenamiento de ese dia '
         "y la alimentacion\n"
         "de ese dia para lograr el objetivo. Varia la comida cada dia: no repitas el "

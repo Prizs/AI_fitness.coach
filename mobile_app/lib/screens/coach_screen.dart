@@ -1,10 +1,11 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/screens/workout_schedule_screen.dart';
-import 'package:mobile_app/screens/user_profile_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
-import 'package:mobile_app/widgets/app_update.dart';
+import 'package:lottie/lottie.dart';
+import 'package:mobile_app/models/anatomy_exercise.dart';
+import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 
 class CoachScreen extends StatefulWidget {
   const CoachScreen({super.key});
@@ -63,10 +64,10 @@ class _CoachScreenState extends State<CoachScreen> {
               'allergies': profile?.foodAllergies,
               'injuries': profile?.currentInjuries,
               'motor_disability': profile?.motorDisability,
-              'areas_to_avoid': profile?.areasToAvoid,
+              'areas_to_avoid': profile?.areasToAvoid, 'age': profile?.age, 'weight': profile?.weight,
             }),
           )
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 120));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -119,24 +120,11 @@ class _CoachScreenState extends State<CoachScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.system_update_alt_rounded, color: Color(0xFF8BE0C0)),
-            tooltip: 'Buscar actualizaciones',
-            onPressed: () => checkForAppUpdate(context),
-          ),
-          IconButton(
             icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BE0C0)),
             tooltip: 'Cronograma Semanal',
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const WorkoutScheduleScreen()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_rounded, color: Color(0xFF8BE0C0)),
-            tooltip: 'Perfil y Salud',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const UserProfileScreen()),
             ),
           ),
         ],
@@ -212,9 +200,38 @@ class _CoachScreenState extends State<CoachScreen> {
                                   const SizedBox(width: 8),
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF173B45), foregroundColor: Colors.white),
-                                    onPressed: () {
-                                      Navigator.push(context, MaterialPageRoute(builder: (_) => const WorkoutScheduleScreen()));
+
+                                    onPressed: () async {
+                                      List<AnatomyExercise> dyn = [];
+                                      if (plan != null && plan['exercises'] != null) {
+                                        for (var ex in plan['exercises']) {
+                                          // fetch from api
+                                          try {
+                                            final res = await http.get(Uri.parse(AuthService.apiBaseUrl + '/api/exercises/gif?query=' + Uri.encodeComponent(ex['name'])));
+                                            if (res.statusCode == 200) {
+                                              final url = jsonDecode(res.body)['url'];
+                                              dyn.add(AnatomyExercise(
+                                                id: ex['name'],
+                                                name: ex['name'],
+                                                shortName: ex['name'],
+                                                gifUrl: url ?? '',
+                                                agonist: ex['primary_muscle'] ?? 'Músculo Principal',
+                                                synergists: [ex['secondary_muscle'] ?? 'Sinergistas'],
+                                                biomechanics: 'Activación dinámica sugerida por IA.',
+                                                tempo: '3-1-1',
+                                                posture: 'Mantén la postura natural.',
+                                                warning: 'Consulta a tu entrenador si sientes dolor.'
+                                              ));
+                                            }
+                                          } catch (e) {}
+                                        }
+                                      }
+                                      if (!context.mounted) return;
+                                      Navigator.push(context, MaterialPageRoute(builder: (_) => AnatomyWorkoutScreen(
+                                        dynamicExercises: dyn.isNotEmpty ? dyn : null,
+                                      )));
                                     },
+
                                     child: const Text('Ver 3D'),
                                   ),
                                 ],
@@ -230,9 +247,24 @@ class _CoachScreenState extends State<CoachScreen> {
             ),
 
             if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Center(child: CircularProgressIndicator(color: Color(0xFF8BE0C0))),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Center(
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: Lottie.network(
+                          'https://assets9.lottiefiles.com/packages/lf20_1idq1nbf.json', // Placeholder de animaciÃƒÂ³n
+                          errorBuilder: (context, error, stackTrace) => const CircularProgressIndicator(color: Color(0xFF8BE0C0)),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('La IA está estructurando tu plan...', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 12)),
+                    ],
+                  ),
+                ),
               ),
 
             // Píldoras de Preguntas Rápidas
@@ -315,3 +347,4 @@ class _CoachScreenState extends State<CoachScreen> {
     );
   }
 }
+

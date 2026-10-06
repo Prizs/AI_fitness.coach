@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_app/services/muscle_map.dart';
-import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
-import 'package:mobile_app/widgets/muscle_map_view.dart';
+import 'package:mobile_app/screens/anatomy_workout_screen.dart';
+import 'package:mobile_app/models/anatomy_exercise.dart';
 
-/// Detalle de un ejercicio con dos vistas:
-///
-/// - **Musculos**: atlas anatomico real con el agonista y el sinergista
-///   resaltados. Es la vista principal porque se lee de un vistazo.
-/// - **3D**: figura humanoide animada y giratoria del movimiento.
-///
-/// Si el ejercicio no tiene musculos reconocidos se abre en la vista 3D.
+/// Reemplazo del "muneñco 3D horrible" y las pestañas separadas.
+/// Ahora redirige directamente al Visor Biomecánico Unificado (modelo .glb real con musculatura).
 class ExerciseDetailView extends StatelessWidget {
   const ExerciseDetailView({
     super.key,
@@ -17,79 +11,74 @@ class ExerciseDetailView extends StatelessWidget {
     this.primaryMuscle,
     this.secondaryMuscle,
     this.height = 320,
+    this.dynamicExercises,
   });
 
   final String animationKey;
   final String? primaryMuscle;
   final String? secondaryMuscle;
   final double height;
+  final List<AnatomyExercise>? dynamicExercises;
 
   @override
   Widget build(BuildContext context) {
-    final hasMuscles = MuscleMap.idsFor(primaryMuscle).isNotEmpty ||
-        MuscleMap.idsFor(secondaryMuscle).isNotEmpty;
-    final initialIndex = hasMuscles ? 1 : 0;
-
-    return DefaultTabController(
-      length: 2,
-      initialIndex: initialIndex,
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F192B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.3)),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F192B),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            padding: const EdgeInsets.all(4),
-            child: TabBar(
-              indicator: BoxDecoration(
-                color: const Color(0xFF8BE0C0),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              labelColor: const Color(0xFF0B1220),
-              unselectedLabelColor: Colors.white70,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-              tabs: const [
-                Tab(text: '3D', icon: Icon(Icons.threed_rotation_rounded, size: 16)),
-                Tab(
-                  text: 'Musculos',
-                  icon: Icon(Icons.accessibility_new_rounded, size: 16),
-                ),
-              ],
-            ),
+          const Icon(Icons.accessibility_new_rounded, size: 48, color: Color(0xFF8BE0C0)),
+          const SizedBox(height: 16),
+          const Text(
+            'Visor Anatómico 3D Unificado',
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: height + 70,
-            child: TabBarView(
-              children: [
-                SingleChildScrollView(
-                  child: Exercise3DViewer(
-                    animationKey: animationKey,
-                    primaryMuscle: primaryMuscle,
-                    secondaryMuscle: secondaryMuscle,
-                    height: height,
-                    showMuscleLegend: false,
-                  ),
-                ),
-                SingleChildScrollView(
-                  child: MuscleMapView(
-                    primaryMuscle: primaryMuscle,
-                    secondaryMuscle: secondaryMuscle,
-                    height: height,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 8),
+          const Text(
+            'Musculatura en movimiento en tiempo real.',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8BE0C0),
+              foregroundColor: Colors.black,
             ),
+            icon: const Icon(Icons.threed_rotation_rounded),
+            label: const Text('Abrir Modelo 3D'),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AnatomyWorkoutScreen(
+                    initialExerciseId: (dynamicExercises != null && dynamicExercises!.isNotEmpty) ? animationKey : _mapAnimKeyToAnatomyId(animationKey),
+                    dynamicExercises: dynamicExercises,
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
     );
+  }
+
+  String _mapAnimKeyToAnatomyId(String key) {
+    // Mapeo simple de las rutinas de la base de datos a los IDs del atlas 3D.
+    final lower = key.toLowerCase();
+    if (lower.contains('squat') || lower.contains('sentadilla')) return 'squat';
+    if (lower.contains('push') || lower.contains('flexion')) return 'pushup';
+    if (lower.contains('deadlift') || lower.contains('peso_muerto')) return 'deadlift';
+    if (lower.contains('plank') || lower.contains('plancha')) return 'plank';
+    if (lower.contains('pull') || lower.contains('dominada')) return 'pullup';
+    if (lower.contains('lunge') || lower.contains('zancada')) return 'lunge';
+    // Por defecto squat para visualizar
+    return 'squat';
   }
 }

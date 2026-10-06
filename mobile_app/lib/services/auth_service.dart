@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -12,7 +12,7 @@ class AuthService {
   /// Valor incluido al compilar con `--dart-define=API_BASE_URL=...`.
   static const String compiledApiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000',
+    defaultValue: 'https://ai-fitness-coach-818a.onrender.com',
   );
 
   static const String _serverKey = 'api_base_url';
@@ -46,12 +46,10 @@ class AuthService {
   /// Carga la URL del servidor guardada en el dispositivo, si existe.
   Future<void> loadServerConfig() async {
     try {
-      final stored = await _storage.read(key: _serverKey);
-      if (stored != null && stored.trim().isNotEmpty) {
-        _apiBaseUrl = stored;
-      }
-    } on Exception {
-      // En Web el almacenamiento seguro puede no estar disponible.
+      final saved = await _storage.read(key: _serverKey);
+      _apiBaseUrl = compiledApiBaseUrl;
+    } catch (e) {
+      _apiBaseUrl = compiledApiBaseUrl;
     }
   }
 
@@ -115,7 +113,7 @@ class AuthService {
           'discapacidad_motora': profile.motorDisability,
           'zonas_a_evitar': profile.areasToAvoid,
         }),
-      );
+      ).timeout(const Duration(seconds: 5));
     } on Exception {
       lastError = 'No se pudo conectar con el servidor.';
       return false;
@@ -147,7 +145,7 @@ class AuthService {
         Uri.parse('$apiBaseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'cedula': cedula, 'password': password}),
-      );
+      ).timeout(const Duration(seconds: 5));
     } on Exception {
       lastError = 'No se pudo conectar con el servidor.';
       return false;
@@ -217,3 +215,4 @@ class AuthService {
     _storage.deleteAll();
   }
 }
+

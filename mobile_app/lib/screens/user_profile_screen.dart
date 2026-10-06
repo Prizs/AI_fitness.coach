@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/widgets/app_update.dart';
+import 'package:mobile_app/main.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -41,7 +42,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       appBar: AppBar(
         title: const Text('Mi Perfil Atlético & Salud', style: TextStyle(fontWeight: FontWeight.w800)),
         backgroundColor: const Color(0xFF0F192B),
-        elevation: 0,
+        elevation: 0, actions: [ IconButton(icon: Icon(Icons.logout, color: Colors.redAccent), onPressed: () { AuthService.instance.logout(); Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => AuthGate()), (r) => false); }) ],
       ),
       body: SafeArea(
         child: ListView(
@@ -243,6 +244,46 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
             const SizedBox(height: 20),
 
+
+            // Configuracion del servidor
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF173B45),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Conexión con la IA (Servidor)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(AuthService.apiBaseUrl, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8BE0C0), foregroundColor: Colors.black),
+                      icon: const Icon(Icons.link, size: 18),
+                      label: const Text('Cambiar Servidor'),
+                      onPressed: () {
+                        final ctrl = TextEditingController(text: AuthService.apiBaseUrl);
+                        showDialog(context: context, builder: (_) => AlertDialog(
+                          backgroundColor: const Color(0xFF101B2D),
+                          title: const Text('Cambiar Servidor', style: TextStyle(color: Colors.white)),
+                          content: TextField(controller: ctrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'https://...', hintStyle: TextStyle(color: Colors.white38))),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
+                            TextButton(onPressed: () async { await AuthService.instance.saveServerConfig(ctrl.text); if(context.mounted){Navigator.pop(context); setState((){});} }, child: const Text('Guardar', style: TextStyle(color: Color(0xFF8BE0C0)))),
+                          ]
+                        ));
+                      },
+                    ),
+                  )
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             // Verificador de actualizaciones de la app
             const AppUpdatePanel(),
             const SizedBox(height: 20),

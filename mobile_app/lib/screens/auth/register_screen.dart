@@ -25,6 +25,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _age = TextEditingController();
   final _weight = TextEditingController();
   final _notes = TextEditingController();
+  final _securityAnswer = TextEditingController();
+  String _securityQuestion = '¿Cuál es tu color favorito?';
+  final List<String> _questions = [
+    '¿Cuál es tu color favorito?',
+    '¿Cuál es tu postre favorito?',
+    '¿Cuál es el apellido de tu mamá?',
+    '¿Dónde estudiaste primaria?',
+    '¿El nombre de tu hermano?'
+  ];
   final _allergyInput = TextEditingController();
   final _injuryInput = TextEditingController();
   final _disabilityInput = TextEditingController();
