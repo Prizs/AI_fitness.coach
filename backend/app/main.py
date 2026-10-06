@@ -52,3 +52,14 @@ def ai_health_check() -> dict:
             "Si el primero agota su cuota, se pasa automaticamente al siguiente."
         ),
     }
+
+@app.get("/api/health")
+def health_check():
+    """Endpoint para mantener activos a Render y Supabase (Keep-Alive)"""
+    try:
+        from app.services.supabase_service import get_supabase_admin_client
+        admin = get_supabase_admin_client()
+        admin.table("usuarios").select("id").limit(1).execute()
+        return {"status": "ok", "message": "Render and Supabase are alive"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
