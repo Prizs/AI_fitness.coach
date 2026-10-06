@@ -117,13 +117,18 @@ def login(payload: LoginRequest):
         raise HTTPException(status_code=401, detail="Cédula o contraseña incorrectos.") from error
 @router.get("/reset_password/{cedula}")
 def reset_password_get(cedula: str):
-    admin_client = get_supabase_admin_client()
-    users = admin_client.auth.admin.list_users()
-    for u in users:
-        if f"cedula.{cedula}@" in u.email:
-            admin_client.auth.admin.update_user_by_id(u.id, {"password": "Password123"})
-            return {"status": "ok", "message": f"Contraseña de {cedula} cambiada a Password123"}
-    return {"status": "error", "message": "User not found"}
+    import traceback
+    try:
+        admin_client = get_supabase_admin_client()
+        users = admin_client.auth.admin.list_users()
+        for u in users:
+            if f"cedula.{cedula}@" in u.email:
+                admin_client.auth.admin.update_user_by_id(u.id, {"password": "Password123"})
+                return {"status": "ok", "message": f"Contraseña de {cedula} cambiada a Password123"}
+        return {"status": "error", "message": "User not found"}
+    except Exception as e:
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
 
 @router.get("/list_users")
 def list_users():
