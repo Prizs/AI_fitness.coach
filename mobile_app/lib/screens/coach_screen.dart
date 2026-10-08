@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:mobile_app/screens/workout_schedule_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:lottie/lottie.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 
@@ -25,6 +26,38 @@ class _CoachScreenState extends State<CoachScreen> {
 
   final TextEditingController _controller = TextEditingController();
   bool _isLoading = false;
+  
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _speech = stt.SpeechToText();
+  }
+  
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) {
+           if (val == 'done') setState(() => _isListening = false);
+        },
+        onError: (val) => setState(() => _isListening = false),
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (val) => setState(() {
+            _controller.text = val.recognizedWords;
+          }),
+          localeId: 'es_ES', // Español
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
+  }
 
   final List<String> _quickPrompts = [
     'Mejorar resistencia pulmonar',
