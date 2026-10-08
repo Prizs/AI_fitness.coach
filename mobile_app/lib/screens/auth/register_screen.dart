@@ -139,8 +139,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       password: _password.text,
       name: _name.text.trim(),
       lastName: _lastName.text.trim(),
-      age: int.parse(_age.text.trim()),
-      weight: double.parse(_weight.text.trim()),
+      age: int.tryParse(_age.text.trim()) ?? 25,
+      weight: double.tryParse(_weight.text.trim()) ?? 70.0,
       pathologyOrAllergies: _notes.text.trim().isEmpty
           ? null
           : _notes.text.trim(),
@@ -148,6 +148,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       currentInjuries: _join(_injuries),
       motorDisability: _join(_disabilities),
       areasToAvoid: _join(_avoidAreas),
+      role: _isTrainer ? 'trainer' : 'client',
+      specialty: _isTrainer ? _specialtyController.text.trim() : null,
+      experienceYears: _isTrainer ? int.tryParse(_experienceController.text.trim()) : null,
+      certifications: _isTrainer ? _certificationsController.text.trim() : null,
     );
     final registered = await AuthService.instance.register(profile);
     if (!mounted) return;
@@ -193,6 +197,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
             children: [
               _hero(),
+              const SizedBox(height: 18),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Alumno / Cliente')),
+                  ButtonSegment(value: true, label: Text('Entrenador Pro')),
+                ],
+                selected: {_isTrainer},
+                onSelectionChanged: (set) => setState(() => _isTrainer = set.first),
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
+                ),
+              ),
               const SizedBox(height: 18),
               _section('Tu perfil', Icons.person_outline_rounded, [
                 TextFormField(
@@ -248,8 +265,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         validator: _ageValidator,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
+                    if (!_isTrainer) const SizedBox(width: 10),
+                    if (!_isTrainer) Expanded(
                       child: TextFormField(
                         controller: _weight,
                         keyboardType: const TextInputType.numberWithOptions(
@@ -266,7 +283,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ]),
               const SizedBox(height: 14),
-              _section('Salud y adaptación', Icons.accessibility_new_rounded, [
+              if (!_isTrainer) _section('Salud y adaptación', Icons.accessibility_new_rounded, [
                 TextFormField(
                   controller: _notes,
                   maxLines: 2,
@@ -314,6 +331,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   tags: _avoidAreas,
                   onAdd: () => _addTags(_avoidInput, _avoidAreas),
                   onRemove: (tag) => setState(() => _avoidAreas.remove(tag)),
+                ),
+              ]),
+              if (_isTrainer) const SizedBox(height: 14),
+              if (_isTrainer) _section('Perfil Profesional', Icons.work_outline_rounded, [
+                DropdownButtonFormField<String>(
+                  value: _specialtyController.text.isEmpty ? null : _specialtyController.text,
+                  decoration: _decoration('Especialidad Principal', Icons.star_border),
+                  dropdownColor: const Color(0xFF101B2D),
+                  items: ['Hipertrofia', 'Pérdida de Grasa', 'Calistenia', 'Rehabilitación', 'Crossfit']
+                      .map((String value) => DropdownMenuItem<String>(value: value, child: Text(value)))
+                      .toList(),
+                  onChanged: (val) => setState(() => _specialtyController.text = val ?? ''),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _experienceController,
+                  keyboardType: TextInputType.number,
+                  decoration: _decoration('Años de Experiencia', Icons.timeline),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _certificationsController,
+                  decoration: _decoration('Certificaciones / Títulos', Icons.card_membership),
                 ),
               ]),
               const SizedBox(height: 20),
