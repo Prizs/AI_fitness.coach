@@ -79,6 +79,9 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     if (AuthService.instance.loggedInUser != null || _isAuthenticated) {
+      if (AuthService.instance.loggedInUser?.role == 'trainer') {
+        return const TrainerDashboardScreen();
+      }
       return const AppShell();
     }
 
