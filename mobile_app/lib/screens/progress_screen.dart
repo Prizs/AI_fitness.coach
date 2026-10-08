@@ -1,143 +1,123 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:mobile_app/services/auth_service.dart';
 
-class ProgressScreen extends StatelessWidget {
+class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final metrics = [
-      _MetricCard(label: 'Peso', value: '74.2 kg', delta: '+0.4 kg'),
-      _MetricCard(label: 'Fuerza', value: '82%', delta: '+8%'),
-      _MetricCard(label: 'Recuperación', value: '89%', delta: '+5%'),
-    ];
+  State<ProgressScreen> createState() => _ProgressScreenState();
+}
 
+class _ProgressScreenState extends State<ProgressScreen> {
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploading = false;
+  List<dynamic> _photos = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPhotos();
+  }
+
+  Future<void> _fetchPhotos() async {
+    final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    try {
+      final url = Uri.parse('\/api/progress/');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        setState(() {
+          _photos = jsonDecode(res.body);
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (_) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _uploadPhoto() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+
+    setState(() => _isUploading = true);
+    try {
+      final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+      var request = http.MultipartRequest('POST', Uri.parse('\/api/progress/upload'));
+      request.fields['user_id'] = uid;
+      
+      final bytes = await image.readAsBytes();
+      request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: image.name));
+      
+      var response = await request.send();
+      if (response.statusCode == 200) {
+        await _fetchPhotos();
+      }
+    } catch (_) {
+    } finally {
+      setState(() => _isUploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Progreso',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: metrics
-                    .map(
-                      (item) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: item,
+      backgroundColor: const Color(0xFF0A0F1D),
+      appBar: AppBar(
+        title: const Text('Mi Progreso (IA Vision)', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF0F192B),
+      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFF8BE0C0)))
+        : _photos.isEmpty 
+          ? const Center(child: Text('No hay fotos de progreso aún.', style: TextStyle(color: Colors.white54)))
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _photos.length,
+              itemBuilder: (ctx, i) {
+                final item = _photos[i];
+                return Card(
+                  color: const Color(0xFF101B2D),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (item['photo_url'] != null)
+                           ClipRRect(
+                             borderRadius: BorderRadius.circular(12),
+                             child: Image.network(item['photo_url'], height: 300, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_,__,___) => const SizedBox()),
+                           ),
+                        const SizedBox(height: 16),
+                        const Row(
+                          children: [
+                            Icon(Icons.auto_awesome, color: Color(0xFF8BE0C0), size: 20),
+                            SizedBox(width: 8),
+                            Text('Análisis Gemini Vision', style: TextStyle(color: Color(0xFF8BE0C0), fontWeight: FontWeight.bold)),
+                          ]
                         ),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Avance semanal',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF111B2D),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Column(
-                  children: const [
-                    _ProgressRow(label: 'Volumen total', value: '74%'),
-                    SizedBox(height: 12),
-                    _ProgressRow(label: 'Recuperación', value: '86%'),
-                    SizedBox(height: 12),
-                    _ProgressRow(label: 'Consistencia', value: '91%'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+                        const SizedBox(height: 8),
+                        Text(item['ai_analysis'] ?? 'Sin análisis', style: const TextStyle(color: Colors.white70)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF8BE0C0),
+        foregroundColor: const Color(0xFF0B1220),
+        onPressed: _isUploading ? null : _uploadPhoto,
+        icon: _isUploading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Color(0xFF0B1220), strokeWidth: 2)) : const Icon(Icons.add_a_photo),
+        label: Text(_isUploading ? 'Analizando...' : 'Subir Foto'),
       ),
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.delta,
-  });
-
-  final String label;
-  final String value;
-  final String delta;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111B2D),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Colors.white70),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            delta,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF2DD4BF)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProgressRow extends StatelessWidget {
-  const _ProgressRow({super.key, required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final percentage = double.parse(value.replaceAll('%', '')) / 100;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [Text(label), Text(value)],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: percentage,
-            minHeight: 10,
-            backgroundColor: const Color(0xFF1E2A39),
-            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2DD4BF)),
-          ),
-        ),
-      ],
     );
   }
 }

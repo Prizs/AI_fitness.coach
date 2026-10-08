@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/widgets/app_update.dart';
 import 'package:mobile_app/main.dart';
+import 'package:mobile_app/screens/progress_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
