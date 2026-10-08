@@ -62,7 +62,8 @@ class AlternativeRequest(BaseModel):
     target_muscle: str
     goal: str = "mejorar condicion fisica"
     equipment_available: bool = True
-\nclass PlanFeedback(BaseModel):
+
+class PlanFeedback(BaseModel):
     plan_provider: str = Field(..., max_length=30)
     rating: int = Field(..., ge=1, le=5)
     restriction_category: str | None = Field(default=None, max_length=40)
