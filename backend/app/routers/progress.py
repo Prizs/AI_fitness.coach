@@ -1,8 +1,7 @@
 ﻿from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from app.services.supabase_service import get_supabase_admin_client
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 import os
 import io
 
@@ -15,29 +14,25 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
         file_bytes = await file.read()
         
         # 1. Analyze with Gemini
-        client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = "Actúa como un entrenador personal experto en recomposición corporal. Analiza esta foto de progreso físico del cliente. Describe brevemente y con tono muy motivador: 1) Puntos fuertes visibles (ej. buena definición en hombros o abdomen), 2) Áreas de oportunidad (ej. enfoque en tren inferior), 3) Un mensaje corto de ánimo para seguir con la rutina."
         
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[
-                types.Part.from_bytes(data=file_bytes, mime_type=file.content_type or 'image/jpeg'),
-                prompt
-            ],
-            config=types.GenerateContentConfig(temperature=0.4)
-        )
+        image_parts = [
+            {
+                "mime_type": file.content_type or 'image/jpeg',
+                "data": file_bytes
+            }
+        ]
+        
+        response = model.generate_content([prompt, image_parts[0]])
         analysis_text = response.text
 
-        # 2. Upload to Supabase Storage (assuming bucket 'photos' exists)
-        # Para evitar errores si el bucket no existe localmente, guardaremos la foto como base64 en url temporalmente, o 
-        # confiaremos en que el frontend enviará una URL si lo suben ellos.
-        # Mejor aún, subámoslo al bucket 'progress'
-        
+        # 2. Upload to Supabase Storage (assuming bucket 'progress' exists)
         file_path = f"{user_id}/{file.filename}"
         try:
             admin.storage.from_("progress").upload(file_path, file_bytes, {"content-type": file.content_type})
         except Exception:
-            # If bucket doesn't exist, we just store a placeholder or base64 (not recommended for large files)
             pass
             
         public_url = admin.storage.from_("progress").get_public_url(file_path)

@@ -9,3 +9,5 @@ google-generativeai
 pytest
 supabase
 psycopg2-binary
+
+python-multipart
