@@ -325,7 +325,8 @@ def get_alternative_exercise(payload) -> dict | None:
             "reps": "10-12",
             "animation_key": "animation-key",
             "primary_muscle": "{payload.target_muscle}",
-            "secondary_muscle": "Secundario"
+            "secondary_muscle": "Secundario",
+            "equipment": "Polea Alta o Peso Corporal"
         }}
         """
         result = generate_json_text(prompt, timeout=15)

@@ -191,6 +191,7 @@ def _normalize_sessions(raw_sessions) -> list[dict]:
                         "animation_key": str(exercise.get("animation_key") or "generic-exercise"),
                         "primary_muscle": str(exercise.get("primary_muscle") or "General"),
                         "secondary_muscle": str(exercise.get("secondary_muscle") or "Secundario"),
+                        "equipment": str(exercise.get("equipment") or "Peso Corporal"),
                     }
                 )
         sessions.append(
