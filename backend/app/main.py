@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import app_updates, auth, coach, plans, workouts, recalibration, exercises
+from app.routers import app_updates, auth, coach, plans, workouts, recalibration, exercises, trainer, progress
 from app.services.ai_providers import PROVIDER_ORDER, configured_providers
 from app.services.supabase_service import check_supabase_connection
 
