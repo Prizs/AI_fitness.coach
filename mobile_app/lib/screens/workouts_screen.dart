@@ -4,7 +4,8 @@ import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/widgets/exercise_detail.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
-import 'package:mobile_app/widgets/plan_options_sheet.dart';\nimport 'package:mobile_app/widgets/pre_workout_checkin.dart';
+import 'package:mobile_app/widgets/plan_options_sheet.dart';
+import 'package:mobile_app/widgets/pre_workout_checkin.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -24,7 +25,8 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   final WeeklyPlanService _service = WeeklyPlanService.instance;
 
   /// Dias ya completados por el usuario, como indices de dia de la semana.
-  final Set<int> _completed = {};\n  final Set<int> _startedDays = {};
+  final Set<int> _completed = {};
+  final Set<int> _startedDays = {};
 
   @override
   void initState() {
@@ -319,7 +321,7 @@ class _DayCard extends StatelessWidget {
                   ),
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
                   label: const Text('Ver 3D'),
-                  onPressed: () => _openExercisePreview(context, item, exercises, _selectedDay),
+                  onPressed: () => _openExercisePreview(context, item, exercises, day['weekday']),
                 ),
               );
             }),
