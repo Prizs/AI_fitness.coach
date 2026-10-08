@@ -89,6 +89,7 @@ class AuthService {
       currentInjuries: await _storage.read(key: 'current_injuries'),
       motorDisability: await _storage.read(key: 'motor_disability'),
       areasToAvoid: await _storage.read(key: 'areas_to_avoid'),
+      role: await _storage.read(key: 'role') ?? 'client',
     );
     return true;
   }
@@ -112,6 +113,10 @@ class AuthService {
           'lesiones_actuales': profile.currentInjuries,
           'discapacidad_motora': profile.motorDisability,
           'zonas_a_evitar': profile.areasToAvoid,
+          'role': profile.role,
+          'specialty': profile.specialty,
+          'experience_years': profile.experienceYears,
+          'certifications': profile.certifications,
         }),
       ).timeout(const Duration(seconds: 5));
     } on Exception {
@@ -177,6 +182,10 @@ class AuthService {
       currentInjuries: user['lesiones_actuales'] as String?,
       motorDisability: user['discapacidad_motora'] as String?,
       areasToAvoid: user['zonas_a_evitar'] as String?,
+      role: user['role'] as String? ?? 'client',
+      specialty: user['specialty'] as String?,
+      experienceYears: user['experience_years'] as int?,
+      certifications: user['certifications'] as String?,
     );
     await _saveSession(loggedInUser!.cedula, accessToken);
     return true;
@@ -206,6 +215,7 @@ class AuthService {
         value: profile.motorDisability,
       );
       await _storage.write(key: 'areas_to_avoid', value: profile.areasToAvoid);
+      await _storage.write(key: 'role', value: profile.role);
     }
   }
 

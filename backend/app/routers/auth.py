@@ -26,6 +26,10 @@ class RegisterRequest(BaseModel):
     lesiones_actuales: str | None = Field(default=None, max_length=1000)
     discapacidad_motora: str | None = Field(default=None, max_length=1000)
     zonas_a_evitar: str | None = Field(default=None, max_length=500)
+    role: str = Field(default="client")
+    specialty: str | None = Field(default=None)
+    experience_years: int | None = Field(default=None)
+    certifications: str | None = Field(default=None)
 
 
 class LoginRequest(BaseModel):
