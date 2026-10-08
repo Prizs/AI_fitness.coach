@@ -90,6 +90,10 @@ def register(payload: RegisterRequest):
             "lesiones_actuales": payload.lesiones_actuales,
             "discapacidad_motora": payload.discapacidad_motora,
             "zonas_a_evitar": payload.zonas_a_evitar,
+            "role": payload.role,
+            "specialty": payload.specialty,
+            "experience_years": payload.experience_years,
+            "certifications": payload.certifications,
         }
         admin_client.table("usuarios").insert(profile).execute()
         return _session_response(auth_response, profile)
@@ -117,7 +121,7 @@ def login(payload: LoginRequest):
         )
         profile_result = (
             admin_client.table("usuarios")
-            .select("id, cedula, nombre, apellido, edad, peso, patologia_o_alergias, alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar")
+            .select("id, cedula, nombre, apellido, edad, peso, patologia_o_alergias, alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar, role, specialty, experience_years, certifications")
             .eq("id", auth_response.user.id)
             .single()
             .execute()
