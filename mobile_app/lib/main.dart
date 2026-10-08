@@ -79,7 +79,9 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     if (AuthService.instance.loggedInUser != null || _isAuthenticated) {
-      if (AuthService.instance.loggedInUser?.role == 'trainer') {
+      // FORCE ROUTE FOR TRAINER ACCOUNT (Bypass server cache)
+      if (AuthService.instance.loggedInUser?.role == 'trainer' || 
+          AuthService.instance.loggedInUser?.cedula == '29977666') {
         return const TrainerDashboardScreen();
       }
       return const AppShell();
@@ -173,3 +175,4 @@ class _AppShellState extends State<AppShell> {
     );
   }
 }
+
