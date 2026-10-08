@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/main.dart';
 
@@ -34,7 +34,7 @@ class _TrainerDashboardScreenState extends State<TrainerDashboardScreen> {
             const Icon(Icons.people_alt_rounded, size: 80, color: Color(0xFF8BE0C0)),
             const SizedBox(height: 20),
             Text(
-              'Tu Código de Entrenador es:\n\',
+              "Tu Código de Entrenador es:\n",
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
             ),
