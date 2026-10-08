@@ -3,7 +3,8 @@ import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/widgets/exercise_detail.dart';
-import 'package:mobile_app/models/anatomy_exercise.dart';\nimport 'package:mobile_app/widgets/plan_options_sheet.dart';
+import 'package:mobile_app/models/anatomy_exercise.dart';
+import 'package:mobile_app/widgets/plan_options_sheet.dart';\nimport 'package:mobile_app/widgets/pre_workout_checkin.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -23,7 +24,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   final WeeklyPlanService _service = WeeklyPlanService.instance;
 
   /// Dias ya completados por el usuario, como indices de dia de la semana.
-  final Set<int> _completed = {};
+  final Set<int> _completed = {};\n  final Set<int> _startedDays = {};
 
   @override
   void initState() {
@@ -318,7 +319,7 @@ class _DayCard extends StatelessWidget {
                   ),
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
                   label: const Text('Ver 3D'),
-                  onPressed: () => _openExercisePreview(context, item, exercises),
+                  onPressed: () => _openExercisePreview(context, item, exercises, _selectedDay),
                 ),
               );
             }),
@@ -328,7 +329,7 @@ class _DayCard extends StatelessWidget {
     );
   }
 
-  void _openExercisePreview(BuildContext context, Map<String, dynamic> item, List<dynamic> exercises) async {
+  void _openExercisePreview(BuildContext context, Map<String, dynamic> item, List<dynamic> exercises, int dayIndex) async {
     showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
     
     List<AnatomyExercise> dyn = [];
@@ -370,15 +371,16 @@ class _DayCard extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => _Exercise3DPreviewSheet(exercise: item, dynamicExercises: dyn),
+      builder: (ctx) => _Exercise3DPreviewSheet(exercise: item, dynamicExercises: dyn, dayIndex: dayIndex),
     );
   }
 }
 
 class _Exercise3DPreviewSheet extends StatefulWidget {
-  const _Exercise3DPreviewSheet({required this.exercise, this.dynamicExercises});
+  const _Exercise3DPreviewSheet({required this.exercise, this.dynamicExercises, required this.dayIndex});
   final Map<String, dynamic> exercise;
   final List<AnatomyExercise>? dynamicExercises;
+  final int dayIndex;
 
   @override
   State<_Exercise3DPreviewSheet> createState() =>
@@ -450,6 +452,32 @@ class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet> {
             dynamicExercises: widget.dynamicExercises,
           ),
           const SizedBox(height: 20),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.orangeAccent,
+              side: const BorderSide(color: Colors.orangeAccent),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () async {
+              // Swap exercise logic
+              final currentName = widget.exercise['name'] as String? ?? '';
+              final primaryMuscle = widget.exercise['primary_muscle'] as String? ?? 'General';
+              
+              showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+              final newEx = await WeeklyPlanService.instance.swapExercise(currentName, primaryMuscle, widget.dayIndex);
+              if (context.mounted) Navigator.pop(context); // close dialog
+              
+              if (newEx != null && context.mounted) {
+                 Navigator.pop(context); // close sheet
+                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cambiado por: ')));
+              } else if (context.mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al cambiar ejercicio')));
+              }
+            },
+            icon: const Icon(Icons.swap_horiz_rounded),
+            label: const Text('Máquina Ocupada (Cambiar)', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(height: 8),
           FilledButton.icon(
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF8BE0C0),

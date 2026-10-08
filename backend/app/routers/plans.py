@@ -56,7 +56,13 @@ WEEKDAY_NAMES = [
 ]
 
 
-class PlanFeedback(BaseModel):
+
+class AlternativeRequest(BaseModel):
+    current_exercise: str
+    target_muscle: str
+    goal: str = "mejorar condicion fisica"
+    equipment_available: bool = True
+\nclass PlanFeedback(BaseModel):
     plan_provider: str = Field(..., max_length=30)
     rating: int = Field(..., ge=1, le=5)
     restriction_category: str | None = Field(default=None, max_length=40)
@@ -271,3 +277,10 @@ def record_feedback(payload: PlanFeedback):
         "scope": "anonymous_aggregate" if payload.learning_consent else "disabled",
         "message": "Solo se guardan señales agregadas y no diagnósticos ni texto médico personal.",
     }
+@router.post("/alternative")
+def alternative_exercise(payload: AlternativeRequest):
+    from app.services.weekly_plan import get_alternative_exercise
+    alt = get_alternative_exercise(payload)
+    if alt:
+        return alt
+    raise HTTPException(status_code=500, detail="No se pudo encontrar una alternativa.")
