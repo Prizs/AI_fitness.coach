@@ -11,6 +11,10 @@ class UserProfile {
     this.currentInjuries,
     this.motorDisability,
     this.areasToAvoid,
+    this.role = 'client',
+    this.specialty,
+    this.experienceYears,
+    this.certifications,
   });
 
   final String cedula;
@@ -24,4 +28,8 @@ class UserProfile {
   final String? currentInjuries;
   final String? motorDisability;
   final String? areasToAvoid;
+  final String role;
+  final String? specialty;
+  final int? experienceYears;
+  final String? certifications;
 }

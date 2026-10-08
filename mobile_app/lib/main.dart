@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/auth/login_screen.dart';
+import 'package:mobile_app/screens/trainer_dashboard_screen.dart';
 import 'package:mobile_app/screens/auth/register_screen.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/screens/home_screen.dart';
