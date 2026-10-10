@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 
-class ClientDetailScreen extends StatelessWidget {
+class ClientDetailScreen extends StatefulWidget {
   final String clientName;
   const ClientDetailScreen({super.key, required this.clientName});
+
+  @override
+  State<ClientDetailScreen> createState() => _ClientDetailScreenState();
+}
+
+class _ClientDetailScreenState extends State<ClientDetailScreen> {
+  final TextEditingController _chatController = TextEditingController();
+  final List<Map<String, String>> _aiChatHistory = [
+    {'role': 'ai', 'text': 'Hola, soy el asistente IA. Puedes preguntarme sobre la biografía, lesiones, o pedirme que adapte la rutina de este alumno.'}
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +33,7 @@ class ClientDetailScreen extends StatelessWidget {
               Tab(text: 'Perfil & Progreso'),
               Tab(text: 'Entrenamiento'),
               Tab(text: 'Nutrición'),
-              Tab(text: 'Análisis IA'),
+              Tab(text: 'Análisis IA & Chat'),
             ],
           ),
         ),
@@ -52,6 +62,7 @@ class ClientDetailScreen extends StatelessWidget {
               _infoRow('Peso Actual', '75 kg'),
               _infoRow('Objetivo', 'Ganancia Muscular'),
               _infoRow('Patologías', 'Ninguna'),
+              _infoRow('Alergias', 'Intolerante a la lactosa'),
             ],
           ),
         ),
@@ -64,7 +75,7 @@ class ClientDetailScreen extends StatelessWidget {
               _infoRow('Frecuencia', '4 días a la semana'),
               _infoRow('Consistencia', '85% este mes'),
               const SizedBox(height: 12),
-              const Text('Evolución de Peso (Últimas 4 semanas)', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const Text('Evolución de Peso (íšltimas 4 semanas)', style: TextStyle(color: Colors.white70, fontSize: 13)),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -99,7 +110,9 @@ class ClientDetailScreen extends StatelessWidget {
               _machineItem('Máquina de Extensión de Cuádriceps'),
               _machineItem('Mancuernas (Pesos Libres)'),
               const Divider(color: Colors.white24, height: 24),
-              const Text('El alumno espera asistencia en la Prensa de Piernas.', style: TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic)),
+              const Text('Alerta Pre-Entreno:', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              const Text('El alumno reportó fatiga en la rodilla derecha esta mañana. Recomiendo calentamiento articular extra.', style: TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic)),
             ],
           ),
         ),
@@ -122,9 +135,9 @@ class ClientDetailScreen extends StatelessWidget {
               _infoRow('Carbohidratos', '350g'),
               _infoRow('Grasas', '85g'),
               const Divider(color: Colors.white24, height: 24),
-              const Text('Sugerencia para hoy:', style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold)),
+              const Text('Sugerencia para hoy (Sin Lactosa):', style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              const Text('Batido de proteína post-entrenamiento con plátano.', style: TextStyle(color: Colors.white)),
+              const Text('Batido de proteína vegana post-entrenamiento con plátano.', style: TextStyle(color: Colors.white)),
             ],
           ),
         ),
@@ -133,35 +146,110 @@ class ClientDetailScreen extends StatelessWidget {
   }
 
   Widget _buildAiTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
+    return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF1FAE87).withOpacity(0.5), width: 1),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Expanded(
+          flex: 4,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
             children: [
-              Row(
-                children: const [
-                  Icon(Icons.smart_toy, color: Color(0xFF1FAE87)),
-                  SizedBox(width: 8),
-                  Text('Recomendaciones de la IA', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                ],
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF1FAE87).withOpacity(0.5), width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.auto_graph, color: Color(0xFF1FAE87)),
+                        SizedBox(width: 8),
+                        Text('Resumen de Rendimiento', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildAiTip('Físico', 'Excelente progresión de cargas en tren inferior. Adaptación al volumen: í“ptima.'),
+                    _buildAiTip('Riesgos Detectados', 'Reporte de molestias en rodilla derecha. Se sustituyó sentadilla libre por prensa hoy.'),
+                    _buildAiTip('Nutrición', 'Cumplimiento del 90%. Alergia a lactosa mitigada correctamente en los menús.'),
+                  ],
+                ),
               ),
+              const SizedBox(height: 20),
+              const Text('Consultoría IA con el Entrenador', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              const Text('Resumen generado automáticamente basándose en el historial reciente del alumno:', style: TextStyle(color: Colors.white70)),
-              const SizedBox(height: 16),
-              _buildAiTip('Rendimiento', 'Excelente progresión de cargas en las últimas 2 semanas. El usuario se está adaptando muy bien al volumen actual.'),
-              _buildAiTip('Punto a Mejorar', 'La asimetría en el hombro derecho reportada persiste. Recomiendo que hoy verifiques su postura durante los ejercicios de tren superior.'),
-              _buildAiTip('Ajuste Sugerido', 'Incrementar las calorías diarias a 3,000 kcal la próxima semana si el peso se estanca, ya que su gasto energético ha subido considerablemente.'),
+              
+              // Chat AI History
+              ..._aiChatHistory.map((msg) => Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: msg['role'] == 'ai' ? MainAxisAlignment.start : MainAxisAlignment.end,
+                  children: [
+                    if (msg['role'] == 'ai') const CircleAvatar(radius: 14, backgroundColor: Color(0xFF1FAE87), child: Icon(Icons.smart_toy, size: 16, color: Colors.white)),
+                    if (msg['role'] == 'ai') const SizedBox(width: 8),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: msg['role'] == 'ai' ? const Color(0xFF1E293B) : const Color(0xFF2C3E50),
+                          borderRadius: BorderRadius.circular(12),
+                          border: msg['role'] == 'ai' ? Border.all(color: const Color(0xFF1FAE87).withOpacity(0.3)) : null,
+                        ),
+                        child: Text(msg['text']!, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                      ),
+                    ),
+                  ],
+                ),
+              )).toList(),
             ],
           ),
         ),
+        // Chat Input Field
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: const BoxDecoration(
+            color: Color(0xFF0F192B),
+            border: Border(top: BorderSide(color: Colors.white12)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _chatController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Ej: Â¿Qué calentamiento específico recomiendas hoy?',
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    filled: true,
+                    fillColor: const Color(0xFF1E293B),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              CircleAvatar(
+                backgroundColor: const Color(0xFF1FAE87),
+                child: IconButton(
+                  icon: const Icon(Icons.send, color: Colors.white, size: 18),
+                  onPressed: () {
+                    if (_chatController.text.isNotEmpty) {
+                      setState(() {
+                        _aiChatHistory.add({'role': 'trainer', 'text': _chatController.text});
+                        _chatController.clear();
+                        // Fake AI response
+                        _aiChatHistory.add({'role': 'ai', 'text': 'Basado en su historial, recomiendo 10 mins de elíptica suave, y movilidad articular de cadera y rodilla (lubricación sin carga) antes de ir a la Prensa.'});
+                      });
+                    }
+                  },
+                ),
+              )
+            ],
+          ),
+        )
       ],
     );
   }
