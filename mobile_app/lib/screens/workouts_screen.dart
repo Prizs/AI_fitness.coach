@@ -76,9 +76,18 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           ),
         );
       }
+      if (_service.lastError != null) {
+        return _EmptyState(
+          message: _service.lastError!,
+          onRetry: () => _service.refresh(AuthService.instance.loggedInUser),
+          isError: true,
+        );
+      }
+      
       return _EmptyState(
-        message: _service.lastError ?? 'No se pudo cargar la semana.',
+        message: 'Aún no tienes una rutina activa.\n\nPresiona el botón de abajo para que la IA diseñe un plan personalizado a tu nivel, disponibilidad y equipo.',
         onRetry: () => showPlanOptionsSheet(context),
+        isError: false,
       );
     }
 
@@ -143,34 +152,47 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message, required this.onRetry});
+  const _EmptyState({required this.message, required this.onRetry, this.isError = true});
 
   final String message;
   final VoidCallback onRetry;
+  final bool isError;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_off_rounded,
-              size: 46, color: Color(0xFFFF7A7A)),
-          const SizedBox(height: 12),
-          Text(message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70)),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF8BE0C0),
-              foregroundColor: const Color(0xFF0B1220),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isError ? Icons.cloud_off_rounded : Icons.fitness_center_rounded,
+              size: 56, 
+              color: isError ? const Color(0xFFFF7A7A) : const Color(0xFF8BE0C0)
             ),
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Reintentar'),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              isError ? 'Error de Carga' : 'Bienvenido',
+              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)
+            ),
+            const SizedBox(height: 12),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, height: 1.5)),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF8BE0C0),
+                foregroundColor: const Color(0xFF0B1220),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)
+              ),
+              onPressed: onRetry,
+              icon: Icon(isError ? Icons.refresh_rounded : Icons.add_rounded),
+              label: Text(isError ? 'Reintentar' : 'Crear mi rutina', style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }
