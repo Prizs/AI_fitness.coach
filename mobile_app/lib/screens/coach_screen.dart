@@ -60,19 +60,41 @@ class _CoachScreenState extends State<CoachScreen> {
     }
   }
 
-  final List<String> _quickPrompts = [
+  final List<String> _defaultQuickPrompts = [
     'Crear nueva rutina de entrenamiento',
     'Registrar entrenamiento completado',
-    'Tengo una molestia / cambiar ejercicio',
     'Ajustar plan nutricional',
   ];
 
+  List<String> get _currentQuickPrompts {
+    if (_messages.isEmpty) return _defaultQuickPrompts;
+    
+    // Buscar el ultimo mensaje de la IA
+    final aiMessages = _messages.where((m) => m['isUser'] == false).toList();
+    if (aiMessages.isEmpty) return _defaultQuickPrompts;
+    
+    final lastAiMsg = aiMessages.last;
+    final text = (lastAiMsg['text'] as String).toLowerCase();
+    
+    if (text.contains('dónde') && (text.contains('duele') || text.contains('molestia'))) {
+      return ['Rodilla', 'Espalda baja', 'Hombro', 'Cuello', 'Ninguna'];
+    }
+    if (text.contains('sientes') || text.contains('física') || text.contains('molestia') || text.contains('dolor')) {
+      return ['Me siento al 100%', 'Tengo una molestia', 'Estoy cansado'];
+    }
+    if (text.contains('equipo') || text.contains('gimnasio') || text.contains('pesas')) {
+      return ['Gym Completo', 'Herramientas en Casa', 'Sin herramientas'];
+    }
+    if (text.contains('intensidad') || text.contains('esfuerzo')) {
+      return ['Intensidad Baja', 'Intensidad Media', 'Intensidad Alta'];
+    }
+    
+    return _defaultQuickPrompts;
+  }
+
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
-    if (text == 'Crear nueva rutina de entrenamiento') {
-      showPlanOptionsSheet(context);
-      return;
-    }
+
     setState(() {
       _messages.add({'isUser': true, 'text': text, 'plan': null});
       _isLoading = true;
@@ -319,7 +341,7 @@ class _CoachScreenState extends State<CoachScreen> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: _quickPrompts.map((p) => Padding(
+                  children: _currentQuickPrompts.map((p) => Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ActionChip(
                       backgroundColor: const Color(0xFF101B2D),
