@@ -9,8 +9,8 @@ class TrainerClientsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final String trainerCode = AuthService.instance.loggedInUser?.cedula ?? 'Desconocido';
     final List<Map<String, dynamic>> mockClients = [
-      {'id': '1', 'name': 'Juan PÃ©rez', 'goal': 'Ganar MÃºsculo', 'status': 'Activo', 'last_photo': 'Hace 2 dÃ­as'},
-      {'id': '2', 'name': 'Ana GÃ³mez', 'goal': 'Perder Peso', 'status': 'Requiere revisiÃ³n', 'last_photo': 'Hoy'},
+      {'id': '1', 'name': 'Juan Pérez', 'goal': 'Ganar Músculo', 'status': 'Activo', 'last_photo': 'Hace 2 días'},
+      {'id': '2', 'name': 'Ana Gómez', 'goal': 'Perder Peso', 'status': 'Requiere revisión', 'last_photo': 'Hoy'},
     ];
 
     return SafeArea(
@@ -37,14 +37,14 @@ class TrainerClientsTab extends StatelessWidget {
                 children: [
                   const Icon(Icons.fitness_center_rounded, size: 48, color: Colors.white),
                   const SizedBox(height: 12),
-                  const Text('Tu CÃ³digo de VinculaciÃ³n', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                  const Text('Tu Código de Vinculación', style: TextStyle(color: Colors.white70, fontSize: 16)),
                   const SizedBox(height: 8),
                   Text(
                     trainerCode,
                     style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold, letterSpacing: 2),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Comparte este cÃ³digo con tus alumnos para que te asignen.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 13)),
+                  const Text('Comparte este código con tus alumnos para que te asignen.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 13)),
                 ],
               ),
             ),
@@ -81,7 +81,7 @@ class TrainerClientsTab extends StatelessWidget {
                               children: [
                                 Text(client['name'] as String, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 4),
-                                Text('Meta: ', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                                Text('Meta: ' + (client['goal'] as String), style: const TextStyle(color: Colors.white70, fontSize: 14)),
                               ],
                             ),
                           ),

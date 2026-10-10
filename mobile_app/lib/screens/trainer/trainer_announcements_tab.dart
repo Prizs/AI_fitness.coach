@@ -13,13 +13,13 @@ class TrainerAnnouncementsTab extends StatelessWidget {
           children: [
             const Text('Muro de Anuncios', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('EnvÃ­a avisos globales a todos tus alumnos.', style: TextStyle(color: Colors.white54, fontSize: 14)),
+            const Text('Envía avisos globales a todos tus alumnos.', style: TextStyle(color: Colors.white54, fontSize: 14)),
             const SizedBox(height: 20),
             TextField(
               maxLines: 3,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Escribe un nuevo anuncio o recomendaciÃ³n general...',
+                hintText: 'Escribe un nuevo anuncio o recomendación general...',
                 hintStyle: const TextStyle(color: Colors.white54),
                 filled: true,
                 fillColor: const Color(0xFF1E293B),
@@ -52,7 +52,7 @@ class TrainerAnnouncementsTab extends StatelessWidget {
                   children: const [
                     Text('Hoy, 9:00 AM', style: TextStyle(color: Colors.white54, fontSize: 12)),
                     SizedBox(height: 8),
-                    Text('Chicos, el gimnasio estarÃ¡ cerrado maÃ±ana en la maÃ±ana. Ãšnanse al chat en lÃ­nea para asesorÃ­a.', style: TextStyle(color: Colors.white, fontSize: 15)),
+                    Text('Chicos, el gimnasio estará cerrado mañana en la mañana. Únanse al chat en línea para asesoría.', style: TextStyle(color: Colors.white, fontSize: 15)),
                   ],
                 ),
               ),

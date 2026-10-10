@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_app/screens/trainer/client_detail_screen.dart';
 
 class TrainerAgendaTab extends StatelessWidget {
   const TrainerAgendaTab({super.key});
@@ -16,14 +17,14 @@ class TrainerAgendaTab extends StatelessWidget {
             Expanded(
               child: ListView(
                 children: [
-                  _buildTimeBlock('12:00 PM - 2:00 PM', '2/2 Cupos Llenos', [
-                    {'name': 'Juan PÃ©rez', 'workout': 'Pecho e hipertrofia'},
-                    {'name': 'Ana GÃ³mez', 'workout': 'Cardio intenso'},
+                  _buildTimeBlock(context, '12:00 PM - 2:00 PM', '2/2 Cupos Llenos', [
+                    {'name': 'Juan Pérez', 'workout': 'Pecho e hipertrofia'},
+                    {'name': 'Ana Gómez', 'workout': 'Cardio intenso'},
                   ], Colors.redAccent),
-                  _buildTimeBlock('2:00 PM - 4:00 PM', '1/2 Cupos Libres', [
+                  _buildTimeBlock(context, '2:00 PM - 4:00 PM', '1/2 Cupos Libres', [
                     {'name': 'Carlos Ruiz', 'workout': 'Piernas'},
                   ], Colors.orangeAccent),
-                  _buildTimeBlock('4:00 PM - 6:00 PM', '2/2 Cupos Libres', [], Colors.greenAccent),
+                  _buildTimeBlock(context, '4:00 PM - 6:00 PM', '2/2 Cupos Libres', [], Colors.greenAccent),
                 ],
               ),
             )
@@ -33,7 +34,7 @@ class TrainerAgendaTab extends StatelessWidget {
     );
   }
 
-  Widget _buildTimeBlock(String time, String capacity, List<Map<String, String>> students, Color capacityColor) {
+  Widget _buildTimeBlock(BuildContext context, String time, String capacity, List<Map<String, String>> students, Color capacityColor) {
     return Card(
       color: const Color(0xFF1E293B),
       margin: const EdgeInsets.only(bottom: 16),
@@ -56,14 +57,19 @@ class TrainerAgendaTab extends StatelessWidget {
             else
               ...students.map((s) => Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
-                child: Row(
-                  children: [
-                    const Icon(Icons.person, color: Color(0xFF1FAE87), size: 18),
-                    const SizedBox(width: 8),
-                    Text(s['name']!, style: const TextStyle(color: Colors.white, fontSize: 16)),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('- ', style: const TextStyle(color: Colors.white54, fontSize: 14), overflow: TextOverflow.ellipsis)),
-                  ],
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => ClientDetailScreen(clientName: s['name']!)));
+                  },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person, color: Color(0xFF1FAE87), size: 18),
+                      const SizedBox(width: 8),
+                      Text(s['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.underline)),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('- ' + s['workout']!, style: const TextStyle(color: Colors.white54, fontSize: 14), overflow: TextOverflow.ellipsis)),
+                    ],
+                  ),
                 ),
               )),
           ],

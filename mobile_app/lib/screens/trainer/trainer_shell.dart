@@ -32,7 +32,7 @@ class _TrainerShellState extends State<TrainerShell> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.redAccent),
-            tooltip: 'Cerrar SesiÃ³n',
+            tooltip: 'Cerrar Sesión',
             onPressed: () {
               AuthService.instance.logout();
               Navigator.of(context).pushAndRemoveUntil(
