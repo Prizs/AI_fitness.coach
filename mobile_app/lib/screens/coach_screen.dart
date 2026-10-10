@@ -69,6 +69,10 @@ class _CoachScreenState extends State<CoachScreen> {
 
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
+    if (text == 'Crear nueva rutina de entrenamiento') {
+      showPlanOptionsSheet(context);
+      return;
+    }
     setState(() {
       _messages.add({'isUser': true, 'text': text, 'plan': null});
       _isLoading = true;
