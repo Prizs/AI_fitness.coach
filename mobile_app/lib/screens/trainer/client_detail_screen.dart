@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:mobile_app/services/auth_service.dart';
 
 class ClientDetailScreen extends StatefulWidget {
   final String clientName;
@@ -10,6 +13,7 @@ class ClientDetailScreen extends StatefulWidget {
 
 class _ClientDetailScreenState extends State<ClientDetailScreen> {
   final TextEditingController _chatController = TextEditingController();
+  bool _isLoadingAi = false;
   final List<Map<String, String>> _aiChatHistory = [
     {'role': 'ai', 'text': 'Hola, soy el asistente IA. Puedes preguntarme sobre la biografía, lesiones, o pedirme que adapte la rutina de este alumno.'}
   ];
@@ -238,16 +242,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 backgroundColor: const Color(0xFF1FAE87),
                 child: IconButton(
                   icon: const Icon(Icons.send, color: Colors.white, size: 18),
-                  onPressed: () {
-                    if (_chatController.text.isNotEmpty) {
-                      setState(() {
-                        _aiChatHistory.add({'role': 'trainer', 'text': _chatController.text});
-                        _chatController.clear();
-                        // Fake AI response
-                        _aiChatHistory.add({'role': 'ai', 'text': 'Basado en su historial, recomiendo 10 mins de elíptica suave, y movilidad articular de cadera y rodilla (lubricación sin carga) antes de ir a la Prensa.'});
-                      });
-                    }
-                  },
+                  onPressed: _sendMessageToAi,
                 ),
               )
             ],
@@ -324,5 +319,55 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _sendMessageToAi() async {
+    final text = _chatController.text.trim();
+    if (text.isEmpty || _isLoadingAi) return;
+
+    setState(() {
+      _aiChatHistory.add({'role': 'trainer', 'text': text});
+      _chatController.clear();
+      _isLoadingAi = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('\/api/coach/chat'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+        'message': 'Soy el entrenador de este alumno. Te consulto sobre él: ',
+        'history': _aiChatHistory
+            .where((msg) => msg['role'] != 'trainer' || msg['text'] != text) // Excluir el reciÃ©n aÃ±adido para el historial previo si es necesario o formatearlo bien
+            .map((msg) => {
+                  'role': msg['role'] == 'trainer' ? 'user' : 'assistant',
+                  'content': msg['text']
+                })
+            .toList(),
+        'user_goal': 'Ganancia Muscular',
+        'allergies': 'Intolerante a la lactosa',
+        'injuries': 'Molestia en rodilla derecha reportada hoy',
+      }));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _aiChatHistory.add({
+            'role': 'ai', 
+            'text': data['response'] ?? 'Sin respuesta de la IA'
+          });
+        });
+      } else {
+        throw Exception('Error del servidor');
+      }
+    } catch (e) {
+      setState(() {
+        _aiChatHistory.add({'role': 'ai', 'text': 'Error de conexión con la IA.'});
+      });
+    } finally {
+      setState(() {
+        _isLoadingAi = false;
+      });
+    }
   }
 }

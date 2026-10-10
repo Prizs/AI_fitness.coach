@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 
 class ClientTrainerTab extends StatefulWidget {
   const ClientTrainerTab({super.key});
@@ -12,24 +12,20 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
   // Estado falso para demo: false = no tiene entrenador, true = si tiene
   bool _hasTrainer = false;
   bool _requestPending = false;
+
+  static bool _hasTrainerGlobal = false;
+  static bool _requestPendingGlobal = false;
+
   @override
   void initState() {
     super.initState();
-    _loadState();
+    _hasTrainer = _hasTrainerGlobal;
+    _requestPending = _requestPendingGlobal;
   }
 
-  Future<void> _loadState() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _hasTrainer = prefs.getBool('has_trainer') ?? false;
-      _requestPending = prefs.getBool('request_pending') ?? false;
-    });
-  }
-
-  Future<void> _saveState(bool hasTrainer, bool requestPending) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('has_trainer', hasTrainer);
-    await prefs.setBool('request_pending', requestPending);
+  void _saveState(bool hasTrainer, bool requestPending) {
+    _hasTrainerGlobal = hasTrainer;
+    _requestPendingGlobal = requestPending;
   }
 
 
