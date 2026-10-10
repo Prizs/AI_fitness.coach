@@ -1,0 +1,24 @@
+﻿import sys
+html = '''<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>AI Fitness Coach - Descarga Android</title>
+<style>body { margin:0; padding:24px; background:#0B1220; color:#E6EDF5; font-family: system-ui, -apple-system, sans-serif; } .card { max-width:520px; margin:0 auto; background:#101B2D; border:1px solid #173B45; border-radius:20px; padding:24px; text-align:center; } h1 { font-size:22px; margin:0 0 6px; } h2 { color: #FF9500; font-size:18px; margin-top:24px; } .btn { display:block; text-align:center; background:#8BE0C0; color:#0B1220; font-weight:700; text-decoration:none; padding:16px; border-radius:14px; margin:18px 0 8px; font-size:16px; } code { background:#173B45; padding:2px 6px; border-radius:6px; color:#8BE0C0; } </style>
+</head>
+<body>
+<div class="card">
+<h1>AI Fitness Coach (Versión 1.0.32)</h1>
+<p>Arreglo de los ejercicios y vistas 3D.</p>
+<a class="btn" href="/mobile_app/build/app/outputs/flutter-apk/app-v1.0.32.apk?rnd=2032" download>DESCARGAR VERSIÓN 1.0.32</a>
+<h2>¡OJO! Desinstala la versión anterior si tienes problemas, e instala esta de nuevo.</h2>
+</div>
+</body>
+</html>'''
+
+with open('index.html', 'w', encoding='utf-8') as f:
+    f.write(html)

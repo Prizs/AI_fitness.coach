@@ -4,6 +4,7 @@ import 'package:mobile_app/screens/user_profile_screen.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/screens/workouts_screen.dart';
 import 'package:mobile_app/screens/progress_screen.dart';
+import 'package:mobile_app/screens/notifications_screen.dart';
 import 'package:mobile_app/screens/nutrition_screen.dart';
 
 class HomeScreen extends StatelessWidget {

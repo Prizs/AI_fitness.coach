@@ -481,3 +481,108 @@ Hay cambios locales no incluidos en ese commit en:
 - `mobile_app/lib/services/plan_service.dart`
 
 Cline debe revisar esos cambios antes de agruparlos en un commit. No usar `git reset --hard` ni `git checkout --`.
+
+---
+
+# Plan semanal, sinergia y rutinas pendientes (2026-09-25)
+
+## Que se implemento
+
+1. **Plan semanal de 7 dias** en `backend/app/services/weekly_plan.py`.
+   Cada dia trae rutina, nutricion propia y una frase de sinergia.
+   Endpoint nuevo: `POST /api/plans/weekly` (cache de 1 hora).
+2. **Apertura instantanea**: `mobile_app/lib/services/weekly_plan_service.dart`
+   pide la semana una sola vez al entrar en `AppShell` (precarga en `main.dart`).
+   Rutinas y Nutricion ya no esperan a la IA en cada apertura.
+3. **Nutricion por dia real del reloj**: la pantalla arranca en el dia de hoy
+   (por ejemplo, el viernes) con una tira L M X J V S D para cambiar de dia.
+   El punto verde marca los dias con entrenamiento.
+4. **Sinergia**: tarjeta que explica como se combinan entrenamiento y comida
+   de ese dia, tanto en Nutricion como en cada tarjeta de Rutinas.
+5. **Rutinas pendientes**: se listan primero las no completadas y despues las
+   completadas, con checkbox para marcar. El dia actual se marca como HOY.
+6. **Boton inferior "Nueva rutina"** en Rutinas que redirige a `CoachScreen`.
+
+## Lo que NO se hizo (decision consciente)
+
+El usuario pidio una IA que generara una guia 3D con munecos musculosos.
+**No existe tal servicio.** Una animacion 3D anatomica es un archivo modelado
+a mano, con licencia. El visor 3D actual (`exercise_3d_viewer.dart`) es un
+esqueleto de 17 huesos dibujado en Dart, y la vista de musculos
+(`muscle_map_view.dart`) usa `flutter_body_atlas`, que son SVG estaticos.
+Para tener musculatura visible en movimiento habria que integrar un modelo
+`.glb` con licencia, o migrar a un motor como `model_viewer_plus`.
+
+## Verificacion
+
+- `flutter analyze`: sin errores.
+- `flutter test`: 17/17.
+- Backend: 15 pruebas pasan. Se desactiva `test_plan_generation` porque llama a
+  la IA real y se cuelga sin conexion (preexistente, no de estos cambios).
+  Ejecutar: `python -m pytest tests -q --timeout=15 --timeout-method=thread
+  --deselect tests/test_api_endpoints.py::test_plan_generation`
+
+## Archivos
+
+- `backend/app/services/weekly_plan.py` (nuevo)
+- `backend/app/routers/plans.py` (endpoint `/weekly`, campos `height` y `sex`)
+- `backend/tests/test_api_endpoints.py` (4 pruebas semanales)
+- `mobile_app/lib/services/weekly_plan_service.dart` (nuevo)
+- `mobile_app/lib/screens/nutrition_screen.dart` (reescrito)
+- `mobile_app/lib/screens/workouts_screen.dart` (reescrito)
+- `mobile_app/lib/main.dart` (precarga)
+
+---
+
+# Pantalla de Anatomia 3D y documentacion del stack (2026-09-25)
+
+## Pantalla de demostracion anatomica
+
+- `mobile_app/lib/models/anatomy_exercise.dart` (nuevo): catalogo de los 4
+  ejercicios con agonista, sinergistas, biomecanica, tempo, postura y
+  advertencia. Tambien define los colores (#FF3B30 agonista, #FF9500 sinergistas).
+- `mobile_app/lib/screens/anatomy_workout_screen.dart` (nuevo): mitad superior con
+  el visor 3D (rotacion 360, zoom, autorrotacion con boton en AppBar) y mitad
+  inferior con panel deslizable (titulo, chips de musculo, indicadores
+  biomecanicos, tempo, nota postural, advertencia y tira de 4 ejercicios).
+- `mobile_app/lib/screens/home_screen.dart`: nuevo boton en la AppBar que abre
+  la pantalla.
+- `mobile_app/test/anatomy_screen_test.dart` (nuevo): 6 pruebas.
+
+## Hallazgo importante sobre el modelo 3D
+
+Se verifico el catalogo oficial de Khronos: 162 modelos y NINGUNO es anatomia
+muscular humana. Los unicos anatomicos son `BrainStem` y `RecursiveSkeletons`.
+En `modelviewer.dev` solo hay Astronaut, RobotExpressive y NeilArmstrong.
+
+Por eso:
+- El modelo usado es NeilArmstrong.glb (cuerpo humanoide real, licencia Apache 2.0).
+- El resaltado muscular es una CAPA SUPERPUESTA en Flutter (`_MuscleOverlay`),
+  coherente con el `muscle_map_view` que ya existia.
+- Para resaltar musculos de verdad hace falta un .glb con las masas musculares
+  separadas por malla; con ese archivo el resaltado seria por material.
+
+Ademas: `model_viewer_plus` 1.10.0 en Android renderiza dentro de un WebView y NO
+expone un controller publico, por lo que cambiar materiales requiere JS. Por eso
+se eligio la capa superpuesta.
+
+## Detalle de las pruebas
+
+El visor 3D real no se puede probar en `flutter test` porque el WebView no
+existe en ese entorno. Se agrega el parametro opcional `viewerBuilder` en
+`AnatomyWorkoutScreen` para sustituir el visor por un marcador en las pruebas.
+En la app real se deja en null.
+
+## Documentacion del stack
+
+- `docs/STACK_TECNOLOGICO_Y_FUNCIONALIDADES.txt`: documento didactico en texto.
+- `docs/STACK_TECNOLOGICO_Y_FUNCIONALIDADES.pdf`: 13 paginas, generado con
+  ReportLab. Portada, indice por secciones, tablas con cabecera, bloques de
+  codigo y pie de pagina numerado.
+- `scripts/build_stack_pdf.py`: generador. Ejecutar con
+  `python scripts/build_stack_pdf.py` despues de editar el .txt.
+
+## Verificacion
+
+- `flutter analyze`: sin errores ni advertencias.
+- `flutter test`: 23/23 (6 nuevas de la pantalla de anatomia).

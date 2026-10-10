@@ -1,0 +1,545 @@
+﻿================================================================================
+ AI FITNESS COACH
+ Documento tecnico del stack y funcionalidades
+================================================================================
+
+ Version   : 1.0.7+8
+ Fecha     : 26 de septiembre de 2026
+ Alcance   : backend, aplicacion movil y base de datos
+ Audiencia : perfiles tecnicos y didacticos
+
+
+================================================================================
+ 1. QUE ES LA APLICACION
+================================================================================
+
+AI Fitness Coach es un entrenador personal digital que genera planes de
+entrenamiento y alimentacion personalizados, y los muestra dia a dia en el
+telefono.
+
+La idea central es la SINERGIA: el entrenamiento y la alimentacion no son dos
+listas independientes, forman un solo plan. Cada dia de la semana tiene su
+rutina, su menu y una explicacion de como ambos se combinan para lograr el
+objetivo del usuario.
+
+La aplicacion se apoya en inteligencia artificial para redactar los planes, pero
+nunca para dar diagnosticos ni prescripciones medicas. Toda la orientacion es
+general y el usuario debe consultar a un profesional de salud ante cualquier
+dolor.
+
+
+================================================================================
+ 2. ARQUITECTURA GENERAL
+================================================================================
+
+  TELEFONO (Android)                  SERVIDOR (PC)
+ +---------------------------+      +--------------------------+
+ |  Flutter / Dart           |      |  FastAPI / Python        |
+ |  - Inicio                | HTTP |  - Routers por dominio   |
+ |  - Coach IA              +----->+  - Servicios de IA        |
+ |  - Rutinas               |      |  - Cache en memoria       |
+ |  - Nutricion             |      +------------+--------------+
+ |  - Progreso              |                   |
+ |  - Mi Perfil y Salud     |                   v
+ |  - Anatomia 3D           |      +--------------------------+
+ |  - Actualizaciones APK   |      |  Supabase (PostgreSQL)    |
+ +---------------------------+      |  - Auth                   |
+                                    |  - Perfiles               |
+                                    |  - Rutinas y ejercicios   |
+                                    |  - Progreso semanal       |
+                                    |  - Aprendizaje anonimo    |
+                                    +--------------------------+
+
+Flujo tipico de una peticion:
+
+  1. El telefono pide la semana al endpoint /api/plans/weekly.
+  2. FastAPI revisa la cache en memoria (1 hora).
+  3. Si no hay respuesta guardada, llama a la cadena de IA.
+  4. La IA devuelve 7 dias con rutina, menu y sinergia.
+  5. Se normaliza la respuesta y se cachea.
+  6. El telefono guarda el resultado y lo muestra al instante.
+
+
+================================================================================
+ 3. STACK TECNOLOGICO
+================================================================================
+
+--------------------------------------------------------------------------------
+ 3.1 BASE DE DATOS
+--------------------------------------------------------------------------------
+
+  Supabase (PostgreSQL alojado)
+    Papel          Almacenamiento de usuarios, perfiles, planes y progreso
+    Cliente        Paquete oficial de Python (supabase 2.31.0)
+    Driver         psycopg2-binary 2.9.9 para conexion directa
+    Seguridad      Dos claves separadas: publica y de servicio (admin)
+
+  El proyecto define 13 tablas. Las principales son:
+
+  Tabla                        Proposito
+  ---------------------------  -----------------------------------------------
+  usuarios                    Credenciales y datos basicos de la cuenta
+  perfil_usuario              Edad, peso, alergias, lesiones, zonas a evitar
+  objetivos                   Metas de fitness declaradas por el usuario
+  rutinas                     Planes de entrenamiento guardados
+  ejercicios                  Catalogo de ejercicios con su animacion
+  rutina_ejercicios           Union de rutina con ejercicio (relacion N:M)
+  dieta_diaria                Planes de alimentacion por dia
+  alimentos                   Catalogo de alimentos
+  dieta_alimentos             Union de dieta con alimento
+  coach_mensajes              Historial de conversación con el Coach IA
+  progreso_semanal            Registro de avance por semana
+  aprendizaje_plan_anonimo    Senales agregadas para mejorar los planes
+
+  Nota importante de privacidad: la tabla de aprendizaje guarda solo senales
+  agregadas y anonimas. Nunca se escriben diagnosticos ni texto medico personal.
+
+
+--------------------------------------------------------------------------------
+ 3.2 BACKEND
+--------------------------------------------------------------------------------
+
+  FastAPI 0.115.0
+    Papel          Framework web de la API REST
+    Ventaja        Documentacion automatica en /docs gracias a OpenAPI
+    Validacion     Modelos Pydantic 2.9.2 en cada endpoint
+
+  Uvicorn 0.30.6
+    Papel          Servidor ASGI que ejecuta FastAPI
+
+  HTTPX 0.27.2
+    Papel          Cliente asincrono para llamar a los proveedores de IA
+
+  Python-dotenv 1.0.1
+    Papel          Carga las claves desde el archivo .env
+
+  Pytest 8.3.3
+    Papel          Pruebas automaticas del backend
+
+  Organizacion del codigo:
+
+  backend/
+    app/
+      main.py                     Registro de rutas y endpoints de salud
+      config.py                   Constantes
+      routers/
+        auth.py                   Registro, inicio de sesion, perfil
+        plans.py                  Generacion de planes y endpoint semanal
+        coach.py                  Conversacion con el Coach IA
+        workouts.py               Rutinas y ejercicios
+        recalibration.py          Recalibracion del plan
+        app_updates.py            Version publicada del APK
+      services/
+        ai_providers.py           Cadena de IA con failover
+        weekly_plan.py            Plan semanal de 7 dias
+        supabase_service.py       Conexion y salud de la base de datos
+
+  Endpoints principales:
+
+  Metodo  Ruta                        Proposito
+  ------  --------------------------  --------------------------------------
+  GET     /health                     Estado del servicio
+  GET     /health/supabase            Estado de la base de datos
+  GET     /health/ai                  Proveedores de IA configurados
+  POST    /api/plans/generate         Plan bajo demanda
+  POST    /api/plans/weekly           Semana completa de 7 dias
+  POST    /api/plans/feedback         Senal de aprendizaje anonima
+  POST    /api/auth/*                 Registro e inicio de sesion
+  POST    /api/coach/*                Mensajes al Coach IA
+  GET     /api/app/latest             Ultima version del APK publicada
+
+
+--------------------------------------------------------------------------------
+ 3.3 INTELIGENCIA ARTIFICIAL
+--------------------------------------------------------------------------------
+
+  La app no depende de un unico proveedor. Usa una CADENA CON FAILOVER: si uno
+  se cae o agota su cuota, pasa automaticamente al siguiente.
+
+  Proveedor        Clave en .env            Estado verificado
+  ---------------  ------------------------  ---------------------------
+  Google Gemini    GEMINI_API_KEY            Accesible, buena calidad
+  OpenRouter       OPENROUTER_API_KEY        Accesible, ~17 modelos gratis
+  Mistral          MISTRAL_API_KEY           Accesible, modo gratuito
+  Groq             GROQ_API_KEY              Devuelve HTTP 403 en esta red
+
+  Detalle de diseno: solo se intentan los proveedores que tienen clave
+  configurada. Si todos fallan se lanza un error explicito con el detalle de
+  cada fallo, en lugar de inventar una respuesta. La API responde con un error
+  real y la app lo muestra al usuario.
+
+  Para la semana de 7 dias, la IA recibe un prompt que exige:
+    - Exactamente 7 dias, uno por dia de la semana
+    - Rutinas distintas por dia
+    - Menus distintos por dia (no repetir el mismo)
+    - Una frase de sinergia por dia
+    - Respetar alergias, lesiones y zonas a evitar
+    - Prohibido diagnosticar o prescribir
+
+  Validacion: si la IA devuelve menos de 3 dias completos, el sistema descarta
+  la respuesta y usa el plan base. Esto evita mostrar una semana vacia.
+
+
+--------------------------------------------------------------------------------
+ 3.4 FRONTEND / APLICACION MOVIL
+--------------------------------------------------------------------------------
+
+  Flutter (Dart SDK ^3.13.4)
+    Papel          Framework de interfaz multiplataforma
+    Target         Android
+    Idioma         Dart, con Material 3 y tema oscuro
+
+  Paquetes usados y su razon:
+
+  Paquete                  Version   Proposito
+  -----------------------  --------  -----------------------------------------
+  http                     ^1.2.2    Llamadas al backend
+  flutter_secure_storage   ^9.2.2   Guarda sesion y tokens cifrados
+  flutter_body_atlas       ^0.2.1   Atlas anatomico de musculos (SVG)
+  model_viewer_plus        ^1.7.0    Visor 3D del modelo anatomico
+  flutter_lints            ^6.0.0    Reglas de calidad de codigo
+  cupertino_icons          ^1.0.8    Iconos del kit de Cupertino
+
+  Nota sobre model_viewer_plus: en Android renderiza dentro de un WebView, por
+  eso el manifiesto necesita el permiso de INTERNET y la aceleracion por
+  hardware activa. La libreria se resolvio en la version 1.10.0.
+
+  Pantallas y su proposito:
+
+  Pantalla                Proposito
+  ----------------------  -----------------------------------------------
+  Login                   Ingreso, muestra el servidor activo
+  Registro                Alta de cuenta y ficha de salud
+  Inicio                  Menu de modulos y acceso a Perfil y Anatomia
+  Coach IA                Conversacion con el entrenador
+  Rutinas                 Dias de la semana, pendientes y completados
+  Nutricion               Menu del dia actual y sinergia
+  Progreso                Avance semanal y recalibracion
+  Mi Perfil y Salud       Datos, restricciones y actualizaciones de la app
+  Anatomia 3D             Demostracion didactica del cuerpo en 3D
+  Cronograma              Agenda de la semana
+
+  Configuracion de Android:
+    - android:usesCleartextTraffic="true" (la app se conecta por HTTP en la red
+      local durante el desarrollo)
+    - android:hardwareAccelerated="true" (requerido para el visor 3D)
+    - android.permission.INTERNET
+    - android.permission.REQUEST_INSTALL_PACKAGES (para instalar el APK nuevo)
+
+
+================================================================================
+ 4. FUNCIONALIDADES ESENCIALES
+================================================================================
+
+--------------------------------------------------------------------------------
+ 4.1 PERFIL DE SALUD Y RESTRICCIONES
+--------------------------------------------------------------------------------
+
+  El usuario declara al registrarse: edad, peso, alergias alimentarias, lesiones
+  actuales, discapacidad motora, patologias y zonas a evitar.
+
+  Estas restricciones viajan al backend y se aplican en DOS momentos:
+    1. Al pedirle el plan a la IA, dentro del prompt.
+    2. En el plan base local, filtrando ejercicios de forma automatica.
+
+  Si el usuario declara que evita la rodilla o la pierna, el sistema elimina
+  automaticamente los ejercicios de cuadriceps, gluteos y gemelos, y los
+  reemplaza por alternativas seguras.
+
+
+--------------------------------------------------------------------------------
+ 4.2 PLAN SEMANAL DE 7 DIAS
+--------------------------------------------------------------------------------
+
+  Este es el eje de la experiencia. A diferencia de un plan unico, el sistema
+  genera la semana completa:
+
+  Dia        Rutina                          Entrenamiento
+  ---------  ------------------------------  -------------
+  Lunes      Fuerza tren superior            Si
+  Martes     Fuerza tren inferior            Si
+  Miercoles  Resistencia y cardio            Si
+  Jueves     Hombros y core                  Si
+  Viernes    Fuerza funcional                Si
+  Sabado     Movilidad y recuperacion        No
+  Domingo    Descanso activo                 No
+
+  Cada dia contiene:
+    - exercises : lista de ejercicios con series, repeticiones, animacion,
+                  musculo principal y musculo secundario
+    - nutrition : 4 comidas con sus alimentos
+    - synergy   : explicacion de como se combinan ambos
+
+
+--------------------------------------------------------------------------------
+ 4.3 SINERGIA ENTRENAMIENTO + ALIMENTACION
+--------------------------------------------------------------------------------
+
+  Este es el diferencial del producto. La idea es que el usuario entienda que
+  el plan es UNO SOLO.
+
+  Ejemplo real que genera el sistema para un dia de fuerza:
+
+    "Hoy entrenas fuerza tren superior. La proteina de la comida y de la cena
+     aporta los aminoacidos que el musculo necesita para repararse, y los
+     carbohidratos de la comida dan energia para la sesion."
+
+  Y para un dia de recuperacion:
+
+    "Hoy toca recuperacion: el musculo se adapta mientras descansas. Mas
+     proteina y liquidos ayudan a reponer lo que gastaste en la semana."
+
+  El menu tambien cambia segun la carga del dia:
+    - Dia de fuerza      : mas proteina (yogur griego extra)
+    - Dia de cardio      : mas carbohidratos para la energia
+    - Dia de recuperacion: mas hydratacion
+    - Dia de descanso   : porcion ligeramente menor
+
+
+--------------------------------------------------------------------------------
+ 4.4 NUTRICION SEGUN EL DIA DEL RELOJ
+--------------------------------------------------------------------------------
+
+  Cuando el usuario abre Nutricion, la pantalla arranca en el dia REAL de su
+  reloj. Si abre un viernes, ve el menu del viernes. No tiene que buscar nada.
+
+  Diseno de la pantalla:
+    - Titulo "Nutricion" y subtitulo "Hoy es Viernes · menu de hoy"
+    - Tira con los 7 dias (L M X J V S D), el dia actual resaltado
+    - Punto verde en los dias con entrenamiento
+    - Tarjeta con el titulo de la rutina de ese dia y la insignia HOY
+    - Tarjeta de sinergia destacada
+    - Las 4 comidas con sus alimentos
+    - Nota de seguridad al pie
+
+  Puede saltar a cualquier dia tocando la tira.
+
+
+--------------------------------------------------------------------------------
+ 4.5 RUTINAS PENDIENTES Y SEGUIMIENTO
+--------------------------------------------------------------------------------
+
+  La pantalla de Rutinas esta organizada por estado, no por fecha:
+
+    PENDIENTES   primero, para saber que falta
+    COMPLETADAS  despues, con texto tachado y atenuado
+
+  Cada dia tiene un boton circular para marcarlo como completado o devolverlo
+  a pendiente. El dia actual se marca con la insignia HOY. El encabezado
+  muestra el progreso: "3 de 7 completadas".
+
+  Al pie hay un boton "Nueva rutina" que lleva a la pantalla del Coach, que es
+  donde se piden rutinas nuevas o se agregan ejercicios.
+
+
+--------------------------------------------------------------------------------
+ 4.6 APERTURA INSTANTANEA
+--------------------------------------------------------------------------------
+
+  Un problema real que se resolvio: las pantallas tardaban o se quedaban en
+  blanco porque cada vez pedian un plan al servidor y ese proceso tardaba hasta
+  45 segundos.
+
+  Solucion implementada: la app pide la semana COMPLETA una sola vez al entrar,
+  al cargar la pantalla principal. El resultado se guarda en memoria y ambas
+  pantallas (Rutinas y Nutricion) lo leen de ahi, sin volver a llamar al
+  servidor. Ahora abren al instante.
+
+  El servicio WeeklyPlanService es un Listenable, por lo que las pantallas se
+  redibujan solas cuando el plan termina de llegar.
+
+
+--------------------------------------------------------------------------------
+ 4.7 ANATOMIA 3D DIDACTICA
+--------------------------------------------------------------------------------
+
+  Pantalla de demostracion con un cuerpo 3D interactivo.
+
+  Mitad superior (300 px):
+    - Modelo 3D real, con rotacion libre de 360 grados
+    - Zoom suave con dos dedos
+    - Boton en la AppBar para activar o pausar la autorrotacion
+    - Capa superpuesta que marca la zona estimulada, con efecto de brillo
+
+  Mitad inferior (panel deslizable):
+    - Se pliega y se despliega tocando el asa
+    - Titulo del ejercicio
+    - Chip rojo con brillo (#FF3B30): musculo agonista
+    - Chips ambar (#FF9500): musculos sinergistas y estabilizadores
+    - Indicadores biomecanicos (angulos articulares)
+    - Tempo recomendado (por ejemplo 3s excentrico - 1s pausa - 1s concentrico)
+    - Nota postural clave
+    - Advertencia de prevencion de lesiones
+    - Tira inferior con 4 ejercicios: Sentadilla, Press Militar, Peso Muerto,
+      Dominadas
+
+  Al cambiar de ejercicio cambian el foco muscular, los textos biomecanicos, el
+  tempo, la postura, la advertencia y la posicion de la capa de musculo.
+
+
+--------------------------------------------------------------------------------
+ 4.8 ACTUALIZACION DE LA APLICACION
+--------------------------------------------------------------------------------
+
+  El telefono detecta automaticamente cuando hay una version nueva:
+
+    1. Al abrir la app se consulta /api/app/latest
+    2. Se compara con la version instalada
+    3. Si hay una version nueva, aparece el panel en Mi Perfil y Salud
+    4. El usuario descarga el APK
+    5. Se instala usando FileProvider y REQUEST_INSTALL_PACKAGES
+
+  Detalle importante: la actualizacion conserva los datos del usuario porque
+  el APK se firma con la misma clave. Si en el futuro se cambia la clave de
+  firma, Android rechazara el APK y habra que desinstalar manualmente.
+
+  La IP del servidor se compila en el APK con:
+    flutter build apk --release --dart-define=API_BASE_URL=http://IP:8000
+
+  Advertencia: en Android, 127.0.0.1 apunta al propio telefono, no al
+  ordenador. Por eso hay que usar la IP local real del PC.
+
+
+================================================================================
+ 5. CALIDAD Y PRUEBAS
+================================================================================
+
+  Pruebas automaticas
+    Backend   15 pruebas en ejecucion + 4 del plan semanal
+              (la prueba de generacion con IA real se desactiva sin conexion)
+    Flutter   23 pruebas, todas en verde
+    Analisis  flutter analyze sin errores ni advertencias
+
+  Cobertura de pruebas
+    - Que la semana siempre devuelve 7 dias completos
+    - Que la comida cambia entre dias
+    - Que se respetan las restricciones de lesion
+    - Que los dias de recuperacion no se marcan como entrenamiento
+    - Que la pantalla cambia el foco muscular al tocar un ejercicio
+    - Que los indicadores biomecanicos se muestran
+    - Que el boton de autorrotacion funciona
+    - Que el control de actualizaciones es visible
+
+
+================================================================================
+ 6. VARIABLES DE ENTORNO
+================================================================================
+
+  Clave                            Proposito
+  -------------------------------  ------------------------------------------
+  SUPABASE_URL                     URL del proyecto Supabase
+  SUPABASE_KEY                     Clave publica del cliente
+  SUPABASE_SERVICE_ROLE_KEY        Clave administrativa (escritura)
+  SUPABASE_REST_URL                Endpoint REST de Supabase
+  DATABASE_URL                     Cadena de conexion a PostgreSQL
+  GEMINI_API_KEY                   Credencial de Google Gemini
+  OPENROUTER_API_KEY               Credencial de OpenRouter
+
+  Ninguna clave se escribe en el codigo. Todas se leen del archivo .env, que
+  esta excluido del control de versiones.
+
+
+================================================================================
+ 7. SEGURIDAD Y PRIVACIDAD
+================================================================================
+
+  - Las claves se guardan cifradas en el dispositivo con
+    flutter_secure_storage, no en shared preferences.
+  - La tabla de aprendizaje guarda solo senales agregadas y anonimas.
+  - No se almacenan diagnosticos ni texto medico personal.
+  - Todo el contenido generado es orientativo e incluye una nota de seguridad.
+  - La app recomienda consultar a un profesional ante cualquier dolor.
+  - Las credenciales de los proveedores de IA nunca viajan al telefono.
+
+
+================================================================================
+ 8. LIMITACIONES CONOCIDAS
+================================================================================
+
+  1. VISOR 3D
+     El modelo 3D actual es un cuerpo humanoide generico, no un modelo
+     anatomico muscular. Se verifico el catalogo oficial de Khronos (162
+     modelos) y ninguno es anatomia muscular humana; los unicos anatómicos
+     son un tronco encefalico y un esqueleto.
+     El resaltado muscular se dibuja como capa superpuesta en Flutter.
+     Para ver un modelo real habria que conseguir un archivo .glb con licencia
+     que tenga las musculas separadas por malla, y ahi si se podria resaltar
+     cada musculo por material.
+
+  2. CONEXION LOCAL
+     El backend corre en el PC y el telefono se conecta por la red WiFi local.
+     Esto significa que la IP puede cambiar y que el servidor debe estar
+     encendido. Para uso real hace falta desplegar en un hosting.
+
+  3. MODO SEGURO
+     El APK se firma con la clave de depuracion. Sirve para pruebas, pero para
+     publicar en Google Play hace falta una clave de firma definitiva.
+
+  4. PRUEBAS CON IA REAL
+     Una prueba del backend llama al proveedor de IA de verdad, por lo que se
+     cuelga sin conexion a internet. En los comandos de prueba se desactiva.
+
+
+================================================================================
+ 9. COMANDOS UTILES
+================================================================================
+
+  Instalar dependencias del backend
+    cd backend
+    ..\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+  Levantar el servidor
+    cd backend
+    ..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  Probar el backend (sin la prueba que usa la IA real)
+    cd backend
+    ..\.venv\Scripts\python.exe -m pytest tests -q --timeout=15 --timeout-method=thread --deselect tests/test_api_endpoints.py::test_plan_generation
+
+  Instalar dependencias de la app
+    cd mobile_app
+    flutter pub get
+
+  Analizar y probar la app
+    cd mobile_app
+    flutter analyze
+    flutter test
+
+  Compilar el APK indicando la IP del servidor
+    cd mobile_app
+    flutter build apk --release --dart-define=API_BASE_URL=http://192.168.X.X:8000
+
+  Ejecutar en un telefono o emulador
+    cd mobile_app
+    flutter run
+
+  Comprobar que el backend responde
+    curl http://127.0.0.1:8000/health
+    curl http://127.0.0.1:8000/health/ai
+
+
+================================================================================
+ 10. RESUMEN EJECUTIVO
+================================================================================
+
+  Que problema resuelve:
+    Entrega un plan de entrenamiento y alimentacion unificado, organizado por
+    dia de la semana y explicado de forma didactica, con un entrenador IA
+    disponible y visuales 3D para entender cada ejercicio.
+
+  Stack en una linea:
+    Flutter (Android) + FastAPI (Python) + Supabase (PostgreSQL) + cadena de
+    IA con failover (Gemini, OpenRouter, Mistral).
+
+  Funcionalidades diferenciadoras:
+    1. Sinergia explicita entre entrenamiento y alimentacion cada dia
+    2. La app muestra siempre el plan del dia real del reloj
+    3. Plan semanal completo de 7 dias en una sola peticion
+    4. Rutinas organizadas por pendientes y completadas
+    5. Pantalla de anatomia 3D interactiva con panel didactico
+    6. Actualizacion del APK por WiFi sin instalar a mano
+    7. Privacidad: solo señales agregadas, nunca datos medicos personales
+
+================================================================================
+ Fin del documento
+================================================================================

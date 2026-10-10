@@ -1,0 +1,386 @@
+﻿import os
+
+base_path = 'mobile_app/lib/screens/trainer'
+client_path = 'mobile_app/lib/screens'
+
+# ----------------- TRAINER SIDE -----------------
+# 1. Trainer Messages Tab
+messages_code = '''import 'package:flutter/material.dart';
+
+class TrainerMessagesTab extends StatelessWidget {
+  const TrainerMessagesTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Map<String, String>> activeChats = [
+      {'name': 'Juan Pérez', 'last_msg': 'Profe, me duele un poco la rodilla.', 'time': '10:30 AM', 'unread': '1'},
+      {'name': 'Ana Gómez', 'last_msg': 'Listo el entreno de hoy, estuvo rudo.', 'time': 'Ayer', 'unread': '0'},
+    ];
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Mensajes Directos', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                itemCount: activeChats.length,
+                itemBuilder: (context, index) {
+                  final chat = activeChats[index];
+                  final hasUnread = chat['unread'] != '0';
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFF1FAE87).withOpacity(0.2),
+                      child: Text(chat['name']![0], style: const TextStyle(color: Color(0xFF1FAE87))),
+                    ),
+                    title: Text(chat['name']!, style: TextStyle(color: Colors.white, fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal)),
+                    subtitle: Text(chat['last_msg']!, style: TextStyle(color: hasUnread ? Colors.white70 : Colors.white54), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(chat['time']!, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                        if (hasUnread)
+                          Container(
+                            margin: const EdgeInsets.top(4),
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(color: Color(0xFF1FAE87), shape: BoxShape.circle),
+                            child: Text(chat['unread']!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          )
+                      ],
+                    ),
+                    onTap: () {
+                      // Abrir chat
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo chat con \')));
+                    },
+                  );
+                },
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+'''
+with open(os.path.join(base_path, 'trainer_messages_tab.dart'), 'w', encoding='utf-8') as f:
+    f.write(messages_code)
+
+# 2. Update TrainerShell
+shell_path = os.path.join(base_path, 'trainer_shell.dart')
+with open(shell_path, 'r', encoding='utf-8') as f:
+    shell_text = f.read()
+
+shell_text = shell_text.replace(
+    "import 'package:mobile_app/screens/trainer/trainer_announcements_tab.dart';",
+    "import 'package:mobile_app/screens/trainer/trainer_announcements_tab.dart';\nimport 'package:mobile_app/screens/trainer/trainer_messages_tab.dart';"
+)
+shell_text = shell_text.replace(
+    "TrainerAnnouncementsTab(),",
+    "TrainerAnnouncementsTab(),\n    TrainerMessagesTab(),"
+)
+shell_text = shell_text.replace(
+    "BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Anuncios'),",
+    "BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Anuncios'),\n          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Chats'),"
+)
+shell_text = shell_text.replace(
+    "BottomNavigationBar(",
+    "BottomNavigationBar(\n        type: BottomNavigationBarType.fixed,"
+)
+with open(shell_path, 'w', encoding='utf-8') as f:
+    f.write(shell_text)
+
+
+# ----------------- CLIENT SIDE -----------------
+# 3. Client Trainer Tab (Find Trainer / Chat)
+client_trainer_code = '''import 'package:flutter/material.dart';
+
+class ClientTrainerTab extends StatefulWidget {
+  const ClientTrainerTab({super.key});
+
+  @override
+  State<ClientTrainerTab> createState() => _ClientTrainerTabState();
+}
+
+class _ClientTrainerTabState extends State<ClientTrainerTab> {
+  // Estado falso para demo: false = no tiene entrenador, true = si tiene
+  bool _hasTrainer = false;
+  bool _requestPending = false;
+
+  final List<Map<String, dynamic>> _availableTrainers = [
+    {'name': 'Nelvis Rincón', 'specialty': 'Hipertrofia y Fuerza', 'rating': '4.9'},
+    {'name': 'Carlos Ruiz', 'specialty': 'Pérdida de Peso', 'rating': '4.7'},
+    {'name': 'Ana Gómez', 'specialty': 'Rehabilitación', 'rating': '5.0'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasTrainer) {
+      return _buildActiveChat();
+    }
+    if (_requestPending) {
+      return _buildPendingState();
+    }
+    return _buildSearchState();
+  }
+
+  Widget _buildSearchState() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Mi Entrenador', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.redAccent.withOpacity(0.5))),
+              child: Column(
+                children: const [
+                  Icon(Icons.person_off, color: Colors.redAccent, size: 40),
+                  SizedBox(height: 12),
+                  Text('No tienes un entrenador asignado', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text('Busca un profesional para que diseñe tu rutina, supervise tu progreso y asigne tus horarios.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Text('Entrenadores Disponibles', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _availableTrainers.length,
+                itemBuilder: (context, index) {
+                  final t = _availableTrainers[index];
+                  return Card(
+                    color: const Color(0xFF1E293B),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      leading: const CircleAvatar(backgroundColor: Color(0xFF1FAE87), child: Icon(Icons.sports, color: Colors.white)),
+                      title: Text(t['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      subtitle: Text(t['specialty'], style: const TextStyle(color: Colors.white70)),
+                      trailing: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1FAE87)),
+                        onPressed: () {
+                          _showTrainerProfile(t);
+                        },
+                        child: const Text('Ver Perfil', style: TextStyle(color: Colors.white)),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTrainerProfile(Map<String, dynamic> trainer) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F192B),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const CircleAvatar(radius: 40, backgroundColor: Color(0xFF1FAE87), child: Icon(Icons.person, size: 40, color: Colors.white)),
+              const SizedBox(height: 16),
+              Text(trainer['name'], style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(trainer['specialty'], style: const TextStyle(color: Color(0xFF1FAE87), fontSize: 16)),
+              const SizedBox(height: 24),
+              const Text('Certificaciones: ISSA Personal Trainer, Nutrición Deportiva Avanzada.', style: TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1FAE87), padding: const EdgeInsets.symmetric(vertical: 16)),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    setState(() => _requestPending = true);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solicitud enviada al entrenador. Esperando aprobación.')));
+                  },
+                  child: const Text('Solicitar Entrenamiento', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              )
+            ],
+          ),
+        );
+      }
+    );
+  }
+
+  Widget _buildPendingState() {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.hourglass_top, color: Colors.orangeAccent, size: 60),
+              const SizedBox(height: 20),
+              const Text('Solicitud Pendiente', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              const Text('El entrenador Nelvis Rincón está revisando tu solicitud. Recibirás una notificación cuando te acepte y podrás agendar tus horarios.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16)),
+              const SizedBox(height: 32),
+              TextButton(
+                onPressed: () => setState(() {
+                  _requestPending = false;
+                  _hasTrainer = true; // Para simular que aceptó en la demo
+                }),
+                child: const Text('[Demo: Simular Aprobación]', style: TextStyle(color: Colors.white38)),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveChat() {
+    return SafeArea(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFF0F192B),
+            child: Row(
+              children: [
+                const CircleAvatar(backgroundColor: Color(0xFF1FAE87), child: Icon(Icons.person, color: Colors.white)),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('Coach: Nelvis Rincón', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('En línea', style: TextStyle(color: Color(0xFF1FAE87), fontSize: 12)),
+                  ],
+                ),
+                const Spacer(),
+                IconButton(icon: const Icon(Icons.calendar_month, color: Colors.white), onPressed: () {}),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                _chatBubble('¡Hola! Bienvenido al equipo. Ya revisé tu perfil y la IA me pasó tu historial.', false),
+                _chatBubble('Veo que quieres ganar masa muscular. ¿Tienes alguna duda con la rutina de hoy?', false),
+                _chatBubble('¡Gracias coach! Todo claro, ya reservé el horario de las 2:00 PM.', true),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: const Color(0xFF0F192B),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Escribe un mensaje...',
+                      hintStyle: const TextStyle(color: Colors.white38),
+                      filled: true,
+                      fillColor: const Color(0xFF1E293B),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                CircleAvatar(backgroundColor: const Color(0xFF1FAE87), child: IconButton(icon: const Icon(Icons.send, color: Colors.white, size: 18), onPressed: () {})),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _chatBubble(String text, bool isMe) {
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(maxWidth: 280),
+        decoration: BoxDecoration(
+          color: isMe ? const Color(0xFF1FAE87) : const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15)),
+      ),
+    );
+  }
+}
+'''
+with open(os.path.join(client_path, 'client_trainer_tab.dart'), 'w', encoding='utf-8') as f:
+    f.write(client_trainer_code)
+
+# 4. Modify AppShell to include the new Client Trainer Tab
+appshell_path = 'mobile_app/lib/main.dart'
+with open(appshell_path, 'r', encoding='utf-8') as f:
+    appshell_text = f.read()
+
+appshell_text = appshell_text.replace(
+    "import 'package:mobile_app/screens/progress_screen.dart';",
+    "import 'package:mobile_app/screens/progress_screen.dart';\nimport 'package:mobile_app/screens/client_trainer_tab.dart';"
+)
+
+old_screens = '''  final List<Widget> _screens = const [
+    HomeScreen(),
+    CoachScreen(),
+    WorkoutsScreen(),
+    NutritionScreen(),
+    ProgressScreen(),
+  ];'''
+
+new_screens = '''  final List<Widget> _screens = const [
+    HomeScreen(),
+    ClientTrainerTab(),
+    WorkoutsScreen(),
+    NutritionScreen(),
+    ProgressScreen(),
+  ];'''
+
+old_dests = '''        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_rounded),
+            label: 'Inicio',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.smart_toy_rounded),
+            label: 'Coach',
+          ),'''
+
+new_dests = '''        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_rounded),
+            label: 'Inicio',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.sports),
+            label: 'Coach',
+          ),'''
+
+appshell_text = appshell_text.replace(old_screens, new_screens)
+appshell_text = appshell_text.replace(old_dests, new_dests)
+
+with open(appshell_path, 'w', encoding='utf-8') as f:
+    f.write(appshell_text)
