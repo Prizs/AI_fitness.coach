@@ -219,6 +219,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
               Expanded(
                 child: TextField(
                   controller: _chatController,
+                  minLines: 1,
+                  maxLines: 5,
+                  keyboardType: TextInputType.multiline,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Ej: Â¿Qué calentamiento específico recomiendas hoy?',

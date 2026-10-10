@@ -192,6 +192,9 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
               children: [
                 Expanded(
                   child: TextField(
+                    minLines: 1,
+                    maxLines: 5,
+                    keyboardType: TextInputType.multiline,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Escribe un mensaje...',
