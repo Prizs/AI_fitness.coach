@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/trainer/trainer_clients_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_agenda_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_announcements_tab.dart';
+import 'package:mobile_app/screens/trainer/trainer_messages_tab.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/main.dart';
 import 'package:mobile_app/screens/trainer/trainer_profile_screen.dart';
@@ -20,6 +21,7 @@ class _TrainerShellState extends State<TrainerShell> {
     TrainerAgendaTab(),
     TrainerClientsTab(),
     TrainerAnnouncementsTab(),
+    TrainerMessagesTab(),
   ];
 
   @override
@@ -46,6 +48,7 @@ class _TrainerShellState extends State<TrainerShell> {
       ),
       body: _tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         backgroundColor: const Color(0xFF0F192B),
         selectedItemColor: const Color(0xFF1FAE87),
         unselectedItemColor: Colors.white54,
@@ -55,6 +58,7 @@ class _TrainerShellState extends State<TrainerShell> {
           BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Agenda'),
           BottomNavigationBarItem(icon: Icon(Icons.people_alt), label: 'Alumnos'),
           BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Anuncios'),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Chats'),
         ],
       ),
     );

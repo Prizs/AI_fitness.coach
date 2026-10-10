@@ -6,6 +6,7 @@ import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/screens/home_screen.dart';
 import 'package:mobile_app/screens/nutrition_screen.dart';
 import 'package:mobile_app/screens/progress_screen.dart';
+import 'package:mobile_app/screens/client_trainer_tab.dart';
 import 'package:mobile_app/screens/workouts_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
@@ -132,7 +133,7 @@ class _AppShellState extends State<AppShell> {
 
   final List<Widget> _screens = const [
     HomeScreen(),
-    CoachScreen(),
+    ClientTrainerTab(),
     WorkoutsScreen(),
     NutritionScreen(),
     ProgressScreen(),
@@ -155,7 +156,7 @@ class _AppShellState extends State<AppShell> {
             label: 'Inicio',
           ),
           NavigationDestination(
-            icon: Icon(Icons.smart_toy_rounded),
+            icon: Icon(Icons.sports),
             label: 'Coach',
           ),
           NavigationDestination(
