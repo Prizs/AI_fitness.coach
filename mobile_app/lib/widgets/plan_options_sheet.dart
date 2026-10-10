@@ -2,25 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/services/auth_service.dart';
 
-void showPlanOptionsSheet(BuildContext context) {
+void showPlanOptionsSheet(BuildContext context, {String initialPrompt = ''}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: const Color(0xFF101B2D),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (context) => const _PlanOptionsForm(),
+    builder: (context) => _PlanOptionsForm(initialPrompt: initialPrompt),
   );
 }
 
 class _PlanOptionsForm extends StatefulWidget {
-  const _PlanOptionsForm();
+  final String initialPrompt;
+  const _PlanOptionsForm({this.initialPrompt = ''});
 
   @override
   State<_PlanOptionsForm> createState() => _PlanOptionsFormState();
 }
 
 class _PlanOptionsFormState extends State<_PlanOptionsForm> {
-  final TextEditingController _promptController = TextEditingController();
+  late final TextEditingController _promptController;
+  
+  @override
+  void initState() {
+    super.initState();
+    _promptController = TextEditingController(text: widget.initialPrompt);
+  }
   String _experience = 'Intermedio';
   String _intensity = 'Medio';
   bool _equipment = true;

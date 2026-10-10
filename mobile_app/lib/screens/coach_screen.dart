@@ -7,6 +7,7 @@ import 'package:lottie/lottie.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
+import 'package:mobile_app/widgets/plan_options_sheet.dart';
 
 class CoachScreen extends StatefulWidget {
   const CoachScreen({super.key});
@@ -60,7 +61,7 @@ class _CoachScreenState extends State<CoachScreen> {
   }
 
   final List<String> _quickPrompts = [
-    'Mejorar resistencia pulmonar',
+    'Crear nueva rutina de entrenamiento',
     'Registrar entrenamiento completado',
     'Tengo una molestia / cambiar ejercicio',
     'Ajustar plan nutricional',
@@ -224,9 +225,17 @@ class _CoachScreenState extends State<CoachScreen> {
                                         foregroundColor: Colors.black,
                                       ),
                                       icon: const Icon(Icons.add_task_rounded, size: 16),
-                                      label: const Text('Agregar a Cronograma', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                                      label: const Text('Configurar Intensidad y Generar Plan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
                                       onPressed: () {
-                                        Navigator.push(context, MaterialPageRoute(builder: (_) => const WorkoutScheduleScreen()));
+                                        final aiSuggestedText = msg['text'] as String? ?? '';
+                                        String prompt = 'Quiero seguir el plan sugerido: ';
+                                        if (plan != null && plan['exercises'] != null) {
+                                          final exNames = (plan['exercises'] as List).map((e) => e['name']).join(', ');
+                                          prompt += exNames;
+                                        } else {
+                                          prompt += aiSuggestedText.length > 80 ? aiSuggestedText.substring(0, 80) : aiSuggestedText;
+                                        }
+                                        showPlanOptionsSheet(context, initialPrompt: prompt);
                                       },
                                     ),
                                   ),
