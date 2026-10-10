@@ -48,6 +48,52 @@ class TrainerClientsTab extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+            // Motivational Stats Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF1FAE87).withOpacity(0.3), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.military_tech, color: Colors.amber, size: 28),
+                          SizedBox(width: 8),
+                          Text('Nivel Élite', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const Text('145 Viajes', style: TextStyle(color: Color(0xFF1FAE87), fontSize: 16, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('145 Entrenamientos completados exitosamente con tus alumnos. ¡Sigue transformando vidas!', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: const LinearProgressIndicator(
+                      value: 0.75, // 75% to next level
+                      backgroundColor: Colors.black26,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
+                      minHeight: 10,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.centerRight,
+                    child: Text('55 sesiones más para Nivel Maestro', style: TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic)),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 32),
             const Text('Tus Alumnos', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),

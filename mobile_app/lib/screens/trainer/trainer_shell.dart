@@ -4,6 +4,7 @@ import 'package:mobile_app/screens/trainer/trainer_agenda_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_announcements_tab.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/main.dart';
+import 'package:mobile_app/screens/trainer/trainer_profile_screen.dart';
 
 class TrainerShell extends StatefulWidget {
   const TrainerShell({super.key});
