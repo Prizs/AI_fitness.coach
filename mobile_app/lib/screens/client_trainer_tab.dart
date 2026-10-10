@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ClientTrainerTab extends StatefulWidget {
   const ClientTrainerTab({super.key});
@@ -11,6 +12,26 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
   // Estado falso para demo: false = no tiene entrenador, true = si tiene
   bool _hasTrainer = false;
   bool _requestPending = false;
+  @override
+  void initState() {
+    super.initState();
+    _loadState();
+  }
+
+  Future<void> _loadState() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _hasTrainer = prefs.getBool('has_trainer') ?? false;
+      _requestPending = prefs.getBool('request_pending') ?? false;
+    });
+  }
+
+  Future<void> _saveState(bool hasTrainer, bool requestPending) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_trainer', hasTrainer);
+    await prefs.setBool('request_pending', requestPending);
+  }
+
 
   final List<Map<String, dynamic>> _availableTrainers = [
     {'name': 'Nelvis Rincón', 'specialty': 'Hipertrofia y Fuerza', 'rating': '4.9'},
@@ -111,7 +132,10 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1FAE87), padding: const EdgeInsets.symmetric(vertical: 16)),
                   onPressed: () {
                     Navigator.pop(context);
-                    setState(() => _requestPending = true);
+                    setState(() {
+                      _requestPending = true;
+                      _saveState(_hasTrainer, true);
+                    });
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solicitud enviada al entrenador. Esperando aprobación.')));
                   },
                   child: const Text('Solicitar Entrenamiento', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),

@@ -427,7 +427,7 @@ class WeeklyPlanService extends ChangeNotifier {
     try {
       final response = await http
           .post(
-            Uri.parse('$apiBaseUrl/api/plans/weekly'),
+            Uri.parse('\/api/plans/weekly'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'goal': 'mejorar condicion fisica',
@@ -442,102 +442,24 @@ class WeeklyPlanService extends ChangeNotifier {
           .timeout(const Duration(seconds: 120));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body);
-        if (data is Map<String, dynamic>) {
-          week = data;
-          loadedFromCache = false;
-          lastError = null;
-          await DBHelper.instance.saveWeeklyPlan(response.body);
-        } else {
-          if (week == null) lastError = 'Formato de plan inesperado.';
-        
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
+        try {
+          final data = jsonDecode(response.body);
+          if (data is Map<String, dynamic>) {
+            week = data;
+            loadedFromCache = false;
+            lastError = null;
+            await DBHelper.instance.saveWeeklyPlan(response.body);
+          } else {
+            if (week == null) lastError = 'Formato de plan inesperado (no es un objeto JSON).';
           }
+        } catch (e) {
+          if (week == null) lastError = 'Error procesando rutina: La IA no respondió con JSON válido. Reintenta.';
         }
-      }
-    } catch (_) {}
-    return null;
-  }
-}
       } else {
-        if (week == null) lastError = 'El servidor respondiÃ³ ${response.statusCode}.';
-      
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
+        if (week == null) lastError = 'El servidor devolvió un error: \.';
       }
-    } catch (_) {}
-    return null;
-  }
-}
     } catch (error) {
-      if (week == null) lastError = 'No se pudo conectar: ${error.runtimeType}.';
+      if (week == null) lastError = 'Aviso: La generación de la rutina tomó mucho tiempo o falló la conexión. Vuelve a intentarlo.';
     } finally {
       isLoading = false;
       _pending = null;
