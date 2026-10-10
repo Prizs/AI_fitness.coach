@@ -272,68 +272,30 @@ class WeeklyPlanService extends ChangeNotifier {
     notifyListeners();
     
     try {
-      // 1. Intentar cargar desde SQLite
       final cachedJson = await DBHelper.instance.getCachedWeeklyPlan();
       if (cachedJson != null) {
-        week = jsonDecode(cachedJson);
-        loadedFromCache = true;
-        isLoading = false;
-        _pending = null;
-        notifyListeners();
-        // Opcional: cargar en segundo plano para actualizar
-        _fetchAndSave(profile);
-        return;
-      
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
+        try {
+          week = jsonDecode(cachedJson);
+          loadedFromCache = true;
+          isLoading = false;
+          _pending = null;
+          notifyListeners();
+          _fetchAndSave(profile);
+          return;
+        } catch (e) {
+          // ignore cache if json is bad
+          print("Cache error: ");
         }
       }
-    } catch (_) {}
-    return null;
-  }
-}
-      
-      // 2. Si no hay cache, descargar de internet
       await _fetchAndSave(profile);
     } catch (error) {
-      lastError = 'Error local: ${error.runtimeType}.';
+      lastError = 'Hubo un error cargando la rutina (Caché). Intenta crear una nueva.';
       isLoading = false;
       _pending = null;
       notifyListeners();
-    
+    }
+  }
+
   Future<Map<String, dynamic>?> swapExercise(
     String currentExerciseName,
     String primaryMuscle,
