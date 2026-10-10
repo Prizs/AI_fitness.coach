@@ -370,20 +370,30 @@ class _CoachScreenState extends State<CoachScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    style: IconButton.styleFrom(
-                      backgroundColor: _controller.text.trim().isEmpty
-                          ? const Color(0xFF2A3A4A)
-                          : const Color(0xFF8BE0C0),
-                      foregroundColor: const Color(0xFF0B1220),
-                      minimumSize: const Size(48, 48),
+                                      const SizedBox(width: 8),
+                    IconButton(
+                      style: IconButton.styleFrom(
+                        backgroundColor: _isListening ? Colors.redAccent : const Color(0xFF2A3A4A),
+                        foregroundColor: _isListening ? Colors.white : Colors.white54,
+                        minimumSize: const Size(48, 48),
+                      ),
+                      icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
+                      onPressed: _listen,
                     ),
-                    icon: const Icon(Icons.send_rounded),
-                    onPressed: _controller.text.trim().isEmpty
-                        ? null
-                        : () => _sendMessage(_controller.text),
-                  ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      style: IconButton.styleFrom(
+                        backgroundColor: _controller.text.trim().isEmpty
+                            ? const Color(0xFF2A3A4A)
+                            : const Color(0xFF8BE0C0),
+                        foregroundColor: const Color(0xFF0B1220),
+                        minimumSize: const Size(48, 48),
+                      ),
+                      icon: const Icon(Icons.send_rounded),
+                      onPressed: _controller.text.trim().isEmpty
+                          ? null
+                          : () => _sendMessage(_controller.text),
+                    ),
                 ],
               ),
             ),
