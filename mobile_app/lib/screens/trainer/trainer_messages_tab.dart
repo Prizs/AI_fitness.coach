@@ -39,7 +39,7 @@ class TrainerMessagesTab extends StatelessWidget {
                         Text(chat['time']!, style: const TextStyle(color: Colors.white38, fontSize: 12)),
                         if (hasUnread)
                           Container(
-                            margin: const EdgeInsets.top(4),
+                            margin: const EdgeInsets.only(top: 4),
                             padding: const EdgeInsets.all(6),
                             decoration: const BoxDecoration(color: Color(0xFF1FAE87), shape: BoxShape.circle),
                             child: Text(chat['unread']!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
