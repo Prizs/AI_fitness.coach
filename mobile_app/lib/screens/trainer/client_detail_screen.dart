@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class ClientDetailScreen extends StatefulWidget {
   final String clientName;
@@ -14,6 +15,37 @@ class ClientDetailScreen extends StatefulWidget {
 class _ClientDetailScreenState extends State<ClientDetailScreen> {
   final TextEditingController _chatController = TextEditingController();
   bool _isLoadingAi = false;
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _speech = stt.SpeechToText();
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) {
+           if (val == 'done') setState(() => _isListening = false);
+        },
+        onError: (val) => setState(() => _isListening = false),
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (val) => setState(() {
+            _chatController.text = val.recognizedWords;
+          }),
+          localeId: 'es_ES',
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
+  }
   final List<Map<String, String>> _aiChatHistory = [
     {'role': 'ai', 'text': 'Hola, soy el asistente IA. Puedes preguntarme sobre la biografía, lesiones, o pedirme que adapte la rutina de este alumno.'}
   ];
