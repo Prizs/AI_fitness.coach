@@ -630,6 +630,7 @@ class WeeklyPlanService extends ChangeNotifier {
 
   Future<void> refresh(
     UserProfile? profile, {
+    String goal = 'Mejorar condición física general',
     String experienceLevel = 'Intermedio',
     String intensityPreference = 'Medio',
     bool equipmentAvailable = true,
@@ -638,6 +639,7 @@ class WeeklyPlanService extends ChangeNotifier {
     notifyListeners();
     await _fetchAndSave(
       profile,
+      goal: goal,
       experienceLevel: experienceLevel,
       intensityPreference: intensityPreference,
       equipmentAvailable: equipmentAvailable,
