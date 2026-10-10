@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/auth/login_screen.dart';
-import 'package:mobile_app/screens/trainer_dashboard_screen.dart';
+import 'package:mobile_app/screens/trainer/trainer_shell.dart';
 import 'package:mobile_app/screens/auth/register_screen.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/screens/home_screen.dart';
@@ -82,7 +82,7 @@ class _AuthGateState extends State<AuthGate> {
       // FORCE ROUTE FOR TRAINER ACCOUNT (Bypass server cache)
       if (AuthService.instance.loggedInUser?.role == 'trainer' || 
           AuthService.instance.loggedInUser?.cedula == '29977666') {
-        return const TrainerDashboardScreen();
+        return const TrainerShell();
       }
       return const AppShell();
     }
