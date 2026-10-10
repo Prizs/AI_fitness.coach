@@ -420,6 +420,7 @@ class WeeklyPlanService extends ChangeNotifier {
   
   Future<void> _fetchAndSave(
     UserProfile? profile, {
+    String goal = 'Mejorar condición física general',
     String experienceLevel = 'Intermedio',
     String intensityPreference = 'Medio',
     bool equipmentAvailable = true,
@@ -430,8 +431,8 @@ class WeeklyPlanService extends ChangeNotifier {
             Uri.parse('$apiBaseUrl/api/plans/weekly'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'goal': 'mejorar condicion fisica',
-              'level': 'principiante',
+              'goal': goal,
+              'level': experienceLevel.toLowerCase(),
               'age': profile?.age ?? 25,
               'weight': profile?.weight ?? 70,
               'food_allergies': profile?.foodAllergies,
