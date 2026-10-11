@@ -29,11 +29,11 @@ class TrainerAgendaTab extends StatelessWidget {
               child: ListView(
                 children: [
                   _buildTimeBlock(context, '12:00 PM - 2:00 PM', '2/2 Cupos Llenos', [
-                    {'name': 'Juan Pérez', 'workout': 'Pecho e hipertrofia'},
-                    {'name': 'Ana Gómez', 'workout': 'Cardio intenso'},
+                    {'name': 'Juan Pérez', 'workout': 'Pecho e hipertrofia', 'risk': 'none'},
+                    {'name': 'Ana Gómez', 'workout': 'Cardio intenso', 'risk': '🔴 Molestia Rodilla'},
                   ], Colors.redAccent),
                   _buildTimeBlock(context, '2:00 PM - 4:00 PM', '1/2 Cupos Libres', [
-                    {'name': 'Carlos Ruiz', 'workout': 'Piernas'},
+                    {'name': 'Carlos Ruiz', 'workout': 'Piernas', 'risk': '⚠️ Fatiga Alta'},
                   ], Colors.orangeAccent),
                   _buildTimeBlock(context, '4:00 PM - 6:00 PM', '2/2 Cupos Libres', [], Colors.greenAccent),
                 ],
@@ -77,6 +77,21 @@ class TrainerAgendaTab extends StatelessWidget {
                       const Icon(Icons.person, color: Color(0xFF1FAE87), size: 18),
                       const SizedBox(width: 8),
                       Text(s['name']!, style: const TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.underline)),
+                      if (s['risk'] != null && s['risk'] != 'none') ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.redAccent.withOpacity(0.6)),
+                          ),
+                          child: Text(
+                            s['risk']!,
+                            style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       Expanded(child: Text('- ' + s['workout']!, style: const TextStyle(color: Colors.white54, fontSize: 14), overflow: TextOverflow.ellipsis)),
                     ],

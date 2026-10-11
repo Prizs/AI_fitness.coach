@@ -9,8 +9,8 @@ class TrainerClientsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final String trainerCode = AuthService.instance.loggedInUser?.cedula ?? 'Desconocido';
     final List<Map<String, dynamic>> mockClients = [
-      {'id': '1', 'name': 'Juan Pérez', 'goal': 'Ganar Músculo', 'status': 'Activo', 'last_photo': 'Hace 2 días'},
-      {'id': '2', 'name': 'Ana Gómez', 'goal': 'Perder Peso', 'status': 'Requiere revisión', 'last_photo': 'Hoy'},
+      {'id': '1', 'name': 'Juan Pérez', 'goal': 'Ganar Músculo', 'status': 'Activo', 'last_photo': 'Hace 2 días', 'alert': null},
+      {'id': '2', 'name': 'Ana Gómez', 'goal': 'Perder Peso', 'status': 'Requiere revisión', 'last_photo': 'Hoy', 'alert': '🔴 Molestia en Rodilla'},
     ];
 
     return SafeArea(
@@ -125,7 +125,26 @@ class TrainerClientsTab extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(client['name'] as String, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                                Row(
+                                  children: [
+                                    Text(client['name'] as String, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                                    if (client['alert'] != null) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.redAccent.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: Colors.redAccent),
+                                        ),
+                                        child: Text(
+                                          client['alert'] as String,
+                                          style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                                 const SizedBox(height: 4),
                                 Text('Meta: ' + (client['goal'] as String), style: const TextStyle(color: Colors.white70, fontSize: 14)),
                               ],
