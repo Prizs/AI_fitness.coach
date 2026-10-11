@@ -3,19 +3,28 @@ import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-void showPlanOptionsSheet(BuildContext context, {String initialPrompt = ''}) {
+void showPlanOptionsSheet(
+  BuildContext context, {
+  String initialPrompt = '',
+  void Function(String summaryText)? onSendState,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: const Color(0xFF101B2D),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (context) => _PlanOptionsForm(initialPrompt: initialPrompt),
+    builder: (context) => _PlanOptionsForm(initialPrompt: initialPrompt, onSendState: onSendState),
   );
 }
 
 class _PlanOptionsForm extends StatefulWidget {
   final String initialPrompt;
-  const _PlanOptionsForm({this.initialPrompt = ''});
+  final void Function(String summaryText)? onSendState;
+
+  const _PlanOptionsForm({
+    this.initialPrompt = '',
+    this.onSendState,
+  });
 
   @override
   State<_PlanOptionsForm> createState() => _PlanOptionsFormState();
@@ -127,7 +136,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   hintText: '¿Dónde te duele? (Ej: Rodilla derecha, evita saltos)',
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
-                  fillColor: const Color(0xFF4A1A1A).withOpacity(0.5),
+                  fillColor: const Color(0xFF4A1A1A).withValues(alpha: 0.5),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent)),
                 ),
               ),
@@ -173,7 +182,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
 
             const SizedBox(height: 20),
             
-            // 4. Experiencia (Oculto en un ExpansionTile para ahorrar espacio o lo dejamos igual)
+            // 4. Experiencia
             const Text('Nivel de Experiencia', style: TextStyle(color: Colors.white70, fontSize: 14)),
             const SizedBox(height: 8),
             SegmentedButton<String>(
@@ -223,28 +232,37 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   Navigator.pop(context);
                   
                   final buffer = StringBuffer();
-                  if (_estado == 'Molestia' && _molestiaController.text.isNotEmpty) {
-                    buffer.writeln('IMPORTANTE: Tengo una molestia/dolor en: . Toma la decisión pertinente de si tomar un descanso o recomendar ejercicios que NO afecten esa área.');
+                  buffer.writeln('📋 Mi Estado Actual para la sesión:');
+                  if (_estado == 'Molestia' && _molestiaController.text.trim().isNotEmpty) {
+                    buffer.writeln('• Estado Físico: Tengo una molestia/dolor en . Por favor toma la decisión pertinente de descanso o sugerir ejercicios que no afecten esa área.');
+                  } else {
+                    buffer.writeln('• Estado Físico: Me siento al 100% (Bien)');
                   }
-                  buffer.writeln('Equipo disponible: .');
+                  buffer.writeln('• Equipo disponible: ');
+                  buffer.writeln('• Intensidad deseada: ');
+                  buffer.writeln('• Nivel de experiencia: ');
                   
                   final prompt = _promptController.text.trim();
                   if (prompt.isNotEmpty) {
-                    buffer.writeln('Preferencias adicionales: ');
+                    buffer.writeln('• Detalles / Objetivo: ');
                   }
                   
-                  final finalGoal = buffer.toString().trim();
+                  final summary = buffer.toString().trim();
 
-                  WeeklyPlanService.instance.refresh(
-                    AuthService.instance.loggedInUser,
-                    goal: finalGoal.isNotEmpty ? finalGoal : 'Mejorar condición física general',
-                    experienceLevel: _experience,
-                    intensityPreference: _intensity,
-                    equipmentAvailable: _equipo != 'Sin Herramientas',
-                  );
+                  if (widget.onSendState != null) {
+                    widget.onSendState!(summary);
+                  } else {
+                    WeeklyPlanService.instance.refresh(
+                      AuthService.instance.loggedInUser,
+                      goal: summary.isNotEmpty ? summary : 'Mejorar condición física general',
+                      experienceLevel: _experience,
+                      intensityPreference: _intensity,
+                      equipmentAvailable: _equipo != 'Sin Herramientas',
+                    );
+                  }
                 },
-                icon: const Icon(Icons.auto_awesome),
-                label: const Text('Generar Plan Inteligente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                icon: const Icon(Icons.send_rounded),
+                label: const Text('Enviar Estado Actual', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
             )
           ],

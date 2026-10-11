@@ -20,7 +20,8 @@ class _CoachScreenState extends State<CoachScreen> {
   final List<Map<String, dynamic>> _messages = [
     {
       'isUser': false,
-      'text': '¡Hola! Soy tu Coach Inteligente. Puedo adaptar tus fases de entrenamiento, diseñar cronogramas para resistencia pulmonar, fuerza o recomposición y modular tu nutrición. ¿En qué objetivo trabajamos hoy?',
+      'text': '¡Hola! Soy tu Coach Inteligente. Puedo adaptar tus fases de entrenamiento, diseñar cronogramas para fuerza, resistencia o recomposición y modular tu nutrición. Para calibrar tu entrenamiento con máxima precisión, por favor completa tu estado actual.',
+      'isWelcome': true,
       'plan': null,
     }
   ];
@@ -60,36 +61,12 @@ class _CoachScreenState extends State<CoachScreen> {
     }
   }
 
-  final List<String> _defaultQuickPrompts = [
-    'Crear nueva rutina de entrenamiento',
-    'Registrar entrenamiento completado',
-    'Ajustar plan nutricional',
-  ];
-
-  List<String> get _currentQuickPrompts {
-    if (_messages.isEmpty) return _defaultQuickPrompts;
-    
-    // Buscar el ultimo mensaje de la IA
-    final aiMessages = _messages.where((m) => m['isUser'] == false).toList();
-    if (aiMessages.isEmpty) return _defaultQuickPrompts;
-    
-    final lastAiMsg = aiMessages.last;
-    final text = (lastAiMsg['text'] as String).toLowerCase();
-    
-    if (text.contains('dónde') && (text.contains('duele') || text.contains('molestia'))) {
-      return ['Rodilla', 'Espalda baja', 'Hombro', 'Cuello', 'Ninguna'];
-    }
-    if (text.contains('sientes') || text.contains('física') || text.contains('molestia') || text.contains('dolor')) {
-      return ['Me siento al 100%', 'Tengo una molestia', 'Estoy cansado'];
-    }
-    if (text.contains('equipo') || text.contains('gimnasio') || text.contains('pesas')) {
-      return ['Gym Completo', 'Herramientas en Casa', 'Sin herramientas'];
-    }
-    if (text.contains('intensidad') || text.contains('esfuerzo')) {
-      return ['Intensidad Baja', 'Intensidad Media', 'Intensidad Alta'];
-    }
-    
-    return _defaultQuickPrompts;
+  void _openStateSheet([String initialPrompt = '']) {
+    showPlanOptionsSheet(
+      context,
+      initialPrompt: initialPrompt,
+      onSendState: (summary) => _sendMessage(summary),
+    );
   }
 
   Future<void> _sendMessage(String text) async {
@@ -180,7 +157,12 @@ class _CoachScreenState extends State<CoachScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BE0C0)),
+            icon: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF8BE0C0)),
+            tooltip: 'Enviar Estado Actual',
+            onPressed: () => _openStateSheet(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.calendar_month_rounded, color: Colors.white70),
             tooltip: 'Cronograma Semanal',
             onPressed: () => Navigator.push(
               context,
@@ -217,6 +199,23 @@ class _CoachScreenState extends State<CoachScreen> {
                         ),
                         child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
                       ),
+                      if (msg['isWelcome'] == true && _messages.length == 1) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, bottom: 8),
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF173B45),
+                              foregroundColor: const Color(0xFF8BE0C0),
+                              side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            icon: const Icon(Icons.assignment_turned_in_rounded, size: 18),
+                            label: const Text('📋 Completar Mi Estado Actual', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            onPressed: () => _openStateSheet(),
+                          ),
+                        ),
+                      ],
                       if (plan != null) ...[
                         Container(
                           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -261,7 +260,7 @@ class _CoachScreenState extends State<CoachScreen> {
                                         } else {
                                           prompt += aiSuggestedText.length > 80 ? aiSuggestedText.substring(0, 80) : aiSuggestedText;
                                         }
-                                        showPlanOptionsSheet(context, initialPrompt: prompt);
+                                        _openStateSheet(prompt);
                                       },
                                     ),
                                   ),
@@ -335,23 +334,7 @@ class _CoachScreenState extends State<CoachScreen> {
                 ),
               ),
 
-            // Píldoras de Preguntas Rápidas
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _currentQuickPrompts.map((p) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      backgroundColor: const Color(0xFF101B2D),
-                      label: Text(p, style: const TextStyle(fontSize: 12, color: Colors.white70)),
-                      onPressed: () => _sendMessage(p),
-                    ),
-                  )).toList(),
-                ),
-              ),
-            ),
+
 
             // Barra de entrada: el cuadro crece hacia abajo al escribir y
             // empuja los mensajes hacia arriba para poder leerlos.
