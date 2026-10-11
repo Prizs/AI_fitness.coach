@@ -1,5 +1,4 @@
-﻿import 'dart:convert';
-
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/models/user_profile.dart';
@@ -24,10 +23,10 @@ class WeeklyPlanService extends ChangeNotifier {
   static const List<String> _weekdayNames = [
     'Lunes',
     'Martes',
-    'MiÃ©rcoles',
+    'Miércoles',
     'Jueves',
     'Viernes',
-    'SÃ¡bado',
+    'Sábado',
     'Domingo',
   ];
 
@@ -37,387 +36,53 @@ class WeeklyPlanService extends ChangeNotifier {
     for (final entry in days) {
       if (entry is Map && entry['weekday'] == todayIndex) {
         return Map<String, dynamic>.from(entry);
-      
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
       }
-    } catch (_) {}
+    }
     return null;
   }
-}
-    
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-}
-    return null;
-  
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-}
 
   List<Map<String, dynamic>> get days {
-    final raw = week?['days'];
-    if (raw is! List) return const [];
-    return raw
+    final list = week?['days'];
+    if (list is! List) return const [];
+    return list
         .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
+        .map((entry) => Map<String, dynamic>.from(entry))
         .toList();
-  
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
   }
-}
 
   Future<void> ensureLoaded(UserProfile? profile) {
     if (week != null) return Future<void>.value();
-    final pending = _pending;
-    if (pending != null) return pending;
-
-    final future = _load(profile);
-    _pending = future;
-    return future;
-  
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
+    if (_pending != null) return _pending!;
+    _pending = _load(profile);
+    return _pending!;
   }
-}
 
   Future<void> _load(UserProfile? profile) async {
     isLoading = true;
     lastError = null;
     notifyListeners();
-    
+
     try {
-      // 1. Intentar cargar desde SQLite
       final cachedJson = await DBHelper.instance.getCachedWeeklyPlan();
-      if (cachedJson != null) {
-        week = jsonDecode(cachedJson);
-        loadedFromCache = true;
-        isLoading = false;
-        _pending = null;
-        notifyListeners();
-        // Opcional: cargar en segundo plano para actualizar
-        _fetchAndSave(profile);
-        return;
-      
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
+      if (cachedJson != null && cachedJson.trim().isNotEmpty) {
+        try {
+          week = jsonDecode(cachedJson) as Map<String, dynamic>?;
+          if (week != null) {
+            loadedFromCache = true;
+            isLoading = false;
+            _pending = null;
+            notifyListeners();
+            return;
           }
-        }
+        } catch (_) {}
       }
     } catch (_) {}
-    return null;
-  }
-}
-      
-      // 2. Si no hay cache, descargar de internet
-      await _fetchAndSave(profile);
-    } catch (error) {
-      lastError = 'Hubo un error local cargando la rutina (Caché). Intenta crear una nueva.';
-      isLoading = false;
-      _pending = null;
-      notifyListeners();
-    
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
+    isLoading = false;
+    _pending = null;
+    notifyListeners();
   }
-}
-  
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-}
-  
   Future<void> _fetchAndSave(
     UserProfile? profile, {
     String goal = 'Mejorar condición física general',
@@ -438,6 +103,8 @@ class WeeklyPlanService extends ChangeNotifier {
               'food_allergies': profile?.foodAllergies,
               'current_injuries': profile?.currentInjuries,
               'areas_to_avoid': profile?.areasToAvoid,
+              'equipment_available': equipmentAvailable,
+              'intensity': intensityPreference,
             }),
           )
           .timeout(const Duration(seconds: 120));
@@ -451,182 +118,22 @@ class WeeklyPlanService extends ChangeNotifier {
           await DBHelper.instance.saveWeeklyPlan(response.body);
         } else {
           if (week == null) lastError = 'Formato de plan inesperado.';
-        
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
         }
-      }
-    } catch (_) {}
-    return null;
-  }
-}
       } else {
-        if (week == null) lastError = 'El servidor respondiÃ³ ${response.statusCode}.';
-      
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
+        if (week == null) {
+          lastError = 'El servidor devolvió un error (${response.statusCode}).';
         }
       }
-    } catch (_) {}
-    return null;
-  }
-}
-    } catch (error) {
-      if (week == null) lastError = 'Aviso: La generación tomó mucho tiempo o falló. Vuelve a intentarlo.';
+    } catch (e) {
+      if (week == null) {
+        lastError = 'No se pudo conectar con el servidor ($e).';
+      }
     } finally {
       isLoading = false;
       _pending = null;
       notifyListeners();
-    
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
+    }
   }
-}
-  
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-}
 
   Future<void> refresh(
     UserProfile? profile, {
@@ -644,7 +151,8 @@ class WeeklyPlanService extends ChangeNotifier {
       intensityPreference: intensityPreference,
       equipmentAvailable: equipmentAvailable,
     );
-  
+  }
+
   Future<Map<String, dynamic>?> swapExercise(
     String currentExerciseName,
     String primaryMuscle,
@@ -652,29 +160,27 @@ class WeeklyPlanService extends ChangeNotifier {
   ) async {
     try {
       final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
+        Uri.parse('$apiBaseUrl/api/plans/alternative'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'current_exercise': currentExerciseName,
           'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
+          'equipment_available': true,
         }),
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
         if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
+          final daysList = List.from(week!['days']);
+          final dIdx = daysList.indexWhere((d) => d['weekday'] == dayIndex);
           if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
+            final exList = List.from(daysList[dIdx]['exercises'] ?? []);
             final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
             if (eIdx != -1) {
               exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
+              daysList[dIdx]['exercises'] = exList;
+              week!['days'] = daysList;
               notifyListeners();
               await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
               return newExercise;
@@ -685,151 +191,48 @@ class WeeklyPlanService extends ChangeNotifier {
     } catch (_) {}
     return null;
   }
-}
 
   Future<void> injectCustomPlanForToday(Map<String, dynamic> structuredPlan) async {
-    if (week == null) return;
-    final currentDays = List.from(week!['days'] ?? []);
-    final idx = currentDays.indexWhere((d) => d['weekday'] == todayIndex);
-    
-    final newDay = {
-      'weekday': todayIndex,
-      'title': structuredPlan['title'] ?? 'SesiÃ³n Personalizada',
-      'exercises': structuredPlan['exercises'] ?? [],
-      'nutrition': structuredPlan['nutrition'] ?? {},
-    };
+    final title = structuredPlan['title'] ?? 'Sesión Personalizada Coach IA';
+    final exercises = structuredPlan['exercises'] ?? [];
+    final nutrition = structuredPlan['nutrition'] ?? {};
 
-    if (idx != -1) {
-      currentDays[idx] = newDay;
+    if (week == null) {
+      week = {
+        'id': 'coach_plan_${DateTime.now().millisecondsSinceEpoch}',
+        'goal': title,
+        'days': List.generate(7, (i) => {
+          'weekday': i,
+          'title': i == todayIndex ? title : 'Descanso / Rutina Base',
+          'exercises': i == todayIndex ? exercises : [],
+          'nutrition': i == todayIndex ? nutrition : {
+            'desayuno': 'Proteína y carbohidratos complejos según objetivo.',
+            'almuerzo': 'Comida balanceada: proteína magra, vegetales y carbohidratos.',
+            'cena': 'Cena ligera alta en proteína.',
+          },
+        }),
+      };
     } else {
-      currentDays.add(newDay);
-    
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
+      final currentDays = List.from(week!['days'] ?? []);
+      final idx = currentDays.indexWhere((d) => d['weekday'] == todayIndex);
+      final newDay = {
+        'weekday': todayIndex,
+        'title': title,
+        'exercises': exercises,
+        'nutrition': nutrition,
+      };
 
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
+      if (idx != -1) {
+        currentDays[idx] = newDay;
+      } else {
+        currentDays.add(newDay);
       }
-    } catch (_) {}
-    return null;
-  }
-}
-    
-    week!['days'] = currentDays;
+      week!['days'] = currentDays;
+    }
+
     notifyListeners();
-    await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-  
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
     try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
+      await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
     } catch (_) {}
-    return null;
-  }
-}
-
-  Future<Map<String, dynamic>?> swapExercise(
-    String currentExerciseName,
-    String primaryMuscle,
-    int dayIndex,
-  ) async {
-    try {
-      final response = await http.post(
-        Uri.parse('\/api/plans/alternative'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'current_exercise': currentExerciseName,
-          'target_muscle': primaryMuscle,
-          'equipment_available': true, // Podriamos leer del state, pero lo pasamos true por defecto
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final newExercise = jsonDecode(response.body);
-        
-        // Find and replace in local state
-        if (week != null && week!['days'] != null) {
-          final days = List.from(week!['days']);
-          final dIdx = days.indexWhere((d) => d['weekday'] == dayIndex);
-          if (dIdx != -1) {
-            final exList = List.from(days[dIdx]['exercises'] ?? []);
-            final eIdx = exList.indexWhere((e) => e['name'] == currentExerciseName);
-            if (eIdx != -1) {
-              exList[eIdx] = newExercise;
-              days[dIdx]['exercises'] = exList;
-              week!['days'] = days;
-              notifyListeners();
-              await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
-              return newExercise;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
   }
 }
