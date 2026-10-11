@@ -53,6 +53,34 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
+            icon: Stack(
+              children: [
+                const Icon(
+                  Icons.notifications_rounded,
+                  color: Color(0xFF8BE0C0),
+                  size: 26,
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
+                  ),
+                ),
+              ],
+            ),
+            tooltip: 'Notificaciones y Avisos',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(
               Icons.view_in_ar_rounded,
               color: Color(0xFF8BE0C0),

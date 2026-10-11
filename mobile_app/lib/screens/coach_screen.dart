@@ -90,6 +90,15 @@ class _CoachScreenState extends State<CoachScreen> {
     try {
       final baseUrl = AuthService.apiBaseUrl;
       final profile = AuthService.instance.loggedInUser;
+      
+      final now = DateTime.now();
+      final monday = now.subtract(Duration(days: now.weekday - 1));
+      final sunday = monday.add(const Duration(days: 6));
+      final formatDate = (DateTime d) => '${d.day}/${d.month}/${d.year}';
+      final hasPlan = WeeklyPlanService.instance.week != null;
+      final startStr = hasPlan ? formatDate(monday) : null;
+      final endStr = hasPlan ? formatDate(sunday) : null;
+
       final response = await http
           .post(
             Uri.parse('$baseUrl/api/coach/chat'),
@@ -102,7 +111,11 @@ class _CoachScreenState extends State<CoachScreen> {
               'allergies': profile?.foodAllergies,
               'injuries': profile?.currentInjuries,
               'motor_disability': profile?.motorDisability,
-              'areas_to_avoid': profile?.areasToAvoid, 'age': profile?.age, 'weight': profile?.weight,
+              'areas_to_avoid': profile?.areasToAvoid,
+              'age': profile?.age,
+              'weight': profile?.weight,
+              'active_plan_start': startStr,
+              'active_plan_end': endStr,
             }),
           )
           .timeout(const Duration(seconds: 120));

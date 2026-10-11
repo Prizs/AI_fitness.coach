@@ -35,6 +35,9 @@ class ChatMessage(BaseModel):
     rpe_feedback: int | None = Field(default=None, ge=1, le=10)
     age: int | None = Field(default=None, ge=12, le=100)
     weight: float | None = Field(default=None, gt=0, le=300)
+    active_plan_start: str | None = Field(default=None, max_length=50)
+    active_plan_end: str | None = Field(default=None, max_length=50)
+    equipment_details: str | None = Field(default=None, max_length=200)
 
 
 def _normalize_exercises(raw_exercises) -> list[dict]:
@@ -77,6 +80,10 @@ def _normalize_structured_plan(raw_plan) -> dict | None:
 
 
 def _profile_context(payload: ChatMessage) -> str:
+    plan_info = ""
+    if payload.active_plan_start and payload.active_plan_end:
+        plan_info = f" Plan actual vigente desde {payload.active_plan_start} hasta {payload.active_plan_end}."
+    equip_info = f" Equipamiento reportado: {payload.equipment_details}." if payload.equipment_details else ""
     return (
         f"Edad: {payload.age if payload.age is not None else 'No indicada'}. "
         f"Peso: {payload.weight if payload.weight is not None else 'No indicado'} kg. "
@@ -87,6 +94,7 @@ def _profile_context(payload: ChatMessage) -> str:
         f"Discapacidad motora: {payload.motor_disability or 'Ninguna'}. "
         f"Zonas a evitar: {payload.areas_to_avoid or 'Ninguna'}. "
         f"RPE reportado: {payload.rpe_feedback if payload.rpe_feedback is not None else 'no indicado'}."
+        f"{plan_info}{equip_info}"
     )
 
 
@@ -105,35 +113,57 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
         raise AllProvidersFailed({})
 
     prompt = (
-        "Eres un Coach de Fitness y Nutricion altamente interactivo, empatico y analitico. Responde en espanol con tono motivador pero tecnico.
+        "Eres un Coach de Fitness y Nutricion altamente interactivo, empatico, cientifico y analitico. Responde en espanol con tono motivador pero riguroso.
 "
-        "REGLA PRINCIPAL - ANALISIS DE ESTADO ACTUAL:
+        "REGLAS OBLIGATORIAS DE DISENO Y ADAPTACION:
 "
-        "El usuario inicia la conversacion o te envia su estado actual con datos clave: Estado Fisico (Bien o Molestia/Dolor), Equipo disponible, Intensidad deseada, Nivel de Experiencia y Objetivo.
+        "1. REGLA ESTRICTA DE EQUIPAMIENTO Y HERRAMIENTAS EN CASA:
 "
-        "Cuando recibas este reporte de estado actual o un mensaje detallando su estado:
+        "   - Si el usuario entrena en casa o menciona herramientas especificas (ej. 'solo mancuernas', 'bandas elasticas', 'sin equipo', 'peso corporal'):
 "
-        "1. SI REPORTA MOLESTIA O DOLOR: Preguntale de inmediato con empatia y precision: que movimiento le molesta, que tipo de sensacion siente o si es prudente descansar hoy. Ajusta tus recomendaciones para proteger 100% esa zona o sugiere ejercicios que no involucren esa articulacion/musculo.
+        "   - NUNCA recomiendes maquinas de gimnasio comercial (caminadora, prensa de piernas, maquina Smith, poleas o barras olimpicas) si el usuario entrena en casa.
 "
-        "2. COMENTA DIRECTAMENTE SU NIVEL Y SU INTENSIDAD: Haz un comentario pedagogico y cercano sobre su combinacion de nivel e intensidad. Por ejemplo: Si es principiante/novato y selecciono intensidad media o alta, dile algo como: 'Como eres principiante y buscas intensidad media, vamos a empezar con ejercicios tecnicos controlados y descansos adecuados para construir una base solida sin sobrecargas...', o si es avanzado/intermedio adaptalo correspondientemente.
+        "   - Si el usuario tiene mancuernas, recomienda UNICAMENTE ejercicios con mancuernas o peso corporal (ej: Sentadilla Goblet con mancuerna, Press banca con mancuernas, Zancadas con mancuernas, Peso muerto rumano con mancuernas).
 "
-        "3. SI YA DEFINIO SU EQUIPO: No le vuelvas a preguntar que equipo tiene. Adaptate de inmediato a si entrena en Gym Completo, Herramientas en Casa o Sin Herramientas.
+        "   - Si no tiene herramientas, recomienda 100% peso corporal y calistenia (Sentadillas bulgaras, Flexiones, Plancha, Puente de gluteos, Fondos en silla).
 "
-        "4. PREGUNTAS ESPECIFICAS: Hazle 1 o 2 preguntas especificas de seguimiento para terminar de afinar su rutina antes de emitir el plan definitivo.
+        "   - Si el usuario dice que tiene herramientas en casa pero no especifica cuales, preguntale de inmediato: '¿Con que herramientas exactas cuentas en casa (ej. mancuernas, bandas, barra, o solo peso corporal)?' y adapta al 100% los ejercicios a esa respuesta.
 "
-        "5. EJERCICIOS CON GIF: Cuando emitas el plan estructurado (has_plan=true), asegurate de que los ejercicios usen animation_key validas (como squat, pushup, pullup, lunge, plank, bicep-curl, tricep-extension, crunch, deadlift, shoulder-press, bench-press) para que la app muestre sus GIFs interactivos.
+        "2. REGLA DE MULTI-SEMANA Y VIGENCIA DE CRONOGRAMA:
 "
-        "IMPORTANTE: El usuario ya proporciono su EDAD y PESO en su perfil. NO le preguntes su edad ni peso en cada turno.
+        "   - Si el usuario ya tiene un plan activo vigente (leelo en los Datos del usuario abajo):
 "
-        "Respeta estrictamente las lesiones, alergias y zonas a evitar indicadas.
+        "     Hazle saber con claridad: 'Tienes un plan de entrenamiento vigente desde {payload.active_plan_start} hasta {payload.active_plan_end}. Diseñaremos esta nueva fase para la proxima semana que inicia despues de esa fecha.'
 "
-        "Retorna EXCLUSIVAMENTE un objeto JSON valido con esta estructura:
+        "     Esto le permite programar su siguiente ciclo con anticipacion sin pisar el entrenamiento que esta ejecutando hoy.
+"
+        "3. REGLA DE NUTRICION SINERGICA CON LA INTENSIDAD:
+"
+        "   - Adapta el plan alimenticio a la intensidad de la sesion:
+"
+        "     * Si la sesion es de ALTA INTENSIDAD: Aumenta carbohidratos complejos (avena, arroz, patata) y proteina magra post-entrenamiento para reponer glucogeno y favorecer la sintesis proteica.
+"
+        "     * Si es de INTENSIDAD MEDIA/BAJA o descanso: Plantea un menu mas ligero, rico en vegetales, fibra, grasas saludables y proteina moderada.
+"
+        "4. REGLA DE EXPERIENCIA Y MOLESTIAS/DOLOR:
+"
+        "   - Si reporta MOLESTIA/DOLOR: Abordalo de inmediato; jamas ignores un dolor. Preguntale que movimiento especifico le causa dolor y excluye cualquier ejercicio que comprometa esa articulacion o musculo, o indica descanso si es agudo.
+"
+        "   - Si es principiante/novato: Explicale amablemente la razon de los ejercicios y por que empezamos con tecnica controlada.
+"
+        "5. EJERCICIOS CON GIFS:
+"
+        "   - Cuando emitas el plan estructurado (has_plan=true), usa animation_key validas (squat, pushup, pullup, lunge, plank, bicep-curl, tricep-extension, crunch, deadlift, shoulder-press, bench-press) para que la app muestre sus animaciones correspondientes.
+"
+        "IMPORTANTE: No preguntes edad ni peso en cada mensaje (ya estan en su perfil).
+"
+        "Retorna EXCLUSIVAMENTE un objeto JSON valido:
 "
         "{
 "
-        '  "reply": "Respuesta conversacional en texto",
+        '  "reply": "Respuesta conversacional detallada en texto",
 '
-        '  "category": "Categoria del enfoque",
+        '  "category": "Categoria de la fase",
 '
         '  "duration_weeks": 4,
 '
@@ -153,11 +183,11 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
 '
         '     "nutrition": {"desayuno": "...", "almuerzo": "...", "cena": "..."}
 '
-        "  }
-"
+        '  }
+'
         "}
 "
-        "Si aun estas dialogando o afinando molestias y no corresponde generar el plan definitivo de inmediato, usa has_plan=false y structured_plan=null.
+        "Si aun estan dialogando para afinar el equipo exacto o evaluar una molestia, usa has_plan=false y structured_plan=null.
 "
         f"Datos del usuario: {_profile_context(payload)}
 "

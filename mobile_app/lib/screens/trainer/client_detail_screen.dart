@@ -1,3 +1,4 @@
+import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -129,54 +130,174 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   }
 
   Widget _buildEntrenamientoTab() {
+    final service = WeeklyPlanService.instance;
+    final days = service.days;
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        const Text('Rutina Programada para Hoy', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        _buildInfoCard(
-          title: 'Día de Piernas y Glúteos',
-          icon: Icons.fitness_center,
-          content: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Máquinas y Equipos a utilizar:', style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              _machineItem('Prensa de Piernas (Leg Press)'),
-              _machineItem('Máquina de Extensión de Cuádriceps'),
-              _machineItem('Mancuernas (Pesos Libres)'),
-              const Divider(color: Colors.white24, height: 24),
-              const Text('Alerta Pre-Entreno:', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              const Text('El alumno reportó fatiga en la rodilla derecha esta mañana. Recomiendo calentamiento articular extra.', style: TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Cronograma del Alumno', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1FAE87).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1FAE87)),
+              ),
+              child: const Text('Vigente / En Curso', style: TextStyle(color: Color(0xFF1FAE87), fontSize: 11, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        
+        // Alerta de Chequeo
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2D1515),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+          ),
+          child: Row(
+            children: const [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Estado Reportado: El alumno completó su cuestionario de estado actual. Revisa los ejercicios y cargas antes de iniciar.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
             ],
           ),
         ),
+        const SizedBox(height: 16),
+
+        if (days.isEmpty) ...[
+          _buildInfoCard(
+            title: 'Sin Rutina Sincronizada',
+            icon: Icons.info_outline,
+            content: const Text(
+              'El alumno aún no ha sincronizado un cronograma semanal con el Coach IA.',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+        ] else ...[
+          ...days.map((day) {
+            final dayTitle = day['title'] ?? 'Sesión';
+            final dayExercises = (day['exercises'] as List?) ?? [];
+            final weekdayName = day['weekday'] is int && day['weekday'] >= 0 && day['weekday'] < 7
+                ? ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][day['weekday']]
+                : 'Día';
+
+            return Card(
+              color: const Color(0xFF1E293B),
+              margin: const EdgeInsets.only(bottom: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.fitness_center_rounded, color: Color(0xFF1FAE87), size: 20),
+                        const SizedBox(width: 8),
+                        Text('$weekdayName · $dayTitle', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      ],
+                    ),
+                    const Divider(color: Colors.white12, height: 20),
+                    if (dayExercises.isEmpty)
+                      const Text('Día de descanso o recuperación activa.', style: TextStyle(color: Colors.white54, fontSize: 13, fontStyle: FontStyle.italic))
+                    else
+                      ...dayExercises.map((ex) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle_outline, color: Color(0xFF1FAE87), size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(ex['name'] ?? 'Ejercicio', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                              ),
+                              Text('${ex['sets'] ?? 3}x${ex['reps'] ?? 12}', style: const TextStyle(color: Color(0xFF1FAE87), fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
       ],
     );
   }
 
   Widget _buildNutricionTab() {
+    final service = WeeklyPlanService.instance;
+    final days = service.days;
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _buildInfoCard(
-          title: 'Plan de Alimentación',
-          icon: Icons.restaurant,
-          content: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _infoRow('Calorías Diarias', '2,800 kcal'),
-              _infoRow('Proteína', '160g'),
-              _infoRow('Carbohidratos', '350g'),
-              _infoRow('Grasas', '85g'),
-              const Divider(color: Colors.white24, height: 24),
-              const Text('Sugerencia para hoy (Sin Lactosa):', style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              const Text('Batido de proteína vegana post-entrenamiento con plátano.', style: TextStyle(color: Colors.white)),
-            ],
+        const Text('Plan Nutricional del Alumno', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        if (days.isEmpty) ...[
+          _buildInfoCard(
+            title: 'Sin Plan Nutricional Activo',
+            icon: Icons.restaurant,
+            content: const Text('El alumno aún no tiene un menú registrado esta semana.', style: TextStyle(color: Colors.white70)),
           ),
-        ),
+        ] else ...[
+          ...days.where((d) => d['nutrition'] is Map && (d['nutrition'] as Map).isNotEmpty).map((d) {
+            final nut = d['nutrition'] as Map;
+            final weekdayName = d['weekday'] is int && d['weekday'] >= 0 && d['weekday'] < 7
+                ? ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][d['weekday']]
+                : 'Día';
+
+            return Card(
+              color: const Color(0xFF1E293B),
+              margin: const EdgeInsets.only(bottom: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.restaurant_rounded, color: Color(0xFF1FAE87), size: 18),
+                        const SizedBox(width: 8),
+                        Text('$weekdayName · Menú Recomendado', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                      ],
+                    ),
+                    const Divider(color: Colors.white12, height: 16),
+                    if (nut['desayuno'] != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text('🍳 Desayuno: ${nut['desayuno']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ),
+                    if (nut['almuerzo'] != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text('🍛 Almuerzo: ${nut['almuerzo']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ),
+                    if (nut['cena'] != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text('🍲 Cena: ${nut['cena']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
       ],
     );
   }
