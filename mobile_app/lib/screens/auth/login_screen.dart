@@ -200,15 +200,52 @@ class _LoginScreenState extends State<LoginScreen> {
             label: const Text('¿No tienes cuenta? Regístrate aquí'),
           ),
           const SizedBox(height: 4),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ActionChip(
+                backgroundColor: AuthService.apiBaseUrl.contains('localhost') || AuthService.apiBaseUrl.contains('8000')
+                    ? const Color(0xFF1FAE87).withOpacity(0.25)
+                    : const Color(0xFF101B2D),
+                side: BorderSide(
+                  color: AuthService.apiBaseUrl.contains('localhost') || AuthService.apiBaseUrl.contains('8000')
+                      ? const Color(0xFF1FAE87)
+                      : Colors.white24,
+                ),
+                label: const Text('🏠 Local (8000)', style: TextStyle(fontSize: 11, color: Colors.white)),
+                onPressed: () async {
+                  await AuthService.instance.saveServerConfig('http://localhost:8000');
+                  setState(() {});
+                },
+              ),
+              const SizedBox(width: 8),
+              ActionChip(
+                backgroundColor: AuthService.apiBaseUrl.contains('onrender.com')
+                    ? const Color(0xFF1FAE87).withOpacity(0.25)
+                    : const Color(0xFF101B2D),
+                side: BorderSide(
+                  color: AuthService.apiBaseUrl.contains('onrender.com')
+                      ? const Color(0xFF1FAE87)
+                      : Colors.white24,
+                ),
+                label: const Text('☁️ Nube Render', style: TextStyle(fontSize: 11, color: Colors.white)),
+                onPressed: () async {
+                  await AuthService.instance.saveServerConfig('https://ai-fitness-coach-818a.onrender.com');
+                  setState(() {});
+                },
+              ),
+            ],
+          ),
           Center(
             child: TextButton.icon(
               onPressed: _editServer,
-              icon: const Icon(Icons.dns_rounded, size: 16),
+              icon: const Icon(Icons.dns_rounded, size: 14),
               label: Text(
-                'Servidor: ${AuthService.apiBaseUrl}',
+                'Activo: ${AuthService.apiBaseUrl}',
                 style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white54,
+                  fontSize: 10,
+                  color: Colors.white38,
                 ),
               ),
             ),
