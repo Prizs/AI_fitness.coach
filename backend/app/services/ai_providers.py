@@ -17,6 +17,7 @@ de modo que la API pueda responder un error real y no una respuesta simulada.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 
 import httpx
@@ -102,13 +103,20 @@ def _model_candidates(provider: str) -> list[str]:
 
 
 def _strip_code_fences(text: str) -> str:
+    if not text:
+        return ""
     cleaned = text.strip()
-    for fence in ("```json", "```"):
-        if cleaned.startswith(fence):
-            cleaned = cleaned[len(fence):]
-    if cleaned.endswith("```"):
-        cleaned = cleaned[:-3]
-    return cleaned.strip()
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+    if match:
+        cleaned = match.group(1).strip()
+    else:
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:].strip()
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:].strip()
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3].strip()
+    return cleaned
 
 
 def _call_gemini(prompt: str, timeout: float) -> str:
@@ -116,7 +124,8 @@ def _call_gemini(prompt: str, timeout: float) -> str:
 
     genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
     model = genai.GenerativeModel(
-        (os.getenv("GEMINI_MODEL", "") or "").strip() or "gemini-2.5-flash"
+        (os.getenv("GEMINI_MODEL", "") or "").strip() or "gemini-2.5-flash",
+        generation_config={"response_mime_type": "application/json"},
     )
     response = model.generate_content(
         prompt,

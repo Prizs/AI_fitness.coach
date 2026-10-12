@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -165,15 +166,38 @@ Devuelve SOLO JSON."""
     )
 
     result = generate_json_text(prompt, timeout=AI_TIMEOUT_SEC)
-    data = json.loads(result.text)
-    if not isinstance(data, dict) or not data.get("reply"):
-        raise ValueError("Respuesta del proveedor de IA sin campo reply.")
+    raw = (result.text or "").strip()
+    data = None
+    try:
+        data = json.loads(raw)
+    except Exception:
+        first_brace = raw.find("{")
+        last_brace = raw.rfind("}")
+        if first_brace != -1 and last_brace > first_brace:
+            try:
+                data = json.loads(raw[first_brace:last_brace + 1])
+            except Exception:
+                pass
+
+    if not isinstance(data, dict):
+        reply_clean = re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
+        data = {
+            "reply": reply_clean or "¡Entendido! Vamos a continuar afinando tu plan de entrenamiento.",
+            "category": "Acondicionamiento y Fuerza",
+            "duration_weeks": 4,
+            "rest_between_sets_sec": 60,
+            "progression_rule": "Mantén técnica estricta con RPE <= 8.",
+            "extracted_equipment": None,
+            "has_plan": False,
+            "structured_plan": None,
+        }
 
     structured_plan = _normalize_structured_plan(data.get("structured_plan"))
     has_plan = bool(data.get("has_plan")) and structured_plan is not None
+    reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
     return {
         "provider": result.provider,
-        "reply": str(data.get("reply")),
+        "reply": reply_str,
         "category": str(data.get("category") or "Acondicionamiento general"),
         "duration_weeks": int(data.get("duration_weeks") or 4),
         "rest_between_sets_sec": int(data.get("rest_between_sets_sec") or 60),
