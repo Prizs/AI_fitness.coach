@@ -1,4 +1,5 @@
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -99,6 +100,9 @@ class _CoachScreenState extends State<CoachScreen> {
       final startStr = hasPlan ? formatDate(monday) : null;
       final endStr = hasPlan ? formatDate(sunday) : null;
 
+      const storage = FlutterSecureStorage();
+      final savedEquipment = await storage.read(key: 'user_equipment');
+
       final response = await http
           .post(
             Uri.parse('$baseUrl/api/coach/chat'),
@@ -116,12 +120,23 @@ class _CoachScreenState extends State<CoachScreen> {
               'weight': profile?.weight,
               'active_plan_start': startStr,
               'active_plan_end': endStr,
+              'equipment_details': savedEquipment,
             }),
           )
           .timeout(const Duration(seconds: 120));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        
+        if (data['extracted_equipment'] != null &&
+            data['extracted_equipment'].toString().isNotEmpty &&
+            data['extracted_equipment'].toString() != 'null') {
+          await storage.write(
+            key: 'user_equipment',
+            value: data['extracted_equipment'].toString(),
+          );
+        }
+
         setState(() {
           _messages.add({
             'isUser': false,

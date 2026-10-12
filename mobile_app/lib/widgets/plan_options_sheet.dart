@@ -234,17 +234,17 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   final buffer = StringBuffer();
                   buffer.writeln('📋 Mi Estado Actual para la sesión:');
                   if (_estado == 'Molestia' && _molestiaController.text.trim().isNotEmpty) {
-                    buffer.writeln('• Estado Físico: Tengo una molestia/dolor en . Por favor toma la decisión pertinente de descanso o sugerir ejercicios que no afecten esa área.');
+                    buffer.writeln('• Estado Físico: Tengo una molestia/dolor en ${_molestiaController.text.trim()}. Por favor toma la decisión pertinente de descanso o sugerir ejercicios que no afecten esa área.');
                   } else {
                     buffer.writeln('• Estado Físico: Me siento al 100% (Bien)');
                   }
-                  buffer.writeln('• Equipo disponible: ');
-                  buffer.writeln('• Intensidad deseada: ');
-                  buffer.writeln('• Nivel de experiencia: ');
+                  buffer.writeln('• Equipo disponible: $_equipo');
+                  buffer.writeln('• Intensidad deseada: $_intensity');
+                  buffer.writeln('• Nivel de experiencia: $_experience');
                   
                   final prompt = _promptController.text.trim();
                   if (prompt.isNotEmpty) {
-                    buffer.writeln('• Detalles / Objetivo: ');
+                    buffer.writeln('• Detalles / Objetivo: $prompt');
                   }
                   
                   final summary = buffer.toString().trim();
