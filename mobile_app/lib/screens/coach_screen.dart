@@ -101,7 +101,8 @@ class _CoachScreenState extends State<CoachScreen> {
       final endStr = hasPlan ? formatDate(sunday) : null;
 
       const storage = FlutterSecureStorage();
-      final savedEquipment = await storage.read(key: 'user_equipment');
+      final userKey = 'user_equipment_${profile?.cedula ?? "default"}';
+      final savedEquipment = await storage.read(key: userKey) ?? await storage.read(key: 'user_equipment');
 
       final response = await http
           .post(
@@ -131,10 +132,9 @@ class _CoachScreenState extends State<CoachScreen> {
         if (data['extracted_equipment'] != null &&
             data['extracted_equipment'].toString().isNotEmpty &&
             data['extracted_equipment'].toString() != 'null') {
-          await storage.write(
-            key: 'user_equipment',
-            value: data['extracted_equipment'].toString(),
-          );
+          final eqStr = data['extracted_equipment'].toString();
+          await storage.write(key: userKey, value: eqStr);
+          await storage.write(key: 'user_equipment', value: eqStr);
         }
 
         setState(() {

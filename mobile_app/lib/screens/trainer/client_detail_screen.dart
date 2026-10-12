@@ -254,11 +254,58 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             content: const Text('El alumno aún no tiene un menú registrado esta semana.', style: TextStyle(color: Colors.white70)),
           ),
         ] else ...[
-          ...days.where((d) => d['nutrition'] is Map && (d['nutrition'] as Map).isNotEmpty).map((d) {
-            final nut = d['nutrition'] as Map;
+          ...days.where((d) {
+            final nut = d['nutrition'];
+            if (nut is Map) return nut.isNotEmpty;
+            if (nut is List) return nut.isNotEmpty;
+            return false;
+          }).map((d) {
+            final nut = d['nutrition'];
             final weekdayName = d['weekday'] is int && d['weekday'] >= 0 && d['weekday'] < 7
                 ? ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][d['weekday']]
                 : 'Día';
+
+            final List<Widget> mealWidgets = [];
+            if (nut is Map) {
+              if (nut['desayuno'] != null) {
+                mealWidgets.add(Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text('🍳 Desayuno: ${nut['desayuno']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ));
+              }
+              if (nut['almuerzo'] != null) {
+                mealWidgets.add(Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text('🍛 Almuerzo: ${nut['almuerzo']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ));
+              }
+              if (nut['cena'] != null) {
+                mealWidgets.add(Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text('🍲 Cena: ${nut['cena']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ));
+              }
+              nut.forEach((k, v) {
+                final keyLower = k.toString().toLowerCase();
+                if (keyLower != 'desayuno' && keyLower != 'almuerzo' && keyLower != 'cena') {
+                  mealWidgets.add(Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text('🥗 ${k.toString()}: $v', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ));
+                }
+              });
+            } else if (nut is List) {
+              for (final m in nut) {
+                if (m is Map) {
+                  final title = m['title'] ?? 'Comida';
+                  final items = (m['items'] as List<dynamic>?)?.join(', ') ?? '';
+                  mealWidgets.add(Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text('🍽️ $title: $items', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ));
+                }
+              }
+            }
 
             return Card(
               color: const Color(0xFF1E293B),
@@ -277,21 +324,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                       ],
                     ),
                     const Divider(color: Colors.white12, height: 16),
-                    if (nut['desayuno'] != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text('🍳 Desayuno: ${nut['desayuno']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      ),
-                    if (nut['almuerzo'] != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text('🍛 Almuerzo: ${nut['almuerzo']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      ),
-                    if (nut['cena'] != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text('🍲 Cena: ${nut['cena']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      ),
+                    ...mealWidgets,
                   ],
                 ),
               ),

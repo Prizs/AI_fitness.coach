@@ -76,7 +76,39 @@ class _NutritionScreenState extends State<NutritionScreen> {
     final day = _day;
     if (day == null) return const SizedBox.shrink();
 
-    final meals = (day['nutrition'] as List<dynamic>?) ?? [];
+    final rawNutrition = day['nutrition'];
+    final List<Map<String, dynamic>> meals = [];
+    if (rawNutrition is List) {
+      for (final m in rawNutrition) {
+        if (m is Map) {
+          meals.add(Map<String, dynamic>.from(m));
+        }
+      }
+    } else if (rawNutrition is Map) {
+      rawNutrition.forEach((key, val) {
+        final keyStr = key.toString();
+        final title = keyStr.isEmpty
+            ? 'Comida'
+            : keyStr[0].toUpperCase() + keyStr.substring(1);
+        List<dynamic> items = [];
+        if (val is List) {
+          items = val;
+        } else if (val != null) {
+          final str = val.toString().trim();
+          if (str.isNotEmpty) {
+            items = str
+                .split('\n')
+                .map((s) => s.trim().replaceAll(RegExp(r'^[•\-\*]\s*'), ''))
+                .where((s) => s.isNotEmpty)
+                .toList();
+          }
+        }
+        meals.add({
+          'title': title,
+          'items': items,
+        });
+      });
+    }
     final isToday = _selected == _service.todayIndex;
 
     return ListView(
