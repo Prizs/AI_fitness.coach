@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:mobile_app/screens/user_profile_screen.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
@@ -6,12 +6,15 @@ import 'package:mobile_app/screens/workouts_screen.dart';
 import 'package:mobile_app/screens/progress_screen.dart';
 import 'package:mobile_app/screens/notifications_screen.dart';
 import 'package:mobile_app/screens/nutrition_screen.dart';
+import 'package:mobile_app/services/weekly_plan_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final planService = WeeklyPlanService.instance;
+    final hasNotification = planService.week == null || DateTime.now().weekday >= 5;
     final modules = [
       _ModuleTile(
         title: 'Coach IA',
@@ -60,18 +63,19 @@ class HomeScreen extends StatelessWidget {
                   color: Color(0xFF8BE0C0),
                   size: 26,
                 ),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.redAccent,
-                      shape: BoxShape.circle,
+                if (hasNotification)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
                     ),
-                    constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
                   ),
-                ),
               ],
             ),
             tooltip: 'Notificaciones y Avisos',
