@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+httpx
+langchain
+langchain-google-genai
+google-generativeai
+pytest
+supabase
+psycopg2-binary
+
+python-multipart
+requests
+PyJWT
+watchfiles
