@@ -30,6 +30,12 @@ app.include_router(recalibration.router, prefix="/api/recalibration", tags=["rec
 app.include_router(exercises.router, prefix="/api/exercises", tags=["exercises"])
 
 
+@app.get("/")
+def root():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")
+
+
 @app.get("/health")
 def health_check() -> dict:
     return {"status": "ok", "service": "ai_fitness_coach_backend"}
