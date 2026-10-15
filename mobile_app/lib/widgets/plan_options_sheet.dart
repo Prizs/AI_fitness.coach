@@ -38,6 +38,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
   bool _isListening = false;
   
   String _estado = 'Bien';
+  String _molestiaAction = 'Descanso';
   String _equipo = 'Gym Completo';
   String _intensity = 'Medio';
   String _experience = 'Intermedio';
@@ -85,6 +86,8 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
 
   @override
   Widget build(BuildContext context) {
+    final isRest = _estado == 'Molestia' && _molestiaAction == 'Descanso';
+
     return Padding(
       padding: EdgeInsets.only(
         left: 24.0, right: 24.0, top: 24.0,
@@ -126,104 +129,169 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
             ),
             
             if (_estado == 'Molestia') ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              const Text('¿La molestia te permite entrenar hoy?', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'Descanso',
+                    icon: Icon(Icons.hotel_rounded, size: 16),
+                    label: Text('Pausa / Descanso', style: TextStyle(fontSize: 11)),
+                  ),
+                  ButtonSegment(
+                    value: 'Adaptar',
+                    icon: Icon(Icons.fitness_center_rounded, size: 16),
+                    label: Text('Entrenar con cuidado', style: TextStyle(fontSize: 11)),
+                  ),
+                ],
+                selected: {_molestiaAction},
+                onSelectionChanged: (set) => setState(() => _molestiaAction = set.first),
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected)
+                      ? (_molestiaAction == 'Descanso' ? const Color(0xFFE57373) : const Color(0xFF8BE0C0))
+                      : Colors.transparent),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected)
+                      ? const Color(0xFF0B1220)
+                      : Colors.white),
+                ),
+              ),
+
+              const SizedBox(height: 14),
+              Text(
+                isRest
+                    ? 'Describe el dolor o motivo que te impide entrenar:'
+                    : '¿Dónde sientes la molestia y qué movimientos evitar?',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: _molestiaController,
-                maxLines: 2,
+                maxLines: isRest ? 3 : 2,
                 minLines: 1,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: '¿Dónde te duele? (Ej: Rodilla derecha, evita saltos)',
+                  hintText: isRest
+                      ? 'Ej: Dolor punzante lumbar al flexionar, siento pinchazos, inflamación o fatiga extrema...'
+                      : 'Ej: Molestia en hombro izquierdo, evitar press banca y fondos...',
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
                   fillColor: const Color(0xFF4A1A1A).withValues(alpha: 0.5),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent)),
                 ),
               ),
+
+              if (isRest) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF261D1A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.healing_rounded, color: Colors.amber, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Se pausará el entrenamiento de hoy. Tu Coach IA analizará tus síntomas para recomendarte tiempo prudencial de reposo, pautas de alivio y si amerita acudir a un traumatólogo o fisioterapeuta.',
+                          style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
 
-            const SizedBox(height: 20),
-            
-            // 2. Equipo
-            const Text('¿Dónde entrenarás / Equipo?', style: TextStyle(color: Colors.white70, fontSize: 14)),
-            const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'Gym Completo', label: Text('Gym Completo', style: TextStyle(fontSize: 11))),
-                ButtonSegment(value: 'Herramientas en Casa', label: Text('Herramientas\nen Casa', textAlign: TextAlign.center, style: TextStyle(fontSize: 10))),
-                ButtonSegment(value: 'Sin Herramientas', label: Text('Sin\nHerramientas', textAlign: TextAlign.center, style: TextStyle(fontSize: 10))),
-              ],
-              selected: {_equipo},
-              onSelectionChanged: (set) => setState(() => _equipo = set.first),
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
-                foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
+            // Solo mostrar opciones de entrenamiento si está Bien o si desea Adaptar el entreno
+            if (!isRest) ...[
+              const SizedBox(height: 20),
+              
+              // 2. Equipo
+              const Text('¿Dónde entrenarás / Equipo?', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'Gym Completo', label: Text('Gym Completo', style: TextStyle(fontSize: 11))),
+                  ButtonSegment(value: 'Herramientas en Casa', label: Text('Herramientas\nen Casa', textAlign: TextAlign.center, style: TextStyle(fontSize: 10))),
+                  ButtonSegment(value: 'Sin Herramientas', label: Text('Sin\nHerramientas', textAlign: TextAlign.center, style: TextStyle(fontSize: 10))),
+                ],
+                selected: {_equipo},
+                onSelectionChanged: (set) => setState(() => _equipo = set.first),
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
+                ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // 3. Intensidad
-            const Text('Nivel de Intensidad', style: TextStyle(color: Colors.white70, fontSize: 14)),
-            const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'Bajo', label: Text('Bajo')),
-                ButtonSegment(value: 'Medio', label: Text('Medio')),
-                ButtonSegment(value: 'Alto', label: Text('Intenso')),
-              ],
-              selected: {_intensity},
-              onSelectionChanged: (set) => setState(() => _intensity = set.first),
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
-                foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
+              // 3. Intensidad
+              const Text('Nivel de Intensidad', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'Bajo', label: Text('Bajo')),
+                  ButtonSegment(value: 'Medio', label: Text('Medio')),
+                  ButtonSegment(value: 'Alto', label: Text('Intenso')),
+                ],
+                selected: {_intensity},
+                onSelectionChanged: (set) => setState(() => _intensity = set.first),
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
+                ),
               ),
-            ),
 
-            const SizedBox(height: 20),
-            
-            // 4. Experiencia
-            const Text('Nivel de Experiencia', style: TextStyle(color: Colors.white70, fontSize: 14)),
-            const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'Principiante', label: Text('Principiante', style: TextStyle(fontSize: 12))),
-                ButtonSegment(value: 'Intermedio', label: Text('Intermedio', style: TextStyle(fontSize: 12))),
-                ButtonSegment(value: 'Avanzado', label: Text('Avanzado', style: TextStyle(fontSize: 12))),
-              ],
-              selected: {_experience},
-              onSelectionChanged: (set) => setState(() => _experience = set.first),
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
-                foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
+              const SizedBox(height: 20),
+              
+              // 4. Experiencia
+              const Text('Nivel de Experiencia', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'Principiante', label: Text('Principiante', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(value: 'Intermedio', label: Text('Intermedio', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(value: 'Avanzado', label: Text('Avanzado', style: TextStyle(fontSize: 12))),
+                ],
+                selected: {_experience},
+                onSelectionChanged: (set) => setState(() => _experience = set.first),
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
+                ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Peticion libre
-            const Text('Detalles adicionales (Opcional)', style: TextStyle(color: Colors.white70, fontSize: 14)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _promptController,
-              maxLines: 2,
-              minLines: 1,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Ej: Solo tengo 30 min, enfocate en piernas...',
-                hintStyle: const TextStyle(color: Colors.white38),
-                filled: true,
-                fillColor: const Color(0xFF1E293B),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              // Peticion libre
+              const Text('Detalles adicionales (Opcional)', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _promptController,
+                maxLines: 2,
+                minLines: 1,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Ej: Solo tengo 30 min, enfocate en piernas...',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  filled: true,
+                  fillColor: const Color(0xFF1E293B),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
               ),
-            ),
+            ],
 
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8BE0C0),
+                  backgroundColor: isRest ? const Color(0xFFE57373) : const Color(0xFF8BE0C0),
                   foregroundColor: const Color(0xFF0B1220),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -233,18 +301,42 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   
                   final buffer = StringBuffer();
                   buffer.writeln('📋 Mi Estado Actual para la sesión:');
-                  if (_estado == 'Molestia' && _molestiaController.text.trim().isNotEmpty) {
-                    buffer.writeln('• Estado Físico: Tengo una molestia/dolor en ${_molestiaController.text.trim()}. Por favor toma la decisión pertinente de descanso o sugerir ejercicios que no afecten esa área.');
+                  if (_estado == 'Molestia') {
+                    if (isRest) {
+                      buffer.writeln('• Estado Físico: Tengo una molestia/dolor que me IMPIDE ENTRENAR HOY.');
+                      final motivo = _molestiaController.text.trim();
+                      if (motivo.isNotEmpty) {
+                        buffer.writeln('• Motivo / Descripción del dolor: $motivo');
+                      } else {
+                        buffer.writeln('• Motivo / Descripción del dolor: Molestia física general que requiere reposo.');
+                      }
+                      buffer.writeln('• Decisión del usuario: Tomar una pausa o descanso total.');
+                      buffer.writeln('• Instrucción clave para la IA: NO generes ninguna rutina de ejercicios hoy. Analiza mis síntomas con criterio profesional, indícame cuánto tiempo debo esperar antes de volver a entrenar, pautas de recuperación y si amerita acudir a un traumatólogo o fisioterapeuta.');
+                    } else {
+                      final area = _molestiaController.text.trim();
+                      if (area.isNotEmpty) {
+                        buffer.writeln('• Estado Físico: Tengo una molestia en $area, pero DESEO ENTRENAR adaptando la sesión.');
+                        buffer.writeln('• Instrucción para la IA: Excluir totalmente ejercicios que carguen o comprometan la zona afectada ($area), priorizando ejercicios seguros o tren opuesto.');
+                      } else {
+                        buffer.writeln('• Estado Físico: Tengo una molestia leve, pero DESEO ENTRENAR con rutina adaptada.');
+                      }
+                      buffer.writeln('• Equipo disponible: $_equipo');
+                      buffer.writeln('• Intensidad deseada: $_intensity');
+                      buffer.writeln('• Nivel de experiencia: $_experience');
+                      final prompt = _promptController.text.trim();
+                      if (prompt.isNotEmpty) {
+                        buffer.writeln('• Detalles / Objetivo: $prompt');
+                      }
+                    }
                   } else {
                     buffer.writeln('• Estado Físico: Me siento al 100% (Bien)');
-                  }
-                  buffer.writeln('• Equipo disponible: $_equipo');
-                  buffer.writeln('• Intensidad deseada: $_intensity');
-                  buffer.writeln('• Nivel de experiencia: $_experience');
-                  
-                  final prompt = _promptController.text.trim();
-                  if (prompt.isNotEmpty) {
-                    buffer.writeln('• Detalles / Objetivo: $prompt');
+                    buffer.writeln('• Equipo disponible: $_equipo');
+                    buffer.writeln('• Intensidad deseada: $_intensity');
+                    buffer.writeln('• Nivel de experiencia: $_experience');
+                    final prompt = _promptController.text.trim();
+                    if (prompt.isNotEmpty) {
+                      buffer.writeln('• Detalles / Objetivo: $prompt');
+                    }
                   }
                   
                   final summary = buffer.toString().trim();
@@ -256,13 +348,18 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                       AuthService.instance.loggedInUser,
                       goal: summary.isNotEmpty ? summary : 'Mejorar condición física general',
                       experienceLevel: _experience,
-                      intensityPreference: _intensity,
+                      intensityPreference: isRest ? 'Bajo' : _intensity,
                       equipmentAvailable: _equipo != 'Sin Herramientas',
                     );
                   }
                 },
-                icon: const Icon(Icons.send_rounded),
-                label: const Text('Enviar Estado Actual', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                icon: Icon(isRest ? Icons.healing_rounded : Icons.send_rounded),
+                label: Text(
+                  isRest
+                      ? 'Enviar Reporte de Descanso a la IA'
+                      : (_estado == 'Molestia' ? 'Enviar Estado y Adaptar Rutina' : 'Enviar Estado Actual'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
               ),
             )
           ],

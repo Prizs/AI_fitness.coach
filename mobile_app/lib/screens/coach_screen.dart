@@ -78,8 +78,11 @@ class _CoachScreenState extends State<CoachScreen> {
     final isSubmission = lowerUser.contains('mi estado actual para la sesión') ||
         lowerUser.contains('mi estado actual para la sesion') ||
         lowerUser.contains('📋 mi estado actual') ||
-        (lowerUser.contains('estado físico:') && lowerUser.contains('equipo disponible:')) ||
-        (lowerUser.contains('estado fisico:') && lowerUser.contains('equipo disponible:'));
+        lowerUser.contains('me impide entrenar') ||
+        lowerUser.contains('descanso total') ||
+        lowerUser.contains('reporte de descanso') ||
+        (lowerUser.contains('estado físico:') && (lowerUser.contains('equipo disponible:') || lowerUser.contains('motivo') || lowerUser.contains('decisión'))) ||
+        (lowerUser.contains('estado fisico:') && (lowerUser.contains('equipo disponible:') || lowerUser.contains('motivo') || lowerUser.contains('decision')));
 
     setState(() {
       if (isSubmission) {
