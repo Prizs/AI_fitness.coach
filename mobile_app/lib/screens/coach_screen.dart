@@ -74,7 +74,19 @@ class _CoachScreenState extends State<CoachScreen> {
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
+    final lowerUser = text.toLowerCase();
+    final isSubmission = lowerUser.contains('mi estado actual para la sesión') ||
+        lowerUser.contains('mi estado actual para la sesion') ||
+        lowerUser.contains('📋 mi estado actual') ||
+        (lowerUser.contains('estado físico:') && lowerUser.contains('equipo disponible:')) ||
+        (lowerUser.contains('estado fisico:') && lowerUser.contains('equipo disponible:'));
+
     setState(() {
+      if (isSubmission) {
+        for (var m in _messages) {
+          m['suggest_questionnaire'] = false;
+        }
+      }
       _messages.add({'isUser': true, 'text': text, 'plan': null});
       _isLoading = true;
     });
@@ -138,23 +150,7 @@ class _CoachScreenState extends State<CoachScreen> {
         }
 
         final replyText = (data['reply'] ?? 'Sin respuesta del Coach.').toString();
-        final lowerUser = text.toLowerCase();
-        final lowerReply = replyText.toLowerCase();
-
-        final isAskingState = lowerUser.contains('estado actual') ||
-            lowerUser.contains('cuestionario') ||
-            lowerUser.contains('formulario') ||
-            lowerUser.contains('me equivoque') ||
-            lowerUser.contains('me equivoqué') ||
-            lowerUser.contains('llenar de nuevo') ||
-            lowerUser.contains('volver a llenar');
-
-        final aiSuggestsState = data['suggest_questionnaire'] == true ||
-            lowerReply.contains('completar mi estado actual') ||
-            lowerReply.contains('completa tu estado actual') ||
-            lowerReply.contains('indicarme tu estado actual');
-
-        final showStateBtn = isAskingState || aiSuggestsState;
+        final bool showStateBtn = !isSubmission && data['suggest_questionnaire'] == true;
 
         setState(() {
           _messages.add({
@@ -248,7 +244,8 @@ class _CoachScreenState extends State<CoachScreen> {
                         ),
                         child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
                       ),
-                      if (msg['suggest_questionnaire'] == true || msg['isWelcome'] == true) ...[
+                      if (msg['suggest_questionnaire'] == true ||
+                          (msg['isWelcome'] == true && _messages.length == 1)) ...[
                         Padding(
                           padding: const EdgeInsets.only(top: 4, bottom: 8),
                           child: ElevatedButton.icon(

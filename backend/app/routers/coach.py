@@ -146,10 +146,12 @@ REGLAS OBLIGATORIAS DE DISENO Y ADAPTACION:
    - Cuando emitas el plan estructurado (has_plan=true), usa animation_key validas (squat, pushup, pullup, lunge, plank, bicep-curl, tricep-extension, crunch, deadlift, shoulder-press, bench-press).
    - VARIEDAD: Si en dias anteriores ya se usaron ciertos ejercicios, propone variaciones biomecanicas para mantener el progreso fresco durante el ciclo.
 7. REGLA DE RECALIBRACION O REPETIR CUESTIONARIO:
-   - Si el usuario dice que se equivoco, que quiere cambiar o repetir su estado actual, o pide el cuestionario (ej. "quiero decir mi estado actual nuevamente", "me equivoque", "arrojame el cuestionario", "volver a llenar mi estado", "cambiar respuestas"):
+   - Si el usuario dice explicitamente que se equivoco, que quiere cambiar o repetir su estado actual, o pide el cuestionario (ej. "quiero decir mi estado actual nuevamente", "me equivoque", "arrojame el cuestionario", "volver a llenar mi estado", "cambiar respuestas"):
      * Activa "suggest_questionnaire": true en tu respuesta JSON.
      * En "reply", dile con empatia: "¡Entendido! No te preocupes. Toca el botón '📋 Completar Mi Estado Actual' que aparece justo abajo para ajustar tus datos y calibraremos tu sesión desde cero."
      * NO escribas las preguntas en texto largo si le sugieres abrir el cuestionario interactivo.
+   - Si el usuario acaba de enviar el cuestionario completado (inicia con '📋 Mi Estado Actual para la sesión') o esta respondiendo preguntas normales:
+     * "suggest_questionnaire" DEBE SER FALSE. NUNCA sugieras el cuestionario si el usuario ya envio sus datos o esta conversando.
 IMPORTANTE: No preguntes edad ni peso en cada mensaje (ya estan en su perfil).
 Retorna EXCLUSIVAMENTE un objeto JSON valido:
 {{
@@ -202,13 +204,38 @@ Devuelve SOLO JSON."""
     has_plan = bool(data.get("has_plan")) and structured_plan is not None
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
     user_msg_lower = (payload.message or "").lower()
-    keywords = [
-        "estado actual", "cuestionario", "me equivoque", "me equivoqué",
-        "arrojame el cuestionario", "arrojar cuestionario", "volver a llenar",
-        "llenar de nuevo", "repetir estado", "cambiar estado", "formulario"
+    
+    is_submission = (
+        "mi estado actual para la sesión" in user_msg_lower
+        or "mi estado actual para la sesion" in user_msg_lower
+        or "📋 mi estado actual" in user_msg_lower
+        or ("estado físico:" in user_msg_lower and "equipo disponible:" in user_msg_lower)
+        or ("estado fisico:" in user_msg_lower and "equipo disponible:" in user_msg_lower)
+    )
+
+    recalibration_keywords = [
+        "me equivoqu",
+        "arrojame el cuestionario",
+        "arrojar cuestionario",
+        "volver a llenar",
+        "llenar de nuevo",
+        "llenar nuevamente",
+        "repetir estado",
+        "repetir cuestionario",
+        "cambiar estado",
+        "cambiar respuestas",
+        "modificar mi estado",
+        "recalibrar estado",
+        "decir mi estado actual nuevamente",
+        "decir mi estado de nuevo",
+        "abrir cuestionario",
+        "abre el cuestionario",
     ]
-    force_suggest = any(k in user_msg_lower for k in keywords)
-    suggest_q = bool(data.get("suggest_questionnaire")) or force_suggest
+    force_suggest = not is_submission and any(k in user_msg_lower for k in recalibration_keywords)
+    if is_submission:
+        suggest_q = False
+    else:
+        suggest_q = bool(data.get("suggest_questionnaire")) or force_suggest
 
     return {
         "provider": result.provider,
