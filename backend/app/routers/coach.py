@@ -205,12 +205,27 @@ Devuelve SOLO JSON."""
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
     user_msg_lower = (payload.message or "").lower()
     
+    is_rest_request = (
+        "me impide entrenar" in user_msg_lower
+        or "descanso total" in user_msg_lower
+        or "no puedo entrenar hoy" in user_msg_lower
+        or "no generes ninguna rutina" in user_msg_lower
+        or "pausa o descanso total" in user_msg_lower
+        or "reporte de descanso" in user_msg_lower
+        or "tomar una pausa o descanso" in user_msg_lower
+    )
+    if is_rest_request:
+        has_plan = False
+        structured_plan = None
+        data["category"] = "Recuperación y Descanso"
+
     is_submission = (
         "mi estado actual para la sesión" in user_msg_lower
         or "mi estado actual para la sesion" in user_msg_lower
         or "📋 mi estado actual" in user_msg_lower
-        or ("estado físico:" in user_msg_lower and "equipo disponible:" in user_msg_lower)
-        or ("estado fisico:" in user_msg_lower and "equipo disponible:" in user_msg_lower)
+        or is_rest_request
+        or ("estado físico:" in user_msg_lower and ("equipo disponible:" in user_msg_lower or "motivo" in user_msg_lower or "decisión" in user_msg_lower))
+        or ("estado fisico:" in user_msg_lower and ("equipo disponible:" in user_msg_lower or "motivo" in user_msg_lower or "decision" in user_msg_lower))
     )
 
     recalibration_keywords = [
