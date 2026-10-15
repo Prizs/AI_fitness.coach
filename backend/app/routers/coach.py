@@ -145,6 +145,11 @@ REGLAS OBLIGATORIAS DE DISENO Y ADAPTACION:
 6. EJERCICIOS CON GIFS Y FORMATO:
    - Cuando emitas el plan estructurado (has_plan=true), usa animation_key validas (squat, pushup, pullup, lunge, plank, bicep-curl, tricep-extension, crunch, deadlift, shoulder-press, bench-press).
    - VARIEDAD: Si en dias anteriores ya se usaron ciertos ejercicios, propone variaciones biomecanicas para mantener el progreso fresco durante el ciclo.
+7. REGLA DE RECALIBRACION O REPETIR CUESTIONARIO:
+   - Si el usuario dice que se equivoco, que quiere cambiar o repetir su estado actual, o pide el cuestionario (ej. "quiero decir mi estado actual nuevamente", "me equivoque", "arrojame el cuestionario", "volver a llenar mi estado", "cambiar respuestas"):
+     * Activa "suggest_questionnaire": true en tu respuesta JSON.
+     * En "reply", dile con empatia: "¡Entendido! No te preocupes. Toca el botón '📋 Completar Mi Estado Actual' que aparece justo abajo para ajustar tus datos y calibraremos tu sesión desde cero."
+     * NO escribas las preguntas en texto largo si le sugieres abrir el cuestionario interactivo.
 IMPORTANTE: No preguntes edad ni peso en cada mensaje (ya estan en su perfil).
 Retorna EXCLUSIVAMENTE un objeto JSON valido:
 {{
@@ -154,6 +159,7 @@ Retorna EXCLUSIVAMENTE un objeto JSON valido:
   "rest_between_sets_sec": 60,
   "progression_rule": "Regla de progresion concreta",
   "extracted_equipment": "Mancuernas y bandas (o null si no menciono herramientas nuevas)",
+  "suggest_questionnaire": false,
   "has_plan": false,
   "structured_plan": null
 }}
@@ -195,6 +201,15 @@ Devuelve SOLO JSON."""
     structured_plan = _normalize_structured_plan(data.get("structured_plan"))
     has_plan = bool(data.get("has_plan")) and structured_plan is not None
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
+    user_msg_lower = (payload.message or "").lower()
+    keywords = [
+        "estado actual", "cuestionario", "me equivoque", "me equivoqué",
+        "arrojame el cuestionario", "arrojar cuestionario", "volver a llenar",
+        "llenar de nuevo", "repetir estado", "cambiar estado", "formulario"
+    ]
+    force_suggest = any(k in user_msg_lower for k in keywords)
+    suggest_q = bool(data.get("suggest_questionnaire")) or force_suggest
+
     return {
         "provider": result.provider,
         "reply": reply_str,
@@ -206,6 +221,7 @@ Devuelve SOLO JSON."""
             or "Aumenta la carga solo si completas las series con RPE <= 7."
         ),
         "extracted_equipment": data.get("extracted_equipment"),
+        "suggest_questionnaire": suggest_q,
         "has_plan": has_plan,
         "structured_plan": structured_plan if has_plan else None,
     }

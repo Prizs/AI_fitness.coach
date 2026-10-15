@@ -137,13 +137,33 @@ class _CoachScreenState extends State<CoachScreen> {
           await storage.write(key: 'user_equipment', value: eqStr);
         }
 
+        final replyText = (data['reply'] ?? 'Sin respuesta del Coach.').toString();
+        final lowerUser = text.toLowerCase();
+        final lowerReply = replyText.toLowerCase();
+
+        final isAskingState = lowerUser.contains('estado actual') ||
+            lowerUser.contains('cuestionario') ||
+            lowerUser.contains('formulario') ||
+            lowerUser.contains('me equivoque') ||
+            lowerUser.contains('me equivoqué') ||
+            lowerUser.contains('llenar de nuevo') ||
+            lowerUser.contains('volver a llenar');
+
+        final aiSuggestsState = data['suggest_questionnaire'] == true ||
+            lowerReply.contains('completar mi estado actual') ||
+            lowerReply.contains('completa tu estado actual') ||
+            lowerReply.contains('indicarme tu estado actual');
+
+        final showStateBtn = isAskingState || aiSuggestsState;
+
         setState(() {
           _messages.add({
             'isUser': false,
-            'text': data['reply'] ?? 'Sin respuesta del Coach.',
+            'text': replyText,
             'plan': data['has_plan'] == true ? data['structured_plan'] : null,
             'category': data['category'],
             'rule': data['progression_rule'],
+            'suggest_questionnaire': showStateBtn,
           });
         });
       } else {
@@ -228,7 +248,7 @@ class _CoachScreenState extends State<CoachScreen> {
                         ),
                         child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
                       ),
-                      if (msg['isWelcome'] == true && _messages.length == 1) ...[
+                      if (msg['suggest_questionnaire'] == true || msg['isWelcome'] == true) ...[
                         Padding(
                           padding: const EdgeInsets.only(top: 4, bottom: 8),
                           child: ElevatedButton.icon(
