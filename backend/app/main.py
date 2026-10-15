@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,9 @@ app = FastAPI(
     version="0.1.0",
 )
 
-app.mount('/static', StaticFiles(directory='app/static'), name='static')
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,12 +31,6 @@ app.include_router(plans.router, prefix="/api/plans", tags=["plans"])
 app.include_router(workouts.router, prefix="/api/workout", tags=["workout"])
 app.include_router(recalibration.router, prefix="/api/recalibration", tags=["recalibration"])
 app.include_router(exercises.router, prefix="/api/exercises", tags=["exercises"])
-
-
-@app.get("/")
-def root():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
@@ -69,3 +66,15 @@ def health_check():
         return {"status": "ok", "message": "Render and Supabase are alive"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+# Montar la aplicacion web de Flutter en la raiz
+web_dist = os.path.join(os.path.dirname(__file__), "web_dist")
+if os.path.exists(web_dist):
+    app.mount("/", StaticFiles(directory=web_dist, html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/docs")
+
