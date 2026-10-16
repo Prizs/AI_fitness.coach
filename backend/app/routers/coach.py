@@ -255,6 +255,346 @@ ADVANCED_HIGH_LEG_EXERCISES = [
 ]
 
 
+UPPER_BODY_POOLS = {
+    "baja": [
+        {
+            "name": "Flexiones inclinadas con manos apoyadas en banco o pared (Básico)",
+            "sets": 3,
+            "reps": "10-12",
+            "animation_key": "pushup",
+            "primary_muscle": "Pectorales, Deltoides Anterior",
+            "secondary_muscle": "Tríceps, Core",
+        },
+        {
+            "name": "Remo sentado con banda elástica o tracción controlada (Básico)",
+            "sets": 3,
+            "reps": "12",
+            "animation_key": "row",
+            "primary_muscle": "Espalda Media, Dorsal Ancho",
+            "secondary_muscle": "Bíceps, Romboides",
+        },
+        {
+            "name": "Press de hombros sentado con banda o peso ligero (Básico)",
+            "sets": 3,
+            "reps": "10-12",
+            "animation_key": "shoulder-press",
+            "primary_muscle": "Hombros (Deltoides)",
+            "secondary_muscle": "Tríceps, Trapecio",
+        },
+        {
+            "name": "Elevaciones laterales suaves de hombros (Básico)",
+            "sets": 3,
+            "reps": "12-15",
+            "animation_key": "lateral-raise",
+            "primary_muscle": "Deltoides Lateral",
+            "secondary_muscle": "Trapecio Superior",
+        },
+        {
+            "name": "Curl de bíceps sentado controlado (Básico)",
+            "sets": 3,
+            "reps": "12",
+            "animation_key": "bicep-curl",
+            "primary_muscle": "Bíceps Braquial",
+            "secondary_muscle": "Antebrazo",
+        },
+    ],
+    "media": [
+        {
+            "name": "Press de pecho con mancuernas en banco (Intermedio)",
+            "sets": 4,
+            "reps": "10-12",
+            "animation_key": "bench-press",
+            "primary_muscle": "Pectoral Mayor",
+            "secondary_muscle": "Tríceps, Deltoides Anterior",
+        },
+        {
+            "name": "Remo en polea baja sentado (Intermedio)",
+            "sets": 4,
+            "reps": "10-12",
+            "animation_key": "row",
+            "primary_muscle": "Espalda Media, Dorsales",
+            "secondary_muscle": "Bíceps, Romboides",
+        },
+        {
+            "name": "Jalón al pecho en polea alta (Intermedio)",
+            "sets": 3,
+            "reps": "10-12",
+            "animation_key": "pulldown",
+            "primary_muscle": "Dorsal Ancho",
+            "secondary_muscle": "Bíceps",
+        },
+        {
+            "name": "Press militar sentado con mancuernas (Intermedio)",
+            "sets": 3,
+            "reps": "10-12",
+            "animation_key": "shoulder-press",
+            "primary_muscle": "Deltoides Anterior y Lateral",
+            "secondary_muscle": "Tríceps",
+        },
+        {
+            "name": "Extensión de tríceps en polea alta (Intermedio)",
+            "sets": 3,
+            "reps": "12",
+            "animation_key": "tricep-pushdown",
+            "primary_muscle": "Tríceps Braquial",
+            "secondary_muscle": "Estabilizadores de hombro",
+        },
+    ],
+    "alta": [
+        {
+            "name": "Press de banca con barra libre (Avanzado)",
+            "sets": 4,
+            "reps": "6-8",
+            "animation_key": "bench-press",
+            "primary_muscle": "Pectoral Mayor, Tríceps",
+            "secondary_muscle": "Deltoides Anterior",
+        },
+        {
+            "name": "Dominadas pronas completas (Avanzado)",
+            "sets": 4,
+            "reps": "8-10",
+            "animation_key": "pullup",
+            "primary_muscle": "Dorsal Ancho, Espalda Alta",
+            "secondary_muscle": "Bíceps, Core",
+        },
+        {
+            "name": "Remo inclinado con barra libre (Avanzado)",
+            "sets": 4,
+            "reps": "8-10",
+            "animation_key": "row",
+            "primary_muscle": "Espalda Media, Dorsal Ancho",
+            "secondary_muscle": "Erectores Espinales, Bíceps",
+        },
+        {
+            "name": "Press militar con barra (Avanzado)",
+            "sets": 4,
+            "reps": "8-10",
+            "animation_key": "shoulder-press",
+            "primary_muscle": "Deltoides, Tríceps",
+            "secondary_muscle": "Core",
+        },
+        {
+            "name": "Curl de bíceps con barra olímpica (Avanzado)",
+            "sets": 3,
+            "reps": "8-10",
+            "animation_key": "bicep-curl",
+            "primary_muscle": "Bíceps Braquial",
+            "secondary_muscle": "Antebrazos",
+        },
+    ],
+}
+
+CORE_POOLS = {
+    "baja": [
+        {
+            "name": "Dead Bug / Estabilización lumbopélvica en suelo (Básico)",
+            "sets": 3,
+            "reps": "10 por lado",
+            "animation_key": "dead-bug",
+            "primary_muscle": "Core Profundo, Transverso Abdominal",
+            "secondary_muscle": "Estabilizadores Lumbares",
+        },
+        {
+            "name": "Plancha abdominal suave con rodillas apoyadas (Básico)",
+            "sets": 3,
+            "reps": "25-30 seg",
+            "animation_key": "plank",
+            "primary_muscle": "Abdomen, Core",
+            "secondary_muscle": "Hombros, Glúteos",
+        },
+        {
+            "name": "Crunch abdominal corto controlado en suelo (Básico)",
+            "sets": 3,
+            "reps": "12-15",
+            "animation_key": "crunch",
+            "primary_muscle": "Recto Abdominal",
+            "secondary_muscle": "Oblicuos",
+        },
+        {
+            "name": "Remo postural sentado con retracción escapular (Básico)",
+            "sets": 3,
+            "reps": "12",
+            "animation_key": "row",
+            "primary_muscle": "Espalda Media, Postura Dorsal",
+            "secondary_muscle": "Romboides, Core",
+        },
+    ],
+    "media": [
+        {
+            "name": "Plancha abdominal frontal con toque de hombros (Intermedio)",
+            "sets": 3,
+            "reps": "35-45 seg",
+            "animation_key": "plank",
+            "primary_muscle": "Core, Transverso Abdominal",
+            "secondary_muscle": "Oblicuos, Deltoides",
+        },
+        {
+            "name": "Dead Bug alterno completo sin apoyo (Intermedio)",
+            "sets": 3,
+            "reps": "12 por lado",
+            "animation_key": "dead-bug",
+            "primary_muscle": "Abdomen Profundo, Core",
+            "secondary_muscle": "Flexores de Cadera",
+        },
+        {
+            "name": "Crunch abdominal en suelo con pausa isométrica (Intermedio)",
+            "sets": 3,
+            "reps": "15",
+            "animation_key": "crunch",
+            "primary_muscle": "Recto Abdominal",
+            "secondary_muscle": "Oblicuos",
+        },
+        {
+            "name": "Remo en polea para control postural (Intermedio)",
+            "sets": 3,
+            "reps": "12",
+            "animation_key": "row",
+            "primary_muscle": "Espalda Media, Trapecio Medio",
+            "secondary_muscle": "Core",
+        },
+    ],
+    "alta": [
+        {
+            "name": "Plancha abdominal lastrada de alta tensión (Avanzado)",
+            "sets": 4,
+            "reps": "45-60 seg",
+            "animation_key": "plank",
+            "primary_muscle": "Core Total, Recto Abdominal",
+            "secondary_muscle": "Oblicuos, Serrato",
+        },
+        {
+            "name": "Elevación de piernas colgado en barra (Avanzado)",
+            "sets": 4,
+            "reps": "10-12",
+            "animation_key": "hanging-leg-raise",
+            "primary_muscle": "Abdomen Inferior, Core",
+            "secondary_muscle": "Agarre, Dorsal",
+        },
+        {
+            "name": "Dead Bug con resistencia isométrica (Avanzado)",
+            "sets": 4,
+            "reps": "12 por lado",
+            "animation_key": "dead-bug",
+            "primary_muscle": "Transverso Abdominal",
+            "secondary_muscle": "Oblicuos",
+        },
+        {
+            "name": "Remo inclinado pesado para cadena posterior alta (Avanzado)",
+            "sets": 4,
+            "reps": "8-10",
+            "animation_key": "row",
+            "primary_muscle": "Espalda Alta, Erectores",
+            "secondary_muscle": "Core",
+        },
+    ],
+}
+
+MOBILITY_CARDIO_POOLS = {
+    "baja": [
+        {
+            "name": "Bicicleta estática o marcha suave sin impacto (Básico)",
+            "sets": 1,
+            "reps": "12-15 min Zona 2",
+            "animation_key": "cardio-bike",
+            "primary_muscle": "Sistema Cardiovascular, Movilidad",
+            "secondary_muscle": "Flujo Sanguíneo de Recuperación",
+        },
+        {
+            "name": "Dead Bug respiratorio de movilidad lumbopélvica (Básico)",
+            "sets": 3,
+            "reps": "10 lentas",
+            "animation_key": "dead-bug",
+            "primary_muscle": "Core, Movilidad de Cadera y Hombro",
+            "secondary_muscle": "Columna Lumbar",
+        },
+        {
+            "name": "Movilidad escapular y tracción suave con banda (Básico)",
+            "sets": 3,
+            "reps": "12-15",
+            "animation_key": "row",
+            "primary_muscle": "Movilidad Torácica, Espalda Alta",
+            "secondary_muscle": "Deltoides Posterior",
+        },
+        {
+            "name": "Plancha suave con apoyo para activación postural (Básico)",
+            "sets": 3,
+            "reps": "25 seg",
+            "animation_key": "plank",
+            "primary_muscle": "Core, Estabilidad Articular",
+            "secondary_muscle": "Cintura Escapular",
+        },
+    ],
+    "media": [
+        {
+            "name": "Jumping Jacks a ritmo controlado (Intermedio)",
+            "sets": 3,
+            "reps": "40 seg",
+            "animation_key": "cardio",
+            "primary_muscle": "Cardio Metabólico, Coordinación",
+            "secondary_muscle": "Hombros, Core",
+        },
+        {
+            "name": "Plancha dinámica con rotación torácica (Intermedio)",
+            "sets": 3,
+            "reps": "10 por lado",
+            "animation_key": "plank",
+            "primary_muscle": "Movilidad Torácica, Oblicuos",
+            "secondary_muscle": "Hombros",
+        },
+        {
+            "name": "Dead Bug fluido de control motor (Intermedio)",
+            "sets": 3,
+            "reps": "12 por lado",
+            "animation_key": "dead-bug",
+            "primary_muscle": "Core y Estabilidad Lumbopélvica",
+            "secondary_muscle": "Flexores",
+        },
+        {
+            "name": "Remo continuo de resistencia aeróbica (Intermedio)",
+            "sets": 3,
+            "reps": "15",
+            "animation_key": "row",
+            "primary_muscle": "Espalda Media, Cardio",
+            "secondary_muscle": "Bíceps",
+        },
+    ],
+    "alta": [
+        {
+            "name": "Burpees atléticos controlados (Avanzado)",
+            "sets": 4,
+            "reps": "12",
+            "animation_key": "burpee",
+            "primary_muscle": "Cardio HIIT, Capacidad Metabólica",
+            "secondary_muscle": "Pecho, Core, Hombros",
+        },
+        {
+            "name": "Jumping Jacks de alta cadencia (Avanzado)",
+            "sets": 4,
+            "reps": "60 seg",
+            "animation_key": "cardio",
+            "primary_muscle": "Sistema Cardiorrespiratorio",
+            "secondary_muscle": "Deltoides, Core",
+        },
+        {
+            "name": "Plancha activa de alta tensión (Avanzado)",
+            "sets": 4,
+            "reps": "45 seg",
+            "animation_key": "plank",
+            "primary_muscle": "Core Anti-extensión",
+            "secondary_muscle": "Hombros",
+        },
+        {
+            "name": "Dominadas o tracción metabólica (Avanzado)",
+            "sets": 4,
+            "reps": "10",
+            "animation_key": "pullup",
+            "primary_muscle": "Dorsal Ancho, Acondicionamiento",
+            "secondary_muscle": "Bíceps, Core",
+        },
+    ],
+}
+
+
 def _is_leg_exercise(name: str, primary_muscle: str) -> bool:
     text = f"{name} {primary_muscle}".lower()
     leg_terms = (
@@ -318,6 +658,9 @@ def _normalize_exercises(
         if intensity_hint == "baja"
         else (ADVANCED_HIGH_LEG_EXERCISES if intensity_hint == "alta" else INTERMEDIATE_MID_LEG_EXERCISES)
     )
+    upper_pool = UPPER_BODY_POOLS[intensity_hint]
+    core_pool = CORE_POOLS[intensity_hint]
+    mobility_pool = MOBILITY_CARDIO_POOLS[intensity_hint]
 
     for idx, exercise in enumerate(raw_exercises):
         if not isinstance(exercise, dict):
@@ -325,13 +668,54 @@ def _normalize_exercises(
         raw_name = str(exercise.get("name") or "Ejercicio").strip()
         primary = str(exercise.get("primary_muscle") or "General").strip()
         secondary = str(exercise.get("secondary_muscle") or "Secundario").strip()
+        sets_val = exercise.get("sets") or 3
+        reps_val = str(exercise.get("reps") or "10-12")
+        anim_key = str(exercise.get("animation_key") or "squat")
+        replaced_from_pool = False
 
-        # Si el usuario pidió exclusivamente piernas y la IA coló un ejercicio de tren superior/tórax/brazos, reemplazarlo por uno de piernas acorde a la intensidad
+        # 1. Si el usuario pidió piernas y la IA coló un ejercicio de otra parte, usar pool de piernas
         if requested_focus == "piernas" and not _is_leg_exercise(raw_name, primary):
             fallback_ex = leg_pool[idx % len(leg_pool)]
             raw_name = fallback_ex["name"]
             primary = fallback_ex["primary_muscle"]
             secondary = fallback_ex["secondary_muscle"]
+            sets_val = fallback_ex["sets"]
+            reps_val = fallback_ex["reps"]
+            anim_key = fallback_ex["animation_key"]
+            replaced_from_pool = True
+
+        # 2. Si el usuario pidió Tren Superior (o Pecho/Espalda/Brazos) y la IA repitió ejercicios de piernas, usar pool de Tren Superior
+        elif requested_focus in ("tren_superior", "pecho", "espalda", "brazos_hombros") and _is_leg_exercise(raw_name, primary):
+            fallback_ex = upper_pool[idx % len(upper_pool)]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex["secondary_muscle"]
+            sets_val = fallback_ex["sets"]
+            reps_val = fallback_ex["reps"]
+            anim_key = fallback_ex["animation_key"]
+            replaced_from_pool = True
+
+        # 3. Si el usuario pidió Core/Abdomen/Postura y la IA repitió ejercicios de piernas, usar pool de Core
+        elif requested_focus == "core" and _is_leg_exercise(raw_name, primary):
+            fallback_ex = core_pool[idx % len(core_pool)]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex["secondary_muscle"]
+            sets_val = fallback_ex["sets"]
+            reps_val = fallback_ex["reps"]
+            anim_key = fallback_ex["animation_key"]
+            replaced_from_pool = True
+
+        # 4. Si el usuario pidió Movilidad y Cardio Suave y la IA repitió ejercicios de fuerza de piernas, usar pool de Movilidad y Cardio
+        elif requested_focus == "movilidad_cardio" and _is_leg_exercise(raw_name, primary):
+            fallback_ex = mobility_pool[idx % len(mobility_pool)]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex["secondary_muscle"]
+            sets_val = fallback_ex["sets"]
+            reps_val = fallback_ex["reps"]
+            anim_key = fallback_ex["animation_key"]
+            replaced_from_pool = True
 
         clean_name = _sanitize_exercise_by_intensity(raw_name, intensity_hint)
         gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint)
@@ -339,24 +723,28 @@ def _normalize_exercises(
         exercises.append(
             {
                 "name": clean_name,
-                "sets": exercise.get("sets") or 3,
-                "reps": str(exercise.get("reps") or "10-12"),
-                "animation_key": str(exercise.get("animation_key") or "squat"),
+                "sets": sets_val,
+                "reps": reps_val,
+                "animation_key": anim_key,
                 "primary_muscle": primary,
                 "secondary_muscle": secondary,
                 "intensity_level": forced_label,
                 "gif_url": gif_meta.get("url") or "",
                 "biomechanics": str(
-                    exercise.get("biomechanics") or gif_meta.get("biomechanics") or "Movimiento controlado respetando el rango articular."
+                    (gif_meta.get("biomechanics") if replaced_from_pool else (exercise.get("biomechanics") or gif_meta.get("biomechanics")))
+                    or "Movimiento controlado respetando el rango articular."
                 ),
                 "tempo": str(
-                    exercise.get("tempo") or gif_meta.get("tempo") or "3-1-1"
+                    (gif_meta.get("tempo") if replaced_from_pool else (exercise.get("tempo") or gif_meta.get("tempo")))
+                    or "3-1-1"
                 ),
                 "posture": str(
-                    exercise.get("posture") or gif_meta.get("posture") or "Mantén la columna neutra y abdomen activo."
+                    (gif_meta.get("posture") if replaced_from_pool else (exercise.get("posture") or gif_meta.get("posture")))
+                    or "Mantén la columna neutra y abdomen activo."
                 ),
                 "warning": str(
-                    exercise.get("warning") or gif_meta.get("warning") or "Detén el ejercicio si sientes dolor articular."
+                    (gif_meta.get("warning") if replaced_from_pool else (exercise.get("warning") or gif_meta.get("warning")))
+                    or "Detén el ejercicio si sientes dolor articular."
                 ),
             }
         )
@@ -410,9 +798,19 @@ def _normalize_structured_plan(
                 "Jueves": "Core, Postura o Movilidad Articular y Cardio Suave",
             }
 
+    raw_title = str(raw_plan.get("title") or "Sesión Personalizada")
+    if is_complementary_days or requested_focus in ("tren_superior", "core", "movilidad_cardio"):
+        focus_titles = {
+            "tren_superior": f"Rutina Complementaria: Tren Superior ({level} · Intensidad {intensity})",
+            "core": f"Rutina Complementaria: Core, Abdomen y Postura ({level} · Intensidad {intensity})",
+            "movilidad_cardio": f"Rutina Complementaria: Movilidad y Cardio Suave ({level} · Intensidad {intensity})",
+        }
+        if requested_focus in focus_titles and ("pierna" in raw_title.lower() or is_complementary_days):
+            raw_title = focus_titles[requested_focus]
+
     return {
         "day": "Martes y Jueves (Complemento Intermedio)" if is_complementary_days else f"{' y '.join(recommended_days)} (Alternado 48-72h)",
-        "title": str(raw_plan.get("title") or "Sesión Personalizada"),
+        "title": raw_title,
         "focus_area": requested_focus or "general",
         "is_complementary_days": is_complementary_days,
         "intensity_summary": f"Nivel {level} · Intensidad {intensity}",
@@ -460,65 +858,57 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
 
     effective_level, effective_intensity = _extract_effective_level_and_intensity(payload)
     requested_focus = _detect_requested_focus(payload)
+    is_complementary = _is_complementary_days_request(payload)
+
+    focus_instruction = {
+        "piernas": "PIERNAS Y GLÚTEOS (Cuádriceps, Isquiotibiales, Glúteos y Gemelos). PROHIBIDO incluir ejercicios de pecho, espalda, abdomen o brazos.",
+        "tren_superior": "TREN SUPERIOR COMPLEMENTARIO PARA MARTES Y JUEVES (Espalda, Pecho, Hombros y Brazos). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas, Elevación de Talones o cualquier ejercicio de piernas!",
+        "core": "CORE, ABDOMEN Y ESTABILIDAD LUMBAR PARA MARTES Y JUEVES (Dead Bug, Plancha, Crunch, Control Postural). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas o cualquier ejercicio de piernas!",
+        "movilidad_cardio": "MOVILIDAD ARTICULAR, ESTABILIDAD Y CARDIO SUAVE DE BAJO IMPACTO PARA MARTES Y JUEVES (Bicicleta/Marcha Zona 2, Movilidad Torácica/Escapular, Dead Bug respiratorio, Plancha suave). ¡ESTÁ ESTRICTAMENTE PROHIBIDO repetir Sentadillas, Puente de Glúteos, Zancadas o Elevación de Talones!",
+    }.get(requested_focus or "", "el grupo muscular solicitado por el usuario en su último mensaje.")
 
     prompt = (
         f"""Eres un Coach de Fitness, Biomecánica y Nutrición altamente interactivo, empático, científico y analítico. Responde en español con tono motivador pero riguroso.
 REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
-1. REGLA DE FLUJO Y NO REPETICIÓN:
-   - El usuario ya responde un cuestionario inicial con: Estado Físico (Bien o Molestia/Dolor), Equipo general (Gym, Casa, Sin herramientas), Intensidad deseada ({effective_intensity}) y Nivel de Experiencia ({effective_level}).
-   - NUNCA vuelvas a preguntarle esos mismos datos que ya vienen indicados en su reporte de estado.
-   - Si reporta MOLESTIA/DOLOR: Menciónalo de entrada y aclara cómo adaptarás la sesión (o si pidió pausa/descanso total, NO generes rutina de ejercicios y da solo pautas de recuperación y alerta médica).
+1. ENFOQUE OBLIGATORIO DEL MENSAJE ACTUAL:
+   - El usuario en este turno está solicitando enfocarse en: **{focus_instruction}**
+   - Si `is_complementary` es `{is_complementary}` (rutina complementaria para Martes y Jueves), TODOS los ejercicios del plan DEBEN ser de esa zona complementaria ({requested_focus}) y NINGUNO puede ser de piernas.
 
-2. REGLA DE ABSOLUTA PRECISIÓN DEL GRUPO MUSCULAR Y CATEGORIZACIÓN POR INTENSIDAD:
-   - Si el usuario pide ejercicios para un área específica (ej. **PIERNAS / TREN INFERIOR**), el **100% de los ejercicios recomendados en el plan DEBEN enfocarse en las piernas** (Cuádriceps, Glúteos, Isquiotibiales, Gemelos, Abductores/Aductores). ¡ESTÁ ESTRICTAMENTE PROHIBIDO mezclar ejercicios de tórax, pecho, abdomen o brazos cuando el usuario pidió piernas!
-   - CATEGORIZA cada ejercicio según el Nivel de Experiencia ({effective_level}) y la Intensidad solicitada ({effective_intensity}):
-     * **Nivel Básico (Intensidad Baja) / Principiante**: Usa EXCLUSIVAMENTE ejercicios básicos de bajo impacto y control motor (ej. "Sentadilla asistida con peso corporal", "Puente de glúteos en suelo (Glute Bridge)", "Zancada estática con peso corporal", "Elevación de talones de pie", "Curl femoral de pie o sentado suave", "Abducción de cadera lateral"). PROHIBIDO mandar sentadilla con barra pesada o ejercicios avanzados a un principiante de intensidad baja.
-     * **Nivel Intermedio (Intensidad Media)**: Ejercicios con carga moderada o máquinas guiadas (ej. "Sentadilla Goblet con mancuerna", "Prensa de piernas 45°", "Zancadas con mancuernas", "Peso muerto rumano con mancuernas", "Curl de isquiotibiales en máquina").
-     * **Nivel Avanzado (Intensidad Alta)**: Ejercicios compuestos pesados o pliométricos (ej. "Sentadilla profunda con barra", "Peso muerto con barra", "Sentadilla búlgara", "Sentadilla con salto").
+2. REGLA DE CATEGORIZACIÓN POR INTENSIDAD ({effective_level} · Intensidad {effective_intensity}):
+   - **Nivel Básico (Intensidad Baja) / Principiante**: Usa EXCLUSIVAMENTE ejercicios básicos de bajo impacto y control motor.
+   - **Nivel Intermedio (Intensidad Media)**: Ejercicios con carga moderada, mancuernas, poleas o máquinas guiadas.
+   - **Nivel Avanzado (Intensidad Alta)**: Ejercicios compuestos pesados o alta exigencia neuromuscular.
 
-3. REGLA CIENTÍFICA DE DESCANSO MUSCULAR (48-72 HORAS) E INTERACCIÓN SEMANAL (¡MUY IMPORTANTE!):
-   - Basado en fisiología del ejercicio, entrenar un mismo grupo muscular grande (especialmente **Piernas y Glúteos**) todos los días seguidos genera fatiga neuromuscular acumulada, catabolismo y riesgo de lesión articular/tendinosa. Las piernas necesitan entre **48 y 72 horas de recuperación** entre sesiones.
-   - Por lo tanto, cuando el usuario pida una rutina de Piernas (o de un grupo muscular específico) para su semana:
-     a) **NO la pautes para todos los días seguidos**.
-     b) **Explícale en `reply`**:
-        - Si es Principiante / Intensidad Baja: que lo más óptimo para no fatigar el músculo es entrenar Piernas **2 días a la semana separados por 48-72h (ej. Lunes y Miércoles, o Lunes y Jueves)**.
-        - Si es Intermedio / Avanzado: que lo más óptimo es entrenar Piernas en **días alternos: Lunes, Miércoles y Viernes** (variando el enfoque: ej. Lunes dominante de cuádriceps, Miércoles dominante de glúteos/isquiotibiales).
-     c) **Hazle la pregunta interactiva de combinación en `reply`**:
-        Dile textualmente algo como: *"Estás pidiendo entrenar piernas para la semana, pero para no fatigar el músculo y respetar las 48 a 72 horas de recuperación, lo más recomendable es hacer Piernas los días Lunes y Miércoles (y opcionalmente Viernes). Para los días intermedios (Martes y Jueves), podemos relacionarlo y combinarlo con otro grupo muscular mientras tus piernas descansan. ¿Con cuál te gustaría combinarlo: **1) Tren Superior (Espalda, Pecho y Brazos)**, **2) Core, Abdomen y Postura**, o **3) Movilidad articular y Cardio suave**?"*
-
-4. REGLA DE EQUIPAMIENTO Y NUTRICIÓN SINÉRGICA:
-   - Respeta estrictamente el equipo disponible del usuario.
-   - Adapta la nutrición a la intensidad ({effective_intensity}).
-
-5. REGLA DE RECALIBRACIÓN O REPETIR CUESTIONARIO:
-   - Solo pon `"suggest_questionnaire": true` si el usuario pide explícitamente cambiar sus respuestas o abrir de nuevo el cuestionario. En cualquier otro caso pon `false`.
+3. REGLA CIENTÍFICA DE DESCANSO MUSCULAR (48-72 HORAS) E INTERACCIÓN SEMANAL:
+   - Si el usuario pidió Piernas: pauta la sesión para **Lunes y Miércoles** (o Lunes, Miércoles y Viernes) explicando las 48-72h de recuperación muscular, y pregúntale con qué grupo complementario quiere combinar los días Martes y Jueves.
+   - Si el usuario ya eligió la rutina complementaria para **Martes y Jueves** ({requested_focus}): felicítalo por completar su estructura semanal alternada y entrega los ejercicios específicos de **{requested_focus}** para los días **Martes y Jueves**.
 
 Retorna EXCLUSIVAMENTE un objeto JSON válido con esta estructura exacta:
 {{
-  "reply": "Respuesta conversacional clara, explicando la selección por nivel de intensidad, la pauta de días alternos (ej. Lunes y Miércoles) para no fatigar el músculo y preguntando con qué grupo complementario quiere combinar los días Martes y Jueves",
-  "category": "Categoría de la fase (ej. Piernas - Nivel Básico · Intensidad Baja)",
+  "reply": "Respuesta conversacional clara acorde a la zona solicitada ({requested_focus or 'general'}) y nivel de intensidad ({effective_intensity})",
+  "category": "Categoría de la fase",
   "duration_weeks": 4,
   "rest_between_sets_sec": 60,
-  "progression_rule": "Regla de progresión y descanso de 48-72h entre sesiones de pierna",
+  "progression_rule": "Regla de progresión y descanso de 48-72h entre sesiones del mismo grupo muscular",
   "extracted_equipment": null,
   "suggest_questionnaire": false,
   "has_plan": true,
   "structured_plan": {{
-    "day": "Lunes y Miércoles (Alternado 48-72h)",
-    "title": "Rutina de Piernas ({effective_level} - Intensidad {effective_intensity})",
-    "recommended_days": ["Lunes", "Miércoles"],
+    "day": "{'Martes y Jueves' if is_complementary else 'Lunes y Miércoles'}",
+    "title": "Rutina personalizada ({effective_level} - Intensidad {effective_intensity})",
+    "recommended_days": {json.dumps(['Martes', 'Jueves'] if is_complementary else ['Lunes', 'Miércoles'])},
     "complementary_days": {{
       "Martes": "Tren Superior Suave o Core",
       "Jueves": "Movilidad Articular o Tren Superior"
     }},
     "exercises": [
       {{
-        "name": "Nombre exacto del ejercicio acorde a la intensidad",
+        "name": "Nombre exacto del ejercicio de {requested_focus or 'la zona solicitada'} acorde a la intensidad {effective_intensity}",
         "sets": 3,
         "reps": "10-12",
-        "animation_key": "squat",
-        "primary_muscle": "Cuádriceps, Glúteos",
-        "secondary_muscle": "Isquiotibiales",
+        "animation_key": "generic",
+        "primary_muscle": "Músculo principal de {requested_focus or 'la zona'}",
+        "secondary_muscle": "Músculo secundario",
         "intensity_level": "Básico (Intensidad Baja)",
         "biomechanics": "Explicación biomecánica concisa del movimiento",
         "posture": "Nota postural clave"
@@ -531,7 +921,6 @@ Retorna EXCLUSIVAMENTE un objeto JSON válido con esta estructura exacta:
     }}
   }}
 }}
-Nota: Si el usuario ya indicó qué área quiere entrenar (ej. piernas) o ya envió su cuestionario pidiendo ejercicios, genera de una vez `has_plan: true` con su `structured_plan` completo para los días óptimos (ej. Lunes y Miércoles) Y al final de `reply` pregúntale con qué ejercicio/grupo complementario desea relacionar los días Martes y Jueves. Si apenas envió el cuestionario sin decir qué área quiere entrenar hoy, pon `has_plan: false` y pregúntale qué grupo muscular quiere priorizar.
 Datos del usuario: {_profile_context(payload, effective_level, effective_intensity)}
 Historial de la conversación:
 {_conversation_history(payload.history)}

@@ -73,6 +73,95 @@ class _CoachScreenState extends State<CoachScreen> {
     );
   }
 
+  Map<String, dynamic>? _sanitizeClientPlan(dynamic rawPlan, String userMsg) {
+    if (rawPlan is! Map) return null;
+    final plan = Map<String, dynamic>.from(rawPlan);
+    final msgLower = userMsg.toLowerCase();
+    final isCompRequest = msgLower.contains('martes y jueves') ||
+        msgLower.contains('días intermedios') ||
+        msgLower.contains('dias intermedios') ||
+        msgLower.contains('relacionarlo con') ||
+        msgLower.contains('rutina complementaria');
+
+    String? compFocus;
+    if (msgLower.contains('tren superior') || msgLower.contains('espalda, pecho')) {
+      compFocus = 'tren_superior';
+    } else if (msgLower.contains('movilidad') || msgLower.contains('cardio suave')) {
+      compFocus = 'movilidad_cardio';
+    } else if (msgLower.contains('core') || msgLower.contains('abdomen') || msgLower.contains('estabilidad')) {
+      compFocus = 'core';
+    }
+
+    if (isCompRequest && compFocus != null) {
+      plan['is_complementary_days'] = true;
+      plan['recommended_days'] = ['Martes', 'Jueves'];
+      final String intBadge = _userIntensity.toLowerCase() == 'baja'
+          ? 'Básico (Intensidad Baja)'
+          : (_userIntensity.toLowerCase() == 'alta' ? 'Avanzado (Intensidad Alta)' : 'Intermedio (Intensidad Media)');
+
+      if (compFocus == 'tren_superior') {
+        plan['title'] = 'Rutina Complementaria: Tren Superior ($_userLevel · Intensidad $_userIntensity)';
+      } else if (compFocus == 'core') {
+        plan['title'] = 'Rutina Complementaria: Core, Abdomen y Postura ($_userLevel · Intensidad $_userIntensity)';
+      } else if (compFocus == 'movilidad_cardio') {
+        plan['title'] = 'Rutina Complementaria: Movilidad y Cardio Suave ($_userLevel · Intensidad $_userIntensity)';
+      }
+
+      final List<Map<String, dynamic>> fallbackPool = compFocus == 'tren_superior'
+          ? [
+              {'name': 'Flexiones inclinadas con apoyo en banco o pared', 'sets': 3, 'reps': '10-12', 'primary_muscle': 'Pectorales, Deltoides', 'secondary_muscle': 'Tríceps, Core', 'intensity_level': intBadge},
+              {'name': 'Remo sentado con banda elástica o tracción controlada', 'sets': 3, 'reps': '12', 'primary_muscle': 'Espalda Media, Dorsales', 'secondary_muscle': 'Bíceps', 'intensity_level': intBadge},
+              {'name': 'Press de hombros sentado controlado', 'sets': 3, 'reps': '10-12', 'primary_muscle': 'Hombros (Deltoides)', 'secondary_muscle': 'Tríceps', 'intensity_level': intBadge},
+              {'name': 'Elevaciones laterales suaves de hombros', 'sets': 3, 'reps': '12-15', 'primary_muscle': 'Deltoides Lateral', 'secondary_muscle': 'Trapecio', 'intensity_level': intBadge},
+              {'name': 'Curl de bíceps controlado sin impulso', 'sets': 3, 'reps': '12', 'primary_muscle': 'Bíceps Braquial', 'secondary_muscle': 'Antebrazo', 'intensity_level': intBadge},
+            ]
+          : compFocus == 'core'
+              ? [
+                  {'name': 'Dead Bug / Estabilización lumbopélvica en suelo', 'sets': 3, 'reps': '10 por lado', 'primary_muscle': 'Core Profundo, Transverso', 'secondary_muscle': 'Zona Lumbar', 'intensity_level': intBadge},
+                  {'name': 'Plancha abdominal controlada', 'sets': 3, 'reps': '30 seg', 'primary_muscle': 'Abdomen, Core', 'secondary_muscle': 'Hombros, Glúteos', 'intensity_level': intBadge},
+                  {'name': 'Crunch abdominal corto controlado en suelo', 'sets': 3, 'reps': '12-15', 'primary_muscle': 'Recto Abdominal', 'secondary_muscle': 'Oblicuos', 'intensity_level': intBadge},
+                  {'name': 'Remo postural con retracción escapular', 'sets': 3, 'reps': '12', 'primary_muscle': 'Espalda Media, Postura', 'secondary_muscle': 'Romboides', 'intensity_level': intBadge},
+                ]
+              : [
+                  {'name': 'Bicicleta estática o marcha suave sin impacto (Zona 2)', 'sets': 1, 'reps': '15 min', 'primary_muscle': 'Sistema Cardiovascular, Movilidad', 'secondary_muscle': 'Recuperación Activa', 'intensity_level': intBadge},
+                  {'name': 'Dead Bug respiratorio de movilidad lumbopélvica', 'sets': 3, 'reps': '10 lentas', 'primary_muscle': 'Core, Movilidad de Cadera y Hombro', 'secondary_muscle': 'Columna Lumbar', 'intensity_level': intBadge},
+                  {'name': 'Movilidad escapular y tracción suave con banda', 'sets': 3, 'reps': '12-15', 'primary_muscle': 'Movilidad Torácica, Espalda Alta', 'secondary_muscle': 'Deltoides Posterior', 'intensity_level': intBadge},
+                  {'name': 'Plancha suave de activación postural', 'sets': 3, 'reps': '25 seg', 'primary_muscle': 'Core, Estabilidad Articular', 'secondary_muscle': 'Cintura Escapular', 'intensity_level': intBadge},
+                ];
+
+      final rawExList = plan['exercises'];
+      if (rawExList is List && rawExList.isNotEmpty) {
+        final List<Map<String, dynamic>> cleaned = [];
+        for (int i = 0; i < rawExList.length; i++) {
+          final item = rawExList[i] is Map ? Map<String, dynamic>.from(rawExList[i]) : <String, dynamic>{};
+          final exText = '${item['name'] ?? ''} ${item['primary_muscle'] ?? ''}'.toLowerCase();
+          final isLegEx = exText.contains('sentadilla') ||
+              exText.contains('squat') ||
+              exText.contains('puente de gl') ||
+              exText.contains('glute bridge') ||
+              exText.contains('zancada') ||
+              exText.contains('lunge') ||
+              exText.contains('talones') ||
+              exText.contains('gemelo') ||
+              exText.contains('cuádriceps') ||
+              exText.contains('cuadriceps') ||
+              exText.contains('isquiotibial') ||
+              exText.contains('abducción de cadera');
+          if (isLegEx) {
+            cleaned.add(Map<String, dynamic>.from(fallbackPool[i % fallbackPool.length]));
+          } else {
+            item['intensity_level'] = item['intensity_level'] ?? intBadge;
+            cleaned.add(item);
+          }
+        }
+        plan['exercises'] = cleaned;
+      } else {
+        plan['exercises'] = fallbackPool;
+      }
+    }
+    return plan;
+  }
+
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
@@ -185,7 +274,7 @@ class _CoachScreenState extends State<CoachScreen> {
           _messages.add({
             'isUser': false,
             'text': replyText,
-            'plan': data['has_plan'] == true ? data['structured_plan'] : null,
+            'plan': data['has_plan'] == true ? _sanitizeClientPlan(data['structured_plan'], text) : null,
             'category': data['category'],
             'rule': data['progression_rule'],
             'suggest_questionnaire': showStateBtn,
@@ -420,7 +509,7 @@ class _CoachScreenState extends State<CoachScreen> {
                                               onPressed: _isLoading
                                                   ? null
                                                   : () => _sendMessage(
-                                                        'Para los días intermedios (Martes y Jueves) mientras descansan las piernas, quiero relacionarlo con Tren Superior (Espalda, Pecho y Brazos) para nivel $_userLevel con intensidad $_userIntensity.',
+                                                        'Para los días intermedios (Martes y Jueves), quiero relacionarlo con una rutina complementaria enfocada 100% en Tren Superior (Espalda, Pecho, Hombros y Brazos) para nivel $_userLevel con intensidad $_userIntensity.',
                                                       ),
                                             ),
                                             ActionChip(
@@ -430,7 +519,7 @@ class _CoachScreenState extends State<CoachScreen> {
                                               onPressed: _isLoading
                                                   ? null
                                                   : () => _sendMessage(
-                                                        'Para los días intermedios (Martes y Jueves) mientras descansan las piernas, quiero relacionarlo con Core, Abdomen y Estabilidad Lumbar para nivel $_userLevel con intensidad $_userIntensity.',
+                                                        'Para los días intermedios (Martes y Jueves), quiero relacionarlo con una rutina complementaria enfocada 100% en Core, Abdomen y Estabilidad Lumbar para nivel $_userLevel con intensidad $_userIntensity.',
                                                       ),
                                             ),
                                             ActionChip(
@@ -440,7 +529,7 @@ class _CoachScreenState extends State<CoachScreen> {
                                               onPressed: _isLoading
                                                   ? null
                                                   : () => _sendMessage(
-                                                        'Para los días intermedios (Martes y Jueves) mientras descansan las piernas, quiero relacionarlo con Movilidad Articular y Cardio Suave de bajo impacto para nivel $_userLevel con intensidad $_userIntensity.',
+                                                        'Para los días intermedios (Martes y Jueves), quiero relacionarlo con una rutina complementaria enfocada 100% en Movilidad Articular y Cardio Suave de bajo impacto para nivel $_userLevel con intensidad $_userIntensity.',
                                                       ),
                                             ),
                                           ],
@@ -571,28 +660,57 @@ class _CoachScreenState extends State<CoachScreen> {
                               Row(
                                 children: [
                                   Expanded(
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF8BE0C0),
-                                        foregroundColor: Colors.black,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      ),
-                                      icon: const Icon(Icons.bookmark_add_rounded, size: 16),
-                                      label: const Text('Agregar a Cronograma y Nutrición', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
-                                      onPressed: () async {
-                                        await WeeklyPlanService.instance.injectCustomPlanForToday(plan);
-                                        if (!context.mounted) return;
-                                        final recDays = (plan['recommended_days'] is List)
-                                            ? (plan['recommended_days'] as List).join(', ')
-                                            : 'días alternos';
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('✅ ¡Rutina distribuida en $recDays (respetando 48-72h de recuperación)!'),
-                                            backgroundColor: const Color(0xFF1B4D3E),
-                                            behavior: SnackBarBehavior.floating,
-                                            duration: const Duration(seconds: 4),
+                                    child: Builder(
+                                      builder: (context) {
+                                        final bool isAdded = plan['is_added_to_schedule'] == true;
+                                        return ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: isAdded ? const Color(0xFF173B45) : const Color(0xFF8BE0C0),
+                                            foregroundColor: isAdded ? const Color(0xFF8BE0C0) : Colors.black,
+                                            side: isAdded ? const BorderSide(color: Color(0xFF8BE0C0), width: 1.2) : null,
+                                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                           ),
+                                          icon: Icon(
+                                            isAdded ? Icons.check_circle_rounded : Icons.bookmark_add_rounded,
+                                            size: 16,
+                                          ),
+                                          label: Text(
+                                            isAdded
+                                                ? 'Añadido al cronograma el plan de nutrición y ejercicios'
+                                                : 'Agregar a Cronograma y Nutrición',
+                                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          onPressed: () async {
+                                            if (plan['is_added_to_schedule'] == true) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('ℹ️ Ya has añadido este plan de nutrición y ejercicios al cronograma.'),
+                                                  backgroundColor: Color(0xFF173B45),
+                                                  behavior: SnackBarBehavior.floating,
+                                                  duration: Duration(seconds: 3),
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                            await WeeklyPlanService.instance.injectCustomPlanForToday(plan);
+                                            if (!context.mounted) return;
+                                            setState(() {
+                                              plan['is_added_to_schedule'] = true;
+                                            });
+                                            final recDays = (plan['recommended_days'] is List)
+                                                ? (plan['recommended_days'] as List).join(', ')
+                                                : 'días alternos';
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('✅ ¡Añadido al cronograma el plan de nutrición y ejercicios en $recDays!'),
+                                                backgroundColor: const Color(0xFF1B4D3E),
+                                                behavior: SnackBarBehavior.floating,
+                                                duration: const Duration(seconds: 4),
+                                              ),
+                                            );
+                                          },
                                         );
                                       },
                                     ),
