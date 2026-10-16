@@ -553,68 +553,79 @@ class _CoachScreenState extends State<CoachScreen> {
                                   final Color badgeColor = isLow
                                       ? const Color(0xFF8BE0C0)
                                       : (isHigh ? const Color(0xFFFF6B6B) : const Color(0xFFFFB340));
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 6),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF16253B),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: Colors.white10),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 18),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                ex['name'] ?? 'Ejercicio',
-                                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                              ),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFF1F3A4B),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '${ex['sets'] ?? 3} × ${ex['reps'] ?? '12'}',
-                                                style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Padding(
-                                          padding: const EdgeInsets.only(left: 26),
-                                          child: Wrap(
-                                            spacing: 8,
-                                            runSpacing: 4,
-                                            crossAxisAlignment: WrapCrossAlignment.center,
+                                  final String exName = (ex['name'] ?? 'Ejercicio').toString();
+                                  return InkWell(
+                                    borderRadius: BorderRadius.circular(10),
+                                    onTap: () => _open3DViewer(plan, targetExerciseName: exName),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF16253B),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.white10),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
                                             children: [
-                                              Text(
-                                                '🎯 $primaryM',
-                                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                              IconButton(
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(),
+                                                icon: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 22),
+                                                tooltip: 'Ver en 3D',
+                                                onPressed: () => _open3DViewer(plan, targetExerciseName: exName),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  exName,
+                                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                                ),
                                               ),
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
-                                                  color: badgeColor.withValues(alpha: 0.18),
-                                                  borderRadius: BorderRadius.circular(5),
-                                                  border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                                                  color: const Color(0xFF1F3A4B),
+                                                  borderRadius: BorderRadius.circular(6),
                                                 ),
                                                 child: Text(
-                                                  '⚡ $intLabel',
-                                                  style: TextStyle(color: badgeColor, fontSize: 10.5, fontWeight: FontWeight.w800),
+                                                  '${ex['sets'] ?? 3} × ${ex['reps'] ?? '12'}',
+                                                  style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
                                                 ),
                                               ),
                                             ],
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 4),
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: 30),
+                                            child: Wrap(
+                                              spacing: 8,
+                                              runSpacing: 4,
+                                              crossAxisAlignment: WrapCrossAlignment.center,
+                                              children: [
+                                                Text(
+                                                  '🎯 $primaryM',
+                                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                  decoration: BoxDecoration(
+                                                    color: badgeColor.withValues(alpha: 0.18),
+                                                    borderRadius: BorderRadius.circular(5),
+                                                    border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                                                  ),
+                                                  child: Text(
+                                                    '⚡ $intLabel',
+                                                    style: TextStyle(color: badgeColor, fontSize: 10.5, fontWeight: FontWeight.w800),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   );
                                 }),
@@ -723,63 +734,7 @@ class _CoachScreenState extends State<CoachScreen> {
                                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
-                                    onPressed: () async {
-                                      List<AnatomyExercise> dyn = [];
-                                      if (plan['exercises'] != null) {
-                                        for (var ex in plan['exercises']) {
-                                          final String exName = (ex['name'] ?? 'Ejercicio').toString();
-                                          final String primaryM = (ex['primary_muscle'] ?? 'Cuádriceps, Glúteos').toString();
-                                          final String secondaryM = (ex['secondary_muscle'] ?? 'Isquiotibiales').toString();
-                                          String gifUrl = (ex['gif_url'] ?? '').toString();
-                                          String intLevel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
-                                          String biomech = (ex['biomechanics'] ?? 'Movimiento controlado respetando el rango articular.').toString();
-                                          String tempoStr = (ex['tempo'] ?? '3-1-1').toString();
-                                          String postureStr = (ex['posture'] ?? 'Mantén la columna neutra y abdomen activo.').toString();
-                                          String warnStr = (ex['warning'] ?? 'Consulta a tu entrenador si sientes dolor.').toString();
-
-                                          if (gifUrl.isEmpty) {
-                                            try {
-                                              final uri = Uri.parse(
-                                                '${AuthService.apiBaseUrl}/api/exercises/gif?query=${Uri.encodeComponent(exName)}&muscle=${Uri.encodeComponent(primaryM)}&intensity=${Uri.encodeComponent(_userIntensity)}',
-                                              );
-                                              final res = await http.get(uri);
-                                              if (res.statusCode == 200) {
-                                                final body = jsonDecode(res.body);
-                                                gifUrl = (body['url'] ?? '').toString();
-                                                intLevel = (body['intensity_level'] ?? intLevel).toString();
-                                                biomech = (body['biomechanics'] ?? biomech).toString();
-                                                tempoStr = (body['tempo'] ?? tempoStr).toString();
-                                                postureStr = (body['posture'] ?? postureStr).toString();
-                                                warnStr = (body['warning'] ?? warnStr).toString();
-                                              }
-                                            } catch (_) {}
-                                          }
-
-                                          dyn.add(AnatomyExercise(
-                                            id: exName,
-                                            name: exName,
-                                            shortName: exName,
-                                            gifUrl: resolveGuaranteedGifUrl(
-                                              name: exName,
-                                              agonist: primaryM,
-                                              intensityLevel: intLevel,
-                                              existingUrl: gifUrl,
-                                            ),
-                                            agonist: primaryM,
-                                            synergists: [secondaryM],
-                                            intensityLevel: intLevel,
-                                            biomechanics: biomech,
-                                            tempo: tempoStr,
-                                            posture: postureStr,
-                                            warning: warnStr,
-                                          ));
-                                        }
-                                      }
-                                      if (!context.mounted) return;
-                                      Navigator.push(context, MaterialPageRoute(builder: (_) => AnatomyWorkoutScreen(
-                                        dynamicExercises: dyn.isNotEmpty ? dyn : null,
-                                      )));
-                                    },
+                                    onPressed: () => _open3DViewer(plan),
                                     child: const Text('Ver 3D', style: TextStyle(fontSize: 12)),
                                   ),
                                 ],
@@ -888,5 +843,63 @@ class _CoachScreenState extends State<CoachScreen> {
       ),
     );
   }
-}
 
+  Future<void> _open3DViewer(Map<String, dynamic> plan, {String? targetExerciseName}) async {
+    List<AnatomyExercise> dyn = [];
+    if (plan['exercises'] != null) {
+      for (var ex in plan['exercises']) {
+        final String exName = (ex['name'] ?? 'Ejercicio').toString();
+        final String primaryM = (ex['primary_muscle'] ?? 'Cuádriceps, Glúteos').toString();
+        final String secondaryM = (ex['secondary_muscle'] ?? 'Isquiotibiales').toString();
+        String gifUrl = (ex['gif_url'] ?? '').toString();
+        String intLevel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
+        String biomech = (ex['biomechanics'] ?? 'Movimiento controlado respetando el rango articular.').toString();
+        String tempoStr = (ex['tempo'] ?? '3-1-1').toString();
+        String postureStr = (ex['posture'] ?? 'Mantén la columna neutra y abdomen activo.').toString();
+        String warnStr = (ex['warning'] ?? 'Consulta a tu entrenador si sientes dolor.').toString();
+
+        if (gifUrl.isEmpty) {
+          try {
+            final uri = Uri.parse(
+              '${AuthService.apiBaseUrl}/api/exercises/gif?query=${Uri.encodeComponent(exName)}&muscle=${Uri.encodeComponent(primaryM)}&intensity=${Uri.encodeComponent(_userIntensity)}',
+            );
+            final res = await http.get(uri);
+            if (res.statusCode == 200) {
+              final body = jsonDecode(res.body);
+              gifUrl = (body['url'] ?? '').toString();
+              intLevel = (body['intensity_level'] ?? intLevel).toString();
+              biomech = (body['biomechanics'] ?? biomech).toString();
+              tempoStr = (body['tempo'] ?? tempoStr).toString();
+              postureStr = (body['posture'] ?? postureStr).toString();
+              warnStr = (body['warning'] ?? warnStr).toString();
+            }
+          } catch (_) {}
+        }
+
+        dyn.add(AnatomyExercise(
+          id: exName,
+          name: exName,
+          shortName: exName,
+          gifUrl: resolveGuaranteedGifUrl(
+            name: exName,
+            agonist: primaryM,
+            intensityLevel: intLevel,
+            existingUrl: gifUrl,
+          ),
+          agonist: primaryM,
+          synergists: [secondaryM],
+          intensityLevel: intLevel,
+          biomechanics: biomech,
+          tempo: tempoStr,
+          posture: postureStr,
+          warning: warnStr,
+        ));
+      }
+    }
+    if (!mounted) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => AnatomyWorkoutScreen(
+      initialExerciseId: targetExerciseName ?? (dyn.isNotEmpty ? dyn.first.id : 'squat'),
+      dynamicExercises: dyn.isNotEmpty ? dyn : null,
+    )));
+  }
+}
