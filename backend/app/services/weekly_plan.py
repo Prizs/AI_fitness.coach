@@ -231,6 +231,9 @@ def _normalize_days(raw):
                 "animation_key": str(ex.get("animation_key") or "generic-exercise"),
                 "primary_muscle": str(ex.get("primary_muscle") or "General"),
                 "secondary_muscle": str(ex.get("secondary_muscle") or "Secundario"),
+                "intensity_level": str(ex.get("intensity_level") or "Básico (Intensidad Baja)"),
+                "biomechanics": str(ex.get("biomechanics") or "Movimiento controlado respetando el rango articular."),
+                "posture": str(ex.get("posture") or "Columna neutra y control postural."),
             })
         nutrition = []
         for meal in entry.get("nutrition") or []:
@@ -271,17 +274,18 @@ def _ai_week(profile):
         "Alergias: " + str(profile.get("food_allergies") or "ninguna") +
         ". Lesiones: " + str(profile.get("current_injuries") or "ninguna") +
         ". Zonas a evitar: " + str(profile.get("areas_to_avoid") or "ninguna") + ".\n\n"
-        "CRITICO: Si el nivel es 'Principiante', escoge ejercicios ultra-basicos, de intensidad " + str(intensity) + ".\n"
+        "CRITICO 1: Si el nivel es 'Principiante' o intensidad baja, escoge ejercicios basicos de bajo impacto acorde a la intensidad " + str(intensity) + ".\n"
+        "CRITICO 2 (DESCANSO MUSCULAR 48-72H): NUNCA pongas el mismo grupo muscular (ej. Piernas) en dias consecutivos. Alterna p. ej. Lunes (Piernas/Tren Inferior), Martes (Tren Superior/Core), Miercoles (Descanso activo o Cardio/Core), Jueves (Piernas/Gluteos), Viernes (Tren Superior Funcional).\n"
         'Devuelve un objeto con la clave "days": una lista de exactamente 7 objetos, '
         "uno por dia.\n"
         "Cada objeto debe tener: weekday (0=Lunes ... 6=Domingo), title, "
         "is_training (true/false),\n"
         "exercises (lista con name, sets, reps, animation_key, primary_muscle, "
-        "secondary_muscle, biomechanics, posture),\n"
+        "secondary_muscle, intensity_level, biomechanics, posture),\n"
         "nutrition (lista con objetos que tengan 'title' e 'items') y synergy.\n\n"
-        "'biomechanics' debe ser una explicacion detallada paso a paso de la tecnica del ejercicio.\n"
+        "'biomechanics' debe ser una explicacion concisa paso a paso de la tecnica del ejercicio.\n"
         "'posture' debe ser una nota de seguridad o postura clave.\n"
-        "Usa SOLO nombres de ejercicios clasicos y estandar (ej. Sentadilla, Press de Banca) para que coincidan con nuestra base de datos.\n"
+        "Usa SOLO nombres de ejercicios clasicos y estandar (ej. Sentadilla asistida con peso corporal, Puente de gluteos, Zancada, Prensa de piernas) para que coincidan con nuestra base de datos.\n"
         '"synergy" explica en una frase como se combinan el entrenamiento de ese dia '
         "y la alimentacion\n"
         "de ese dia para lograr el objetivo. Varia la comida cada dia: no repitas el "

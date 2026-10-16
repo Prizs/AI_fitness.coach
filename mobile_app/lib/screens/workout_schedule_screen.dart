@@ -262,6 +262,30 @@ class _WorkoutScheduleScreenState extends State<WorkoutScheduleScreen> {
                         children: [
                           Text(ex.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                           const SizedBox(height: 4),
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: ex.intensityLevel.toLowerCase().contains('baja') || ex.intensityLevel.toLowerCase().contains('básico')
+                                  ? const Color(0xFF8BE0C0).withOpacity(0.18)
+                                  : ex.intensityLevel.toLowerCase().contains('alta') || ex.intensityLevel.toLowerCase().contains('avanzado')
+                                      ? const Color(0xFFFF3B30).withOpacity(0.22)
+                                      : const Color(0xFFFF9500).withOpacity(0.22),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              ex.intensityLevel,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: ex.intensityLevel.toLowerCase().contains('baja') || ex.intensityLevel.toLowerCase().contains('básico')
+                                    ? const Color(0xFF8BE0C0)
+                                    : ex.intensityLevel.toLowerCase().contains('alta') || ex.intensityLevel.toLowerCase().contains('avanzado')
+                                        ? const Color(0xFFFF6B6B)
+                                        : const Color(0xFFFFB340),
+                              ),
+                            ),
+                          ),
                           Text('${ex.sets} series · ${ex.reps} · Primario: ${ex.primaryMuscle}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
                           if (ex.rpe != null)
                             Text('RPE Registrado: ${ex.rpe}/10', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 12, fontWeight: FontWeight.w600)),
@@ -280,24 +304,40 @@ class _WorkoutScheduleScreenState extends State<WorkoutScheduleScreen> {
                         showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
                         List<AnatomyExercise> dyn = [];
                         for (var e in currentDay.exercises) {
-                          String url = '';
-                          try {
-                            final res = await http.get(Uri.parse('https://ai-fitness-coach-818a.onrender.com/api/exercises/gif?query=' + Uri.encodeComponent(e.name)));
-                            if (res.statusCode == 200) {
-                              url = jsonDecode(res.body)['url'] ?? '';
-                            }
-                          } catch (_) {}
+                          String url = e.gifUrl;
+                          String intensityLbl = e.intensityLevel;
+                          if (url.isEmpty) {
+                            try {
+                              final uri = Uri.parse(
+                                '${AuthService.apiBaseUrl}/api/exercises/gif?query=${Uri.encodeComponent(e.name)}&muscle=${Uri.encodeComponent(e.primaryMuscle)}&intensity=${Uri.encodeComponent(e.intensityLevel)}',
+                              );
+                              final res = await http.get(uri).timeout(const Duration(seconds: 6));
+                              if (res.statusCode == 200) {
+                                final data = jsonDecode(res.body);
+                                url = data['url']?.toString() ?? '';
+                                intensityLbl = data['intensity_level']?.toString() ?? intensityLbl;
+                              }
+                            } catch (_) {}
+                          }
+                          if (url.isEmpty) {
+                            url = resolveGuaranteedGifUrl(
+                              name: e.name,
+                              agonist: e.primaryMuscle,
+                              intensityLevel: intensityLbl,
+                            );
+                          }
                           dyn.add(AnatomyExercise(
                             id: e.name,
                             name: e.name,
                             shortName: e.name,
                             gifUrl: url,
+                            intensityLevel: intensityLbl,
                             agonist: e.primaryMuscle,
                             synergists: [e.secondaryMuscle],
                             biomechanics: e.biomechanics,
-                            tempo: '3-1-1',
+                            tempo: e.tempo,
                             posture: e.posture,
-                            warning: 'Consulta a tu entrenador si sientes dolor.'
+                            warning: e.warning,
                           ));
                         }
                         if (!mounted) return;

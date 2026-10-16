@@ -196,36 +196,71 @@ class WeeklyPlanService extends ChangeNotifier {
     final title = structuredPlan['title'] ?? 'Sesión Personalizada Coach IA';
     final exercises = structuredPlan['exercises'] ?? [];
     final nutrition = structuredPlan['nutrition'] ?? {};
+    final rawRecommended = structuredPlan['recommended_days'];
+    final Map<String, int> dayNameToIndex = {
+      'lunes': 0,
+      'martes': 1,
+      'miércoles': 2,
+      'miercoles': 2,
+      'jueves': 3,
+      'viernes': 4,
+      'sábado': 5,
+      'sabado': 5,
+      'domingo': 6,
+    };
+
+    final Set<int> targetIndices = {todayIndex};
+    if (rawRecommended is List) {
+      for (final d in rawRecommended) {
+        final key = d.toString().trim().toLowerCase();
+        if (dayNameToIndex.containsKey(key)) {
+          targetIndices.add(dayNameToIndex[key]!);
+        }
+      }
+    } else {
+      targetIndices.addAll([0, 3]); // Lunes y Jueves por defecto (72h recuperación)
+    }
+
+    final defaultNutrition = {
+      'desayuno': 'Proteína y carbohidratos complejos según objetivo.',
+      'almuerzo': 'Comida balanceada: proteína magra, vegetales y carbohidratos.',
+      'cena': 'Cena ligera alta en proteína para síntesis miofibrilar.',
+    };
 
     if (week == null) {
       week = {
         'id': 'coach_plan_${DateTime.now().millisecondsSinceEpoch}',
         'goal': title,
-        'days': List.generate(7, (i) => {
-          'weekday': i,
-          'title': i == todayIndex ? title : 'Descanso / Rutina Base',
-          'exercises': i == todayIndex ? exercises : [],
-          'nutrition': i == todayIndex ? nutrition : {
-            'desayuno': 'Proteína y carbohidratos complejos según objetivo.',
-            'almuerzo': 'Comida balanceada: proteína magra, vegetales y carbohidratos.',
-            'cena': 'Cena ligera alta en proteína.',
-          },
+        'days': List.generate(7, (i) {
+          final isTarget = targetIndices.contains(i);
+          return {
+            'weekday': i,
+            'title': isTarget
+                ? title
+                : (i == 1 || i == 3)
+                    ? 'Recuperación Muscular 48-72h / Tren Superior o Core'
+                    : 'Descanso Activo / Regeneración Muscular',
+            'exercises': isTarget ? exercises : [],
+            'nutrition': isTarget ? nutrition : defaultNutrition,
+          };
         }),
       };
     } else {
       final currentDays = List.from(week!['days'] ?? []);
-      final idx = currentDays.indexWhere((d) => d['weekday'] == todayIndex);
-      final newDay = {
-        'weekday': todayIndex,
-        'title': title,
-        'exercises': exercises,
-        'nutrition': nutrition,
-      };
+      for (final dayIdx in targetIndices) {
+        final idx = currentDays.indexWhere((d) => d['weekday'] == dayIdx);
+        final newDay = {
+          'weekday': dayIdx,
+          'title': title,
+          'exercises': exercises,
+          'nutrition': nutrition.isNotEmpty ? nutrition : defaultNutrition,
+        };
 
-      if (idx != -1) {
-        currentDays[idx] = newDay;
-      } else {
-        currentDays.add(newDay);
+        if (idx != -1) {
+          currentDays[idx] = newDay;
+        } else {
+          currentDays.add(newDay);
+        }
       }
       week!['days'] = currentDays;
     }

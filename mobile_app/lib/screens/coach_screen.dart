@@ -30,6 +30,8 @@ class _CoachScreenState extends State<CoachScreen> {
 
   final TextEditingController _controller = TextEditingController();
   bool _isLoading = false;
+  String _userLevel = 'Principiante';
+  String _userIntensity = 'Baja';
   
   late stt.SpeechToText _speech;
   bool _isListening = false;
@@ -75,6 +77,29 @@ class _CoachScreenState extends State<CoachScreen> {
     if (text.trim().isEmpty) return;
 
     final lowerUser = text.toLowerCase();
+    if (lowerUser.contains('novato') || lowerUser.contains('principiante')) {
+      _userLevel = 'Principiante';
+    } else if (lowerUser.contains('avanzado')) {
+      _userLevel = 'Avanzado';
+    } else if (lowerUser.contains('intermedio')) {
+      _userLevel = 'Intermedio';
+    }
+
+    if (lowerUser.contains('intensidad deseada: baja') ||
+        lowerUser.contains('intensidad baja') ||
+        lowerUser.contains('intensidad bajo') ||
+        lowerUser.contains('suave')) {
+      _userIntensity = 'Baja';
+    } else if (lowerUser.contains('intensidad deseada: alta') ||
+        lowerUser.contains('intensidad alta') ||
+        lowerUser.contains('intenso')) {
+      _userIntensity = 'Alta';
+    } else if (lowerUser.contains('intensidad deseada: media') ||
+        lowerUser.contains('intensidad media') ||
+        lowerUser.contains('moderada')) {
+      _userIntensity = 'Media';
+    }
+
     final isSubmission = lowerUser.contains('mi estado actual para la sesión') ||
         lowerUser.contains('mi estado actual para la sesion') ||
         lowerUser.contains('📋 mi estado actual') ||
@@ -127,7 +152,8 @@ class _CoachScreenState extends State<CoachScreen> {
               'message': text,
               'history': history,
               'user_goal': 'Rendimiento general',
-              'user_level': 'Intermedio',
+              'user_level': _userLevel,
+              'user_intensity': _userIntensity,
               'allergies': profile?.foodAllergies,
               'injuries': profile?.currentInjuries,
               'motor_disability': profile?.motorDisability,
@@ -293,13 +319,43 @@ class _CoachScreenState extends State<CoachScreen> {
                                 const SizedBox(height: 6),
                                 Text('Regla de progresión: ${msg['rule']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                               ],
+                              if (plan['recommended_days'] is List && (plan['recommended_days'] as List).isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF173B45),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.4)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '📅 Frecuencia óptima (48-72h recuperación): ${(plan['recommended_days'] as List).join(', ')}',
+                                        style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11.5, fontWeight: FontWeight.w700),
+                                      ),
+                                      if (plan['complementary_days'] is Map && (plan['complementary_days'] as Map).isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '🔄 Días intermedios sugeridos: ${(plan['complementary_days'] as Map).entries.map((e) => '${e.key} (${e.value})').join(' · ')}',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
                               
                               // Listado de Ejercicios
                               if (plan['exercises'] is List && (plan['exercises'] as List).isNotEmpty) ...[
                                 const SizedBox(height: 14),
-                                const Text('🏋️ Ejercicios Recomendados:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                const Text('🏋️ Ejercicios Recomendados (Categorizados por Intensidad):', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                                 const SizedBox(height: 8),
                                 ...(plan['exercises'] as List).take(5).map((ex) {
+                                  final String intLabel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
+                                  final String primaryM = (ex['primary_muscle'] ?? 'Piernas').toString();
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 6),
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -308,25 +364,48 @@ class _CoachScreenState extends State<CoachScreen> {
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(color: Colors.white10),
                                     ),
-                                    child: Row(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 18),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            ex['name'] ?? 'Ejercicio',
-                                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                          ),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 18),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                ex['name'] ?? 'Ejercicio',
+                                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                              ),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF1F3A4B),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                '${ex['sets'] ?? 3} × ${ex['reps'] ?? '12'}',
+                                                style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF1F3A4B),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            '${ex['sets'] ?? 3} × ${ex['reps'] ?? '12'}',
-                                            style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
+                                        const SizedBox(height: 4),
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 26),
+                                          child: Wrap(
+                                            spacing: 8,
+                                            runSpacing: 4,
+                                            children: [
+                                              Text(
+                                                '🎯 $primaryM',
+                                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                              ),
+                                              Text(
+                                                '⚡ $intLabel',
+                                                style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.w600),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -387,12 +466,15 @@ class _CoachScreenState extends State<CoachScreen> {
                                       onPressed: () async {
                                         await WeeklyPlanService.instance.injectCustomPlanForToday(plan);
                                         if (!context.mounted) return;
+                                        final recDays = (plan['recommended_days'] is List)
+                                            ? (plan['recommended_days'] as List).join(', ')
+                                            : 'días alternos';
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('✅ ¡Rutina y Nutrición agregadas a tu semana con éxito!'),
-                                            backgroundColor: Color(0xFF1B4D3E),
+                                          SnackBar(
+                                            content: Text('✅ ¡Rutina distribuida en $recDays (respetando 48-72h de recuperación)!'),
+                                            backgroundColor: const Color(0xFF1B4D3E),
                                             behavior: SnackBarBehavior.floating,
-                                            duration: Duration(seconds: 4),
+                                            duration: const Duration(seconds: 4),
                                           ),
                                         );
                                       },
@@ -410,24 +492,52 @@ class _CoachScreenState extends State<CoachScreen> {
                                       List<AnatomyExercise> dyn = [];
                                       if (plan['exercises'] != null) {
                                         for (var ex in plan['exercises']) {
-                                          try {
-                                            final res = await http.get(Uri.parse(AuthService.apiBaseUrl + '/api/exercises/gif?query=' + Uri.encodeComponent(ex['name'])));
-                                            if (res.statusCode == 200) {
-                                              final url = jsonDecode(res.body)['url'];
-                                              dyn.add(AnatomyExercise(
-                                                id: ex['name'],
-                                                name: ex['name'],
-                                                shortName: ex['name'],
-                                                gifUrl: url ?? '',
-                                                agonist: ex['primary_muscle'] ?? 'Músculo Principal',
-                                                synergists: [ex['secondary_muscle'] ?? 'Sinergistas'],
-                                                biomechanics: 'Activación dinámica sugerida por IA.',
-                                                tempo: '3-1-1',
-                                                posture: 'Mantén la postura natural.',
-                                                warning: 'Consulta a tu entrenador si sientes dolor.'
-                                              ));
-                                            }
-                                          } catch (e) {}
+                                          final String exName = (ex['name'] ?? 'Ejercicio').toString();
+                                          final String primaryM = (ex['primary_muscle'] ?? 'Cuádriceps, Glúteos').toString();
+                                          final String secondaryM = (ex['secondary_muscle'] ?? 'Isquiotibiales').toString();
+                                          String gifUrl = (ex['gif_url'] ?? '').toString();
+                                          String intLevel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
+                                          String biomech = (ex['biomechanics'] ?? 'Movimiento controlado respetando el rango articular.').toString();
+                                          String tempoStr = (ex['tempo'] ?? '3-1-1').toString();
+                                          String postureStr = (ex['posture'] ?? 'Mantén la columna neutra y abdomen activo.').toString();
+                                          String warnStr = (ex['warning'] ?? 'Consulta a tu entrenador si sientes dolor.').toString();
+
+                                          if (gifUrl.isEmpty) {
+                                            try {
+                                              final uri = Uri.parse(
+                                                '${AuthService.apiBaseUrl}/api/exercises/gif?query=${Uri.encodeComponent(exName)}&muscle=${Uri.encodeComponent(primaryM)}&intensity=${Uri.encodeComponent(_userIntensity)}',
+                                              );
+                                              final res = await http.get(uri);
+                                              if (res.statusCode == 200) {
+                                                final body = jsonDecode(res.body);
+                                                gifUrl = (body['url'] ?? '').toString();
+                                                intLevel = (body['intensity_level'] ?? intLevel).toString();
+                                                biomech = (body['biomechanics'] ?? biomech).toString();
+                                                tempoStr = (body['tempo'] ?? tempoStr).toString();
+                                                postureStr = (body['posture'] ?? postureStr).toString();
+                                                warnStr = (body['warning'] ?? warnStr).toString();
+                                              }
+                                            } catch (_) {}
+                                          }
+
+                                          dyn.add(AnatomyExercise(
+                                            id: exName,
+                                            name: exName,
+                                            shortName: exName,
+                                            gifUrl: resolveGuaranteedGifUrl(
+                                              name: exName,
+                                              agonist: primaryM,
+                                              intensityLevel: intLevel,
+                                              existingUrl: gifUrl,
+                                            ),
+                                            agonist: primaryM,
+                                            synergists: [secondaryM],
+                                            intensityLevel: intLevel,
+                                            biomechanics: biomech,
+                                            tempo: tempoStr,
+                                            posture: postureStr,
+                                            warning: warnStr,
+                                          ));
                                         }
                                       }
                                       if (!context.mounted) return;

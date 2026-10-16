@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.routers.exercises import classify_intensity, get_exercise_gif
 from app.services.ai_providers import (
     AllProvidersFailed,
     configured_providers,
@@ -29,6 +30,7 @@ class ChatMessage(BaseModel):
     history: list[ChatTurn] = Field(default_factory=list, max_length=MAX_HISTORY_TURNS)
     user_goal: str | None = Field(default=None, max_length=120)
     user_level: str | None = Field(default=None, max_length=40)
+    user_intensity: str | None = Field(default=None, max_length=40)
     allergies: str | None = Field(default=None, max_length=1000)
     injuries: str | None = Field(default=None, max_length=1000)
     motor_disability: str | None = Field(default=None, max_length=1000)
@@ -41,30 +43,204 @@ class ChatMessage(BaseModel):
     equipment_details: str | None = Field(default=None, max_length=200)
 
 
-def _normalize_exercises(raw_exercises) -> list[dict]:
+def _extract_effective_level_and_intensity(payload: ChatMessage) -> tuple[str, str]:
+    """Detecta el nivel de experiencia e intensidad reales a partir del mensaje y del historial."""
+    combined_user_text = " ".join(
+        [t.content for t in payload.history if t.role == "user"] + [payload.message]
+    ).lower()
+
+    level = payload.user_level or "Intermedio"
+    if any(k in combined_user_text for k in ("principiante", "novato", "iniciando", "empezando", "básico", "basico")):
+        level = "Principiante"
+    elif any(k in combined_user_text for k in ("avanzado", "experto", "atleta")):
+        level = "Avanzado"
+    elif "intermedio" in combined_user_text:
+        level = "Intermedio"
+
+    intensity = payload.user_intensity or "Media"
+    if any(k in combined_user_text for k in (
+        "intensidad deseada: baja", "intensidad baja", "nivel de intensidad bajo",
+        "intensidad bajo", "suave", "ligero", "baja intensidad", "bajo impacto",
+    )):
+        intensity = "Baja"
+    elif any(k in combined_user_text for k in (
+        "intensidad deseada: alta", "intensidad alta", "alta intensidad", "intenso", "pesado",
+    )):
+        intensity = "Alta"
+    elif any(k in combined_user_text for k in ("intensidad deseada: media", "intensidad media", "moderada")):
+        intensity = "Media"
+    elif level == "Principiante" and not payload.user_intensity:
+        intensity = "Baja"
+
+    return level, intensity
+
+
+def _detect_requested_focus(payload: ChatMessage) -> str | None:
+    """Detecta si el usuario pidió enfocarse en Piernas/Glúteos u otra zona específica."""
+    recent_user_text = " ".join(
+        [t.content for t in payload.history[-4:] if t.role == "user"] + [payload.message]
+    ).lower()
+    if any(w in recent_user_text for w in ("pierna", "piernas", "tren inferior", "gluteo", "glúteo", "cuadriceps", "cuádriceps", "isquio", "femoral")):
+        return "piernas"
+    if any(w in recent_user_text for w in ("pecho", "pectoral", "empuje")):
+        return "pecho"
+    if any(w in recent_user_text for w in ("espalda", "dorsal", "traccion", "tracción")):
+        return "espalda"
+    if any(w in recent_user_text for w in ("brazo", "brazos", "biceps", "bíceps", "triceps", "tríceps", "hombro")):
+        return "brazos_hombros"
+    if any(w in recent_user_text for w in ("abdomen", "abdominal", "core")):
+        return "core"
+    return None
+
+
+BEGINNER_LOW_LEG_EXERCISES = [
+    {
+        "name": "Sentadilla asistida con peso corporal",
+        "sets": 3,
+        "reps": "10-12",
+        "animation_key": "squat",
+        "primary_muscle": "Cuádriceps, Glúteos",
+        "secondary_muscle": "Core, Estabilizadores",
+    },
+    {
+        "name": "Puente de glúteos en suelo (Glute Bridge)",
+        "sets": 3,
+        "reps": "12-15",
+        "animation_key": "glute-bridge",
+        "primary_muscle": "Glúteos",
+        "secondary_muscle": "Isquiotibiales, Core",
+    },
+    {
+        "name": "Zancada estática con peso corporal",
+        "sets": 3,
+        "reps": "8-10 por pierna",
+        "animation_key": "lunge",
+        "primary_muscle": "Cuádriceps, Glúteos",
+        "secondary_muscle": "Isquiotibiales",
+    },
+    {
+        "name": "Curl femoral de pie sin peso (Isquiotibiales)",
+        "sets": 3,
+        "reps": "12 por pierna",
+        "animation_key": "leg-curl",
+        "primary_muscle": "Isquiotibiales",
+        "secondary_muscle": "Gemelos",
+    },
+    {
+        "name": "Elevación de talones de pie con peso corporal",
+        "sets": 3,
+        "reps": "15",
+        "animation_key": "calf-raise",
+        "primary_muscle": "Gemelos",
+        "secondary_muscle": "Sóleo, Tobillo",
+    },
+]
+
+
+def _is_leg_exercise(name: str, primary_muscle: str) -> bool:
+    text = f"{name} {primary_muscle}".lower()
+    leg_terms = (
+        "sentadilla", "squat", "zancada", "desplante", "lunge", "prensa", "leg press",
+        "puente", "bridge", "hip thrust", "glute", "glúte", "cuadriceps", "cuádriceps",
+        "quad", "isquio", "femoral", "hamstring", "gemelo", "pantorrilla", "talon",
+        "talón", "calf", "abduc", "aduc", "pierna", "step", "cajon", "cajón", "peso muerto", "deadlift",
+    )
+    upper_terms = (
+        "pecho", "pectoral", "banca", "bench press", "dominada", "pull up", "jalon",
+        "remo", "biceps", "bíceps", "triceps", "tríceps", "press militar", "hombro",
+        "deltoides", "antebrazo", "muñeca", "wrist", "crunch", "oblicuo", "tórax", "torax",
+    )
+    if any(u in text for u in upper_terms) and not any(l in text for l in ("sentadilla", "zancada", "pierna", "isquio", "femoral", "glute", "glúte", "cuadriceps", "cuádriceps", "gemelo")):
+        return False
+    return any(l in text for l in leg_terms)
+
+
+def _sanitize_beginner_leg_name(name: str, intensity: str, level: str) -> str:
+    """Si es principiante o intensidad baja, evita nombres con barra pesada o máquinas avanzadas."""
+    if intensity.lower() != "baja" and level.lower() != "principiante":
+        return name
+    lower = name.lower()
+    if "sentadilla" in lower and ("barra" in lower or "profunda" in lower):
+        return "Sentadilla asistida con peso corporal"
+    if "peso muerto" in lower and "barra" in lower:
+        return "Bisagra de cadera / Peso muerto suave sin carga"
+    return name
+
+
+def _normalize_exercises(
+    raw_exercises,
+    intensity: str = "Media",
+    level: str = "Intermedio",
+    requested_focus: str | None = None,
+) -> list[dict]:
     exercises: list[dict] = []
     if not isinstance(raw_exercises, list):
         return exercises
-    for exercise in raw_exercises:
+
+    intensity_hint = "baja" if (intensity.lower() == "baja" or level.lower() == "principiante") else (
+        "alta" if intensity.lower() == "alta" else "media"
+    )
+
+    for idx, exercise in enumerate(raw_exercises):
         if not isinstance(exercise, dict):
             continue
+        raw_name = str(exercise.get("name") or "Ejercicio").strip()
+        primary = str(exercise.get("primary_muscle") or "General").strip()
+        secondary = str(exercise.get("secondary_muscle") or "Secundario").strip()
+
+        # Si el usuario pidió exclusivamente piernas y la IA coló un ejercicio de tren superior/tórax/brazos, reemplazarlo por uno de piernas acorde al nivel
+        if requested_focus == "piernas" and not _is_leg_exercise(raw_name, primary):
+            fallback_ex = BEGINNER_LOW_LEG_EXERCISES[idx % len(BEGINNER_LOW_LEG_EXERCISES)]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex["secondary_muscle"]
+
+        clean_name = _sanitize_beginner_leg_name(raw_name, intensity, level)
+        gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint)
+
         exercises.append(
             {
-                "name": str(exercise.get("name") or "Ejercicio"),
+                "name": clean_name,
                 "sets": exercise.get("sets") or 3,
-                "reps": str(exercise.get("reps") or "10"),
-                "animation_key": str(exercise.get("animation_key") or "generic-exercise"),
-                "primary_muscle": str(exercise.get("primary_muscle") or "General"),
-                "secondary_muscle": str(exercise.get("secondary_muscle") or "Secundario"),
+                "reps": str(exercise.get("reps") or "10-12"),
+                "animation_key": str(exercise.get("animation_key") or "squat"),
+                "primary_muscle": primary,
+                "secondary_muscle": secondary,
+                "intensity_level": str(
+                    exercise.get("intensity_level") or gif_meta.get("intensity_level") or "Básico (Intensidad Baja)"
+                ),
+                "gif_url": gif_meta.get("url") or "",
+                "biomechanics": str(
+                    exercise.get("biomechanics") or gif_meta.get("biomechanics") or "Movimiento controlado respetando el rango articular."
+                ),
+                "tempo": str(
+                    exercise.get("tempo") or gif_meta.get("tempo") or "3-1-1"
+                ),
+                "posture": str(
+                    exercise.get("posture") or gif_meta.get("posture") or "Mantén la columna neutra y abdomen activo."
+                ),
+                "warning": str(
+                    exercise.get("warning") or gif_meta.get("warning") or "Detén el ejercicio si sientes dolor articular."
+                ),
             }
         )
     return exercises
 
 
-def _normalize_structured_plan(raw_plan) -> dict | None:
+def _normalize_structured_plan(
+    raw_plan,
+    intensity: str = "Media",
+    level: str = "Intermedio",
+    requested_focus: str | None = None,
+) -> dict | None:
     if not isinstance(raw_plan, dict):
         return None
-    exercises = _normalize_exercises(raw_plan.get("exercises"))
+    exercises = _normalize_exercises(
+        raw_plan.get("exercises"),
+        intensity=intensity,
+        level=level,
+        requested_focus=requested_focus,
+    )
     if not exercises:
         return None
     nutrition = raw_plan.get("nutrition")
@@ -72,15 +248,44 @@ def _normalize_structured_plan(raw_plan) -> dict | None:
         nutrition = {str(k): str(v) for k, v in nutrition.items()}
     else:
         nutrition = {}
+
+    # Determinar días óptimos de entrenamiento respetando 48-72h de recuperación muscular
+    raw_days = raw_plan.get("recommended_days")
+    if isinstance(raw_days, list) and raw_days:
+        recommended_days = [str(d) for d in raw_days]
+    else:
+        if level.lower() == "principiante" or intensity.lower() == "baja":
+            recommended_days = ["Lunes", "Jueves"]
+        else:
+            recommended_days = ["Lunes", "Miércoles", "Viernes"]
+
+    complementary_days = raw_plan.get("complementary_days")
+    if not isinstance(complementary_days, dict) or not complementary_days:
+        if recommended_days == ["Lunes", "Jueves"]:
+            complementary_days = {
+                "Martes": "Tren Superior Suave (Espalda/Postura) o Core",
+                "Miércoles": "Descanso Activo y Movilidad Articular",
+                "Viernes": "Tren Superior / Core y Cardio sin impacto",
+            }
+        else:
+            complementary_days = {
+                "Martes": "Tren Superior (Espalda, Pecho y Brazos) o Core",
+                "Jueves": "Tren Superior (Hombros y Postura) o Movilidad Activa",
+            }
+
     return {
-        "day": str(raw_plan.get("day") or "Sesion"),
-        "title": str(raw_plan.get("title") or "Sesion"),
+        "day": str(raw_plan.get("day") or "Sesión Alternada (48-72h recuperación)"),
+        "title": str(raw_plan.get("title") or "Sesión Personalizada"),
+        "intensity_summary": f"Nivel {level} · Intensidad {intensity}",
+        "recommended_days": recommended_days,
+        "complementary_days": complementary_days,
+        "recovery_rule": "Descanso obligatorio de 48 a 72 horas para este grupo muscular (nunca entrenar piernas en días seguidos).",
         "exercises": exercises,
         "nutrition": nutrition,
     }
 
 
-def _profile_context(payload: ChatMessage) -> str:
+def _profile_context(payload: ChatMessage, effective_level: str, effective_intensity: str) -> str:
     plan_info = ""
     if payload.active_plan_start and payload.active_plan_end:
         plan_info = f" Plan actual vigente desde {payload.active_plan_start} hasta {payload.active_plan_end}."
@@ -89,7 +294,8 @@ def _profile_context(payload: ChatMessage) -> str:
         f"Edad: {payload.age if payload.age is not None else 'No indicada'}. "
         f"Peso: {payload.weight if payload.weight is not None else 'No indicado'} kg. "
         f"Meta: {payload.user_goal or 'Rendimiento general'}. "
-        f"Nivel: {payload.user_level or 'Intermedio'}. "
+        f"Nivel de experiencia: {effective_level}. "
+        f"Intensidad solicitada: {effective_intensity}. "
         f"Alergias: {payload.allergies or 'Ninguna'}. "
         f"Lesiones: {payload.injuries or 'Ninguna'}. "
         f"Discapacidad motora: {payload.motor_disability or 'Ninguna'}. "
@@ -113,61 +319,82 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
     if not configured_providers():
         raise AllProvidersFailed({})
 
+    effective_level, effective_intensity = _extract_effective_level_and_intensity(payload)
+    requested_focus = _detect_requested_focus(payload)
+
     prompt = (
-        f"""Eres un Coach de Fitness y Nutricion altamente interactivo, empatico, cientifico y analitico. Responde en espanol con tono motivador pero riguroso.
-REGLAS OBLIGATORIAS DE DISENO Y ADAPTACION:
-1. REGLA DE FLUJO Y NO REPETICION:
-   - El usuario ya responde un cuestionario inicial con: Estado Fisico (Bien o Molestia/Dolor), Equipo general (Gym, Casa, Sin herramientas), Intensidad deseada y Nivel de Experiencia.
+        f"""Eres un Coach de Fitness, Biomecánica y Nutrición altamente interactivo, empático, científico y analítico. Responde en español con tono motivador pero riguroso.
+REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
+1. REGLA DE FLUJO Y NO REPETICIÓN:
+   - El usuario ya responde un cuestionario inicial con: Estado Físico (Bien o Molestia/Dolor), Equipo general (Gym, Casa, Sin herramientas), Intensidad deseada ({effective_intensity}) y Nivel de Experiencia ({effective_level}).
    - NUNCA vuelvas a preguntarle esos mismos datos que ya vienen indicados en su reporte de estado.
-   - Reacciona de inmediato y con empatia a lo que indico en su cuestionario:
-     * Si reporta MOLESTIA/DOLOR (ej. rodilla, hombro, espalda baja): Mucionalo de entrada y aclara como adaptaras la sesion para proteger esa articulacion o musculo sin lesionar.
-     * Si indico nivel Novato/Principiante: Ajusta a progresion tecnica y RPE controlado. Si indico Avanzado o Alta intensidad: Enfatiza sobrecarga o densidad.
-   - LO QUE DEBES PREGUNTAR A CONTINUACION PARA DISENAR LA SESION (solo lo que falte saber):
-     * HERRAMIENTAS EXACTAS (Solo si no estan ya en 'Equipamiento reportado'): Si entrena en casa y no estan registradas sus herramientas, preguntale: "¿Con que herramientas exactas cuentas en casa? (ej. mancuernas de X kg, bandas elasticas, barra, esterilla, o solo peso corporal)".
-     * GRUPO MUSCULAR A REFORZAR: "¿Que grupo muscular o aspecto te gustaria priorizar o reforzar hoy?" (ej. piernas/gluteos, empuje/pecho, traccion/espalda, core, resistencia).
-     * TIEMPO DISPONIBLE: "¿De cuantos minutos dispones para tu sesion de hoy?" (ej. 25 min express, 45 min o 60 min).
-     * NUTRICION / MOMENTO DEL DIA: Si aplica, preguntale en que momento del dia entrena o si tiene alguna preferencia o intolerancia alimentaria para coordinar su menu.
-2. REGLA DE MEMORIA DE EQUIPAMIENTO POR USUARIO:
-   - Si en los datos del usuario ya figura 'Equipamiento reportado', NUNCA le vuelvas a preguntar que herramientas tiene. Asume y utiliza esas herramientas directamente, a menos que el usuario mencione explicitamente que compro una herramienta nueva o que hoy va al gimnasio.
-   - Si el usuario menciona sus herramientas en este mensaje, extraelas en el campo 'extracted_equipment' para guardarlas en su perfil.
-3. REGLA DE ABSOLUTA PRECISION DE EJERCICIOS CON EL EQUIPO:
-   - Recomienda UNICAMENTE ejercicios que se puedan realizar con las herramientas exactas que tiene el usuario.
-   - Si entrena en casa con mancuernas, NUNCA propongas maquinas de gimnasio (caminadora, prensa de piernas, eliptica, poleas). Solo ejercicios con mancuernas o peso corporal.
-   - Si entrena sin herramientas, SOLO ejercicios con peso corporal y calistenia.
-   - Si el usuario cuenta con una herramienta especifica (ej. mancuernas), prioriza ejercicios efectivos con esa herramienta.
-4. REGLA DE MULTI-SEMANA Y VIGENCIA DE CRONOGRAMA:
-   - Si el usuario ya tiene un plan activo vigente (leelo en los Datos del usuario abajo):
-     Hazle saber: 'Tienes un plan de entrenamiento vigente desde {payload.active_plan_start} hasta {payload.active_plan_end}. Esta nueva sesion/plan se programara para tu siguiente fase sin alterar lo que ya tienes activo.'
-5. REGLA DE NUTRICION SINERGICA CON LA INTENSIDAD:
-   - Adapta el menu a la intensidad de la sesion:
-     * ALTA INTENSIDAD: Aumenta carbohidratos complejos y proteina magra post-entrenamiento para recuperacion glucogenica.
-     * MEDIA/BAJA INTENSIDAD o descanso: Menu balanceado y ligero, vegetales, grasas saludables y proteina de alta biodisponibilidad.
-6. EJERCICIOS CON GIFS Y FORMATO:
-   - Cuando emitas el plan estructurado (has_plan=true), usa animation_key validas (squat, pushup, pullup, lunge, plank, bicep-curl, tricep-extension, crunch, deadlift, shoulder-press, bench-press).
-   - VARIEDAD: Si en dias anteriores ya se usaron ciertos ejercicios, propone variaciones biomecanicas para mantener el progreso fresco durante el ciclo.
-7. REGLA DE RECALIBRACION O REPETIR CUESTIONARIO:
-   - Si el usuario dice explicitamente que se equivoco, que quiere cambiar o repetir su estado actual, o pide el cuestionario (ej. "quiero decir mi estado actual nuevamente", "me equivoque", "arrojame el cuestionario", "volver a llenar mi estado", "cambiar respuestas"):
-     * Activa "suggest_questionnaire": true en tu respuesta JSON.
-     * En "reply", dile con empatia: "¡Entendido! No te preocupes. Toca el botón '📋 Completar Mi Estado Actual' que aparece justo abajo para ajustar tus datos y calibraremos tu sesión desde cero."
-     * NO escribas las preguntas en texto largo si le sugieres abrir el cuestionario interactivo.
-   - Si el usuario acaba de enviar el cuestionario completado (inicia con '📋 Mi Estado Actual para la sesión') o esta respondiendo preguntas normales:
-     * "suggest_questionnaire" DEBE SER FALSE. NUNCA sugieras el cuestionario si el usuario ya envio sus datos o esta conversando.
-IMPORTANTE: No preguntes edad ni peso en cada mensaje (ya estan en su perfil).
-Retorna EXCLUSIVAMENTE un objeto JSON valido:
+   - Si reporta MOLESTIA/DOLOR: Menciónalo de entrada y aclara cómo adaptarás la sesión (o si pidió pausa/descanso total, NO generes rutina de ejercicios y da solo pautas de recuperación y alerta médica).
+
+2. REGLA DE ABSOLUTA PRECISIÓN DEL GRUPO MUSCULAR Y CATEGORIZACIÓN POR INTENSIDAD:
+   - Si el usuario pide ejercicios para un área específica (ej. **PIERNAS / TREN INFERIOR**), el **100% de los ejercicios recomendados en el plan DEBEN enfocarse en las piernas** (Cuádriceps, Glúteos, Isquiotibiales, Gemelos, Abductores/Aductores). ¡ESTÁ ESTRICTAMENTE PROHIBIDO mezclar ejercicios de tórax, pecho, abdomen o brazos cuando el usuario pidió piernas!
+   - CATEGORIZA cada ejercicio según el Nivel de Experiencia ({effective_level}) y la Intensidad solicitada ({effective_intensity}):
+     * **Nivel Básico (Intensidad Baja) / Principiante**: Usa EXCLUSIVAMENTE ejercicios básicos de bajo impacto y control motor (ej. "Sentadilla asistida con peso corporal", "Puente de glúteos en suelo (Glute Bridge)", "Zancada estática con peso corporal", "Elevación de talones de pie", "Curl femoral de pie o sentado suave", "Abducción de cadera lateral"). PROHIBIDO mandar sentadilla con barra pesada o ejercicios avanzados a un principiante de intensidad baja.
+     * **Nivel Intermedio (Intensidad Media)**: Ejercicios con carga moderada o máquinas guiadas (ej. "Sentadilla Goblet con mancuerna", "Prensa de piernas 45°", "Zancadas con mancuernas", "Peso muerto rumano con mancuernas", "Curl de isquiotibiales en máquina").
+     * **Nivel Avanzado (Intensidad Alta)**: Ejercicios compuestos pesados o pliométricos (ej. "Sentadilla profunda con barra", "Peso muerto con barra", "Sentadilla búlgara", "Sentadilla con salto").
+
+3. REGLA CIENTÍFICA DE DESCANSO MUSCULAR (48-72 HORAS) E INTERACCIÓN SEMANAL (¡MUY IMPORTANTE!):
+   - Basado en fisiología del ejercicio, entrenar un mismo grupo muscular grande (especialmente **Piernas y Glúteos**) todos los días seguidos genera fatiga neuromuscular acumulada, catabolismo y riesgo de lesión articular/tendinosa. Las piernas necesitan entre **48 y 72 horas de recuperación** entre sesiones.
+   - Por lo tanto, cuando el usuario pida una rutina de Piernas (o de un grupo muscular específico) para su semana:
+     a) **NO la pautes para todos los días seguidos**.
+     b) **Explícale en `reply`**:
+        - Si es Principiante / Intensidad Baja: que lo más óptimo para no fatigar el músculo es entrenar Piernas **2 días a la semana separados por 48-72h (ej. Lunes y Miércoles, o Lunes y Jueves)**.
+        - Si es Intermedio / Avanzado: que lo más óptimo es entrenar Piernas en **días alternos: Lunes, Miércoles y Viernes** (variando el enfoque: ej. Lunes dominante de cuádriceps, Miércoles dominante de glúteos/isquiotibiales).
+     c) **Hazle la pregunta interactiva de combinación en `reply`**:
+        Dile textualmente algo como: *"Estás pidiendo entrenar piernas para la semana, pero para no fatigar el músculo y respetar las 48 a 72 horas de recuperación, lo más recomendable es hacer Piernas los días Lunes y Miércoles (y opcionalmente Viernes). Para los días intermedios (Martes y Jueves), podemos relacionarlo y combinarlo con otro grupo muscular mientras tus piernas descansan. ¿Con cuál te gustaría combinarlo: **1) Tren Superior (Espalda, Pecho y Brazos)**, **2) Core, Abdomen y Postura**, o **3) Movilidad articular y Cardio suave**?"*
+
+4. REGLA DE EQUIPAMIENTO Y NUTRICIÓN SINÉRGICA:
+   - Respeta estrictamente el equipo disponible del usuario.
+   - Adapta la nutrición a la intensidad ({effective_intensity}).
+
+5. REGLA DE RECALIBRACIÓN O REPETIR CUESTIONARIO:
+   - Solo pon `"suggest_questionnaire": true` si el usuario pide explícitamente cambiar sus respuestas o abrir de nuevo el cuestionario. En cualquier otro caso pon `false`.
+
+Retorna EXCLUSIVAMENTE un objeto JSON válido con esta estructura exacta:
 {{
-  "reply": "Respuesta conversacional detallada en texto",
-  "category": "Categoria de la fase",
+  "reply": "Respuesta conversacional clara, explicando la selección por nivel de intensidad, la pauta de días alternos (ej. Lunes y Miércoles) para no fatigar el músculo y preguntando con qué grupo complementario quiere combinar los días Martes y Jueves",
+  "category": "Categoría de la fase (ej. Piernas - Nivel Básico · Intensidad Baja)",
   "duration_weeks": 4,
   "rest_between_sets_sec": 60,
-  "progression_rule": "Regla de progresion concreta",
-  "extracted_equipment": "Mancuernas y bandas (o null si no menciono herramientas nuevas)",
+  "progression_rule": "Regla de progresión y descanso de 48-72h entre sesiones de pierna",
+  "extracted_equipment": null,
   "suggest_questionnaire": false,
-  "has_plan": false,
-  "structured_plan": null
+  "has_plan": true,
+  "structured_plan": {{
+    "day": "Lunes y Miércoles (Alternado 48-72h)",
+    "title": "Rutina de Piernas ({effective_level} - Intensidad {effective_intensity})",
+    "recommended_days": ["Lunes", "Miércoles"],
+    "complementary_days": {{
+      "Martes": "Tren Superior Suave o Core",
+      "Jueves": "Movilidad Articular o Tren Superior"
+    }},
+    "exercises": [
+      {{
+        "name": "Nombre exacto del ejercicio acorde a la intensidad",
+        "sets": 3,
+        "reps": "10-12",
+        "animation_key": "squat",
+        "primary_muscle": "Cuádriceps, Glúteos",
+        "secondary_muscle": "Isquiotibiales",
+        "intensity_level": "Básico (Intensidad Baja)",
+        "biomechanics": "Explicación biomecánica concisa del movimiento",
+        "posture": "Nota postural clave"
+      }}
+    ],
+    "nutrition": {{
+      "desayuno": "...",
+      "almuerzo": "...",
+      "cena": "..."
+    }}
+  }}
 }}
-Si ya afinaron el grupo muscular, el tiempo y el equipo y tienes suficiente detalle, genera has_plan=true y llena structured_plan con exercises (name, sets, reps, animation_key, primary_muscle, secondary_muscle) y nutrition (desayuno, almuerzo, cena). Si aun estan conversando los detalles, usa has_plan=false y structured_plan=null.
-Datos del usuario: {_profile_context(payload)}
-Historial de la conversacion:
+Nota: Si el usuario ya indicó qué área quiere entrenar (ej. piernas) o ya envió su cuestionario pidiendo ejercicios, genera de una vez `has_plan: true` con su `structured_plan` completo para los días óptimos (ej. Lunes y Miércoles) Y al final de `reply` pregúntale con qué ejercicio/grupo complementario desea relacionar los días Martes y Jueves. Si apenas envió el cuestionario sin decir qué área quiere entrenar hoy, pon `has_plan: false` y pregúntale qué grupo muscular quiere priorizar.
+Datos del usuario: {_profile_context(payload, effective_level, effective_intensity)}
+Historial de la conversación:
 {_conversation_history(payload.history)}
 Mensaje actual del usuario: {payload.message}
 Devuelve SOLO JSON."""
@@ -194,17 +421,22 @@ Devuelve SOLO JSON."""
             "category": "Acondicionamiento y Fuerza",
             "duration_weeks": 4,
             "rest_between_sets_sec": 60,
-            "progression_rule": "Mantén técnica estricta con RPE <= 8.",
+            "progression_rule": "Mantén técnica estricta y respeta 48-72h de recuperación muscular.",
             "extracted_equipment": None,
             "has_plan": False,
             "structured_plan": None,
         }
 
-    structured_plan = _normalize_structured_plan(data.get("structured_plan"))
+    structured_plan = _normalize_structured_plan(
+        data.get("structured_plan"),
+        intensity=effective_intensity,
+        level=effective_level,
+        requested_focus=requested_focus,
+    )
     has_plan = bool(data.get("has_plan")) and structured_plan is not None
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
     user_msg_lower = (payload.message or "").lower()
-    
+
     is_rest_request = (
         "me impide entrenar" in user_msg_lower
         or "descanso total" in user_msg_lower
@@ -255,12 +487,12 @@ Devuelve SOLO JSON."""
     return {
         "provider": result.provider,
         "reply": reply_str,
-        "category": str(data.get("category") or "Acondicionamiento general"),
+        "category": str(data.get("category") or f"Entrenamiento ({effective_level} · Intensidad {effective_intensity})"),
         "duration_weeks": int(data.get("duration_weeks") or 4),
         "rest_between_sets_sec": int(data.get("rest_between_sets_sec") or 60),
         "progression_rule": str(
             data.get("progression_rule")
-            or "Aumenta la carga solo si completas las series con RPE <= 7."
+            or "Deja 48 a 72 horas de recuperación antes de repetir el mismo grupo muscular."
         ),
         "extracted_equipment": data.get("extracted_equipment"),
         "suggest_questionnaire": suggest_q,

@@ -123,78 +123,98 @@ class _Viewer extends StatelessWidget {
   const _Viewer({required this.exercise, required this.autoRotate});
   final AnatomyExercise exercise;
   final bool autoRotate;
+
+  Color _intensityColor(String level) {
+    final l = level.toLowerCase();
+    if (l.contains('baja') || l.contains('basico') || l.contains('básico')) {
+      return const Color(0xFF8BE0C0);
+    }
+    if (l.contains('alta') || l.contains('avanzado')) {
+      return const Color(0xFFFF5252);
+    }
+    return const Color(0xFFFFB74D);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final effectiveGifUrl = resolveGuaranteedGifUrl(
+      name: exercise.name,
+      agonist: exercise.agonist,
+      intensityLevel: exercise.intensityLevel,
+      existingUrl: exercise.gifUrl,
+    );
+    final badgeColor = _intensityColor(exercise.intensityLevel);
+
     return Container(
       color: kAnatomyBackground,
       child: Stack(
         fit: StackFit.expand,
         children: [
-
-            exercise.gifUrl.isNotEmpty 
-              ? Image.network(
-                  exercise.gifUrl,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(child: CircularProgressIndicator(color: kAgonistColor));
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(child: Icon(Icons.fitness_center_rounded, size: 64, color: Colors.white24));
-                  },
-                )
-                              : Center(
-                    child: SingleChildScrollView(
-                      child: Container(
-                        margin: const EdgeInsets.all(24),
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF101B2D),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFF8BE0C0), width: 1.5),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.psychology_rounded, size: 56, color: Color(0xFF8BE0C0)),
-                            const SizedBox(height: 16),
-                            Text('Guía Textual Interactiva', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 12),
-                            Text('Visualización 3D en desarrollo para este ejercicio.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(color: const Color(0xFF173B45), borderRadius: BorderRadius.circular(12)),
-                              child: Column(
-                                children: [
-                                  Text('1. Agonista: ' + exercise.agonist, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 14, fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 8),
-                                  Text('2. Sinergistas: ' + exercise.synergists.join(', '), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                                  const SizedBox(height: 8),
-                                  Text('3. Postura: ' + exercise.posture, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                                  const SizedBox(height: 8),
-                                  Text('4. Tempo: ' + exercise.tempo, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+          Image.network(
+            effectiveGifUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const Center(
+                child: CircularProgressIndicator(color: kAgonistColor),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return Image.network(
+                'https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/glutes/potty-squat-with-support.gif',
+                fit: BoxFit.contain,
+              );
+            },
+          ),
+          Positioned(
+            top: 12,
+            right: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xDD101B2D),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: badgeColor, width: 1.4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.speed_rounded, color: badgeColor, size: 15),
+                  const SizedBox(width: 6),
+                  Text(
+                    exercise.intensityLevel,
+                    style: TextStyle(
+                      color: badgeColor,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-
+                ],
+              ),
+            ),
+          ),
           Positioned(
             left: 12,
             bottom: 12,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 16),
                   SizedBox(width: 6),
-                  Text('Guía Animada', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Guía Animada',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -372,6 +392,12 @@ class _SlidableSheetState extends State<_SlidableSheet> {
   /// Bloques del panel, en orden de lectura.
   List<Widget> _sections(BuildContext context) {
     final ex = widget.exercise;
+    final l = ex.intensityLevel.toLowerCase();
+    final Color intColor = (l.contains('baja') || l.contains('basico') || l.contains('básico'))
+        ? const Color(0xFF8BE0C0)
+        : (l.contains('alta') || l.contains('avanzado')
+            ? const Color(0xFFFF5252)
+            : const Color(0xFFFFB74D));
     return [
       Text(
         ex.name,
@@ -379,6 +405,33 @@ class _SlidableSheetState extends State<_SlidableSheet> {
           fontSize: 21,
           fontWeight: FontWeight.w800,
           color: Colors.white,
+        ),
+      ),
+      const SizedBox(height: 10),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: intColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: intColor, width: 1.2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.bolt_rounded, size: 15, color: intColor),
+              const SizedBox(width: 6),
+              Text(
+                'Categoría: ${ex.intensityLevel}',
+                style: TextStyle(
+                  color: intColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       const SizedBox(height: 16),

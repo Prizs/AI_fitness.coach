@@ -1,10 +1,14 @@
-  class ExerciseItem {
+class ExerciseItem {
   final String name;
   final int sets;
   final String reps;
   final String animationKey;
   final String primaryMuscle;
   final String secondaryMuscle;
+  final String intensityLevel;
+  final String gifUrl;
+  final String tempo;
+  final String warning;
   final String biomechanics;
   final String posture;
   bool isCompleted;
@@ -17,6 +21,10 @@
     required this.animationKey,
     this.primaryMuscle = 'General',
     this.secondaryMuscle = 'Secundario',
+    this.intensityLevel = 'Básico (Intensidad Baja)',
+    this.gifUrl = '',
+    this.tempo = '3-1-2',
+    this.warning = 'Mantén el control técnico en todo el recorrido.',
     this.biomechanics = 'Activación dinámica sugerida por IA.',
     this.posture = 'Mantén la postura natural.',
     this.isCompleted = false,
@@ -31,6 +39,10 @@
       animationKey: json['animation_key'] as String? ?? 'generic',
       primaryMuscle: json['primary_muscle'] as String? ?? 'General',
       secondaryMuscle: json['secondary_muscle'] as String? ?? 'Secundario',
+      intensityLevel: json['intensity_level'] as String? ?? 'Básico (Intensidad Baja)',
+      gifUrl: json['gif_url'] as String? ?? '',
+      tempo: json['tempo'] as String? ?? '3-1-2',
+      warning: json['warning'] as String? ?? 'Mantén el control técnico en todo el recorrido.',
       biomechanics: json['biomechanics'] as String? ?? 'Activación dinámica sugerida por IA.',
       posture: json['posture'] as String? ?? 'Mantén la postura natural.',
       isCompleted: json['is_completed'] as bool? ?? false,
@@ -45,6 +57,10 @@
     'animation_key': animationKey,
     'primary_muscle': primaryMuscle,
     'secondary_muscle': secondaryMuscle,
+    'intensity_level': intensityLevel,
+    'gif_url': gifUrl,
+    'tempo': tempo,
+    'warning': warning,
     'biomechanics': biomechanics,
     'posture': posture,
     'is_completed': isCompleted,
