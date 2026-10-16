@@ -76,26 +76,58 @@ def _extract_effective_level_and_intensity(payload: ChatMessage) -> tuple[str, s
 
 
 def _detect_requested_focus(payload: ChatMessage) -> str | None:
-    """Detecta si el usuario pidió enfocarse en Piernas/Glúteos u otra zona específica."""
-    recent_user_text = " ".join(
-        [t.content for t in payload.history[-4:] if t.role == "user"] + [payload.message]
-    ).lower()
-    if any(w in recent_user_text for w in ("pierna", "piernas", "tren inferior", "gluteo", "glúteo", "cuadriceps", "cuádriceps", "isquio", "femoral")):
-        return "piernas"
-    if any(w in recent_user_text for w in ("pecho", "pectoral", "empuje")):
-        return "pecho"
-    if any(w in recent_user_text for w in ("espalda", "dorsal", "traccion", "tracción")):
-        return "espalda"
-    if any(w in recent_user_text for w in ("brazo", "brazos", "biceps", "bíceps", "triceps", "tríceps", "hombro")):
-        return "brazos_hombros"
-    if any(w in recent_user_text for w in ("abdomen", "abdominal", "core")):
-        return "core"
+    """Detecta qué zona pidió el usuario dando prioridad al mensaje actual sobre el historial."""
+    def _match_focus(txt: str) -> str | None:
+        # Si el usuario está eligiendo el complemento para días intermedios, priorizar el complemento elegido
+        if any(w in txt for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda")):
+            return "tren_superior"
+        if any(w in txt for w in ("movilidad", "cardio suave", "bajo impacto", "estiramiento")):
+            return "movilidad_cardio"
+        if any(w in txt for w in ("abdomen", "abdominal", "core", "estabilidad lumbar")):
+            return "core"
+        if any(w in txt for w in ("pecho", "pectoral", "empuje")):
+            return "pecho"
+        if any(w in txt for w in ("espalda", "dorsal", "traccion", "tracción")):
+            return "espalda"
+        if any(w in txt for w in ("brazo", "brazos", "biceps", "bíceps", "triceps", "tríceps", "hombro")):
+            return "brazos_hombros"
+        if any(w in txt for w in ("pierna", "piernas", "tren inferior", "gluteo", "glúteo", "cuadriceps", "cuádriceps", "isquio", "femoral")):
+            return "piernas"
+        return None
+
+    current_msg = (payload.message or "").lower()
+    focus = _match_focus(current_msg)
+    if focus:
+        return focus
+
+    for turn in reversed(payload.history[-4:]):
+        if turn.role == "user":
+            f = _match_focus(turn.content.lower())
+            if f:
+                return f
     return None
+
+
+def _is_complementary_days_request(payload: ChatMessage) -> bool:
+    """Detecta si el usuario está respondiendo a la pregunta interactiva para programar los días intermedios (Martes y Jueves)."""
+    msg = (payload.message or "").lower()
+    return any(
+        phrase in msg
+        for phrase in (
+            "martes y jueves",
+            "dias intermedios",
+            "días intermedios",
+            "relacionarlo con",
+            "combinarlo con",
+            "combinar con",
+            "mientras descansan las piernas",
+        )
+    )
 
 
 BEGINNER_LOW_LEG_EXERCISES = [
     {
-        "name": "Sentadilla asistida con peso corporal",
+        "name": "Sentadilla asistida con peso corporal (Básico)",
         "sets": 3,
         "reps": "10-12",
         "animation_key": "squat",
@@ -103,7 +135,7 @@ BEGINNER_LOW_LEG_EXERCISES = [
         "secondary_muscle": "Core, Estabilizadores",
     },
     {
-        "name": "Puente de glúteos en suelo (Glute Bridge)",
+        "name": "Puente de glúteos en suelo (Glute Bridge - Básico)",
         "sets": 3,
         "reps": "12-15",
         "animation_key": "glute-bridge",
@@ -111,7 +143,7 @@ BEGINNER_LOW_LEG_EXERCISES = [
         "secondary_muscle": "Isquiotibiales, Core",
     },
     {
-        "name": "Zancada estática con peso corporal",
+        "name": "Zancada estática asistida con peso corporal (Básico)",
         "sets": 3,
         "reps": "8-10 por pierna",
         "animation_key": "lunge",
@@ -119,7 +151,7 @@ BEGINNER_LOW_LEG_EXERCISES = [
         "secondary_muscle": "Isquiotibiales",
     },
     {
-        "name": "Curl femoral de pie sin peso (Isquiotibiales)",
+        "name": "Curl femoral de pie sin peso (Isquiotibiales - Básico)",
         "sets": 3,
         "reps": "12 por pierna",
         "animation_key": "leg-curl",
@@ -127,12 +159,98 @@ BEGINNER_LOW_LEG_EXERCISES = [
         "secondary_muscle": "Gemelos",
     },
     {
-        "name": "Elevación de talones de pie con peso corporal",
+        "name": "Elevación de talones de pie con peso corporal (Básico)",
         "sets": 3,
         "reps": "15",
         "animation_key": "calf-raise",
         "primary_muscle": "Gemelos",
         "secondary_muscle": "Sóleo, Tobillo",
+    },
+]
+
+INTERMEDIATE_MID_LEG_EXERCISES = [
+    {
+        "name": "Sentadilla Goblet con mancuerna (Intermedio)",
+        "sets": 4,
+        "reps": "10-12",
+        "animation_key": "squat",
+        "primary_muscle": "Cuádriceps, Glúteos",
+        "secondary_muscle": "Core",
+    },
+    {
+        "name": "Prensa de piernas inclinada 45° (Intermedio)",
+        "sets": 4,
+        "reps": "10-12",
+        "animation_key": "leg-press",
+        "primary_muscle": "Cuádriceps, Glúteos",
+        "secondary_muscle": "Isquiotibiales",
+    },
+    {
+        "name": "Zancadas alternas con mancuernas (Intermedio)",
+        "sets": 3,
+        "reps": "10 por pierna",
+        "animation_key": "lunge",
+        "primary_muscle": "Cuádriceps, Glúteos",
+        "secondary_muscle": "Isquiotibiales",
+    },
+    {
+        "name": "Curl de isquiotibiales sentado en máquina (Intermedio)",
+        "sets": 3,
+        "reps": "12",
+        "animation_key": "leg-curl",
+        "primary_muscle": "Isquiotibiales",
+        "secondary_muscle": "Gemelos",
+    },
+    {
+        "name": "Peso muerto rumano con mancuernas (Intermedio)",
+        "sets": 3,
+        "reps": "10-12",
+        "animation_key": "deadlift",
+        "primary_muscle": "Isquiotibiales, Glúteos",
+        "secondary_muscle": "Espalda baja",
+    },
+]
+
+ADVANCED_HIGH_LEG_EXERCISES = [
+    {
+        "name": "Sentadilla profunda con barra libre (Avanzado)",
+        "sets": 4,
+        "reps": "6-8",
+        "animation_key": "squat",
+        "primary_muscle": "Cuádriceps, Glúteos",
+        "secondary_muscle": "Core, Erectores espinales",
+    },
+    {
+        "name": "Peso muerto rumano con barra (Avanzado)",
+        "sets": 4,
+        "reps": "8-10",
+        "animation_key": "deadlift",
+        "primary_muscle": "Isquiotibiales, Glúteos",
+        "secondary_muscle": "Cadena posterior",
+    },
+    {
+        "name": "Sentadilla búlgara con carga (Avanzado)",
+        "sets": 4,
+        "reps": "8-10 por pierna",
+        "animation_key": "split-squat",
+        "primary_muscle": "Cuádriceps, Glúteo mayor",
+        "secondary_muscle": "Estabilizadores de cadera",
+    },
+    {
+        "name": "Curl femoral tumbado en máquina (Avanzado)",
+        "sets": 4,
+        "reps": "10-12",
+        "animation_key": "leg-curl",
+        "primary_muscle": "Isquiotibiales",
+        "secondary_muscle": "Gemelos",
+    },
+    {
+        "name": "Prensa 45° pesada pies anchos (Avanzado)",
+        "sets": 4,
+        "reps": "8-10",
+        "animation_key": "leg-press",
+        "primary_muscle": "Cuádriceps, Glúteos, Aductores",
+        "secondary_muscle": "Isquiotibiales",
     },
 ]
 
@@ -155,15 +273,24 @@ def _is_leg_exercise(name: str, primary_muscle: str) -> bool:
     return any(l in text for l in leg_terms)
 
 
-def _sanitize_beginner_leg_name(name: str, intensity: str, level: str) -> str:
-    """Si es principiante o intensidad baja, evita nombres con barra pesada o máquinas avanzadas."""
-    if intensity.lower() != "baja" and level.lower() != "principiante":
-        return name
+def _sanitize_exercise_by_intensity(name: str, intensity_hint: str) -> str:
+    """Ajusta el nombre del ejercicio para que coincida de forma coherente con el nivel de intensidad solicitado."""
     lower = name.lower()
-    if "sentadilla" in lower and ("barra" in lower or "profunda" in lower):
-        return "Sentadilla asistida con peso corporal"
-    if "peso muerto" in lower and "barra" in lower:
-        return "Bisagra de cadera / Peso muerto suave sin carga"
+    if intensity_hint == "baja":
+        if "prensa" in lower or "leg press" in lower:
+            return "Sentadilla asistida en silla o cajón con peso corporal"
+        if "sentadilla" in lower and ("barra" in lower or "profunda" in lower or "salto" in lower or "búlgara" in lower or "bulgara" in lower):
+            return "Sentadilla asistida con peso corporal"
+        if "peso muerto" in lower and ("barra" in lower or "pesado" in lower):
+            return "Puente de glúteos en suelo (Glute Bridge)"
+        if ("isquio" in lower or "femoral" in lower) and ("máquina" in lower or "maquina" in lower or "barra" in lower):
+            return "Curl femoral de pie sin peso (Isquiotibiales)"
+        if ("zancada" in lower or "lunge" in lower) and ("barra" in lower or "salto" in lower or "mancuerna" in lower):
+            return "Zancada estática con peso corporal"
+        if "press de banca" in lower and "barra" in lower:
+            return "Flexiones inclinadas con manos apoyadas en banco"
+        if "dominada" in lower:
+            return "Jalón o tracción suave con banda elástica"
     return name
 
 
@@ -177,8 +304,19 @@ def _normalize_exercises(
     if not isinstance(raw_exercises, list):
         return exercises
 
-    intensity_hint = "baja" if (intensity.lower() == "baja" or level.lower() == "principiante") else (
-        "alta" if intensity.lower() == "alta" else "media"
+    intensity_hint = "baja" if (intensity.lower() == "baja" or (level.lower() == "principiante" and intensity.lower() != "alta" and intensity.lower() != "media")) else (
+        "alta" if (intensity.lower() == "alta" or level.lower() == "avanzado") else "media"
+    )
+    forced_label = {
+        "baja": "Básico (Intensidad Baja)",
+        "media": "Intermedio (Intensidad Media)",
+        "alta": "Avanzado (Intensidad Alta)",
+    }[intensity_hint]
+
+    leg_pool = (
+        BEGINNER_LOW_LEG_EXERCISES
+        if intensity_hint == "baja"
+        else (ADVANCED_HIGH_LEG_EXERCISES if intensity_hint == "alta" else INTERMEDIATE_MID_LEG_EXERCISES)
     )
 
     for idx, exercise in enumerate(raw_exercises):
@@ -188,14 +326,14 @@ def _normalize_exercises(
         primary = str(exercise.get("primary_muscle") or "General").strip()
         secondary = str(exercise.get("secondary_muscle") or "Secundario").strip()
 
-        # Si el usuario pidió exclusivamente piernas y la IA coló un ejercicio de tren superior/tórax/brazos, reemplazarlo por uno de piernas acorde al nivel
+        # Si el usuario pidió exclusivamente piernas y la IA coló un ejercicio de tren superior/tórax/brazos, reemplazarlo por uno de piernas acorde a la intensidad
         if requested_focus == "piernas" and not _is_leg_exercise(raw_name, primary):
-            fallback_ex = BEGINNER_LOW_LEG_EXERCISES[idx % len(BEGINNER_LOW_LEG_EXERCISES)]
+            fallback_ex = leg_pool[idx % len(leg_pool)]
             raw_name = fallback_ex["name"]
             primary = fallback_ex["primary_muscle"]
             secondary = fallback_ex["secondary_muscle"]
 
-        clean_name = _sanitize_beginner_leg_name(raw_name, intensity, level)
+        clean_name = _sanitize_exercise_by_intensity(raw_name, intensity_hint)
         gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint)
 
         exercises.append(
@@ -206,9 +344,7 @@ def _normalize_exercises(
                 "animation_key": str(exercise.get("animation_key") or "squat"),
                 "primary_muscle": primary,
                 "secondary_muscle": secondary,
-                "intensity_level": str(
-                    exercise.get("intensity_level") or gif_meta.get("intensity_level") or "Básico (Intensidad Baja)"
-                ),
+                "intensity_level": forced_label,
                 "gif_url": gif_meta.get("url") or "",
                 "biomechanics": str(
                     exercise.get("biomechanics") or gif_meta.get("biomechanics") or "Movimiento controlado respetando el rango articular."
@@ -232,6 +368,7 @@ def _normalize_structured_plan(
     intensity: str = "Media",
     level: str = "Intermedio",
     requested_focus: str | None = None,
+    is_complementary_days: bool = False,
 ) -> dict | None:
     if not isinstance(raw_plan, dict):
         return None
@@ -250,32 +387,34 @@ def _normalize_structured_plan(
         nutrition = {}
 
     # Determinar días óptimos de entrenamiento respetando 48-72h de recuperación muscular
-    raw_days = raw_plan.get("recommended_days")
-    if isinstance(raw_days, list) and raw_days:
-        recommended_days = [str(d) for d in raw_days]
+    if is_complementary_days:
+        recommended_days = ["Martes", "Jueves"]
+        complementary_days = {
+            "Lunes y Miércoles": "Sesión Principal de Piernas (En recuperación muscular 48-72h)",
+            "Viernes": "Movilidad o Sesión Integrada Suave",
+        }
     else:
-        if level.lower() == "principiante" or intensity.lower() == "baja":
-            recommended_days = ["Lunes", "Jueves"]
+        raw_days = raw_plan.get("recommended_days")
+        if isinstance(raw_days, list) and raw_days and len(raw_days) <= 3:
+            recommended_days = [str(d) for d in raw_days]
         else:
-            recommended_days = ["Lunes", "Miércoles", "Viernes"]
+            if level.lower() == "principiante" or intensity.lower() == "baja":
+                recommended_days = ["Lunes", "Miércoles"]
+            else:
+                recommended_days = ["Lunes", "Miércoles", "Viernes"]
 
-    complementary_days = raw_plan.get("complementary_days")
-    if not isinstance(complementary_days, dict) or not complementary_days:
-        if recommended_days == ["Lunes", "Jueves"]:
+        complementary_days = raw_plan.get("complementary_days")
+        if not isinstance(complementary_days, dict) or not complementary_days:
             complementary_days = {
-                "Martes": "Tren Superior Suave (Espalda/Postura) o Core",
-                "Miércoles": "Descanso Activo y Movilidad Articular",
-                "Viernes": "Tren Superior / Core y Cardio sin impacto",
-            }
-        else:
-            complementary_days = {
-                "Martes": "Tren Superior (Espalda, Pecho y Brazos) o Core",
-                "Jueves": "Tren Superior (Hombros y Postura) o Movilidad Activa",
+                "Martes": "Tren Superior Suave (Espalda/Pecho) o Core",
+                "Jueves": "Core, Postura o Movilidad Articular y Cardio Suave",
             }
 
     return {
-        "day": str(raw_plan.get("day") or "Sesión Alternada (48-72h recuperación)"),
+        "day": "Martes y Jueves (Complemento Intermedio)" if is_complementary_days else f"{' y '.join(recommended_days)} (Alternado 48-72h)",
         "title": str(raw_plan.get("title") or "Sesión Personalizada"),
+        "focus_area": requested_focus or "general",
+        "is_complementary_days": is_complementary_days,
         "intensity_summary": f"Nivel {level} · Intensidad {intensity}",
         "recommended_days": recommended_days,
         "complementary_days": complementary_days,
@@ -427,15 +566,31 @@ Devuelve SOLO JSON."""
             "structured_plan": None,
         }
 
+    is_complementary = _is_complementary_days_request(payload)
     structured_plan = _normalize_structured_plan(
         data.get("structured_plan"),
         intensity=effective_intensity,
         level=effective_level,
         requested_focus=requested_focus,
+        is_complementary_days=is_complementary,
     )
     has_plan = bool(data.get("has_plan")) and structured_plan is not None
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
     user_msg_lower = (payload.message or "").lower()
+
+    if has_plan and not is_complementary and requested_focus == "piernas":
+        lower_reply = reply_str.lower()
+        if not any(w in lower_reply for w in ("martes", "combinar", "relacionar", "48", "72")):
+            rec_days_txt = " y ".join(structured_plan.get("recommended_days", ["Lunes", "Miércoles"]))
+            reply_str += (
+                f"\n\n💡 **Recomendación de Periodización Semanal:** Estás pidiendo ejercicios de piernas para la semana, "
+                f"pero fisiológicamente no es recomendable hacerlos todos los días seguidos porque el músculo requiere entre **48 y 72 horas de recuperación** "
+                f"para evitar fatiga neuromuscular. Lo más óptimo es realizar esta sesión los días **{rec_days_txt}**.\n"
+                f"Para los días intermedios (**Martes y Jueves**), podemos relacionarlo con otro grupo muscular complementario. ¿Cuál prefieres?\n"
+                f"1️⃣ **Tren Superior Suave (Espalda, Pecho y Brazos)**\n"
+                f"2️⃣ **Core, Abdomen y Postura**\n"
+                f"3️⃣ **Movilidad Articular y Cardio de Bajo Impacto**"
+            )
 
     is_rest_request = (
         "me impide entrenar" in user_msg_lower

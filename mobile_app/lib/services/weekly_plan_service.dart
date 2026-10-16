@@ -209,16 +209,17 @@ class WeeklyPlanService extends ChangeNotifier {
       'domingo': 6,
     };
 
-    final Set<int> targetIndices = {todayIndex};
-    if (rawRecommended is List) {
+    final Set<int> targetIndices = {};
+    if (rawRecommended is List && rawRecommended.isNotEmpty) {
       for (final d in rawRecommended) {
         final key = d.toString().trim().toLowerCase();
         if (dayNameToIndex.containsKey(key)) {
           targetIndices.add(dayNameToIndex[key]!);
         }
       }
-    } else {
-      targetIndices.addAll([0, 3]); // Lunes y Jueves por defecto (72h recuperación)
+    }
+    if (targetIndices.isEmpty) {
+      targetIndices.addAll({todayIndex, 0, 2}); // Lunes y Miércoles por defecto
     }
 
     final defaultNutrition = {

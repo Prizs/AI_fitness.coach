@@ -248,6 +248,65 @@ class _CoachScreenState extends State<CoachScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Barra interactiva de Categorización de Nivel e Intensidad
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFF0F192B),
+                border: Border(bottom: BorderSide(color: Colors.white10)),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    const Icon(Icons.tune_rounded, size: 15, color: Color(0xFF8BE0C0)),
+                    const SizedBox(width: 6),
+                    const Text('Categoría:', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 6),
+                    ...[
+                      {'label': '🟢 Básico (Baja)', 'level': 'Principiante', 'intensity': 'Baja', 'color': const Color(0xFF8BE0C0)},
+                      {'label': '🟠 Intermedio (Media)', 'level': 'Intermedio', 'intensity': 'Media', 'color': const Color(0xFFFFB340)},
+                      {'label': '🔴 Avanzado (Alta)', 'level': 'Avanzado', 'intensity': 'Alta', 'color': const Color(0xFFFF6B6B)},
+                    ].map((tier) {
+                      final bool isSelected = _userIntensity.toLowerCase() == (tier['intensity'] as String).toLowerCase();
+                      final Color tierColor = tier['color'] as Color;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () {
+                            setState(() {
+                              _userLevel = tier['level'] as String;
+                              _userIntensity = tier['intensity'] as String;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isSelected ? tierColor.withValues(alpha: 0.22) : const Color(0xFF16253B),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected ? tierColor : Colors.white12,
+                                width: isSelected ? 1.3 : 1.0,
+                              ),
+                            ),
+                            child: Text(
+                              tier['label'] as String,
+                              style: TextStyle(
+                                color: isSelected ? tierColor : Colors.white60,
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
             // Lista de Mensajes y Tarjetas
             Expanded(
               child: ListView.builder(
@@ -323,24 +382,68 @@ class _CoachScreenState extends State<CoachScreen> {
                                 const SizedBox(height: 8),
                                 Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF173B45),
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(12),
                                     border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.4)),
                                   ),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '📅 Frecuencia óptima (48-72h recuperación): ${(plan['recommended_days'] as List).join(', ')}',
-                                        style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11.5, fontWeight: FontWeight.w700),
+                                        '📅 Días Óptimos (48-72h recuperación): ${(plan['recommended_days'] as List).join(' y ')}',
+                                        style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 12, fontWeight: FontWeight.w800),
                                       ),
                                       if (plan['complementary_days'] is Map && (plan['complementary_days'] as Map).isNotEmpty) ...[
                                         const SizedBox(height: 4),
                                         Text(
                                           '🔄 Días intermedios sugeridos: ${(plan['complementary_days'] as Map).entries.map((e) => '${e.key} (${e.value})').join(' · ')}',
                                           style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                        ),
+                                      ],
+                                      if (plan['is_complementary_days'] != true) ...[
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          '🤝 ¿Con qué ejercicio/área relacionamos los días intermedios (Martes y Jueves) para no fatigar el músculo?',
+                                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: [
+                                            ActionChip(
+                                              backgroundColor: const Color(0xFF0F1E2E),
+                                              side: const BorderSide(color: Color(0xFF8BE0C0), width: 1),
+                                              label: const Text('💪 Tren Superior (Mar/Jue)', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 10.5, fontWeight: FontWeight.w700)),
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : () => _sendMessage(
+                                                        'Para los días intermedios (Martes y Jueves) mientras descansan las piernas, quiero relacionarlo con Tren Superior (Espalda, Pecho y Brazos) para nivel $_userLevel con intensidad $_userIntensity.',
+                                                      ),
+                                            ),
+                                            ActionChip(
+                                              backgroundColor: const Color(0xFF0F1E2E),
+                                              side: const BorderSide(color: Color(0xFF8BE0C0), width: 1),
+                                              label: const Text('🧘 Core y Postura (Mar/Jue)', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 10.5, fontWeight: FontWeight.w700)),
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : () => _sendMessage(
+                                                        'Para los días intermedios (Martes y Jueves) mientras descansan las piernas, quiero relacionarlo con Core, Abdomen y Estabilidad Lumbar para nivel $_userLevel con intensidad $_userIntensity.',
+                                                      ),
+                                            ),
+                                            ActionChip(
+                                              backgroundColor: const Color(0xFF0F1E2E),
+                                              side: const BorderSide(color: Color(0xFF8BE0C0), width: 1),
+                                              label: const Text('🏃 Movilidad y Cardio Suave (Mar/Jue)', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 10.5, fontWeight: FontWeight.w700)),
+                                              onPressed: _isLoading
+                                                  ? null
+                                                  : () => _sendMessage(
+                                                        'Para los días intermedios (Martes y Jueves) mientras descansan las piernas, quiero relacionarlo con Movilidad Articular y Cardio Suave de bajo impacto para nivel $_userLevel con intensidad $_userIntensity.',
+                                                      ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ],
@@ -356,6 +459,11 @@ class _CoachScreenState extends State<CoachScreen> {
                                 ...(plan['exercises'] as List).take(5).map((ex) {
                                   final String intLabel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
                                   final String primaryM = (ex['primary_muscle'] ?? 'Piernas').toString();
+                                  final bool isLow = intLabel.toLowerCase().contains('baja') || intLabel.toLowerCase().contains('básico');
+                                  final bool isHigh = intLabel.toLowerCase().contains('alta') || intLabel.toLowerCase().contains('avanzado');
+                                  final Color badgeColor = isLow
+                                      ? const Color(0xFF8BE0C0)
+                                      : (isHigh ? const Color(0xFFFF6B6B) : const Color(0xFFFFB340));
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 6),
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -396,14 +504,23 @@ class _CoachScreenState extends State<CoachScreen> {
                                           child: Wrap(
                                             spacing: 8,
                                             runSpacing: 4,
+                                            crossAxisAlignment: WrapCrossAlignment.center,
                                             children: [
                                               Text(
                                                 '🎯 $primaryM',
                                                 style: const TextStyle(color: Colors.white70, fontSize: 11),
                                               ),
-                                              Text(
-                                                '⚡ $intLabel',
-                                                style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.w600),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                decoration: BoxDecoration(
+                                                  color: badgeColor.withValues(alpha: 0.18),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                  border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                                                ),
+                                                child: Text(
+                                                  '⚡ $intLabel',
+                                                  style: TextStyle(color: badgeColor, fontSize: 10.5, fontWeight: FontWeight.w800),
+                                                ),
                                               ),
                                             ],
                                           ),
