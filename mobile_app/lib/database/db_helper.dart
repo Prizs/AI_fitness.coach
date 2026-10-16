@@ -1,9 +1,14 @@
-﻿import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DBHelper {
   static final DBHelper instance = DBHelper._init();
   static Database? _database;
+  static String? _memoryCache;
+  static const String _webStorageKey = 'cached_weekly_plan_v1';
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   DBHelper._init();
 
@@ -35,19 +40,65 @@ CREATE TABLE cached_plan (
   }
 
   Future<void> saveWeeklyPlan(String jsonString) async {
-    final db = await instance.database;
-    await db.delete('cached_plan');
-    await db.insert('cached_plan', {
-      'plan_json': jsonString,
-      'updated_at': DateTime.now().toIso8601String(),
-    });
+    _memoryCache = jsonString;
+    if (kIsWeb) {
+      try {
+        await _secureStorage
+            .write(key: _webStorageKey, value: jsonString)
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+      return;
+    }
+    try {
+      final db = await instance.database.timeout(const Duration(seconds: 2));
+      await db.delete('cached_plan');
+      await db.insert('cached_plan', {
+        'plan_json': jsonString,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {
+      try {
+        await _secureStorage
+            .write(key: _webStorageKey, value: jsonString)
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }
   }
 
   Future<String?> getCachedWeeklyPlan() async {
-    final db = await instance.database;
-    final result = await db.query('cached_plan', limit: 1);
-    if (result.isNotEmpty) {
-      return result.first['plan_json'] as String;
+    if (_memoryCache != null && _memoryCache!.trim().isNotEmpty) {
+      return _memoryCache;
+    }
+    if (kIsWeb) {
+      try {
+        final stored = await _secureStorage
+            .read(key: _webStorageKey)
+            .timeout(const Duration(seconds: 2));
+        if (stored != null && stored.trim().isNotEmpty) {
+          _memoryCache = stored;
+          return stored;
+        }
+      } catch (_) {}
+      return null;
+    }
+    try {
+      final db = await instance.database.timeout(const Duration(seconds: 2));
+      final result = await db.query('cached_plan', limit: 1);
+      if (result.isNotEmpty) {
+        final plan = result.first['plan_json'] as String;
+        _memoryCache = plan;
+        return plan;
+      }
+    } catch (_) {
+      try {
+        final stored = await _secureStorage
+            .read(key: _webStorageKey)
+            .timeout(const Duration(seconds: 2));
+        if (stored != null && stored.trim().isNotEmpty) {
+          _memoryCache = stored;
+          return stored;
+        }
+      } catch (_) {}
     }
     return null;
   }

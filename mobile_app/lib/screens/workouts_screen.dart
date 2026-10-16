@@ -54,7 +54,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     );
   }
 
-  /// Lleva al Coach, que es donde se piden rutinas y se agregan ejercicios.
+  /// Lleva al módulo Coach IA, que es donde se solicitan las recomendaciones y rutinas.
   void _openCoach() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const CoachScreen()),
@@ -70,31 +70,36 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 14),
-              Text('Cargando tu semana...',
+              Text('Sincronizando tu cronograma...',
                   style: TextStyle(color: Colors.white70)),
             ],
           ),
         );
       }
-      if (_service.lastError != null) {
-        return _EmptyState(
-          message: _service.lastError!,
-          onRetry: () => _service.refresh(AuthService.instance.loggedInUser),
-          isError: true,
-        );
-      }
-      
+
       return _EmptyState(
-        message: 'Aún no tienes una rutina activa.\n\nPresiona el botón de abajo para que la IA diseñe un plan personalizado a tu nivel, disponibilidad y equipo.',
-        onRetry: () => showPlanOptionsSheet(context),
+        message:
+            'Aún no tienes rutinas programadas en esta semana.\n\nPresiona el botón de abajo para ir al módulo Coach IA, solicitar tu recomendación personalizada y agregarla a tu cronograma semanal.',
+        onRetry: _openCoach,
         isError: false,
       );
     }
 
     final days = _service.days;
     final today = _service.todayIndex;
-    final pending = days.where((d) => !_completed.contains(d['weekday']));
-    final done = days.where((d) => _completed.contains(d['weekday']));
+    final scheduledDays = days.where((d) {
+      final ex = d['exercises'];
+      return ex is List && ex.isNotEmpty;
+    }).toList();
+    final restDays = days.where((d) {
+      final ex = d['exercises'];
+      return ex is! List || ex.isEmpty;
+    }).toList();
+
+    final pendingScheduled =
+        scheduledDays.where((d) => !_completed.contains(d['weekday'])).toList();
+    final doneScheduled =
+        scheduledDays.where((d) => _completed.contains(d['weekday'])).toList();
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -103,29 +108,39 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           children: [
             const Expanded(
               child: Text(
-                'Rutinas',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+                'Rutinas de la Semana',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
               ),
             ),
-            IconButton(
-              tooltip: 'Actualizar semana',
-              onPressed: () =>
-                  _service.refresh(AuthService.instance.loggedInUser),
-              icon: const Icon(Icons.refresh_rounded,
-                  color: Color(0xFF8BE0C0)),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF8BE0C0),
+                backgroundColor: const Color(0xFF16233A),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: _openCoach,
+              icon: const Icon(Icons.smart_toy_rounded, size: 18),
+              label: const Text(
+                'Ir a Coach IA',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 4),
         Text(
           'Hoy es ${_service.todayName} · '
-          '${_completed.length} de ${days.length} completadas',
+          '${doneScheduled.length} de ${scheduledDays.length} sesiones programadas completadas',
           style: const TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 18),
-        if (pending.isNotEmpty) ...[
-          const _SectionLabel('Pendientes'),
-          ...pending.map((day) => _DayCard(
+        if (pendingScheduled.isNotEmpty) ...[
+          const _SectionLabel('RUTINAS PROGRAMADAS EN LA SEMANA'),
+          ...pendingScheduled.map((day) => _DayCard(
                 day: day,
                 isToday: day['weekday'] == today,
                 isDone: false,
@@ -133,15 +148,45 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                     setState(() => _completed.add(day['weekday'] as int)),
               )),
         ],
-        if (done.isNotEmpty) ...[
+        if (doneScheduled.isNotEmpty) ...[
           const SizedBox(height: 10),
-          const _SectionLabel('Completadas'),
-          ...done.map((day) => _DayCard(
+          const _SectionLabel('SESIONES COMPLETADAS'),
+          ...doneScheduled.map((day) => _DayCard(
                 day: day,
                 isToday: day['weekday'] == today,
                 isDone: true,
-                onToggle: () => setState(
-                    () => _completed.remove(day['weekday'] as int)),
+                onToggle: () =>
+                    setState(() => _completed.remove(day['weekday'] as int)),
+              )),
+        ],
+        if (restDays.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const _SectionLabel('DÍAS DE RECUPERACIÓN MUSCULAR (48-72H) / DISPONIBLES'),
+          ...restDays.map((day) => Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                color: const Color(0xFF101929),
+                child: ListTile(
+                  leading: const Icon(Icons.self_improvement_rounded,
+                      color: Color(0xFF8BE0C0)),
+                  title: Text(
+                    '${day['weekday_name']} · ${day['title']}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Descanso muscular o disponible para rutina complementaria en Coach IA.',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  trailing: TextButton(
+                    onPressed: _openCoach,
+                    child: const Text(
+                      '+ Programar',
+                      style: TextStyle(
+                          color: Color(0xFF8BE0C0),
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
               )),
         ],
         // Espacio para que el boton flotante no tape la ultima tarjeta.
@@ -166,15 +211,18 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isError ? Icons.cloud_off_rounded : Icons.fitness_center_rounded,
-              size: 56, 
-              color: isError ? const Color(0xFFFF7A7A) : const Color(0xFF8BE0C0)
+            const Icon(
+              Icons.smart_toy_rounded,
+              size: 58,
+              color: Color(0xFF2DD4BF),
             ),
             const SizedBox(height: 16),
-            Text(
-              isError ? 'Error de Carga' : 'Bienvenido',
-              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)
+            const Text(
+              'Rutinas Programadas',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Text(message,
@@ -183,13 +231,17 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 24),
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF8BE0C0),
+                backgroundColor: const Color(0xFF2DD4BF),
                 foregroundColor: const Color(0xFF0B1220),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               ),
               onPressed: onRetry,
-              icon: Icon(isError ? Icons.refresh_rounded : Icons.add_rounded),
-              label: Text(isError ? 'Reintentar' : 'Crear mi rutina', style: const TextStyle(fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.smart_toy_rounded),
+              label: const Text(
+                'Crear mi rutina en Coach IA',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
             ),
           ],
         ),

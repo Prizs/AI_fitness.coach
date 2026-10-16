@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
-import 'package:mobile_app/widgets/plan_options_sheet.dart';
 
 /// Nutricion del dia de la semana en el que esta el telefono.
 ///
@@ -33,6 +33,12 @@ class _NutritionScreenState extends State<NutritionScreen> {
     _service.ensureLoaded(AuthService.instance.loggedInUser);
   }
 
+  void _openCoach() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const CoachScreen()),
+    );
+  }
+
   Map<String, dynamic>? get _day {
     for (final day in _service.days) {
       if (day['weekday'] == _selected) return day;
@@ -61,16 +67,16 @@ class _NutritionScreenState extends State<NutritionScreen> {
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 14),
-              Text('Preparando tu semana...',
+              Text('Sincronizando tu semana...',
                   style: TextStyle(color: Colors.white70)),
             ],
           ),
         );
       }
       return _EmptyState(
-        message: _service.lastError ??
-            'Aún no tienes un plan nutricional semanal activo.\n\nPresiona el botón de abajo para generar tu rutina y plan nutricional personalizado.',
-        onRetry: () => showPlanOptionsSheet(context),
+        message:
+            'Aún no tienes un plan nutricional semanal programado.\n\nPresiona el botón de abajo para ir al módulo Coach IA, solicitar tu rutina y agregar tu plan nutricional a la semana.',
+        onRetry: _openCoach,
       );
     }
 
@@ -119,16 +125,26 @@ class _NutritionScreenState extends State<NutritionScreen> {
           children: [
             const Expanded(
               child: Text(
-                'Nutricion',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+                'Nutrición de la Semana',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
               ),
             ),
-            IconButton(
-              tooltip: 'Actualizar semana',
-              onPressed: () =>
-                  _service.refresh(AuthService.instance.loggedInUser),
-              icon: const Icon(Icons.refresh_rounded,
-                  color: Color(0xFF8BE0C0)),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF8BE0C0),
+                backgroundColor: const Color(0xFF16233A),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: _openCoach,
+              icon: const Icon(Icons.smart_toy_rounded, size: 18),
+              label: const Text(
+                'Ir a Coach IA',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+              ),
             ),
           ],
         ),
@@ -376,16 +392,16 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 20),
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF8BE0C0),
+                backgroundColor: const Color(0xFF2DD4BF),
                 foregroundColor: const Color(0xFF0B1220),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               ),
               onPressed: onRetry,
-              icon: const Icon(Icons.add_rounded),
+              icon: const Icon(Icons.smart_toy_rounded),
               label: const Text(
-                'Crear mi plan',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                'Crear mi plan en Coach IA',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ],

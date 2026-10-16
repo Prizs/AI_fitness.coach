@@ -44,35 +44,42 @@ class WeeklyPlanService extends ChangeNotifier {
   List<Map<String, dynamic>> get days {
     final list = week?['days'];
     if (list is! List) return const [];
-    return list
-        .whereType<Map>()
-        .map((entry) => Map<String, dynamic>.from(entry))
-        .toList();
+    final mapped = list.whereType<Map>().map((entry) {
+      final m = Map<String, dynamic>.from(entry);
+      final w = (m['weekday'] is int) ? (m['weekday'] as int).clamp(0, 6) : 0;
+      m['weekday'] = w;
+      if (m['weekday_name'] == null ||
+          m['weekday_name'].toString().trim().isEmpty) {
+        m['weekday_name'] = _weekdayNames[w];
+      }
+      return m;
+    }).toList();
+    mapped.sort((a, b) => (a['weekday'] as int).compareTo(b['weekday'] as int));
+    return mapped;
   }
 
   Future<void> ensureLoaded(UserProfile? profile) {
-    if (week != null) return Future<void>.value();
+    if (week != null) {
+      isLoading = false;
+      return Future<void>.value();
+    }
     if (_pending != null) return _pending!;
     _pending = _load(profile);
     return _pending!;
   }
 
   Future<void> _load(UserProfile? profile) async {
-    isLoading = true;
     lastError = null;
-    notifyListeners();
-
     try {
-      final cachedJson = await DBHelper.instance.getCachedWeeklyPlan();
+      final cachedJson = await DBHelper.instance
+          .getCachedWeeklyPlan()
+          .timeout(const Duration(seconds: 2), onTimeout: () => null);
       if (cachedJson != null && cachedJson.trim().isNotEmpty) {
         try {
-          week = jsonDecode(cachedJson) as Map<String, dynamic>?;
-          if (week != null) {
+          final decoded = jsonDecode(cachedJson);
+          if (decoded is Map<String, dynamic>) {
+            week = decoded;
             loadedFromCache = true;
-            isLoading = false;
-            _pending = null;
-            notifyListeners();
-            return;
           }
         } catch (_) {}
       }
@@ -526,6 +533,9 @@ class WeeklyPlanService extends ChangeNotifier {
       'cena': 'Cena ligera alta en proteína para síntesis miofibrilar.',
     };
 
+    final recoveryRule = structuredPlan['recovery_rule'] as String? ??
+        'Sesión programada por el Coach IA respetando 48-72h de recuperación muscular.';
+
     if (week == null) {
       week = {
         'id': 'coach_plan_${DateTime.now().millisecondsSinceEpoch}',
@@ -534,13 +544,18 @@ class WeeklyPlanService extends ChangeNotifier {
           final isTarget = targetIndices.contains(i);
           return {
             'weekday': i,
+            'weekday_name': _weekdayNames[i],
             'title': isTarget
                 ? title
                 : (i == 1 || i == 3)
                     ? 'Recuperación Muscular 48-72h / Tren Superior o Core'
                     : 'Descanso Activo / Regeneración Muscular',
+            'is_training': isTarget && (exercises as List).isNotEmpty,
             'exercises': isTarget ? exercises : [],
             'nutrition': isTarget ? nutrition : defaultNutrition,
+            'synergy': isTarget
+                ? recoveryRule
+                : 'Día de recuperación y supercompensación muscular.',
           };
         }),
       };
@@ -550,9 +565,15 @@ class WeeklyPlanService extends ChangeNotifier {
         final idx = currentDays.indexWhere((d) => d['weekday'] == dayIdx);
         final newDay = {
           'weekday': dayIdx,
+          'weekday_name': _weekdayNames[dayIdx.clamp(0, 6)],
           'title': title,
+          'is_training': (exercises as List).isNotEmpty,
           'exercises': exercises,
-          'nutrition': nutrition.isNotEmpty ? nutrition : defaultNutrition,
+          'nutrition': (nutrition is Map && nutrition.isNotEmpty) ||
+                  (nutrition is List && nutrition.isNotEmpty)
+              ? nutrition
+              : defaultNutrition,
+          'synergy': recoveryRule,
         };
 
         if (idx != -1) {
@@ -564,6 +585,9 @@ class WeeklyPlanService extends ChangeNotifier {
       week!['days'] = currentDays;
     }
 
+    isLoading = false;
+    _pending = null;
+    lastError = null;
     notifyListeners();
     try {
       await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
