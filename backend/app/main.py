@@ -24,6 +24,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def disable_web_cache(request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if (
+        path == "/"
+        or path.endswith(".html")
+        or path.endswith(".js")
+        or path.endswith(".json")
+    ):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 app.include_router(coach.router, prefix="/api/coach", tags=["coach"])
 app.include_router(app_updates.router, prefix="/api/app", tags=["app"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

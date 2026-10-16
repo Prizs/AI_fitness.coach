@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -8,6 +9,12 @@ void showPlanOptionsSheet(
   String initialPrompt = '',
   void Function(String summaryText)? onSendState,
 }) {
+  if (onSendState == null) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const CoachScreen()),
+    );
+    return;
+  }
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,

@@ -51,7 +51,7 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
         title: const Text(
-          'Inicio (VERSIÓN 1.0.40 - Render Activo)',
+          'Inicio (VERSIÓN 1.0.47 - Render Activo)',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
