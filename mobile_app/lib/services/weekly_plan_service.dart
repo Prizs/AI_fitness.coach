@@ -83,6 +83,291 @@ class WeeklyPlanService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Map<String, dynamic> _buildLocalFallbackWeek({
+    required String goal,
+    required String experienceLevel,
+    required String intensityPreference,
+  }) {
+    final hint = '$intensityPreference $experienceLevel $goal'.toLowerCase();
+    final isLow = hint.contains('baja') ||
+        hint.contains('bajo') ||
+        hint.contains('principiante') ||
+        hint.contains('novato');
+    final isHigh = hint.contains('alta') ||
+        hint.contains('alto') ||
+        hint.contains('avanzado');
+    final lvlLabel = isLow
+        ? 'Básico (Intensidad Baja)'
+        : (isHigh
+            ? 'Avanzado (Intensidad Alta)'
+            : 'Intermedio (Intensidad Media)');
+    const baseGif =
+        'https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/';
+
+    final sessions = [
+      {
+        'title': 'Tren Inferior (Piernas y Glúteos) · $lvlLabel',
+        'exercises': [
+          {
+            'name': isLow
+                ? 'Sentadilla asistida con peso corporal'
+                : (isHigh
+                    ? 'Sentadilla profunda con barra'
+                    : 'Sentadilla goblet con mancuerna'),
+            'sets': isLow ? 3 : 4,
+            'reps': '10-12',
+            'primary_muscle': 'Cuádriceps',
+            'secondary_muscle': 'Glúteos',
+            'intensity_level': lvlLabel,
+            'gif_url': isLow
+                ? '${baseGif}Quads/Bodyweight-Squat.gif'
+                : '${baseGif}Quads/Dumbbell-Goblet-Squat.gif',
+          },
+          {
+            'name': isLow
+                ? 'Puente de glúteos en suelo'
+                : 'Peso muerto rumano con mancuernas',
+            'sets': 3,
+            'reps': '12',
+            'primary_muscle': 'Glúteos',
+            'secondary_muscle': 'Isquiotibiales',
+            'intensity_level': lvlLabel,
+            'gif_url': isLow
+                ? '${baseGif}Hamstrings/Glute-Bridge-with-Abduction- Bodyweight.gif'
+                : '${baseGif}Hamstrings/Dumbbell-Romanian-Deadlift.gif',
+          },
+          {
+            'name': 'Elevación de talones de pie',
+            'sets': 3,
+            'reps': '15',
+            'primary_muscle': 'Pantorrillas',
+            'secondary_muscle': 'Sóleo',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Calves/Standing-Calf-Raise.gif',
+          },
+        ],
+      },
+      {
+        'title': 'Tren Superior (Pecho y Espalda) · $lvlLabel',
+        'exercises': [
+          {
+            'name': isLow
+                ? 'Flexiones inclinadas con apoyo'
+                : 'Press de pecho con mancuernas',
+            'sets': 3,
+            'reps': '10-12',
+            'primary_muscle': 'Pectorales',
+            'secondary_muscle': 'Tríceps',
+            'intensity_level': lvlLabel,
+            'gif_url': isLow
+                ? '${baseGif}Chest/Incline-Push-Up.gif'
+                : '${baseGif}Chest/Dumbbell-Bench-Press.gif',
+          },
+          {
+            'name': isLow
+                ? 'Remo sentado en polea o con banda'
+                : 'Remo con mancuerna a una mano',
+            'sets': 3,
+            'reps': '12',
+            'primary_muscle': 'Dorsales',
+            'secondary_muscle': 'Bíceps',
+            'intensity_level': lvlLabel,
+            'gif_url': isLow
+                ? '${baseGif}Back/Cable-Seated-Row.gif'
+                : '${baseGif}Back/Dumbbell-Bent-Over-Row.gif',
+          },
+          {
+            'name': 'Press de hombros sentado con mancuernas',
+            'sets': 3,
+            'reps': '10-12',
+            'primary_muscle': 'Deltoides',
+            'secondary_muscle': 'Tríceps',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Shoulders/Dumbbell-Seated-Shoulder-Press.gif',
+          },
+        ],
+      },
+      {
+        'title': 'Tren Inferior (Recuperación 48h Superada) · $lvlLabel',
+        'exercises': [
+          {
+            'name': isLow
+                ? 'Zancada estática asistida sin peso'
+                : 'Prensa de piernas en máquina',
+            'sets': 3,
+            'reps': isLow ? '10 por pierna' : '10-12',
+            'primary_muscle': 'Cuádriceps',
+            'secondary_muscle': 'Glúteos',
+            'intensity_level': lvlLabel,
+            'gif_url': isLow
+                ? '${baseGif}Quads/Bodyweight-Walking-Lunge.gif'
+                : '${baseGif}Quads/Sled-45-degree-Leg-Press.gif',
+          },
+          {
+            'name': 'Curl femoral tumbado en máquina',
+            'sets': 3,
+            'reps': '12',
+            'primary_muscle': 'Isquiotibiales',
+            'secondary_muscle': 'Glúteos',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Hamstrings/Lever-Lying-Leg-Curl.gif',
+          },
+          {
+            'name': 'Plancha abdominal isométrica',
+            'sets': 3,
+            'reps': '30 s',
+            'primary_muscle': 'Core',
+            'secondary_muscle': 'Recto abdominal',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Abdominals/Front-Plank.gif',
+          },
+        ],
+      },
+      {
+        'title': 'Hombros, Brazos y Core · $lvlLabel',
+        'exercises': [
+          {
+            'name': 'Elevaciones laterales con mancuernas',
+            'sets': 3,
+            'reps': '12',
+            'primary_muscle': 'Deltoides',
+            'secondary_muscle': 'Trapecio',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Shoulders/Dumbbell-Lateral-Raise.gif',
+          },
+          {
+            'name': 'Curl de bíceps con mancuernas',
+            'sets': 3,
+            'reps': '12',
+            'primary_muscle': 'Bíceps',
+            'secondary_muscle': 'Antebrazo',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Biceps/Dumbbell-Bicep-Curl.gif',
+          },
+          {
+            'name': 'Crunch abdominal controlado en suelo',
+            'sets': 3,
+            'reps': '12-15',
+            'primary_muscle': 'Abdominales',
+            'secondary_muscle': 'Core',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Abdominals/Crunch-Floor.gif',
+          },
+        ],
+      },
+      {
+        'title': 'Acondicionamiento Funcional Integral · $lvlLabel',
+        'exercises': [
+          {
+            'name': isLow
+                ? 'Subida al cajón baja (Step-up suave)'
+                : 'Zancadas con mancuernas',
+            'sets': 3,
+            'reps': '10 por lado',
+            'primary_muscle': 'Cuádriceps',
+            'secondary_muscle': 'Glúteos',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Quads/Dumbbell-Step-up.gif',
+          },
+          {
+            'name': 'Jalón al pecho en polea alta',
+            'sets': 3,
+            'reps': '12',
+            'primary_muscle': 'Dorsales',
+            'secondary_muscle': 'Bíceps',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Back/Cable-Pulldown.gif',
+          },
+          {
+            'name': 'Elevación de piernas tumbado',
+            'sets': 3,
+            'reps': '12',
+            'primary_muscle': 'Abdominales',
+            'secondary_muscle': 'Core',
+            'intensity_level': lvlLabel,
+            'gif_url': '${baseGif}Abdominals/Lying-Leg-Raise.gif',
+          },
+        ],
+      },
+      {
+        'title': 'Movilidad Articular y Recuperación',
+        'exercises': [
+          {
+            'name': 'Estiramiento dinámico y movilidad de cadera',
+            'sets': 3,
+            'reps': '40 s',
+            'primary_muscle': 'Movilidad',
+            'secondary_muscle': 'Zona Lumbar',
+            'intensity_level': 'Básico (Intensidad Baja)',
+            'gif_url': '${baseGif}Calves/Butterfly-Yoga-Pose.gif',
+          },
+        ],
+      },
+      {
+        'title': 'Descanso Activo y Regeneración',
+        'exercises': [
+          {
+            'name': 'Caminata suave o bicicleta estática sin resistencia',
+            'sets': 1,
+            'reps': '20 min',
+            'primary_muscle': 'Cardio Bajo Impacto',
+            'secondary_muscle': 'Articulaciones',
+            'intensity_level': 'Básico (Intensidad Baja)',
+            'gif_url': '${baseGif}Cardio/Walking-on-Incline-Treadmill.gif',
+          },
+        ],
+      },
+    ];
+
+    final daysList = List.generate(7, (idx) {
+      final s = sessions[idx];
+      return {
+        'weekday': idx,
+        'weekday_name': _weekdayNames[idx],
+        'title': s['title'],
+        'is_training': idx < 5,
+        'exercises': s['exercises'],
+        'nutrition': [
+          {
+            'title': 'Desayuno',
+            'items': [
+              'Avena con yogur natural o huevos revueltos',
+              'Fruta fresca de temporada',
+              'Agua 400 ml',
+            ],
+          },
+          {
+            'title': 'Almuerzo',
+            'items': [
+              'Proteína magra 150 g (pollo, pescado o carne magra)',
+              'Arroz integral, papa o batata 1 taza cocida',
+              'Ensalada fresca variada con aceite de oliva',
+            ],
+          },
+          {
+            'title': 'Merienda',
+            'items': ['Fruta entera y puñado de frutos secos o yogur griego'],
+          },
+          {
+            'title': 'Cena',
+            'items': [
+              'Proteína ligera 130 g',
+              'Vegetales al vapor o salteados',
+            ],
+          },
+        ],
+        'synergy':
+            'Plan alternado con 48-72h de recuperación muscular y nutrición ajustada al gasto energético del día.',
+      };
+    });
+
+    return {
+      'provider': 'fallback_local',
+      'days': daysList,
+      'training_days': _weekdayNames.sublist(0, 5),
+    };
+  }
+
   Future<void> _fetchAndSave(
     UserProfile? profile, {
     String goal = 'Mejorar condición física general',
@@ -90,6 +375,8 @@ class WeeklyPlanService extends ChangeNotifier {
     String intensityPreference = 'Medio',
     bool equipmentAvailable = true,
   }) async {
+    final safeAge = (profile?.age ?? 25).clamp(12, 100);
+    final safeWeight = (profile?.weight ?? 70.0).clamp(30.0, 300.0);
     try {
       final response = await http
           .post(
@@ -98,16 +385,18 @@ class WeeklyPlanService extends ChangeNotifier {
             body: jsonEncode({
               'goal': goal,
               'level': experienceLevel.toLowerCase(),
-              'age': profile?.age ?? 25,
-              'weight': profile?.weight ?? 70,
+              'experience_level': experienceLevel,
+              'intensity': intensityPreference,
+              'intensity_preference': intensityPreference,
+              'age': safeAge,
+              'weight': safeWeight,
               'food_allergies': profile?.foodAllergies,
               'current_injuries': profile?.currentInjuries,
               'areas_to_avoid': profile?.areasToAvoid,
               'equipment_available': equipmentAvailable,
-              'intensity': intensityPreference,
             }),
           )
-          .timeout(const Duration(seconds: 120));
+          .timeout(const Duration(seconds: 90));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body);
@@ -116,18 +405,27 @@ class WeeklyPlanService extends ChangeNotifier {
           loadedFromCache = false;
           lastError = null;
           await DBHelper.instance.saveWeeklyPlan(response.body);
-        } else {
-          if (week == null) lastError = 'Formato de plan inesperado.';
-        }
-      } else {
-        if (week == null) {
-          lastError = 'El servidor devolvió un error (${response.statusCode}).';
+          return;
         }
       }
+      // Si el servidor devolvió error (ej. 422/500/503), generamos plan local seguro
+      week ??= _buildLocalFallbackWeek(
+        goal: goal,
+        experienceLevel: experienceLevel,
+        intensityPreference: intensityPreference,
+      );
+      lastError = null;
+      await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
     } catch (e) {
-      if (week == null) {
-        lastError = 'No se pudo conectar con el servidor ($e).';
-      }
+      week ??= _buildLocalFallbackWeek(
+        goal: goal,
+        experienceLevel: experienceLevel,
+        intensityPreference: intensityPreference,
+      );
+      lastError = null;
+      try {
+        await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
+      } catch (_) {}
     } finally {
       isLoading = false;
       _pending = null;

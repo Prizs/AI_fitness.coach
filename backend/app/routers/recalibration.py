@@ -5,9 +5,9 @@ router = APIRouter()
 
 
 class RecalibrationRequest(BaseModel):
-    current_weight: float = Field(..., gt=0)
-    target_weight: float = Field(..., gt=0)
-    weekly_progress: float = Field(..., ge=-100, le=100)
+    current_weight: float = Field(default=70.0)
+    target_weight: float = Field(default=68.0)
+    weekly_progress: float = Field(default=0.0)
 
 
 @router.post("/evaluate")

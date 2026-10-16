@@ -7,6 +7,7 @@ dia que le toca, sin depender de que el usuario consulte nada.
 Cuando la IA no esta disponible se usa un plan base seguro y orientativo.
 """
 
+from app.routers.exercises import classify_intensity, get_exercise_gif
 from app.services.ai_providers import configured_providers, generate_json_text
 
 WEEKDAY_NAMES = [
@@ -35,102 +36,160 @@ def _fallback_synergy(index: int, title: str) -> str:
     )
 
 
-def _sessions():
-    """Rutinas base de la semana. Los ultimos dos dias recuperan."""
+def _enrich_exercise(ex: dict, intensity_hint: str = "Media") -> dict:
+    name = str(ex.get("name") or "Ejercicio")
+    info = classify_intensity(name, intensity_hint)
+    gif_data = get_exercise_gif(name, intensity_hint)
+    return {
+        "name": name,
+        "sets": ex.get("sets") or 3,
+        "reps": str(ex.get("reps") or "10-12"),
+        "animation_key": str(ex.get("animation_key") or "generic-exercise"),
+        "primary_muscle": str(ex.get("primary_muscle") or "General"),
+        "secondary_muscle": str(ex.get("secondary_muscle") or "Secundario"),
+        "intensity_level": str(ex.get("intensity_level") or info["label"]),
+        "biomechanics": str(
+            ex.get("biomechanics")
+            or "Movimiento controlado respetando el rango articular y la respiración."
+        ),
+        "posture": str(
+            ex.get("posture")
+            or "Columna neutra, abdomen activado y estabilidad escapular."
+        ),
+        "gif_url": ex.get("gif_url") or gif_data.get("gif_url"),
+    }
+
+
+def _sessions(intensity_hint: str = "Media"):
+    """Rutinas base de la semana alternadas (48-72h recuperacion muscular)."""
+    is_low = any(k in intensity_hint.lower() for k in ("baja", "bajo", "principiante", "novato"))
+    is_high = any(k in intensity_hint.lower() for k in ("alta", "alto", "avanzado"))
+    lvl_label = (
+        "Básico (Intensidad Baja)"
+        if is_low
+        else ("Avanzado (Intensidad Alta)" if is_high else "Intermedio (Intensidad Media)")
+    )
     return [
         {
-            "title": "Fuerza tren superior",
+            "title": f"Tren Inferior (Piernas y Glúteos) · {lvl_label}",
             "exercises": [
-                {"name": "Press de pecho en pared", "sets": 3, "reps": "10",
-                 "animation_key": "wall-chest-press",
-                 "primary_muscle": "Pectoral", "secondary_muscle": "Triceps"},
-                {"name": "Flexiones inclinadas", "sets": 3, "reps": "8-12",
-                 "animation_key": "incline-push-up",
-                 "primary_muscle": "Pectoral", "secondary_muscle": "Core"},
-                {"name": "Remo con banda elastica", "sets": 3, "reps": "12",
-                 "animation_key": "seated-row",
-                 "primary_muscle": "Dorsal ancho", "secondary_muscle": "Biceps"},
-            ],
-        },
-        {
-            "title": "Fuerza tren inferior",
-            "exercises": [
-                {"name": "Sentadilla a la silla", "sets": 3, "reps": "10-12",
+                {"name": "Sentadilla asistida con peso corporal" if is_low else ("Sentadilla profunda con barra" if is_high else "Sentadilla goblet con mancuerna"),
+                 "sets": 3 if is_low else 4, "reps": "10-12",
                  "animation_key": "chair-squat",
-                 "primary_muscle": "Cuadriceps", "secondary_muscle": "Gluteos"},
-                {"name": "Puente de cadera", "sets": 3, "reps": "12",
+                 "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos",
+                 "intensity_level": lvl_label},
+                {"name": "Puente de glúteos en suelo" if is_low else "Peso muerto rumano con mancuernas",
+                 "sets": 3, "reps": "12",
                  "animation_key": "glute-bridge",
-                 "primary_muscle": "Gluteos", "secondary_muscle": "Isquiotibiales"},
-                {"name": "Elevacion de talones de pie", "sets": 3, "reps": "15",
+                 "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales",
+                 "intensity_level": lvl_label},
+                {"name": "Elevación de talones de pie",
+                 "sets": 3, "reps": "15",
                  "animation_key": "calf-raise",
-                 "primary_muscle": "Gemelos", "secondary_muscle": "Tibial anterior"},
+                 "primary_muscle": "Pantorrillas", "secondary_muscle": "Sóleo",
+                 "intensity_level": lvl_label},
             ],
         },
         {
-            "title": "Resistencia y cardio",
+            "title": f"Tren Superior (Pecho y Espalda) · {lvl_label}",
             "exercises": [
-                {"name": "Marcha en el sitio", "sets": 5, "reps": "60 s",
-                 "animation_key": "march-in-place",
-                 "primary_muscle": "Cardio", "secondary_muscle": "Cuadriceps"},
-                {"name": "Bicicleta suave", "sets": 4, "reps": "45 s",
-                 "animation_key": "bike",
-                 "primary_muscle": "Cardio", "secondary_muscle": "Gluteos"},
-                {"name": "Plancha frontal", "sets": 3, "reps": "20-30 s",
-                 "animation_key": "front-plank",
-                 "primary_muscle": "Core", "secondary_muscle": "Dorsal ancho"},
-            ],
-        },
-        {
-            "title": "Hombros y core",
-            "exercises": [
-                {"name": "Press de hombros sentado", "sets": 3, "reps": "10",
-                 "animation_key": "seated-shoulder-press",
-                 "primary_muscle": "Deltoides", "secondary_muscle": "Triceps"},
-                {"name": "Elevaciones laterales", "sets": 3, "reps": "12",
-                 "animation_key": "lateral-raise",
-                 "primary_muscle": "Deltoides", "secondary_muscle": "Trapecio"},
-                {"name": "Dead bug", "sets": 3, "reps": "10 por lado",
-                 "animation_key": "dead-bug",
-                 "primary_muscle": "Core", "secondary_muscle": "Cuadriceps"},
-            ],
-        },
-        {
-            "title": "Fuerza funcional",
-            "exercises": [
-                {"name": "Zancada asistida", "sets": 3, "reps": "10 por pierna",
-                 "animation_key": "assisted-lunge",
-                 "primary_muscle": "Cuadriceps", "secondary_muscle": "Gluteos"},
-                {"name": "Remo sentado en silla", "sets": 3, "reps": "12",
+                {"name": "Flexiones inclinadas con apoyo" if is_low else "Press de pecho con mancuernas",
+                 "sets": 3, "reps": "10-12",
+                 "animation_key": "incline-push-up",
+                 "primary_muscle": "Pectorales", "secondary_muscle": "Tríceps",
+                 "intensity_level": lvl_label},
+                {"name": "Remo sentado con banda o polea" if is_low else "Remo con mancuerna a una mano",
+                 "sets": 3, "reps": "12",
                  "animation_key": "seated-row",
-                 "primary_muscle": "Dorsal ancho", "secondary_muscle": "Biceps"},
-                {"name": "Plancha lateral", "sets": 3, "reps": "20 s por lado",
+                 "primary_muscle": "Dorsales", "secondary_muscle": "Bíceps",
+                 "intensity_level": lvl_label},
+                {"name": "Press de hombros sentado con mancuernas ligeras",
+                 "sets": 3, "reps": "10-12",
+                 "animation_key": "seated-shoulder-press",
+                 "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps",
+                 "intensity_level": lvl_label},
+            ],
+        },
+        {
+            "title": f"Tren Inferior (Recuperación 48h Superada) · {lvl_label}",
+            "exercises": [
+                {"name": "Zancada estática asistida sin peso" if is_low else "Prensa de piernas en máquina",
+                 "sets": 3, "reps": "10 por pierna" if is_low else "10-12",
+                 "animation_key": "assisted-lunge",
+                 "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos",
+                 "intensity_level": lvl_label},
+                {"name": "Curl femoral tumbado en máquina",
+                 "sets": 3, "reps": "12",
+                 "animation_key": "leg-curl",
+                 "primary_muscle": "Isquiotibiales", "secondary_muscle": "Glúteos",
+                 "intensity_level": lvl_label},
+                {"name": "Plancha abdominal isométrica",
+                 "sets": 3, "reps": "30 s",
+                 "animation_key": "front-plank",
+                 "primary_muscle": "Core", "secondary_muscle": "Recto abdominal",
+                 "intensity_level": lvl_label},
+            ],
+        },
+        {
+            "title": f"Hombros, Brazos y Core · {lvl_label}",
+            "exercises": [
+                {"name": "Elevaciones laterales con mancuernas",
+                 "sets": 3, "reps": "12",
+                 "animation_key": "lateral-raise",
+                 "primary_muscle": "Deltoides", "secondary_muscle": "Trapecio",
+                 "intensity_level": lvl_label},
+                {"name": "Curl de bíceps con mancuernas",
+                 "sets": 3, "reps": "12",
+                 "animation_key": "bicep-curl",
+                 "primary_muscle": "Bíceps", "secondary_muscle": "Antebrazo",
+                 "intensity_level": lvl_label},
+                {"name": "Crunch abdominal controlado en suelo",
+                 "sets": 3, "reps": "12-15",
+                 "animation_key": "dead-bug",
+                 "primary_muscle": "Abdominales", "secondary_muscle": "Core",
+                 "intensity_level": lvl_label},
+            ],
+        },
+        {
+            "title": f"Acondicionamiento Funcional Integral · {lvl_label}",
+            "exercises": [
+                {"name": "Subida al cajón baja (Step-up suave)" if is_low else "Zancadas caminando con mancuernas",
+                 "sets": 3, "reps": "10 por lado",
+                 "animation_key": "assisted-lunge",
+                 "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos",
+                 "intensity_level": lvl_label},
+                {"name": "Jalón al pecho en polea alta",
+                 "sets": 3, "reps": "12",
+                 "animation_key": "seated-row",
+                 "primary_muscle": "Dorsales", "secondary_muscle": "Bíceps",
+                 "intensity_level": lvl_label},
+                {"name": "Elevación de piernas tumbado",
+                 "sets": 3, "reps": "12",
                  "animation_key": "side-plank",
-                 "primary_muscle": "Core", "secondary_muscle": "Dorsal ancho"},
+                 "primary_muscle": "Abdominales", "secondary_muscle": "Core",
+                 "intensity_level": lvl_label},
             ],
         },
         {
-            "title": "Movilidad y recuperacion",
+            "title": "Movilidad Articular y Recuperación",
             "exercises": [
-                {"name": "Estiramiento de cadena posterior", "sets": 2, "reps": "30 s",
+                {"name": "Estiramiento dinámico y movilidad de cadera", "sets": 3, "reps": "40 s",
                  "animation_key": "hamstring-stretch",
-                 "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
-                {"name": "Rotacion de hombro asistida", "sets": 2, "reps": "12",
-                 "animation_key": "shoulder-mobility",
-                 "primary_muscle": "Deltoides", "secondary_muscle": "Trapecio"},
-                {"name": "Caminata suave", "sets": 1, "reps": "15 min",
+                 "primary_muscle": "Caderas y Movilidad", "secondary_muscle": "Zona Lumbar",
+                 "intensity_level": "Básico (Intensidad Baja)"},
+                {"name": "Caminata en cinta con inclinación moderada", "sets": 1, "reps": "15 min",
                  "animation_key": "walk",
-                 "primary_muscle": "Cardio", "secondary_muscle": "Core"},
+                 "primary_muscle": "Sistema Cardiovascular", "secondary_muscle": "Tren Inferior",
+                 "intensity_level": "Básico (Intensidad Baja)"},
             ],
         },
         {
-            "title": "Descanso activo",
+            "title": "Descanso Activo y Regeneración",
             "exercises": [
-                {"name": "Caminata a ritmo conversacional", "sets": 1, "reps": "25 min",
-                 "animation_key": "walk",
-                 "primary_muscle": "Cardio", "secondary_muscle": "Core"},
-                {"name": "Estiramiento de pectoral en puerta", "sets": 2, "reps": "30 s",
-                 "animation_key": "chest-stretch",
-                 "primary_muscle": "Pectoral", "secondary_muscle": "Deltoides"},
+                {"name": "Bicicleta estática a ritmo suave", "sets": 1, "reps": "20 min",
+                 "animation_key": "bike",
+                 "primary_muscle": "Cardio Bajo Impacto", "secondary_muscle": "Articulaciones",
+                 "intensity_level": "Básico (Intensidad Baja)"},
             ],
         },
     ]
@@ -163,7 +222,7 @@ def _meals_for(index):
     if index == 0:
         base[0]["items"].append("Yogur griego: proteina extra para fuerza")
     elif index == 2:
-        base[1]["items"].append("Carbohidratos extra: energia para el cardio")
+        base[1]["items"].append("Carbohidratos extra: energia para recuperacion muscular")
     elif index == 5:
         base[2]["items"] = ["Fruta", "Agua 500 ml: hidratacion para recuperar"]
     elif index == 6:
@@ -172,30 +231,32 @@ def _meals_for(index):
 
 
 def _fallback_week(profile):
-    """Semana completa sin IA, respetando las restricciones del perfil."""
-    sessions = _sessions()
+    """Semana completa sin IA, respetando las restricciones e intensidad del perfil."""
+    intensity_hint = f"{profile.get('intensity_preference', 'Media')} {profile.get('experience_level', 'Intermedio')} {profile.get('goal', '')}"
+    sessions = _sessions(intensity_hint)
 
     notes = " ".join([
         str(profile.get("areas_to_avoid") or ""),
         str(profile.get("current_injuries") or ""),
     ]).lower()
     if any(t in notes for t in ("tobillo", "rodilla", "cadera", "pierna")):
-        allowed = ("Pectoral", "Dorsal ancho", "Biceps", "Triceps", "Deltoides",
-                   "Core", "Cardio", "Trapecio", "Isquiotibiales")
+        allowed = ("Pectorales", "Dorsales", "Bíceps", "Tríceps", "Deltoides",
+                   "Core", "Abdominales", "Sistema Cardiovascular", "Cardio Bajo Impacto")
         for day in sessions:
             filtered = [ex for ex in day["exercises"]
                         if ex["primary_muscle"] in allowed]
-            day["exercises"] = filtered or sessions[6]["exercises"]
+            day["exercises"] = filtered or sessions[1]["exercises"]
 
     days = []
     for index, name in enumerate(WEEKDAY_NAMES):
         session = sessions[index]
+        enriched_exercises = [_enrich_exercise(ex, intensity_hint) for ex in session["exercises"]]
         days.append({
             "weekday": index,
             "weekday_name": name,
             "title": session["title"],
             "is_training": index < 5,
-            "exercises": session["exercises"],
+            "exercises": enriched_exercises,
             "nutrition": _meals_for(index),
             "synergy": _fallback_synergy(index, session["title"]),
         })
@@ -207,7 +268,7 @@ def _fallback_week(profile):
     }
 
 
-def _normalize_days(raw):
+def _normalize_days(raw, intensity_hint: str = "Media"):
     """Garantiza que haya 7 dias bien formados y en orden."""
     by_weekday = {}
     for entry in (raw if isinstance(raw, list) else []):
@@ -224,17 +285,7 @@ def _normalize_days(raw):
         for ex in entry.get("exercises") or []:
             if not isinstance(ex, dict):
                 continue
-            exercises.append({
-                "name": str(ex.get("name") or "Ejercicio"),
-                "sets": ex.get("sets") or 3,
-                "reps": str(ex.get("reps") or "10"),
-                "animation_key": str(ex.get("animation_key") or "generic-exercise"),
-                "primary_muscle": str(ex.get("primary_muscle") or "General"),
-                "secondary_muscle": str(ex.get("secondary_muscle") or "Secundario"),
-                "intensity_level": str(ex.get("intensity_level") or "Básico (Intensidad Baja)"),
-                "biomechanics": str(ex.get("biomechanics") or "Movimiento controlado respetando el rango articular."),
-                "posture": str(ex.get("posture") or "Columna neutra y control postural."),
-            })
+            exercises.append(_enrich_exercise(ex, intensity_hint))
         nutrition = []
         for meal in entry.get("nutrition") or []:
             if not isinstance(meal, dict):
@@ -295,7 +346,7 @@ def _ai_week(profile):
     try:
         result = generate_json_text(prompt, timeout=AI_TIMEOUT_SEC)
         data = json.loads(result.text)
-        days = _normalize_days(data.get("days"))
+        days = _normalize_days(data.get("days"), f"{intensity} {exp}")
         # Solo se acepta si la IA trajo contenido real para varios dias.
         completos = sum(1 for d in days if d["exercises"] and d["nutrition"])
         if completos < 3:

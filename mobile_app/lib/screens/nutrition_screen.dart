@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/widgets/plan_options_sheet.dart';
 
 /// Nutricion del dia de la semana en el que esta el telefono.
 ///
@@ -68,8 +69,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
       }
       return _EmptyState(
         message: _service.lastError ??
-            'No se pudo cargar la semana. Revisa la conexion.',
-        onRetry: _ensure,
+            'Aún no tienes un plan nutricional semanal activo.\n\nPresiona el botón de abajo para generar tu rutina y plan nutricional personalizado.',
+        onRetry: () => showPlanOptionsSheet(context),
       );
     }
 
@@ -124,7 +125,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
             ),
             IconButton(
               tooltip: 'Actualizar semana',
-              onPressed: _ensure,
+              onPressed: () =>
+                  _service.refresh(AuthService.instance.loggedInUser),
               icon: const Icon(Icons.refresh_rounded,
                   color: Color(0xFF8BE0C0)),
             ),
@@ -360,26 +362,34 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_off_rounded,
-              size: 46, color: Color(0xFFFF7A7A)),
-          const SizedBox(height: 12),
-          Text(message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70)),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF8BE0C0),
-              foregroundColor: const Color(0xFF0B1220),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.restaurant_menu_rounded,
+                size: 56, color: Color(0xFF8BE0C0)),
+            const SizedBox(height: 14),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, height: 1.5)),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF8BE0C0),
+                foregroundColor: const Color(0xFF0B1220),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              ),
+              onPressed: onRetry,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Crear mi plan',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ),
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Reintentar'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

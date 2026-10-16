@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.ai_providers import configured_providers, generate_json_text
@@ -22,31 +22,32 @@ WEEK_CACHE: dict[str, tuple[float, dict]] = {}
 
 
 class WeeklyRequest(BaseModel):
-    goal: str = Field(default="mejorar condicion fisica", max_length=120)
-    level: str = Field(default="intermedio", max_length=40)
-    experience_level: str = Field(default="Intermedio", max_length=40)
-    intensity_preference: str = Field(default="Medio", max_length=40)
-    equipment_available: bool = Field(default=True)
-    age: int = Field(default=25, ge=12, le=100)
-    weight: float = Field(default=70, gt=0, le=300)
-    food_allergies: str | None = Field(default=None, max_length=1000)
-    current_injuries: str | None = Field(default=None, max_length=1000)
-    areas_to_avoid: str | None = Field(default=None, max_length=500)
+    goal: str | None = Field(default="mejorar condicion fisica", max_length=5000)
+    level: str | None = Field(default="intermedio", max_length=500)
+    experience_level: str | None = Field(default=None, max_length=500)
+    intensity: str | None = Field(default=None, max_length=500)
+    intensity_preference: str | None = Field(default="Medio", max_length=500)
+    equipment_available: bool | None = Field(default=True)
+    age: int | float | None = Field(default=25)
+    weight: float | int | None = Field(default=70)
+    food_allergies: str | None = Field(default=None, max_length=3000)
+    current_injuries: str | None = Field(default=None, max_length=3000)
+    areas_to_avoid: str | None = Field(default=None, max_length=3000)
 
 
 class PlanRequest(BaseModel):
-    goal: str = Field(..., min_length=2, max_length=120)
-    level: str = Field(..., min_length=2, max_length=40)
-    days_per_week: int = Field(..., ge=1, le=7)
-    age: int = Field(..., ge=12, le=100)
-    weight: float = Field(..., gt=0, le=300)
-    height: float | None = Field(default=None, gt=0, le=260)
-    sex: str | None = Field(default=None, max_length=20)
-    health_notes: str | None = Field(default=None, max_length=1000)
-    food_allergies: str | None = Field(default=None, max_length=1000)
-    current_injuries: str | None = Field(default=None, max_length=1000)
-    motor_disability: str | None = Field(default=None, max_length=1000)
-    areas_to_avoid: str | None = Field(default=None, max_length=500)
+    goal: str = Field(default="mejorar condicion fisica", max_length=5000)
+    level: str = Field(default="intermedio", max_length=500)
+    days_per_week: int = Field(default=4)
+    age: int | float = Field(default=25)
+    weight: float | int = Field(default=70)
+    height: float | int | None = Field(default=None)
+    sex: str | None = Field(default=None, max_length=100)
+    health_notes: str | None = Field(default=None, max_length=3000)
+    food_allergies: str | None = Field(default=None, max_length=3000)
+    current_injuries: str | None = Field(default=None, max_length=3000)
+    motor_disability: str | None = Field(default=None, max_length=3000)
+    areas_to_avoid: str | None = Field(default=None, max_length=3000)
     learning_consent: bool = False
 
 
@@ -56,17 +57,17 @@ WEEKDAY_NAMES = [
 ]
 
 
-
 class AlternativeRequest(BaseModel):
-    current_exercise: str
-    target_muscle: str
-    goal: str = "mejorar condicion fisica"
+    current_exercise: str = Field(default="Ejercicio", max_length=500)
+    target_muscle: str = Field(default="General", max_length=500)
+    goal: str | None = Field(default="mejorar condicion fisica", max_length=5000)
     equipment_available: bool = True
 
+
 class PlanFeedback(BaseModel):
-    plan_provider: str = Field(..., max_length=30)
-    rating: int = Field(..., ge=1, le=5)
-    restriction_category: str | None = Field(default=None, max_length=40)
+    plan_provider: str = Field(default="fallback", max_length=200)
+    rating: int = Field(default=5)
+    restriction_category: str | None = Field(default=None, max_length=500)
     safe_outcome: bool = False
     learning_consent: bool = False
 
@@ -253,7 +254,24 @@ def weekly_plan(payload: WeeklyRequest):
     muestren el dia actual sin tener que esperar a una IA.
     """
     profile = payload.model_dump()
-    key = _cache_key(payload)
+    profile["goal"] = (payload.goal or "mejorar condicion fisica").strip()
+    effective_level = payload.experience_level or payload.level or "Intermedio"
+    profile["experience_level"] = effective_level
+    profile["level"] = effective_level.lower()
+    effective_intensity = payload.intensity or payload.intensity_preference or "Medio"
+    profile["intensity_preference"] = effective_intensity
+    try:
+        profile["age"] = max(12, min(100, int(payload.age or 25)))
+    except Exception:
+        profile["age"] = 25
+    try:
+        profile["weight"] = max(30.0, min(300.0, float(payload.weight or 70.0)))
+    except Exception:
+        profile["weight"] = 70.0
+
+    key = hashlib.sha256(
+        json.dumps(profile, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
     entry = WEEK_CACHE.get(key)
     if entry is not None and time.time() - entry[0] <= WEEK_CACHE_TTL_SEC:
         return {**entry[1], "cached": True}
@@ -279,10 +297,22 @@ def record_feedback(payload: PlanFeedback):
         "scope": "anonymous_aggregate" if payload.learning_consent else "disabled",
         "message": "Solo se guardan señales agregadas y no diagnósticos ni texto médico personal.",
     }
+
+
 @router.post("/alternative")
 def alternative_exercise(payload: AlternativeRequest):
     from app.services.weekly_plan import get_alternative_exercise
     alt = get_alternative_exercise(payload)
     if alt:
         return alt
-    raise HTTPException(status_code=500, detail="No se pudo encontrar una alternativa.")
+    return {
+        "name": f"Variante controlada de {payload.target_muscle}",
+        "sets": 3,
+        "reps": "10-12",
+        "animation_key": "generic-exercise",
+        "primary_muscle": payload.target_muscle,
+        "secondary_muscle": "Core",
+        "equipment": "Peso Corporal",
+        "intensity_level": "Básico (Intensidad Baja)",
+    }
+

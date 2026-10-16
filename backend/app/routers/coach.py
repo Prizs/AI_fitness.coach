@@ -21,26 +21,26 @@ MAX_HISTORY_TURNS = 20
 
 
 class ChatTurn(BaseModel):
-    role: str = Field(..., pattern="^(user|assistant)$")
-    content: str = Field(..., max_length=4000)
+    role: str = Field(default="user")
+    content: str = Field(default="", max_length=20000)
 
 
 class ChatMessage(BaseModel):
-    message: str = Field(..., min_length=1, max_length=2000)
-    history: list[ChatTurn] = Field(default_factory=list, max_length=MAX_HISTORY_TURNS)
-    user_goal: str | None = Field(default=None, max_length=120)
-    user_level: str | None = Field(default=None, max_length=40)
-    user_intensity: str | None = Field(default=None, max_length=40)
-    allergies: str | None = Field(default=None, max_length=1000)
-    injuries: str | None = Field(default=None, max_length=1000)
-    motor_disability: str | None = Field(default=None, max_length=1000)
-    areas_to_avoid: str | None = Field(default=None, max_length=500)
-    rpe_feedback: int | None = Field(default=None, ge=1, le=10)
-    age: int | None = Field(default=None, ge=12, le=100)
-    weight: float | None = Field(default=None, gt=0, le=300)
-    active_plan_start: str | None = Field(default=None, max_length=50)
-    active_plan_end: str | None = Field(default=None, max_length=50)
-    equipment_details: str | None = Field(default=None, max_length=200)
+    message: str = Field(default="Hola", max_length=15000)
+    history: list[ChatTurn] = Field(default_factory=list)
+    user_goal: str | None = Field(default=None, max_length=5000)
+    user_level: str | None = Field(default=None, max_length=500)
+    user_intensity: str | None = Field(default=None, max_length=500)
+    allergies: str | None = Field(default=None, max_length=3000)
+    injuries: str | None = Field(default=None, max_length=3000)
+    motor_disability: str | None = Field(default=None, max_length=3000)
+    areas_to_avoid: str | None = Field(default=None, max_length=3000)
+    rpe_feedback: int | float | None = Field(default=None)
+    age: int | float | None = Field(default=None)
+    weight: float | int | None = Field(default=None)
+    active_plan_start: str | None = Field(default=None, max_length=200)
+    active_plan_end: str | None = Field(default=None, max_length=200)
+    equipment_details: str | None = Field(default=None, max_length=2000)
 
 
 def _extract_effective_level_and_intensity(payload: ChatMessage) -> tuple[str, str]:

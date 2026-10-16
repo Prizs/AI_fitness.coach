@@ -315,6 +315,8 @@ class _DayCard extends StatelessWidget {
             const SizedBox(height: 6),
             ...exercises.map((exercise) {
               final item = Map<String, dynamic>.from(exercise as Map);
+              final intensityLvl =
+                  item['intensity_level'] as String? ?? 'Básico (Intensidad Baja)';
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Container(
@@ -331,8 +333,8 @@ class _DayCard extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
-                  '${item['sets']} series · ${item['reps']}',
-                  style: const TextStyle(color: Colors.white70),
+                  '${item['sets']} series · ${item['reps']} · $intensityLvl',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 trailing: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
@@ -362,20 +364,25 @@ class _DayCard extends StatelessWidget {
       final exName = ex['name'] as String? ?? 'Ejercicio';
       final primary = ex['primary_muscle'] as String? ?? 'General';
       final secondary = ex['secondary_muscle'] as String? ?? 'Secundario';
+      final intensityLvl = ex['intensity_level'] as String? ?? 'Básico (Intensidad Baja)';
       
-      String url = '';
-      try {
-        final res = await http.get(Uri.parse('https://ai-fitness-coach-818a.onrender.com/api/exercises/gif?query=' + Uri.encodeComponent(exName)));
-        if (res.statusCode == 200) {
-          url = jsonDecode(res.body)['url'] ?? '';
-        }
-      } catch (_) {}
+      String url = (ex['gif_url'] as String? ?? '').trim();
+      if (url.isEmpty) {
+        try {
+          final res = await http.get(Uri.parse(
+              'https://ai-fitness-coach-818a.onrender.com/api/exercises/gif?query=${Uri.encodeComponent(exName)}&intensity=${Uri.encodeComponent(intensityLvl)}'));
+          if (res.statusCode == 200) {
+            url = jsonDecode(res.body)['url'] ?? '';
+          }
+        } catch (_) {}
+      }
       
       dyn.add(AnatomyExercise(
         id: exName,
         name: exName,
         shortName: exName,
         gifUrl: url,
+        intensityLevel: intensityLvl,
         agonist: primary,
         synergists: [secondary],
         biomechanics: ex['biomechanics'] as String? ?? 'Biomecánica sugerida por IA.',

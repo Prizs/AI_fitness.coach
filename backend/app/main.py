@@ -31,6 +31,8 @@ app.include_router(plans.router, prefix="/api/plans", tags=["plans"])
 app.include_router(workouts.router, prefix="/api/workout", tags=["workout"])
 app.include_router(recalibration.router, prefix="/api/recalibration", tags=["recalibration"])
 app.include_router(exercises.router, prefix="/api/exercises", tags=["exercises"])
+app.include_router(trainer.router)
+app.include_router(progress.router)
 
 
 @app.get("/health")

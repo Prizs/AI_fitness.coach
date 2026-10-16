@@ -5,9 +5,9 @@ router = APIRouter()
 
 
 class WorkoutRequest(BaseModel):
-    goal: str = Field(..., min_length=2)
-    level: str = Field(..., min_length=2)
-    days_per_week: int = Field(..., ge=1, le=7)
+    goal: str = Field(default="mejorar condicion fisica", max_length=5000)
+    level: str = Field(default="intermedio", max_length=500)
+    days_per_week: int = Field(default=4)
 
 
 @router.post("/routine")
