@@ -369,6 +369,15 @@ class _CoachScreenState extends State<CoachScreen> {
                               _userLevel = tier['level'] as String;
                               _userIntensity = tier['intensity'] as String;
                             });
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('⚡ Modo ${tier['label']} seleccionado para el Coach IA y ejercicios'),
+                                backgroundColor: const Color(0xFF16253B),
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -849,32 +858,14 @@ class _CoachScreenState extends State<CoachScreen> {
     if (plan['exercises'] != null) {
       for (var ex in plan['exercises']) {
         final String exName = (ex['name'] ?? 'Ejercicio').toString();
-        final String primaryM = (ex['primary_muscle'] ?? 'Cuádriceps, Glúteos').toString();
-        final String secondaryM = (ex['secondary_muscle'] ?? 'Isquiotibiales').toString();
+        final String primaryM = (ex['primary_muscle'] ?? 'Piernas').toString();
+        final String secondaryM = (ex['secondary_muscle'] ?? '').toString();
         String gifUrl = (ex['gif_url'] ?? '').toString();
         String intLevel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
         String biomech = (ex['biomechanics'] ?? 'Movimiento controlado respetando el rango articular.').toString();
         String tempoStr = (ex['tempo'] ?? '3-1-1').toString();
         String postureStr = (ex['posture'] ?? 'Mantén la columna neutra y abdomen activo.').toString();
         String warnStr = (ex['warning'] ?? 'Consulta a tu entrenador si sientes dolor.').toString();
-
-        if (gifUrl.isEmpty) {
-          try {
-            final uri = Uri.parse(
-              '${AuthService.apiBaseUrl}/api/exercises/gif?query=${Uri.encodeComponent(exName)}&muscle=${Uri.encodeComponent(primaryM)}&intensity=${Uri.encodeComponent(_userIntensity)}',
-            );
-            final res = await http.get(uri);
-            if (res.statusCode == 200) {
-              final body = jsonDecode(res.body);
-              gifUrl = (body['url'] ?? '').toString();
-              intLevel = (body['intensity_level'] ?? intLevel).toString();
-              biomech = (body['biomechanics'] ?? biomech).toString();
-              tempoStr = (body['tempo'] ?? tempoStr).toString();
-              postureStr = (body['posture'] ?? postureStr).toString();
-              warnStr = (body['warning'] ?? warnStr).toString();
-            }
-          } catch (_) {}
-        }
 
         dyn.add(AnatomyExercise(
           id: exName,
@@ -887,7 +878,7 @@ class _CoachScreenState extends State<CoachScreen> {
             existingUrl: gifUrl,
           ),
           agonist: primaryM,
-          synergists: [secondaryM],
+          synergists: secondaryM.isNotEmpty ? [secondaryM] : [],
           intensityLevel: intLevel,
           biomechanics: biomech,
           tempo: tempoStr,
@@ -896,9 +887,25 @@ class _CoachScreenState extends State<CoachScreen> {
         ));
       }
     }
+
+    String initialId = 'squat';
+    if (targetExerciseName != null && dyn.isNotEmpty) {
+      final tLower = targetExerciseName.toLowerCase().trim();
+      final match = dyn.firstWhere(
+        (e) => e.name.toLowerCase().trim() == tLower ||
+               e.name.toLowerCase().contains(tLower) ||
+               tLower.contains(e.name.toLowerCase().trim()) ||
+               e.id.toLowerCase() == tLower,
+        orElse: () => dyn.first,
+      );
+      initialId = match.id;
+    } else if (dyn.isNotEmpty) {
+      initialId = dyn.first.id;
+    }
+
     if (!mounted) return;
     Navigator.push(context, MaterialPageRoute(builder: (_) => AnatomyWorkoutScreen(
-      initialExerciseId: targetExerciseName ?? (dyn.isNotEmpty ? dyn.first.id : 'squat'),
+      initialExerciseId: initialId,
       dynamicExercises: dyn.isNotEmpty ? dyn : null,
     )));
   }
