@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-/// Servicio centralizado de reconocimiento de voz para Web, Móvil y Escritorio.
-/// Resuelve el problema del singleton de speech_to_text y asegura que un segundo
-/// clic detenga la grabación y envíe el mensaje de forma inmediata y confiable.
+/// Servicio centralizado y robusto de reconocimiento de voz para Web, Móvil y PC.
+/// Mantiene la sesión activa en PC durante pausas naturales (ignora 'no-speech')
+/// y garantiza que el segundo toque detenga la grabación y envíe el mensaje.
 class VoiceService with ChangeNotifier {
   static final VoiceService instance = VoiceService._internal();
   VoiceService._internal();
@@ -12,8 +12,10 @@ class VoiceService with ChangeNotifier {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isInitialized = false;
   bool _isListening = false;
+  bool _userExplicitlyStopped = true;
   String _currentWords = '';
   String? _lastError;
+  String? _selectedLocale;
 
   void Function(String text)? _activeResultCallback;
   void Function(bool listening)? _activeListeningCallback;
@@ -23,7 +25,7 @@ class VoiceService with ChangeNotifier {
   String get currentWords => _currentWords;
   String? get lastError => _lastError;
 
-  /// Inicializa el motor de reconocimiento si aún no está listo.
+  /// Inicializa el motor de voz y resuelve el dialecto adecuado para la PC.
   Future<bool> initIfNeeded() async {
     if (_isInitialized) return true;
 
@@ -33,6 +35,21 @@ class VoiceService with ChangeNotifier {
         onError: _handleError,
         debugLogging: kDebugMode,
       );
+
+      if (_isInitialized) {
+        // Encontrar mejor dialecto español compatible en este navegador
+        try {
+          final locales = await _speech.locales();
+          for (var l in locales) {
+            final id = l.localeId.toLowerCase();
+            if (id == 'es-419' || id == 'es_419' || id == 'es-ve' || id == 'es_ve' || id == 'es-la' || id == 'es-es' || id == 'es_es' || id.startsWith('es')) {
+              _selectedLocale = l.localeId;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+
       return _isInitialized;
     } catch (e) {
       _isInitialized = false;
@@ -47,22 +64,72 @@ class VoiceService with ChangeNotifier {
       _activeListeningCallback?.call(true);
       notifyListeners();
     } else if (status == 'notListening' || status == 'done') {
-      _isListening = false;
-      _activeListeningCallback?.call(false);
-      notifyListeners();
+      // En PC / Web el navegador envía notListening ante una pausa breve.
+      // Si el usuario no ha tocado detener, rearmamos la escucha para que
+      // no se corte mientras habla.
+      if (!_userExplicitlyStopped && _isListening) {
+        _rearmListening();
+      } else {
+        _isListening = false;
+        _activeListeningCallback?.call(false);
+        notifyListeners();
+      }
     }
   }
 
   void _handleError(dynamic errorNotification) {
-    _isListening = false;
     final String errorMsg = errorNotification?.errorMsg?.toString() ?? 'Error de micrófono';
+
+    // 'no-speech' no es un error fatal: solo indica silencio temporal en la PC.
+    if (errorMsg.contains('no-speech')) {
+      if (!_userExplicitlyStopped && _isListening) {
+        _rearmListening();
+      }
+      return;
+    }
+
     _lastError = errorMsg;
+    _isListening = false;
     _activeListeningCallback?.call(false);
     _activeErrorCallback?.call(errorMsg);
     notifyListeners();
   }
 
-  /// Inicia la escucha con un callback para recibir las palabras en tiempo real.
+  void _rearmListening() {
+    if (_userExplicitlyStopped) return;
+    Future.delayed(const Duration(milliseconds: 250), () async {
+      if (!_userExplicitlyStopped && _isListening) {
+        try {
+          await _listenInternal();
+        } catch (_) {}
+      }
+    });
+  }
+
+  Future<void> _listenInternal() async {
+    final options = stt.SpeechListenOptions(
+      listenMode: stt.ListenMode.dictation,
+      cancelOnError: false,
+      partialResults: true,
+      onDevice: false,
+    );
+
+    await _speech.listen(
+      onResult: (result) {
+        if (result.recognizedWords.trim().isNotEmpty) {
+          _currentWords = result.recognizedWords;
+          _activeResultCallback?.call(_currentWords);
+          notifyListeners();
+        }
+      },
+      localeId: _selectedLocale ?? 'es_ES',
+      listenOptions: options,
+      pauseFor: const Duration(seconds: 15),
+      listenFor: const Duration(minutes: 5),
+    );
+  }
+
+  /// Inicia la captura continua de voz.
   Future<bool> startListening({
     required void Function(String text) onResult,
     void Function(bool listening)? onListeningChanged,
@@ -78,13 +145,14 @@ class VoiceService with ChangeNotifier {
     _activeErrorCallback = onError;
     _currentWords = '';
     _lastError = null;
+    _userExplicitlyStopped = false;
 
     final bool available = await initIfNeeded();
     if (!available) {
       _isListening = false;
       _activeListeningCallback?.call(false);
       _activeErrorCallback?.call(
-        'El micrófono no está habilitado en este navegador. Revisa los permisos en la barra de direcciones (ícono de candado 🔒).',
+        'El micrófono no está habilitado o bloqueado. En PC, haz clic en el candado 🔒 en la barra de direcciones y selecciona "Permitir micrófono".',
       );
       notifyListeners();
       return false;
@@ -95,29 +163,21 @@ class VoiceService with ChangeNotifier {
       _activeListeningCallback?.call(true);
       notifyListeners();
 
-      await _speech.listen(
-        onResult: (result) {
-          _currentWords = result.recognizedWords;
-          _activeResultCallback?.call(_currentWords);
-          notifyListeners();
-        },
-        localeId: 'es_ES',
-        cancelOnError: false,
-        partialResults: true,
-      );
+      await _listenInternal();
       return true;
     } catch (e) {
       _isListening = false;
       _lastError = e.toString();
       _activeListeningCallback?.call(false);
-      _activeErrorCallback?.call('No se pudo activar el micrófono: $e');
+      _activeErrorCallback?.call('No se pudo activar el micrófono en tu navegador: $e');
       notifyListeners();
       return false;
     }
   }
 
-  /// Detiene la escucha y devuelve el texto reconocido final.
+  /// Segundo clic: Detiene la escucha de forma definitiva y devuelve el texto transcrito.
   Future<String> stopListening() async {
+    _userExplicitlyStopped = true;
     final text = _currentWords;
     _isListening = false;
     _activeListeningCallback?.call(false);
@@ -132,6 +192,7 @@ class VoiceService with ChangeNotifier {
 
   /// Cancela la sesión sin guardar
   Future<void> cancelListening() async {
+    _userExplicitlyStopped = true;
     _isListening = false;
     _currentWords = '';
     _activeListeningCallback?.call(false);

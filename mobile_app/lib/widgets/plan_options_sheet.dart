@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/services/auth_service.dart';
-import 'package:mobile_app/services/voice_service.dart';
 
 void showPlanOptionsSheet(
   BuildContext context, {
@@ -55,9 +54,6 @@ class _PlanOptionsForm extends StatefulWidget {
 class _PlanOptionsFormState extends State<_PlanOptionsForm> {
   late final TextEditingController _promptController;
   final TextEditingController _molestiaController = TextEditingController();
-  
-  bool _isListening = false;
-  String _listeningTarget = 'prompt'; // 'prompt' o 'molestia'
   
   String _estado = 'Bien';
   String _molestiaAction = 'Descanso';
@@ -139,69 +135,9 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
       widget.onPreferenceChanged!(_experience, intensityCode);
     }
   }
-  
-  void _listen({String target = 'prompt'}) async {
-    // Si ya está escuchando en este target -> Segundo clic: DETIENE Y APLICA
-    if (_isListening && _listeningTarget == target) {
-      await VoiceService.instance.stopListening();
-      if (mounted) {
-        setState(() => _isListening = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Dictado completado. Texto guardado en el campo.'),
-            backgroundColor: Color(0xFF1B4D3E),
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return;
-    }
-
-    // Primer clic: Inicia la captura
-    setState(() {
-      _isListening = true;
-      _listeningTarget = target;
-    });
-
-    final started = await VoiceService.instance.startListening(
-      onResult: (text) {
-        if (mounted) {
-          setState(() {
-            if (target == 'molestia') {
-              _molestiaController.text = text;
-            } else {
-              _promptController.text = text;
-            }
-          });
-        }
-      },
-      onListeningChanged: (listening) {
-        if (mounted) setState(() => _isListening = listening);
-      },
-      onError: (errorMsg) {
-        if (mounted) {
-          setState(() => _isListening = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('⚠️ $errorMsg'),
-              backgroundColor: const Color(0xFF332020),
-              duration: const Duration(seconds: 4),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      },
-    );
-
-    if (!started && mounted) {
-      setState(() => _isListening = false);
-    }
-  }
 
   @override
   void dispose() {
-    VoiceService.instance.cancelListening();
     _promptController.dispose();
     _molestiaController.dispose();
     super.dispose();
@@ -221,62 +157,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Configuración Rápida', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
-                  color: _isListening ? Colors.redAccent : const Color(0xFF8BE0C0),
-                  onPressed: () => _listen(target: _estado == 'Molestia' ? 'molestia' : 'prompt'),
-                  tooltip: _isListening ? 'Detener dictado' : 'Dictar por voz',
-                ),
-              ],
-            ),
-            if (_isListening)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E1515),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.6)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.record_voice_over_rounded, color: Colors.redAccent, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _listeningTarget == 'molestia'
-                                ? '🎙️ Grabando molestia... Habla ahora'
-                                : '🎙️ Grabando detalles... Habla ahora',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                          const Text(
-                            'Toca el micrófono otra vez para DETENER y guardar',
-                            style: TextStyle(color: Color(0xFFFF8A80), fontSize: 10.5),
-                          ),
-                        ],
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () => _listen(target: _listeningTarget),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text('DETENER', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const Text('Configuración Rápida', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             
             // 1. Estado Fisico
@@ -344,14 +225,6 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
                   fillColor: const Color(0xFF4A1A1A).withValues(alpha: 0.5),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isListening && _listeningTarget == 'molestia' ? Icons.mic : Icons.mic_none_rounded,
-                      color: _isListening && _listeningTarget == 'molestia' ? Colors.redAccent : Colors.redAccent.withValues(alpha: 0.8),
-                    ),
-                    tooltip: 'Dictar molestia por voz',
-                    onPressed: () => _listen(target: 'molestia'),
-                  ),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent)),
                 ),
               ),
@@ -464,38 +337,8 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
 
               const SizedBox(height: 20),
 
-              // Peticion libre con micrófono en el propio campo
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Detalles adicionales (Opcional)', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                  InkWell(
-                    onTap: () => _listen(target: 'prompt'),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _isListening && _listeningTarget == 'prompt' ? Icons.mic : Icons.mic_none_rounded,
-                            size: 15,
-                            color: _isListening && _listeningTarget == 'prompt' ? Colors.redAccent : const Color(0xFF8BE0C0),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _isListening && _listeningTarget == 'prompt' ? 'Escuchando...' : 'Dictar aquí',
-                            style: TextStyle(
-                              color: _isListening && _listeningTarget == 'prompt' ? Colors.redAccent : const Color(0xFF8BE0C0),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              // Peticion libre
+              const Text('Detalles adicionales (Opcional)', style: TextStyle(color: Colors.white70, fontSize: 14)),
               const SizedBox(height: 8),
               TextField(
                 controller: _promptController,
@@ -507,14 +350,6 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
                   fillColor: const Color(0xFF1E293B),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isListening && _listeningTarget == 'prompt' ? Icons.mic : Icons.mic_none_rounded,
-                      color: _isListening && _listeningTarget == 'prompt' ? Colors.redAccent : const Color(0xFF8BE0C0),
-                    ),
-                    tooltip: 'Dictar detalles por voz',
-                    onPressed: () => _listen(target: 'prompt'),
-                  ),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
               ),
