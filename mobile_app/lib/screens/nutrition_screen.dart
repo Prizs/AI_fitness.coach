@@ -24,7 +24,28 @@ class _NutritionScreenState extends State<NutritionScreen> {
   @override
   void initState() {
     super.initState();
+    _syncGoalFromService();
     _ensure();
+  }
+
+  void _syncGoalFromService() {
+    final goalLower = (_service.userGoal).toLowerCase();
+    if (goalLower.contains('perder') ||
+        goalLower.contains('bajar') ||
+        goalLower.contains('grasa') ||
+        goalLower.contains('defin')) {
+      _selectedGoal = 'grasa';
+    } else if (goalLower.contains('resistencia') ||
+        goalLower.contains('cardio') ||
+        goalLower.contains('correr')) {
+      _selectedGoal = 'resistencia';
+    } else if (goalLower.contains('salud') ||
+        goalLower.contains('energía') ||
+        goalLower.contains('bienestar')) {
+      _selectedGoal = 'salud';
+    } else {
+      _selectedGoal = 'musculo';
+    }
   }
 
   void _ensure() {
@@ -88,66 +109,13 @@ class _NutritionScreenState extends State<NutritionScreen> {
       isTrainingDay: isTraining,
     );
 
-    // Revisar si el plan en memoria trae comidas reales o genéricas
-    final rawNutrition = day['nutrition'];
-    final List<Map<String, dynamic>> meals = [];
-    bool hasCustomAiMeals = false;
+    // Los planes de alimentación de la semana se adaptan dinámicamente al objetivo seleccionado con ingredientes 100% de mercado venezolano
+    final activeMeals = (databasePlan['meals'] as List<dynamic>)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
 
-    if (rawNutrition is List && rawNutrition.isNotEmpty) {
-      for (final m in rawNutrition) {
-        if (m is Map) {
-          final items = m['items'];
-          if (items is List && items.isNotEmpty) {
-            final firstItem = items.first.toString().toLowerCase();
-            if (!firstItem.contains('según objetivo') &&
-                !firstItem.contains('segun objetivo')) {
-              hasCustomAiMeals = true;
-            }
-          }
-          meals.add(Map<String, dynamic>.from(m));
-        }
-      }
-    } else if (rawNutrition is Map && rawNutrition.isNotEmpty) {
-      rawNutrition.forEach((key, val) {
-        final keyStr = key.toString();
-        final title = keyStr.isEmpty
-            ? 'Comida'
-            : keyStr[0].toUpperCase() + keyStr.substring(1);
-        List<dynamic> items = [];
-        if (val is List) {
-          items = val;
-        } else if (val != null) {
-          final str = val.toString().trim();
-          if (str.isNotEmpty &&
-              !str.toLowerCase().contains('según objetivo') &&
-              !str.toLowerCase().contains('segun objetivo')) {
-            hasCustomAiMeals = true;
-            items = str
-                .split('\n')
-                .map((s) => s.trim().replaceAll(RegExp(r'^[•\-\*]\s*'), ''))
-                .where((s) => s.isNotEmpty)
-                .toList();
-          }
-        }
-        if (items.isNotEmpty) {
-          meals.add({
-            'title': title,
-            'items': items,
-          });
-        }
-      });
-    }
+    final synergyText = databasePlan['synergy'] as String;
 
-    // Si las comidas eran el placeholder genérico, usamos las comidas accesibles y completas de la base de datos
-    final activeMeals = (!hasCustomAiMeals || meals.isEmpty)
-        ? (databasePlan['meals'] as List<dynamic>)
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList()
-        : meals;
-
-    final synergyText = (!hasCustomAiMeals || day['synergy'] == null || '${day['synergy']}'.contains('según el gasto'))
-        ? databasePlan['synergy'] as String
-        : '${day['synergy']}';
 
     final isToday = _selected == _service.todayIndex;
     final currentGoalMeta = NutritionDatabase.goals.firstWhere(
@@ -323,7 +291,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Alimentos accesibles: Este plan prioriza ingredientes económicos y fáciles de conseguir en tu mercado local (huevos, avena, pollo, caraotas/lentejas, arroz, batata, atún y vegetales frescos).',
+                  'Alimentos venezolanos accesibles: Este plan prioriza ingredientes económicos y fáciles de conseguir en tu mercado local en Venezuela (arepa de maíz, huevos pericos, pollo, carne molida magra, atún, sardinas, caraotas/lentejas, arroz, batata, yuca, plátano verde o maduro, avena, cambur, lechosa y queso blanco criollo).',
                   style: TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.35),
                 ),
               ),

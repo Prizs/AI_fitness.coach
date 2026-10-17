@@ -214,7 +214,7 @@ def _ai_plan(payload: PlanRequest) -> dict | None:
 Objetivo: {payload.goal}; nivel: {payload.level}; dias: {payload.days_per_week}; edad: {payload.age}; peso: {payload.weight}; notas: {payload.health_notes or 'ninguna'}; alergias alimentarias: {payload.food_allergies or 'ninguna'}; lesiones: {payload.current_injuries or 'ninguna'}; discapacidad motora: {payload.motor_disability or 'ninguna'}; zonas a evitar: {payload.areas_to_avoid or 'ninguna'}.
 Devuelve exactamente provider, goal, level, sessions, nutrition y safety_note.
 "sessions" DEBE ser una lista de objetos con las claves day, title y exercises (lista de objetos con name, sets, reps, animation_key, primary_muscle, secondary_muscle).
-"nutrition" DEBE ser una lista de objetos con las claves title e items (lista de textos).
+"nutrition" DEBE ser una lista de objetos con las claves title e items (lista de textos con alimentos 100% de mercado local de Venezuela: arepa, huevos pericos, pollo, carne molida, caraotas, lentejas, arroz, batata, yuca, plátano, avena, cambur, queso blanco; NUNCA salmón ni quinoa).
 No diagnostiques ni prescribas tratamientos."""
         result = generate_json_text(prompt, timeout=GEMINI_TIMEOUT_SEC)
         plan = json.loads(result.text)

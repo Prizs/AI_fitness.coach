@@ -897,6 +897,13 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
    - Si el usuario pidió Piernas: pauta la sesión para **Lunes y Miércoles** (o Lunes, Miércoles y Viernes) explicando las 48-72h de recuperación muscular, y pregúntale con qué grupo complementario quiere combinar los días Martes y Jueves.
    - Si el usuario ya eligió la rutina complementaria para **Martes y Jueves** ({requested_focus}): felicítalo por completar su estructura semanal alternada y entrega los ejercicios específicos de **{requested_focus}** para los días **Martes y Jueves**.
 
+4. REGLA OBLIGATORIA DE NUTRICIÓN ADAPTADA A VENEZUELA (MERCADO LOCAL ACCESIBLE):
+   - Todos los planes de alimentación DEBEN usar ingredientes económicos y fáciles de conseguir en Venezuela:
+     * Proteínas: huevos (pericos criollos con tomate y cebolla, o sancochados), pechuga o muslos de pollo, carne molida magra, atún, sardinas, queso blanco llanero o paisa.
+     * Carbohidratos: arepa de maíz, avena en hojuelas, arroz blanco, caraotas negras, lentejas, frijoles, batata, yuca, plátano verde o maduro (asado o hervido).
+     * Frutas y vegetales: cambur, lechosa, patilla, melón, guayaba, tomate, cebolla, pimentón, repollo, pepino, chayota, calabacín y aguacate criollo.
+   - PROHIBIDO TERMINANTEMENTE incluir salmón, quinoa, espárragos, semillas de chía, frutos rojos importados ni suplementos costosos.
+
 Retorna EXCLUSIVAMENTE un objeto JSON válido con esta estructura exacta:
 {{
   "reply": "Respuesta conversacional clara acorde a la zona solicitada ({requested_focus or 'general'}) y nivel de intensidad ({effective_intensity})",
