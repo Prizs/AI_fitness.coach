@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sqflite/sqflite.dart';
@@ -7,7 +8,9 @@ class DBHelper {
   static final DBHelper instance = DBHelper._init();
   static Database? _database;
   static String? _memoryCache;
+  static Set<int>? _memoryCompletedDays;
   static const String _webStorageKey = 'cached_weekly_plan_v1';
+  static const String _completedDaysKey = 'cached_completed_days_v1';
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   DBHelper._init();
@@ -101,5 +104,37 @@ CREATE TABLE cached_plan (
       } catch (_) {}
     }
     return null;
+  }
+
+  Future<void> saveCompletedDays(Set<int> days) async {
+    _memoryCompletedDays = Set<int>.from(days);
+    final encoded = jsonEncode(days.toList());
+    try {
+      await _secureStorage
+          .write(key: _completedDaysKey, value: encoded)
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {}
+  }
+
+  Future<Set<int>> getCompletedDays() async {
+    if (_memoryCompletedDays != null) {
+      return _memoryCompletedDays!;
+    }
+    try {
+      final stored = await _secureStorage
+          .read(key: _completedDaysKey)
+          .timeout(const Duration(seconds: 2));
+      if (stored != null && stored.trim().isNotEmpty) {
+        final decoded = jsonDecode(stored);
+        if (decoded is List) {
+          final set = decoded
+              .map((e) => int.tryParse(e.toString()) ?? 0)
+              .toSet();
+          _memoryCompletedDays = set;
+          return set;
+        }
+      }
+    } catch (_) {}
+    return {};
   }
 }

@@ -4,16 +4,12 @@ import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/widgets/exercise_detail.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
-import 'package:mobile_app/widgets/plan_options_sheet.dart';
-import 'package:mobile_app/widgets/pre_workout_checkin.dart';
+import 'package:mobile_app/database/db_helper.dart';
+import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-/// Rutinas de la semana, con el dia de hoy destacado.
-///
-/// Arriba se ven primero las rutinas pendientes. El usuario puede marcar cada
-/// dia como completado, y el boton inferior lleva al Coach para pedir una rutina
-/// nueva o agregar un ejercicio.
+/// Rutinas de la semana, con el ciclo activo, días programados y fechas de periodización.
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
 
@@ -24,14 +20,34 @@ class WorkoutsScreen extends StatefulWidget {
 class _WorkoutsScreenState extends State<WorkoutsScreen> {
   final WeeklyPlanService _service = WeeklyPlanService.instance;
 
-  /// Dias ya completados por el usuario, como indices de dia de la semana.
+  /// Dias ya completados por el usuario, como indices de dia de la semana (0=Lunes, 6=Domingo).
   final Set<int> _completed = {};
-  final Set<int> _startedDays = {};
 
   @override
   void initState() {
     super.initState();
     _service.ensureLoaded(AuthService.instance.loggedInUser);
+    _loadCompletedDays();
+  }
+
+  Future<void> _loadCompletedDays() async {
+    final saved = await DBHelper.instance.getCompletedDays();
+    if (mounted) {
+      setState(() {
+        _completed.addAll(saved);
+      });
+    }
+  }
+
+  Future<void> _toggleCompleted(int weekday) async {
+    setState(() {
+      if (_completed.contains(weekday)) {
+        _completed.remove(weekday);
+      } else {
+        _completed.add(weekday);
+      }
+    });
+    await DBHelper.instance.saveCompletedDays(_completed);
   }
 
   @override
@@ -46,15 +62,247 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF8BE0C0),
         foregroundColor: const Color(0xFF0B1220),
-        onPressed: _openCoach,
+        onPressed: _handleNewRoutinePress,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Nueva rutina',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        label: const Text(
+          'Nueva rutina',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
 
-  /// Lleva al módulo Coach IA, que es donde se solicitan las recomendaciones y rutinas.
+  /// Maneja el clic en "Nueva rutina", informando al usuario si ya tiene un plan activo
+  /// o si puede iniciar uno nuevo a partir del próximo ciclo.
+  void _handleNewRoutinePress() {
+    if (_service.hasActivePlan) {
+      _showActiveCycleInfoSheet();
+    } else {
+      _openCoach();
+    }
+  }
+
+  void _showActiveCycleInfoSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final trainingDaysStr = _service.activeTrainingDayNames.join(', ');
+        final restDaysStr = _service.activeRestDayNames.isNotEmpty
+            ? _service.activeRestDayNames.join(', ')
+            : 'Fines de semana';
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF173B45),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.event_available_rounded,
+                      color: Color(0xFF8BE0C0),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Planificación Semanal Activa',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16233A),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.date_range_rounded,
+                            size: 16, color: Color(0xFF8BE0C0)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Ciclo en curso: ${_service.cycleDateRangeStr}',
+                          style: const TextStyle(
+                            color: Color(0xFF8BE0C0),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '🏋️ Días con entrenamiento ya programado:\n$trainingDaysStr',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '🧘 Días de recuperación / disponibles:\n$restDaysStr',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                    const Divider(color: Colors.white12, height: 20),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            size: 16, color: Color(0xFFFFB340)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '¿Cuándo podrás planificar un nuevo ciclo general?\nA partir del ${_service.nextCycleDateStr}. Esto asegura el cumplimiento de la periodización deportiva y la recuperación muscular fisiológica (48 a 72 horas).',
+                            style: const TextStyle(
+                              color: Color(0xFFFFB340),
+                              fontSize: 12,
+                              height: 1.4,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF8BE0C0),
+                  foregroundColor: const Color(0xFF0B1220),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openCoach();
+                },
+                icon: const Icon(Icons.add_task_rounded),
+                label: const Text(
+                  'Rutina complementaria en días libres',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orangeAccent,
+                  side: const BorderSide(color: Colors.orangeAccent),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _confirmResetCycle();
+                },
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text(
+                  'Reiniciar y Reemplazar ciclo actual',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Continuar con mi ciclo actual',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmResetCycle() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F192B),
+        title: const Text('¿Reiniciar ciclo de entrenamiento?'),
+        content: const Text(
+          'Se borrarán las rutinas y días completados de esta semana para que puedas solicitar una planificación totalmente nueva en Coach IA.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _service.clearWeeklyPlan();
+              setState(() {
+                _completed.clear();
+              });
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Ciclo semanal reiniciado. Puedes solicitar tu nueva rutina.'),
+                    backgroundColor: Color(0xFF173B45),
+                  ),
+                );
+                _openCoach();
+              }
+            },
+            child: const Text('Reiniciar', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openCoach() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const CoachScreen()),
@@ -68,7 +316,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
+              CircularProgressIndicator(color: Color(0xFF8BE0C0)),
               SizedBox(height: 14),
               Text('Sincronizando tu cronograma...',
                   style: TextStyle(color: Colors.white70)),
@@ -116,13 +364,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF8BE0C0),
                 backgroundColor: const Color(0xFF16233A),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: _openCoach,
+              onPressed: _handleNewRoutinePress,
               icon: const Icon(Icons.smart_toy_rounded, size: 18),
               label: const Text(
                 'Ir a Coach IA',
@@ -137,15 +384,25 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           '${doneScheduled.length} de ${scheduledDays.length} sesiones programadas completadas',
           style: const TextStyle(color: Colors.white70),
         ),
+        const SizedBox(height: 16),
+
+        // Banner informativo del Ciclo Semanal Activo y Próxima Planificación
+        _ActiveCycleCard(
+          service: _service,
+          completedCount: doneScheduled.length,
+          totalCount: scheduledDays.length,
+          onNewRoutinePressed: _handleNewRoutinePress,
+        ),
         const SizedBox(height: 18),
+
         if (pendingScheduled.isNotEmpty) ...[
           const _SectionLabel('RUTINAS PROGRAMADAS EN LA SEMANA'),
           ...pendingScheduled.map((day) => _DayCard(
                 day: day,
                 isToday: day['weekday'] == today,
                 isDone: false,
-                onToggle: () =>
-                    setState(() => _completed.add(day['weekday'] as int)),
+                onToggle: () => _toggleCompleted(day['weekday'] as int),
+                onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
               )),
         ],
         if (doneScheduled.isNotEmpty) ...[
@@ -155,8 +412,8 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 day: day,
                 isToday: day['weekday'] == today,
                 isDone: true,
-                onToggle: () =>
-                    setState(() => _completed.remove(day['weekday'] as int)),
+                onToggle: () => _toggleCompleted(day['weekday'] as int),
+                onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
               )),
         ],
         if (restDays.isNotEmpty) ...[
@@ -178,9 +435,9 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                     style: TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                   trailing: TextButton(
-                    onPressed: _openCoach,
+                    onPressed: _handleNewRoutinePress,
                     child: const Text(
-                      '+ Programar',
+                      '+ Complementar',
                       style: TextStyle(
                           color: Color(0xFF8BE0C0),
                           fontWeight: FontWeight.bold),
@@ -189,15 +446,181 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 ),
               )),
         ],
-        // Espacio para que el boton flotante no tape la ultima tarjeta.
         const SizedBox(height: 80),
       ],
+    );
+  }
+
+  void _openExerciseIn3D(
+    BuildContext context,
+    Map<String, dynamic> item,
+    List<dynamic> exercises,
+  ) {
+    final List<AnatomyExercise> dyn = [];
+    for (var e in exercises) {
+      final ex = Map<String, dynamic>.from(e as Map);
+      final exName = ex['name'] as String? ?? 'Ejercicio';
+      final primary = ex['primary_muscle'] as String? ?? 'General';
+      final secondary = ex['secondary_muscle'] as String? ?? '';
+      final intensityLvl =
+          ex['intensity_level'] as String? ?? 'Básico (Intensidad Baja)';
+      final gifUrl = ex['gif_url'] as String? ?? '';
+
+      dyn.add(AnatomyExercise(
+        id: exName,
+        name: exName,
+        shortName: exName,
+        gifUrl: resolveGuaranteedGifUrl(
+          name: exName,
+          agonist: primary,
+          intensityLevel: intensityLvl,
+          existingUrl: gifUrl,
+        ),
+        agonist: primary,
+        synergists: secondary.isNotEmpty ? [secondary] : [],
+        intensityLevel: intensityLvl,
+        biomechanics: ex['biomechanics'] as String? ??
+            'Movimiento controlado con técnica biomecánica estricta.',
+        tempo: ex['tempo'] as String? ?? '3-1-1',
+        posture: ex['posture'] as String? ??
+            'Mantén columna alineada y respiración constante.',
+        warning: ex['warning'] as String? ??
+            'Detén la ejecución si experimentas dolor articular o mareo.',
+      ));
+    }
+
+    final targetName = (item['name'] as String? ?? '').trim();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AnatomyWorkoutScreen(
+          initialExerciseId: targetName.isNotEmpty
+              ? targetName
+              : (dyn.isNotEmpty ? dyn.first.id : 'squat'),
+          dynamicExercises: dyn.isNotEmpty ? dyn : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveCycleCard extends StatelessWidget {
+  const _ActiveCycleCard({
+    required this.service,
+    required this.completedCount,
+    required this.totalCount,
+    required this.onNewRoutinePressed,
+  });
+
+  final WeeklyPlanService service;
+  final int completedCount;
+  final int totalCount;
+  final VoidCallback onNewRoutinePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final trainingDays = service.activeTrainingDayNames;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101C2F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF8BE0C0).withOpacity(0.35),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF173B45),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle_rounded,
+                        size: 14, color: Color(0xFF8BE0C0)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'CICLO ACTIVO: ${service.cycleDateRangeStr}',
+                      style: const TextStyle(
+                        color: Color(0xFF8BE0C0),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$completedCount de $totalCount hechos',
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '🏋️ Días de entrenamiento programados:\n${trainingDays.isNotEmpty ? trainingDays.join(' · ') : 'Sin rutinas fijas'}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16253B),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.timer_outlined,
+                    size: 16, color: Color(0xFFFFB340)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 11.5, height: 1.35),
+                      children: [
+                        const TextSpan(
+                          text: 'Próxima planificación completa: ',
+                          style: TextStyle(
+                            color: Color(0xFFFFB340),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextSpan(
+                          text:
+                              'A partir del ${service.nextCycleDateStr} para respetar el ciclo semanal y la recuperación neuromuscular.',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message, required this.onRetry, this.isError = true});
+  const _EmptyState(
+      {required this.message, required this.onRetry, this.isError = true});
 
   final String message;
   final VoidCallback onRetry;
@@ -277,12 +700,14 @@ class _DayCard extends StatelessWidget {
     required this.isToday,
     required this.isDone,
     required this.onToggle,
+    required this.onExerciseTap,
   });
 
   final Map<String, dynamic> day;
   final bool isToday;
   final bool isDone;
   final VoidCallback onToggle;
+  final void Function(Map<String, dynamic> exercise, List<dynamic> all) onExerciseTap;
 
   @override
   Widget build(BuildContext context) {
@@ -314,11 +739,14 @@ class _DayCard extends StatelessWidget {
                         ),
                       ),
                       if (isToday)
-                        const Text('HOY',
-                            style: TextStyle(
-                                color: Color(0xFF8BE0C0),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800)),
+                        const Text(
+                          'HOY',
+                          style: TextStyle(
+                            color: Color(0xFF8BE0C0),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -397,183 +825,12 @@ class _DayCard extends StatelessWidget {
                   ),
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
                   label: const Text('Ver 3D'),
-                  onPressed: () => _openExercisePreview(context, item, exercises, day['weekday']),
+                  onPressed: () => onExerciseTap(item, exercises),
                 ),
               );
             }),
           ],
         ),
-      ),
-    );
-  }
-
-  void _openExercisePreview(BuildContext context, Map<String, dynamic> item, List<dynamic> exercises, int dayIndex) async {
-    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
-    
-    List<AnatomyExercise> dyn = [];
-    for (var e in exercises) {
-      final ex = Map<String, dynamic>.from(e as Map);
-      final exName = ex['name'] as String? ?? 'Ejercicio';
-      final primary = ex['primary_muscle'] as String? ?? 'General';
-      final secondary = ex['secondary_muscle'] as String? ?? 'Secundario';
-      final intensityLvl = ex['intensity_level'] as String? ?? 'Básico (Intensidad Baja)';
-      
-      String url = (ex['gif_url'] as String? ?? '').trim();
-      if (url.isEmpty) {
-        try {
-          final res = await http.get(Uri.parse(
-              'https://ai-fitness-coach-818a.onrender.com/api/exercises/gif?query=${Uri.encodeComponent(exName)}&intensity=${Uri.encodeComponent(intensityLvl)}'));
-          if (res.statusCode == 200) {
-            url = jsonDecode(res.body)['url'] ?? '';
-          }
-        } catch (_) {}
-      }
-      
-      dyn.add(AnatomyExercise(
-        id: exName,
-        name: exName,
-        shortName: exName,
-        gifUrl: url,
-        intensityLevel: intensityLvl,
-        agonist: primary,
-        synergists: [secondary],
-        biomechanics: ex['biomechanics'] as String? ?? 'Biomecánica sugerida por IA.',
-        tempo: '3-1-1',
-        posture: ex['posture'] as String? ?? 'Mantén la postura natural.',
-        warning: 'Consulta a tu entrenador si sientes dolor.'
-      ));
-    }
-    
-    if (!context.mounted) return;
-    Navigator.pop(context); // close dialog
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0F192B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => _Exercise3DPreviewSheet(exercise: item, dynamicExercises: dyn, dayIndex: dayIndex),
-    );
-  }
-}
-
-class _Exercise3DPreviewSheet extends StatefulWidget {
-  const _Exercise3DPreviewSheet({required this.exercise, this.dynamicExercises, required this.dayIndex});
-  final Map<String, dynamic> exercise;
-  final List<AnatomyExercise>? dynamicExercises;
-  final int dayIndex;
-
-  @override
-  State<_Exercise3DPreviewSheet> createState() =>
-      _Exercise3DPreviewSheetState();
-}
-
-class _Exercise3DPreviewSheetState extends State<_Exercise3DPreviewSheet> {
-  @override
-  Widget build(BuildContext context) {
-    final name = widget.exercise['name'] as String? ?? 'Ejercicio';
-    final sets = widget.exercise['sets']?.toString() ?? '3';
-    final reps = widget.exercise['reps']?.toString() ?? '12';
-    final animKey =
-        widget.exercise['animation_key'] as String? ?? 'generic_exercise';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF8BE0C0),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.fitness_center_rounded,
-                    color: Color(0xFF0B1220)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      '$sets series · $reps repeticiones',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          ExerciseDetailView(
-            animationKey: name, // We use 'name' as ID now!
-            primaryMuscle: widget.exercise['primary_muscle'] as String?,
-            secondaryMuscle: widget.exercise['secondary_muscle'] as String?,
-            height: 300,
-            dynamicExercises: widget.dynamicExercises,
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.orangeAccent,
-              side: const BorderSide(color: Colors.orangeAccent),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-            onPressed: () async {
-              // Swap exercise logic
-              final currentName = widget.exercise['name'] as String? ?? '';
-              final primaryMuscle = widget.exercise['primary_muscle'] as String? ?? 'General';
-              
-              showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
-              final newEx = await WeeklyPlanService.instance.swapExercise(currentName, primaryMuscle, widget.dayIndex);
-              if (context.mounted) Navigator.pop(context); // close dialog
-              
-              if (newEx != null && context.mounted) {
-                 Navigator.pop(context); // close sheet
-                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Cambiado por: ')));
-              } else if (context.mounted) {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al cambiar ejercicio')));
-              }
-            },
-            icon: const Icon(Icons.swap_horiz_rounded),
-            label: const Text('Máquina Ocupada (Cambiar)', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF8BE0C0),
-              foregroundColor: const Color(0xFF0B1220),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-            ),
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.check_circle_outline_rounded),
-            label: const Text('Entendido, continuar rutina',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-        ],
       ),
     );
   }

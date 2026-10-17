@@ -40,6 +40,8 @@ class ChatMessage(BaseModel):
     weight: float | int | None = Field(default=None)
     active_plan_start: str | None = Field(default=None, max_length=200)
     active_plan_end: str | None = Field(default=None, max_length=200)
+    next_cycle_start: str | None = Field(default=None, max_length=200)
+    active_training_days: list[str] | None = Field(default=None)
     equipment_details: str | None = Field(default=None, max_length=2000)
 
 
@@ -825,7 +827,16 @@ def _normalize_structured_plan(
 def _profile_context(payload: ChatMessage, effective_level: str, effective_intensity: str) -> str:
     plan_info = ""
     if payload.active_plan_start and payload.active_plan_end:
-        plan_info = f" Plan actual vigente desde {payload.active_plan_start} hasta {payload.active_plan_end}."
+        active_days_str = ", ".join(payload.active_training_days) if payload.active_training_days else "Lunes, Miércoles y Viernes"
+        next_str = payload.next_cycle_start or "el próximo lunes"
+        plan_info = (
+            f" [CICLO SEMANAL ACTIVO: Vigente del {payload.active_plan_start} al {payload.active_plan_end}. "
+            f"Días de entrenamiento programados: {active_days_str}. "
+            f"Próxima planificación de ciclo completo: {next_str}. "
+            f"REGLA: Si pide generar una nueva rutina, recuérdale que su ciclo actual está activo hasta el {payload.active_plan_end} "
+            f"y que el nuevo ciclo completo se podrá planificar a partir de {next_str} para respetar 48-72h de descanso. "
+            f"Para esta semana, ofrécele rutinas complementarias para sus días libres (Martes/Jueves: Tren Superior, Core o Movilidad).] "
+        )
     equip_info = f" Equipamiento reportado: {payload.equipment_details}." if payload.equipment_details else ""
     return (
         f"Edad: {payload.age if payload.age is not None else 'No indicada'}. "
@@ -980,6 +991,23 @@ Devuelve SOLO JSON."""
                 f"2️⃣ **Core, Abdomen y Postura**\n"
                 f"3️⃣ **Movilidad Articular y Cardio de Bajo Impacto**"
             )
+
+    if payload.active_plan_start and payload.active_plan_end:
+        active_days_str = ", ".join(payload.active_training_days) if payload.active_training_days else "Lunes, Miércoles y Viernes"
+        next_cycle = payload.next_cycle_start or "el próximo lunes"
+        is_routine_request = any(k in user_msg_lower for k in ("nueva rutina", "otra rutina", "crear rutina", "planifica", "rutina nueva", "nuevo plan"))
+        if is_routine_request and not is_complementary:
+            lower_reply = reply_str.lower()
+            if not any(k in lower_reply for k in ("ciclo activo", "próximo lunes", "proximo lunes", "nuevo ciclo", "planificar un nuevo")):
+                reply_str = (
+                    f"🗓️ **Estado de tu Plan Semanal:** Tienes un ciclo de entrenamiento activo hasta el **domingo {payload.active_plan_end}**, "
+                    f"con sesiones programadas para los días **{active_days_str}**.\n\n"
+                    f"⏳ **¿Cuándo podrás planificar un nuevo ciclo general?** Podrás generar un ciclo completo totalmente nuevo a partir del **{next_cycle}**, "
+                    f"asegurando la adaptación neuromuscular y el descanso de 48 a 72 horas.\n\n"
+                    f"💡 **Para esta semana:** Puedes aprovechar tus días libres con una **rutina complementaria** "
+                    f"(Tren Superior, Core o Movilidad) o incorporar la propuesta ajustada a continuación:\n\n"
+                    + reply_str
+                )
 
     is_rest_request = (
         "me impide entrenar" in user_msg_lower

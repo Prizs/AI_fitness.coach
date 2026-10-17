@@ -58,6 +58,61 @@ class WeeklyPlanService extends ChangeNotifier {
     return mapped;
   }
 
+  DateTime get currentWeekMonday {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+  }
+
+  DateTime get currentWeekSunday => currentWeekMonday.add(const Duration(days: 6));
+
+  DateTime get nextCycleMonday => currentWeekMonday.add(const Duration(days: 7));
+
+  String get cycleDateRangeStr {
+    final m = currentWeekMonday;
+    final s = currentWeekSunday;
+    final mMonth = m.month < 10 ? '0${m.month}' : '${m.month}';
+    final sMonth = s.month < 10 ? '0${s.month}' : '${s.month}';
+    return '${m.day}/$mMonth al ${s.day}/$sMonth';
+  }
+
+  String get nextCycleDateStr {
+    final n = nextCycleMonday;
+    final nMonth = n.month < 10 ? '0${n.month}' : '${n.month}';
+    return 'Lunes ${n.day}/$nMonth';
+  }
+
+  List<String> get activeTrainingDayNames {
+    final list = <String>[];
+    for (final d in days) {
+      final ex = d['exercises'];
+      if (ex is List && ex.isNotEmpty) {
+        final name = d['weekday_name']?.toString() ?? '';
+        if (name.isNotEmpty && !list.contains(name)) {
+          list.add(name);
+        }
+      }
+    }
+    return list;
+  }
+
+  List<String> get activeRestDayNames {
+    final list = <String>[];
+    for (final d in days) {
+      final ex = d['exercises'];
+      if (ex is! List || ex.isEmpty) {
+        final name = d['weekday_name']?.toString() ?? '';
+        if (name.isNotEmpty && !list.contains(name)) {
+          list.add(name);
+        }
+      }
+    }
+    return list;
+  }
+
+  bool get hasActivePlan {
+    return week != null && days.any((d) => (d['exercises'] as List?)?.isNotEmpty == true);
+  }
+
   Future<void> ensureLoaded(UserProfile? profile) {
     if (week != null) {
       isLoading = false;
@@ -591,6 +646,17 @@ class WeeklyPlanService extends ChangeNotifier {
     notifyListeners();
     try {
       await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
+    } catch (_) {}
+  }
+
+  Future<void> clearWeeklyPlan() async {
+    week = null;
+    loadedFromCache = false;
+    lastError = null;
+    notifyListeners();
+    try {
+      await DBHelper.instance.saveWeeklyPlan('');
+      await DBHelper.instance.saveCompletedDays({});
     } catch (_) {}
   }
 }

@@ -224,10 +224,13 @@ class _CoachScreenState extends State<CoachScreen> {
       final now = DateTime.now();
       final monday = now.subtract(Duration(days: now.weekday - 1));
       final sunday = monday.add(const Duration(days: 6));
+      final nextMonday = monday.add(const Duration(days: 7));
       final formatDate = (DateTime d) => '${d.day}/${d.month}/${d.year}';
-      final hasPlan = WeeklyPlanService.instance.week != null;
+      final hasPlan = WeeklyPlanService.instance.hasActivePlan;
       final startStr = hasPlan ? formatDate(monday) : null;
       final endStr = hasPlan ? formatDate(sunday) : null;
+      final nextStartStr = hasPlan ? formatDate(nextMonday) : null;
+      final activeDays = hasPlan ? WeeklyPlanService.instance.activeTrainingDayNames : <String>[];
 
       const storage = FlutterSecureStorage();
       final userKey = 'user_equipment_${profile?.cedula ?? "default"}';
@@ -251,6 +254,8 @@ class _CoachScreenState extends State<CoachScreen> {
               'weight': profile?.weight,
               'active_plan_start': startStr,
               'active_plan_end': endStr,
+              'next_cycle_start': nextStartStr,
+              'active_training_days': activeDays,
               'equipment_details': savedEquipment,
             }),
           )
@@ -405,6 +410,56 @@ class _CoachScreenState extends State<CoachScreen> {
                 ),
               ),
             ),
+            if (WeeklyPlanService.instance.hasActivePlan)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF132238),
+                  border: Border(bottom: BorderSide(color: Color(0xFF8BE0C0), width: 0.8)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF8BE0C0)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Plan Activo: ${WeeklyPlanService.instance.cycleDateRangeStr} · Próximo ciclo: ${WeeklyPlanService.instance.nextCycleDateStr}',
+                        style: const TextStyle(
+                          color: Color(0xFF8BE0C0),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '🏋️ Días programados: ${WeeklyPlanService.instance.activeTrainingDayNames.join(", ")}\n'
+                              '⏳ Próxima planificación general completa: ${WeeklyPlanService.instance.nextCycleDateStr}.\n'
+                              '💡 Para esta semana puedes solicitar rutinas complementarias para tus días libres.',
+                            ),
+                            backgroundColor: const Color(0xFF16253B),
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1F3A4B),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('Info', style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Lista de Mensajes y Tarjetas
             Expanded(
               child: ListView.builder(
