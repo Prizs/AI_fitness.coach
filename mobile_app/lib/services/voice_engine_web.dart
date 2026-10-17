@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:js' as js;
+import 'auth_service.dart';
 import 'voice_engine.dart';
 
 class VoiceEngineImpl implements VoiceEngine {
@@ -39,7 +41,8 @@ class VoiceEngineImpl implements VoiceEngine {
       onError(err?.toString() ?? 'Error de micrófono');
     };
 
-    final dynamic res = aiVoice.callMethod('start', [onResultJs, onStatusJs, onErrorJs]);
+    final String baseUrl = AuthService.apiBaseUrl;
+    final dynamic res = aiVoice.callMethod('start', [onResultJs, onStatusJs, onErrorJs, baseUrl]);
     final bool started = res == true;
     _listening = started;
     return started;
@@ -49,13 +52,39 @@ class VoiceEngineImpl implements VoiceEngine {
   Future<String> stop() async {
     _listening = false;
     final dynamic aiVoice = js.context['AIFitnessVoice'];
-    if (aiVoice != null) {
-      final dynamic result = aiVoice.callMethod('stop', []);
-      if (result != null && result.toString().isNotEmpty) {
-        _lastText = result.toString();
+    if (aiVoice == null) return _lastText.trim();
+
+    final completer = Completer<String>();
+
+    final onDoneJs = (dynamic result) {
+      final res = result?.toString() ?? '';
+      if (res.isNotEmpty) {
+        _lastText = res;
+      }
+      if (!completer.isCompleted) {
+        completer.complete(_lastText.trim());
+      }
+    };
+
+    try {
+      final dynamic syncResult = aiVoice.callMethod('stop', [onDoneJs]);
+      if (syncResult != null && syncResult.toString().isNotEmpty) {
+        _lastText = syncResult.toString();
+        if (!completer.isCompleted) {
+          completer.complete(_lastText.trim());
+        }
+      }
+    } catch (_) {
+      if (!completer.isCompleted) {
+        completer.complete(_lastText.trim());
       }
     }
-    return _lastText.trim();
+
+    // Esperar respuesta (con salvaguarda de 15 segundos)
+    return completer.future.timeout(
+      const Duration(seconds: 15),
+      onTimeout: () => _lastText.trim(),
+    );
   }
 
   @override

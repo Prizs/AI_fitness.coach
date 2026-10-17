@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/services/voice_service.dart';
 
 void showPlanOptionsSheet(
   BuildContext context, {
@@ -60,6 +61,65 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
   String _equipo = 'Gym Completo';
   String _intensity = 'Medio';
   String _experience = 'Intermedio';
+  String? _activeVoiceField;
+
+  @override
+  void dispose() {
+    if (_activeVoiceField != null) {
+      VoiceService.instance.stopListening();
+    }
+    _promptController.dispose();
+    _molestiaController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleVoice(String field) async {
+    if (_activeVoiceField == field) {
+      // Segundo toque: Detener grabación
+      setState(() => _activeVoiceField = null);
+      final text = await VoiceService.instance.stopListening();
+      if (text.isNotEmpty && !text.startsWith('Transcribiendo')) {
+        setState(() {
+          if (field == 'molestia') {
+            _molestiaController.text = text;
+          } else {
+            _promptController.text = text;
+          }
+        });
+      }
+      return;
+    }
+
+    if (_activeVoiceField != null) {
+      await VoiceService.instance.stopListening();
+    }
+
+    setState(() => _activeVoiceField = field);
+
+    await VoiceService.instance.startListening(
+      onResult: (text) {
+        if (mounted && _activeVoiceField == field) {
+          setState(() {
+            if (field == 'molestia') {
+              _molestiaController.text = text;
+            } else {
+              _promptController.text = text;
+            }
+          });
+        }
+      },
+      onListeningChanged: (listening) {
+        if (!listening && mounted && _activeVoiceField == field) {
+          setState(() => _activeVoiceField = null);
+        }
+      },
+      onError: (_) {
+        if (mounted && _activeVoiceField == field) {
+          setState(() => _activeVoiceField = null);
+        }
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -134,13 +194,6 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
     if (widget.onPreferenceChanged != null) {
       widget.onPreferenceChanged!(_experience, intensityCode);
     }
-  }
-
-  @override
-  void dispose() {
-    _promptController.dispose();
-    _molestiaController.dispose();
-    super.dispose();
   }
 
   @override
@@ -226,6 +279,14 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   filled: true,
                   fillColor: const Color(0xFF4A1A1A).withValues(alpha: 0.5),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent)),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _activeVoiceField == 'molestia' ? Icons.mic : Icons.mic_none_rounded,
+                      color: _activeVoiceField == 'molestia' ? Colors.redAccent : const Color(0xFF8BE0C0),
+                    ),
+                    tooltip: _activeVoiceField == 'molestia' ? 'Detener dictado' : 'Dictar molestia por voz',
+                    onPressed: () => _toggleVoice('molestia'),
+                  ),
                 ),
               ),
 
@@ -351,6 +412,14 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   filled: true,
                   fillColor: const Color(0xFF1E293B),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _activeVoiceField == 'prompt' ? Icons.mic : Icons.mic_none_rounded,
+                      color: _activeVoiceField == 'prompt' ? Colors.redAccent : const Color(0xFF8BE0C0),
+                    ),
+                    tooltip: _activeVoiceField == 'prompt' ? 'Detener dictado' : 'Dictar detalles por voz',
+                    onPressed: () => _toggleVoice('prompt'),
+                  ),
                 ),
               ),
             ],

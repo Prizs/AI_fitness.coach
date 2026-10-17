@@ -63,15 +63,19 @@ class _CoachScreenState extends State<CoachScreen> {
   void _listen() async {
     // Si ya está escuchando -> Segundo clic: DETIENE Y ENVÍA DE INMEDIATO
     if (_isListening) {
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+        });
+      }
       final recognizedText = await VoiceService.instance.stopListening();
       final textToSend = recognizedText.isNotEmpty ? recognizedText : _controller.text.trim();
-      if (mounted) setState(() => _isListening = false);
 
-      if (textToSend.isNotEmpty) {
+      if (textToSend.isNotEmpty && !textToSend.startsWith('Transcribiendo')) {
         _controller.clear();
         _sendMessage(textToSend);
       } else {
-        if (mounted) {
+        if (mounted && textToSend.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('ℹ️ No se detectó voz. Vuelve a pulsar el micrófono para intentar de nuevo.'),
@@ -100,10 +104,14 @@ class _CoachScreenState extends State<CoachScreen> {
       onError: (errorMsg) {
         if (mounted) {
           setState(() => _isListening = false);
-          _showMicrophoneHelpDialog(errorMsg);
+          final lower = errorMsg.toLowerCase();
+          if (lower.contains('permiso') || lower.contains('not-allowed') || lower.contains('permission') || lower.contains('denied')) {
+            _showMicrophoneHelpDialog(errorMsg);
+          }
         }
       },
     );
+
 
     if (started && mounted) {
       setState(() => _isListening = true);

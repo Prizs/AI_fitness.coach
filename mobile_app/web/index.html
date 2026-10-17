@@ -52,92 +52,211 @@
       });
     }
 
-    // Motor de captura de voz nativo Web Speech para máxima compatibilidad en PC y Móvil
+    // Motor de captura de voz híbrido (Web Speech + MediaRecorder con respaldo IA)
     window.AIFitnessVoice = {
       recognition: null,
+      mediaRecorder: null,
+      audioStream: null,
+      audioChunks: [],
       isListening: false,
       transcript: '',
       onResultCb: null,
       onStatusCb: null,
       onErrorCb: null,
+      apiBaseUrl: '',
 
       isSupported: function() {
-        return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+        return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ||
+               ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
       },
 
-      start: function(onResult, onStatus, onError) {
-        if (!this.isSupported()) {
-          if (onError) onError('Tu navegador no soporta reconocimiento de voz. Te recomendamos usar Google Chrome o Microsoft Edge.');
-          return false;
-        }
-
+      start: async function(onResult, onStatus, onError, apiBaseUrl) {
         this.stop();
         this.transcript = '';
+        this.audioChunks = [];
         this.onResultCb = onResult;
         this.onStatusCb = onStatus;
         this.onErrorCb = onError;
         this.isListening = true;
+        this.apiBaseUrl = apiBaseUrl || '';
 
-        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-        this.recognition = new SpeechRec();
-        this.recognition.continuous = true;
-        this.recognition.interimResults = true;
-        this.recognition.maxAlternatives = 1;
-
-        const lang = navigator.language || 'es-419';
-        this.recognition.lang = lang.startsWith('es') ? lang : 'es-419';
-
-        this.recognition.onstart = () => {
-          if (this.onStatusCb) this.onStatusCb('listening');
-        };
-
-        this.recognition.onresult = (event) => {
-          let finalStr = '';
-          let interimStr = '';
-          for (let i = 0; i < event.results.length; ++i) {
-            const item = event.results[i];
-            if (item.isFinal) {
-              finalStr += item[0].transcript;
-            } else {
-              interimStr += item[0].transcript;
+        // 1. Iniciar captura nativa con getUserMedia + MediaRecorder (compatible con Brave, Chrome, Safari, etc.)
+        try {
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.audioStream = stream;
+            let mimeType = 'audio/webm';
+            if (typeof MediaRecorder !== 'undefined') {
+              if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+                else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+                else mimeType = '';
+              }
+              const options = mimeType ? { mimeType: mimeType } : {};
+              this.mediaRecorder = new MediaRecorder(stream, options);
+              this.mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                  this.audioChunks.push(e.data);
+                }
+              };
+              this.mediaRecorder.start(250);
             }
           }
-          const full = (finalStr + ' ' + interimStr).trim();
-          this.transcript = full;
-          if (this.onResultCb) this.onResultCb(full);
-        };
-
-        this.recognition.onerror = (event) => {
-          if (event.error === 'no-speech') return;
-          if (this.onErrorCb) this.onErrorCb(event.error || 'Error de micrófono');
-        };
-
-        this.recognition.onend = () => {
-          if (this.isListening) {
-            try { this.recognition.start(); } catch(e) {}
-          } else {
-            if (this.onStatusCb) this.onStatusCb('notListening');
+        } catch (mediaErr) {
+          console.warn('getUserMedia notice:', mediaErr);
+          if (mediaErr && (mediaErr.name === 'NotAllowedError' || mediaErr.name === 'PermissionDeniedError')) {
+            if (this.onErrorCb) this.onErrorCb('Permiso de micrófono no otorgado en el navegador.');
+            this.isListening = false;
+            return false;
           }
-        };
-
-        try {
-          this.recognition.start();
-          return true;
-        } catch(e) {
-          if (this.onErrorCb) this.onErrorCb(e.message || 'Error al iniciar micrófono');
-          return false;
         }
+
+        if (this.onStatusCb) this.onStatusCb('listening');
+
+        // 2. Iniciar reconocimiento en vivo (Web Speech API) si está habilitado en el navegador
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRec) {
+          try {
+            this.recognition = new SpeechRec();
+            this.recognition.continuous = true;
+            this.recognition.interimResults = true;
+            this.recognition.maxAlternatives = 1;
+            const lang = navigator.language || 'es-419';
+            this.recognition.lang = lang.startsWith('es') ? lang : 'es-419';
+
+            this.recognition.onresult = (event) => {
+              let finalStr = '';
+              let interimStr = '';
+              for (let i = 0; i < event.results.length; ++i) {
+                const item = event.results[i];
+                if (item.isFinal) finalStr += item[0].transcript;
+                else interimStr += item[0].transcript;
+              }
+              const full = (finalStr + ' ' + interimStr).trim();
+              if (full) {
+                this.transcript = full;
+                if (this.onResultCb) this.onResultCb(full);
+              }
+            };
+
+            this.recognition.onerror = (event) => {
+              // Silenciar 'network' (habitual en Brave por bloqueo a Google) y 'no-speech'
+              // Ya que el MediaRecorder capturará el audio y la IA lo transcribirá sin fallar
+              if (event.error === 'no-speech' || event.error === 'network') {
+                console.log('SpeechRecognition notice:', event.error);
+                return;
+              }
+              console.warn('SpeechRecognition error:', event.error);
+            };
+
+            this.recognition.onend = () => {
+              if (this.isListening && this.recognition) {
+                try { this.recognition.start(); } catch(e) {}
+              }
+            };
+
+            this.recognition.start();
+          } catch(e) {
+            console.log('Web Speech init notice:', e);
+          }
+        }
+
+        return true;
       },
 
-      stop: function() {
+      stop: function(onDone) {
         this.isListening = false;
         if (this.recognition) {
           try { this.recognition.stop(); } catch(e) {}
           this.recognition = null;
         }
-        return this.transcript || '';
+
+        const finish = (text) => {
+          const res = (text || this.transcript || '').trim();
+          if (this.onStatusCb) this.onStatusCb('notListening');
+          if (onDone) onDone(res);
+          return res;
+        };
+
+        // Si ya hay transcripción capturada en vivo por Web Speech
+        if (this.transcript && this.transcript.trim().length > 0) {
+          if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            try { this.mediaRecorder.stop(); } catch(e) {}
+          }
+          if (this.audioStream) {
+            try { this.audioStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+            this.audioStream = null;
+          }
+          return finish(this.transcript);
+        }
+
+        // Si no hay texto directo (caso Brave o red que bloquea Web Speech),
+        // procesamos el audio grabado con MediaRecorder mediante el endpoint de IA backend:
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+          this.mediaRecorder.onstop = () => {
+            if (this.audioStream) {
+              try { this.audioStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+              this.audioStream = null;
+            }
+
+            const mime = this.mediaRecorder.mimeType || 'audio/webm';
+            const blob = new Blob(this.audioChunks, { type: mime });
+            if (blob.size < 1200) {
+              return finish('');
+            }
+
+            if (this.onResultCb) this.onResultCb('Transcribiendo nota de voz...');
+
+            this._blobToBase64(blob).then((b64) => {
+              const url = (this.apiBaseUrl || window.location.origin) + '/api/voice/transcribe';
+              fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ audio_base64: b64, mime_type: mime })
+              }).then(r => r.json()).then(data => {
+                const aiText = (data && data.text) ? data.text.trim() : '';
+                this.transcript = aiText;
+                if (this.onResultCb) this.onResultCb(aiText);
+                finish(aiText);
+              }).catch(err => {
+                console.error('Error al transcribir en backend:', err);
+                finish(this.transcript);
+              });
+            }).catch(err => {
+              finish(this.transcript);
+            });
+          };
+
+          try {
+            this.mediaRecorder.stop();
+          } catch(e) {
+            finish(this.transcript);
+          }
+          return '';
+        }
+
+        if (this.audioStream) {
+          try { this.audioStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+          this.audioStream = null;
+        }
+
+        return finish(this.transcript);
+      },
+
+      _blobToBase64: function(blob) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result;
+            const b64 = result.split(',')[1] || result;
+            resolve(b64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
       }
     };
+
   </script>
   <script src="flutter_bootstrap.js?v=1.0.52" async></script>
 </body>
