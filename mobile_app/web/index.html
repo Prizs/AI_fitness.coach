@@ -51,6 +51,93 @@
         }
       });
     }
+
+    // Motor de captura de voz nativo Web Speech para máxima compatibilidad en PC y Móvil
+    window.AIFitnessVoice = {
+      recognition: null,
+      isListening: false,
+      transcript: '',
+      onResultCb: null,
+      onStatusCb: null,
+      onErrorCb: null,
+
+      isSupported: function() {
+        return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+      },
+
+      start: function(onResult, onStatus, onError) {
+        if (!this.isSupported()) {
+          if (onError) onError('Tu navegador no soporta reconocimiento de voz. Te recomendamos usar Google Chrome o Microsoft Edge.');
+          return false;
+        }
+
+        this.stop();
+        this.transcript = '';
+        this.onResultCb = onResult;
+        this.onStatusCb = onStatus;
+        this.onErrorCb = onError;
+        this.isListening = true;
+
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        this.recognition = new SpeechRec();
+        this.recognition.continuous = true;
+        this.recognition.interimResults = true;
+        this.recognition.maxAlternatives = 1;
+
+        const lang = navigator.language || 'es-419';
+        this.recognition.lang = lang.startsWith('es') ? lang : 'es-419';
+
+        this.recognition.onstart = () => {
+          if (this.onStatusCb) this.onStatusCb('listening');
+        };
+
+        this.recognition.onresult = (event) => {
+          let finalStr = '';
+          let interimStr = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            const item = event.results[i];
+            if (item.isFinal) {
+              finalStr += item[0].transcript;
+            } else {
+              interimStr += item[0].transcript;
+            }
+          }
+          const full = (finalStr + ' ' + interimStr).trim();
+          this.transcript = full;
+          if (this.onResultCb) this.onResultCb(full);
+        };
+
+        this.recognition.onerror = (event) => {
+          if (event.error === 'no-speech') return;
+          if (this.onErrorCb) this.onErrorCb(event.error || 'Error de micrófono');
+        };
+
+        this.recognition.onend = () => {
+          if (this.isListening) {
+            try { this.recognition.start(); } catch(e) {}
+          } else {
+            if (this.onStatusCb) this.onStatusCb('notListening');
+          }
+        };
+
+        try {
+          this.recognition.start();
+          return true;
+        } catch(e) {
+          if (this.onErrorCb) this.onErrorCb(e.message || 'Error al iniciar micrófono');
+          return false;
+        }
+      },
+
+      stop: function() {
+        this.isListening = false;
+        if (this.recognition) {
+          try { this.recognition.stop(); } catch(e) {}
+          this.recognition = null;
+        }
+        return this.transcript || '';
+      }
+    };
   </script>
   <script src="flutter_bootstrap.js?v=1.0.52" async></script>
 </body>

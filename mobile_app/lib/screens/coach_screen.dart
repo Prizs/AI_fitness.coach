@@ -1028,14 +1028,6 @@ class _CoachScreenState extends State<CoachScreen> {
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 14),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _isListening ? Icons.mic : Icons.mic_none_rounded,
-                              color: _isListening ? Colors.redAccent : const Color(0xFF8BE0C0),
-                            ),
-                            tooltip: _isListening ? 'Detener dictado' : 'Hablar por micrófono',
-                            onPressed: _listen,
-                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide.none,
