@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:mobile_app/screens/workout_schedule_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:lottie/lottie.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:mobile_app/services/voice_service.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:mobile_app/widgets/plan_options_sheet.dart';
@@ -32,14 +32,11 @@ class _CoachScreenState extends State<CoachScreen> {
   bool _isLoading = false;
   String _userLevel = 'Principiante';
   String _userIntensity = 'Baja';
-  
-  late stt.SpeechToText _speech;
   bool _isListening = false;
   
   @override
   void initState() {
     super.initState();
-    _speech = stt.SpeechToText();
     final prefLvl = WeeklyPlanService.instance.userLevel;
     if (prefLvl.isNotEmpty) _userLevel = prefLvl;
     final prefInt = WeeklyPlanService.instance.userIntensity;
@@ -64,45 +61,111 @@ class _CoachScreenState extends State<CoachScreen> {
   }
   
   void _listen() async {
+    // Si ya está escuchando -> Segundo clic: DETIENE Y ENVÍA DE INMEDIATO
     if (_isListening) {
-      setState(() => _isListening = false);
-      _speech.stop();
-      return;
-    }
+      final recognizedText = await VoiceService.instance.stopListening();
+      final textToSend = recognizedText.isNotEmpty ? recognizedText : _controller.text.trim();
+      if (mounted) setState(() => _isListening = false);
 
-    try {
-      bool available = await _speech.initialize(
-        onStatus: (val) {
-          if (val == 'done' || val == 'notListening') {
-            if (mounted) setState(() => _isListening = false);
-          }
-        },
-        onError: (val) {
-          if (mounted) setState(() => _isListening = false);
-        },
-      );
-      if (available) {
-        if (mounted) setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (val) => setState(() {
-            _controller.text = val.recognizedWords;
-          }),
-          localeId: 'es_ES', // Español
-        );
+      if (textToSend.isNotEmpty) {
+        _controller.clear();
+        _sendMessage(textToSend);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('⚠️ Permiso de micrófono no habilitado o no soportado en tu navegador.'),
-              backgroundColor: Color(0xFF332020),
+              content: Text('ℹ️ No se detectó voz. Vuelve a pulsar el micrófono para intentar de nuevo.'),
+              backgroundColor: Color(0xFF16253B),
+              behavior: SnackBarBehavior.floating,
               duration: Duration(seconds: 3),
             ),
           );
         }
       }
-    } catch (e) {
-      if (mounted) setState(() => _isListening = false);
+      return;
     }
+
+    // Primer clic: Inicia la captura de voz
+    final started = await VoiceService.instance.startListening(
+      onResult: (text) {
+        if (mounted) {
+          setState(() {
+            _controller.text = text;
+          });
+        }
+      },
+      onListeningChanged: (listening) {
+        if (mounted) setState(() => _isListening = listening);
+      },
+      onError: (errorMsg) {
+        if (mounted) {
+          setState(() => _isListening = false);
+          _showMicrophoneHelpDialog(errorMsg);
+        }
+      },
+    );
+
+    if (started && mounted) {
+      setState(() => _isListening = true);
+    }
+  }
+
+  void _showMicrophoneHelpDialog(String errorMsg) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF101B2D),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.mic_off_rounded, color: Colors.amber, size: 24),
+            SizedBox(width: 8),
+            Text('Micrófono en Navegador', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Detalle: $errorMsg',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16253B),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.3)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('💡 Cómo habilitarlo en tu Laptop / PC:', style: TextStyle(color: Color(0xFF8BE0C0), fontWeight: FontWeight.bold, fontSize: 12)),
+                  SizedBox(height: 6),
+                  Text('1. Haz clic en el ícono de Candado 🔒 a la izquierda del enlace en la barra de direcciones.', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                  SizedBox(height: 3),
+                  Text('2. En la opción "Micrófono", selecciona "Permitir".', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                  SizedBox(height: 3),
+                  Text('3. Te recomendamos usar Google Chrome o Microsoft Edge para la mejor compatibilidad de voz.', style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8BE0C0),
+              foregroundColor: const Color(0xFF0B1220),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openStateSheet([String initialPrompt = '']) {
@@ -896,32 +959,41 @@ class _CoachScreenState extends State<CoachScreen> {
             if (_isListening)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.18),
-                  border: const Border(top: BorderSide(color: Colors.redAccent, width: 1.0)),
+                  color: const Color(0xFF2E1515),
+                  border: const Border(top: BorderSide(color: Colors.redAccent, width: 1.5)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.record_voice_over_rounded, color: Colors.redAccent, size: 18),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.record_voice_over_rounded, color: Colors.redAccent, size: 22),
+                    const SizedBox(width: 10),
                     const Expanded(
-                      child: Text(
-                        '🎙️ Escuchando... habla claramente para escribir en el chat',
-                        style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '🎙️ Grabando voz... Habla ahora',
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'Toca el micrófono otra vez para DETENER Y ENVIAR 🚀',
+                            style: TextStyle(color: Color(0xFFFF8A80), fontSize: 11),
+                          ),
+                        ],
                       ),
                     ),
-                    InkWell(
-                      onTap: _listen,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text('DETENER', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
+                      onPressed: _listen,
+                      icon: const Icon(Icons.send_rounded, size: 14),
+                      label: const Text('ENVIAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
