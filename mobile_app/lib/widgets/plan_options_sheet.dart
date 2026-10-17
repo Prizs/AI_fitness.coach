@@ -7,7 +7,10 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 void showPlanOptionsSheet(
   BuildContext context, {
   String initialPrompt = '',
+  String? initialIntensity,
+  String? initialLevel,
   void Function(String summaryText)? onSendState,
+  void Function(String level, String intensity)? onPreferenceChanged,
 }) {
   if (onSendState == null) {
     Navigator.of(context).push(
@@ -20,17 +23,29 @@ void showPlanOptionsSheet(
     isScrollControlled: true,
     backgroundColor: const Color(0xFF101B2D),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (context) => _PlanOptionsForm(initialPrompt: initialPrompt, onSendState: onSendState),
+    builder: (context) => _PlanOptionsForm(
+      initialPrompt: initialPrompt,
+      initialIntensity: initialIntensity,
+      initialLevel: initialLevel,
+      onSendState: onSendState,
+      onPreferenceChanged: onPreferenceChanged,
+    ),
   );
 }
 
 class _PlanOptionsForm extends StatefulWidget {
   final String initialPrompt;
+  final String? initialIntensity;
+  final String? initialLevel;
   final void Function(String summaryText)? onSendState;
+  final void Function(String level, String intensity)? onPreferenceChanged;
 
   const _PlanOptionsForm({
     this.initialPrompt = '',
+    this.initialIntensity,
+    this.initialLevel,
     this.onSendState,
+    this.onPreferenceChanged,
   });
 
   @override
@@ -43,6 +58,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
   
   late stt.SpeechToText _speech;
   bool _isListening = false;
+  String _listeningTarget = 'prompt'; // 'prompt' o 'molestia'
   
   String _estado = 'Bien';
   String _molestiaAction = 'Descanso';
@@ -55,21 +71,103 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
     super.initState();
     _promptController = TextEditingController(text: widget.initialPrompt);
     _speech = stt.SpeechToText();
+
+    // Sincronizar nivel e intensidad con lo seleccionado en Coach o WeeklyPlanService
+    final currentPrefLevel = widget.initialLevel ?? WeeklyPlanService.instance.userLevel;
+    final currentPrefIntensity = widget.initialIntensity ?? WeeklyPlanService.instance.userIntensity;
+
+    if (currentPrefLevel.toLowerCase().contains('principiante') ||
+        currentPrefLevel.toLowerCase().contains('básico') ||
+        currentPrefLevel.toLowerCase().contains('basico')) {
+      _experience = 'Principiante';
+      _intensity = 'Bajo';
+    } else if (currentPrefLevel.toLowerCase().contains('avanzado')) {
+      _experience = 'Avanzado';
+      _intensity = 'Alto';
+    } else {
+      _experience = 'Intermedio';
+      _intensity = 'Medio';
+    }
+
+    if (currentPrefIntensity.toLowerCase() == 'baja' || currentPrefIntensity.toLowerCase() == 'bajo') {
+      _intensity = 'Bajo';
+      _experience = 'Principiante';
+    } else if (currentPrefIntensity.toLowerCase() == 'alta' ||
+        currentPrefIntensity.toLowerCase() == 'alto' ||
+        currentPrefIntensity.toLowerCase() == 'intenso') {
+      _intensity = 'Alto';
+      _experience = 'Avanzado';
+    } else if (currentPrefIntensity.toLowerCase() == 'media' || currentPrefIntensity.toLowerCase() == 'medio') {
+      _intensity = 'Medio';
+      _experience = 'Intermedio';
+    }
+  }
+
+  void _onIntensityChanged(String newIntensity) {
+    setState(() {
+      _intensity = newIntensity;
+      if (newIntensity == 'Bajo') {
+        _experience = 'Principiante';
+      } else if (newIntensity == 'Medio') {
+        _experience = 'Intermedio';
+      } else if (newIntensity == 'Alto') {
+        _experience = 'Avanzado';
+      }
+    });
+    _syncPreferences();
+  }
+
+  void _onExperienceChanged(String newExperience) {
+    setState(() {
+      _experience = newExperience;
+      if (newExperience == 'Principiante') {
+        _intensity = 'Bajo';
+      } else if (newExperience == 'Intermedio') {
+        _intensity = 'Medio';
+      } else if (newExperience == 'Avanzado') {
+        _intensity = 'Alto';
+      }
+    });
+    _syncPreferences();
+  }
+
+  void _syncPreferences() {
+    final intensityCode = _intensity == 'Bajo' ? 'Baja' : (_intensity == 'Alto' ? 'Alta' : 'Media');
+    WeeklyPlanService.instance.updateUserPreferences(
+      level: _experience,
+      intensity: intensityCode,
+    );
+    if (widget.onPreferenceChanged != null) {
+      widget.onPreferenceChanged!(_experience, intensityCode);
+    }
   }
   
-  void _listen() async {
-    if (!_isListening) {
+  void _listen({String target = 'prompt'}) async {
+    if (_isListening && _listeningTarget == target) {
+      setState(() => _isListening = false);
+      _speech.stop();
+      return;
+    }
+
+    try {
       bool available = await _speech.initialize(
         onStatus: (val) {
-           if (val == 'done') setState(() => _isListening = false);
+          if (val == 'done' || val == 'notListening') {
+            if (mounted) setState(() => _isListening = false);
+          }
         },
-        onError: (val) => setState(() => _isListening = false),
+        onError: (val) {
+          if (mounted) setState(() => _isListening = false);
+        },
       );
       if (available) {
-        setState(() => _isListening = true);
+        setState(() {
+          _isListening = true;
+          _listeningTarget = target;
+        });
         _speech.listen(
           onResult: (val) => setState(() {
-            if (_estado == 'Molestia') {
+            if (target == 'molestia') {
               _molestiaController.text = val.recognizedWords;
             } else {
               _promptController.text = val.recognizedWords;
@@ -77,10 +175,19 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
           }),
           localeId: 'es_ES',
         );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ Permiso de micrófono no habilitado en el navegador.'),
+              backgroundColor: Color(0xFF332020),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
-    } else {
-      setState(() => _isListening = false);
-      _speech.stop();
+    } catch (e) {
+      if (mounted) setState(() => _isListening = false);
     }
   }
 
@@ -112,11 +219,33 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                 IconButton(
                   icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
                   color: _isListening ? Colors.redAccent : const Color(0xFF8BE0C0),
-                  onPressed: _listen,
-                  tooltip: 'Dictar por voz',
+                  onPressed: () => _listen(target: _estado == 'Molestia' ? 'molestia' : 'prompt'),
+                  tooltip: _isListening ? 'Detener dictado' : 'Dictar por voz',
                 ),
               ],
             ),
+            if (_isListening)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.record_voice_over_rounded, color: Colors.redAccent, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      _listeningTarget == 'molestia'
+                          ? '🎙️ Escuchando descripción de molestia...'
+                          : '🎙️ Escuchando detalles adicionales...',
+                      style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
             
             // 1. Estado Fisico
@@ -184,6 +313,14 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
                   fillColor: const Color(0xFF4A1A1A).withValues(alpha: 0.5),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isListening && _listeningTarget == 'molestia' ? Icons.mic : Icons.mic_none_rounded,
+                      color: _isListening && _listeningTarget == 'molestia' ? Colors.redAccent : Colors.redAccent.withValues(alpha: 0.8),
+                    ),
+                    tooltip: 'Dictar molestia por voz',
+                    onPressed: () => _listen(target: 'molestia'),
+                  ),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent)),
                 ),
               ),
@@ -195,7 +332,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF261D1A),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                    border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
                   ),
                   child: const Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,8 +374,29 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
 
               const SizedBox(height: 20),
 
-              // 3. Intensidad
-              const Text('Nivel de Intensidad', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              // 3. Intensidad y sincronización
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Nivel de Intensidad', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16253B),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sync_rounded, size: 12, color: Color(0xFF8BE0C0)),
+                        SizedBox(width: 4),
+                        Text('Sincronizado con Coach', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 10, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [
@@ -247,7 +405,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   ButtonSegment(value: 'Alto', label: Text('Intenso')),
                 ],
                 selected: {_intensity},
-                onSelectionChanged: (set) => setState(() => _intensity = set.first),
+                onSelectionChanged: (set) => _onIntensityChanged(set.first),
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
                   foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
@@ -266,7 +424,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   ButtonSegment(value: 'Avanzado', label: Text('Avanzado', style: TextStyle(fontSize: 12))),
                 ],
                 selected: {_experience},
-                onSelectionChanged: (set) => setState(() => _experience = set.first),
+                onSelectionChanged: (set) => _onExperienceChanged(set.first),
                 style: ButtonStyle(
                   backgroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF8BE0C0) : Colors.transparent),
                   foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? const Color(0xFF0B1220) : Colors.white),
@@ -275,8 +433,38 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
 
               const SizedBox(height: 20),
 
-              // Peticion libre
-              const Text('Detalles adicionales (Opcional)', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              // Peticion libre con micrófono en el propio campo
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Detalles adicionales (Opcional)', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  InkWell(
+                    onTap: () => _listen(target: 'prompt'),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isListening && _listeningTarget == 'prompt' ? Icons.mic : Icons.mic_none_rounded,
+                            size: 15,
+                            color: _isListening && _listeningTarget == 'prompt' ? Colors.redAccent : const Color(0xFF8BE0C0),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _isListening && _listeningTarget == 'prompt' ? 'Escuchando...' : 'Dictar aquí',
+                            style: TextStyle(
+                              color: _isListening && _listeningTarget == 'prompt' ? Colors.redAccent : const Color(0xFF8BE0C0),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               TextField(
                 controller: _promptController,
@@ -288,6 +476,14 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
                   fillColor: const Color(0xFF1E293B),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isListening && _listeningTarget == 'prompt' ? Icons.mic : Icons.mic_none_rounded,
+                      color: _isListening && _listeningTarget == 'prompt' ? Colors.redAccent : const Color(0xFF8BE0C0),
+                    ),
+                    tooltip: 'Dictar detalles por voz',
+                    onPressed: () => _listen(target: 'prompt'),
+                  ),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
               ),

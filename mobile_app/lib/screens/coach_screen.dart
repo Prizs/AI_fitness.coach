@@ -40,28 +40,68 @@ class _CoachScreenState extends State<CoachScreen> {
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
+    final prefLvl = WeeklyPlanService.instance.userLevel;
+    if (prefLvl.isNotEmpty) _userLevel = prefLvl;
+    final prefInt = WeeklyPlanService.instance.userIntensity;
+    if (prefInt.isNotEmpty) _userIntensity = prefInt;
+    WeeklyPlanService.instance.addListener(_onWeeklyPlanUpdated);
+  }
+
+  void _onWeeklyPlanUpdated() {
+    if (mounted) {
+      setState(() {
+        _userLevel = WeeklyPlanService.instance.userLevel;
+        _userIntensity = WeeklyPlanService.instance.userIntensity;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    WeeklyPlanService.instance.removeListener(_onWeeklyPlanUpdated);
+    _controller.dispose();
+    super.dispose();
   }
   
   void _listen() async {
-    if (!_isListening) {
+    if (_isListening) {
+      setState(() => _isListening = false);
+      _speech.stop();
+      return;
+    }
+
+    try {
       bool available = await _speech.initialize(
         onStatus: (val) {
-           if (val == 'done') setState(() => _isListening = false);
+          if (val == 'done' || val == 'notListening') {
+            if (mounted) setState(() => _isListening = false);
+          }
         },
-        onError: (val) => setState(() => _isListening = false),
+        onError: (val) {
+          if (mounted) setState(() => _isListening = false);
+        },
       );
       if (available) {
-        setState(() => _isListening = true);
+        if (mounted) setState(() => _isListening = true);
         _speech.listen(
           onResult: (val) => setState(() {
             _controller.text = val.recognizedWords;
           }),
           localeId: 'es_ES', // Español
         );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ Permiso de micrófono no habilitado o no soportado en tu navegador.'),
+              backgroundColor: Color(0xFF332020),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
-    } else {
-      setState(() => _isListening = false);
-      _speech.stop();
+    } catch (e) {
+      if (mounted) setState(() => _isListening = false);
     }
   }
 
@@ -69,6 +109,14 @@ class _CoachScreenState extends State<CoachScreen> {
     showPlanOptionsSheet(
       context,
       initialPrompt: initialPrompt,
+      initialIntensity: _userIntensity,
+      initialLevel: _userLevel,
+      onPreferenceChanged: (lvl, intn) {
+        setState(() {
+          _userLevel = lvl;
+          _userIntensity = intn;
+        });
+      },
       onSendState: (summary) => _sendMessage(summary),
     );
   }
@@ -845,6 +893,40 @@ class _CoachScreenState extends State<CoachScreen> {
 
             // Barra de entrada: el cuadro crece hacia abajo al escribir y
             // empuja los mensajes hacia arriba para poder leerlos.
+            if (_isListening)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withValues(alpha: 0.18),
+                  border: const Border(top: BorderSide(color: Colors.redAccent, width: 1.0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.record_voice_over_rounded, color: Colors.redAccent, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        '🎙️ Escuchando... habla claramente para escribir en el chat',
+                        style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _listen,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('DETENER', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
               decoration: const BoxDecoration(
@@ -866,7 +948,7 @@ class _CoachScreenState extends State<CoachScreen> {
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
                           hintText: _controller.text.isEmpty
-                              ? 'Escribe tu pregunta...'
+                              ? 'Escribe tu pregunta o usa el micrófono...'
                               : null,
                           hintStyle: const TextStyle(color: Colors.white38),
                           filled: true,
@@ -874,6 +956,14 @@ class _CoachScreenState extends State<CoachScreen> {
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 14),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isListening ? Icons.mic : Icons.mic_none_rounded,
+                              color: _isListening ? Colors.redAccent : const Color(0xFF8BE0C0),
+                            ),
+                            tooltip: _isListening ? 'Detener dictado' : 'Hablar por micrófono',
+                            onPressed: _listen,
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide.none,
@@ -882,30 +972,31 @@ class _CoachScreenState extends State<CoachScreen> {
                       ),
                     ),
                   ),
-                                      const SizedBox(width: 8),
-                    IconButton(
-                      style: IconButton.styleFrom(
-                        backgroundColor: _isListening ? Colors.redAccent : const Color(0xFF2A3A4A),
-                        foregroundColor: _isListening ? Colors.white : Colors.white54,
-                        minimumSize: const Size(48, 48),
-                      ),
-                      icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
-                      onPressed: _listen,
+                  const SizedBox(width: 8),
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: _isListening ? Colors.redAccent : const Color(0xFF2A3A4A),
+                      foregroundColor: _isListening ? Colors.white : const Color(0xFF8BE0C0),
+                      minimumSize: const Size(48, 48),
                     ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      style: IconButton.styleFrom(
-                        backgroundColor: _controller.text.trim().isEmpty
-                            ? const Color(0xFF2A3A4A)
-                            : const Color(0xFF8BE0C0),
-                        foregroundColor: const Color(0xFF0B1220),
-                        minimumSize: const Size(48, 48),
-                      ),
-                      icon: const Icon(Icons.send_rounded),
-                      onPressed: _controller.text.trim().isEmpty
-                          ? null
-                          : () => _sendMessage(_controller.text),
+                    icon: Icon(_isListening ? Icons.mic : Icons.mic_rounded),
+                    tooltip: _isListening ? 'Detener dictado' : 'Dictar por voz',
+                    onPressed: _listen,
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: _controller.text.trim().isEmpty
+                          ? const Color(0xFF2A3A4A)
+                          : const Color(0xFF8BE0C0),
+                      foregroundColor: const Color(0xFF0B1220),
+                      minimumSize: const Size(48, 48),
                     ),
+                    icon: const Icon(Icons.send_rounded),
+                    onPressed: _controller.text.trim().isEmpty
+                        ? null
+                        : () => _sendMessage(_controller.text),
+                  ),
                 ],
               ),
             ),
