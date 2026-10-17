@@ -42,6 +42,8 @@ class ChatMessage(BaseModel):
     active_plan_end: str | None = Field(default=None, max_length=200)
     next_cycle_start: str | None = Field(default=None, max_length=200)
     active_training_days: list[str] | None = Field(default=None)
+    user_streak: int | None = Field(default=None)
+    total_completed_sessions: int | None = Field(default=None)
     equipment_details: str | None = Field(default=None, max_length=2000)
 
 
@@ -847,8 +849,9 @@ def _profile_context(payload: ChatMessage, effective_level: str, effective_inten
         f"Alergias: {payload.allergies or 'Ninguna'}. "
         f"Lesiones: {payload.injuries or 'Ninguna'}. "
         f"Discapacidad motora: {payload.motor_disability or 'Ninguna'}. "
-        f"Zonas a evitar: {payload.areas_to_avoid or 'Ninguna'}. "
-        f"RPE reportado: {payload.rpe_feedback if payload.rpe_feedback is not None else 'no indicado'}."
+        f"RPE reportado: {payload.rpe_feedback if payload.rpe_feedback is not None else 'no indicado'}. "
+        f"Racha actual de entrenamientos completados: {payload.user_streak or 0} sesiones consecutivas. "
+        f"Total de sesiones completadas históricas: {payload.total_completed_sessions or 0}."
         f"{plan_info}{equip_info}"
     )
 

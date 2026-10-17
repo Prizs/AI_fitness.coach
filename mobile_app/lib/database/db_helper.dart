@@ -106,6 +106,9 @@ CREATE TABLE cached_plan (
     return null;
   }
 
+  static const String _workoutStatsKey = 'cached_workout_stats_v1';
+  static const String _workoutHistoryKey = 'cached_workout_history_v1';
+
   Future<void> saveCompletedDays(Set<int> days) async {
     _memoryCompletedDays = Set<int>.from(days);
     final encoded = jsonEncode(days.toList());
@@ -136,5 +139,113 @@ CREATE TABLE cached_plan (
       }
     } catch (_) {}
     return {};
+  }
+
+  Future<void> recordWorkoutSession({
+    required int weekday,
+    required String title,
+    required int rpe,
+    required String feeling,
+    String? notes,
+  }) async {
+    final stats = await getWorkoutStats();
+    int currentStreak = (stats['current_streak'] as int? ?? 0) + 1;
+    int bestStreak = stats['best_streak'] as int? ?? 0;
+    if (currentStreak > bestStreak) {
+      bestStreak = currentStreak;
+    }
+    int totalSessions = (stats['total_sessions'] as int? ?? 0) + 1;
+
+    final history = await getSessionHistory();
+    history.insert(0, {
+      'weekday': weekday,
+      'title': title,
+      'rpe': rpe,
+      'feeling': feeling,
+      'notes': notes ?? '',
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+    if (history.length > 30) {
+      history.removeRange(30, history.length);
+    }
+
+    final updatedStats = {
+      'current_streak': currentStreak,
+      'best_streak': bestStreak,
+      'total_sessions': totalSessions,
+      'last_rpe': rpe,
+      'last_feeling': feeling,
+      'last_completed_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await _secureStorage.write(
+        key: _workoutStatsKey,
+        value: jsonEncode(updatedStats),
+      );
+      await _secureStorage.write(
+        key: _workoutHistoryKey,
+        value: jsonEncode(history),
+      );
+    } catch (_) {}
+
+    final completed = await getCompletedDays();
+    completed.add(weekday);
+    await saveCompletedDays(completed);
+  }
+
+  Future<void> removeSessionRecord(int weekday) async {
+    final completed = await getCompletedDays();
+    completed.remove(weekday);
+    await saveCompletedDays(completed);
+
+    final stats = await getWorkoutStats();
+    int currentStreak = (stats['current_streak'] as int? ?? 1) - 1;
+    if (currentStreak < 0) currentStreak = 0;
+    int total = (stats['total_sessions'] as int? ?? 1) - 1;
+    if (total < 0) total = 0;
+
+    stats['current_streak'] = currentStreak;
+    stats['total_sessions'] = total;
+
+    try {
+      await _secureStorage.write(
+        key: _workoutStatsKey,
+        value: jsonEncode(stats),
+      );
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> getWorkoutStats() async {
+    try {
+      final stored = await _secureStorage.read(key: _workoutStatsKey);
+      if (stored != null && stored.trim().isNotEmpty) {
+        final decoded = jsonDecode(stored);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+      }
+    } catch (_) {}
+    return {
+      'current_streak': 0,
+      'best_streak': 0,
+      'total_sessions': 0,
+      'last_rpe': 7,
+      'last_feeling': 'Normal',
+      'last_completed_at': null,
+    };
+  }
+
+  Future<List<Map<String, dynamic>>> getSessionHistory() async {
+    try {
+      final stored = await _secureStorage.read(key: _workoutHistoryKey);
+      if (stored != null && stored.trim().isNotEmpty) {
+        final decoded = jsonDecode(stored);
+        if (decoded is List) {
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+    } catch (_) {}
+    return [];
   }
 }

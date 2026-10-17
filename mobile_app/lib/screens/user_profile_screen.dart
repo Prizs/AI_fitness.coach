@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
-import 'package:mobile_app/widgets/app_update.dart';
+import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/database/db_helper.dart';
+import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/main.dart';
-import 'package:mobile_app/screens/progress_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -12,15 +13,28 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
+  final WeeklyPlanService _planService = WeeklyPlanService.instance;
   final List<String> _allergies = ['Lácteos', 'Mariscos'];
   final List<String> _injuries = ['Molestia en manguito rotador derecho'];
   final _allergyController = TextEditingController();
   final _injuryController = TextEditingController();
+  List<Map<String, dynamic>> _sessionHistory = [];
 
-  final String _activeGoal = 'Mejorar resistencia cardiovascular y pulmonar';
-  final String _secondaryGoal = 'Hipertrofia en tren superior (Fase 2)';
-  final int _completedSessions = 14;
-  final double _adherenceRate = 87.5;
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _planService.refreshWorkoutStats();
+    final history = await DBHelper.instance.getSessionHistory();
+    if (mounted) {
+      setState(() {
+        _sessionHistory = history;
+      });
+    }
+  }
 
   void _addTag(List<String> list, TextEditingController ctrl) {
     if (ctrl.text.trim().isNotEmpty) {
@@ -34,6 +48,85 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+  void _showChangeGoalDialog() {
+    final goals = [
+      'Aumentar masa muscular',
+      'Pérdida de grasa y definición',
+      'Mejorar resistencia cardiovascular',
+      'Ganar fuerza funcional',
+      'Salud integral y movilidad',
+    ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Selecciona tu Meta Principal',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Se actualizará de inmediato en Inicio, Perfil y en el Coach IA.',
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+            ...goals.map((g) {
+              final isCurrent = g.toLowerCase() == _planService.userGoal.toLowerCase();
+              return ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: isCurrent ? const Color(0xFF173B45) : null,
+                leading: Icon(
+                  isCurrent ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                  color: isCurrent ? const Color(0xFF8BE0C0) : Colors.white38,
+                ),
+                title: Text(
+                  g,
+                  style: TextStyle(
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                    color: isCurrent ? const Color(0xFF8BE0C0) : Colors.white,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _planService.updateUserPreferences(goal: g);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('🎯 Meta actualizada a: $g'),
+                        backgroundColor: const Color(0xFF16253B),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = AuthService.instance.loggedInUser;
@@ -43,254 +136,392 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       appBar: AppBar(
         title: const Text('Mi Perfil Atlético & Salud', style: TextStyle(fontWeight: FontWeight.w800)),
         backgroundColor: const Color(0xFF0F192B),
-        elevation: 0, actions: [ IconButton(icon: Icon(Icons.logout, color: Colors.redAccent), onPressed: () { AuthService.instance.logout(); Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => AuthGate()), (r) => false); }) ],
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            tooltip: 'Cerrar sesión',
+            onPressed: () {
+              AuthService.instance.logout();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const AuthGate()),
+                (r) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // Resumen de Métricas
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF173B45),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8BE0C0),
-                      borderRadius: BorderRadius.circular(20),
+        child: AnimatedBuilder(
+          animation: _planService,
+          builder: (context, _) => ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // Resumen de Métricas
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF173B45),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8BE0C0),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(Icons.person_rounded, size: 36, color: Color(0xFF0B1220)),
                     ),
-                    child: const Icon(Icons.person_rounded, size: 36, color: Color(0xFF0B1220)),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${user?.name ?? 'Atleta'} ${user?.lastName ?? ''}',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Cédula: ${user?.cedula ?? 'V-Local'} · ${user?.age ?? 25} años · ${user?.weight ?? 70.0} kg',
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Tarjeta de Racha de Entrenamiento (Streak) - Incentivo Atlético
+              _StreakCard(
+                currentStreak: _planService.currentStreak,
+                bestStreak: _planService.bestStreak,
+                totalSessions: _planService.totalCompletedSessions,
+                adherence: _planService.adherenceRate,
+              ),
+              const SizedBox(height: 16),
+
+              // Metas Atléticas y Nivel Sincronizado con Coach IA
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F192B),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Text('${user?.name ?? 'Atleta'} ${user?.lastName ?? ''}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 4),
-                        Text('Cédula: ${user?.cedula ?? 'V-Local'} · ${user?.age ?? 25} años · ${user?.weight ?? 70.0} kg', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                        const Expanded(
+                          child: Text(
+                            'Metas y Nivel del Atleta',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF8BE0C0),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          ),
+                          onPressed: _showChangeGoalDialog,
+                          icon: const Icon(Icons.edit_rounded, size: 16),
+                          label: const Text('Cambiar', style: TextStyle(fontSize: 12)),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Adherencia y Sesiones
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F192B),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Historial y Rendimiento', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Column(
-                        children: [
-                          Text('$_completedSessions', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF8BE0C0))),
-                          const SizedBox(height: 4),
-                          const Text('Sesiones Hechas', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                        ],
+                    const SizedBox(height: 10),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.track_changes_rounded, color: Color(0xFF8BE0C0)),
+                      title: const Text('Meta Activa (Fase en Curso)', style: TextStyle(fontSize: 12, color: Colors.white60)),
+                      subtitle: Text(
+                        _planService.userGoal,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                       ),
-                      Container(width: 1, height: 40, color: Colors.white12),
-                      Column(
-                        children: [
-                          Text('$_adherenceRate%', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF8BE0C0))),
-                          const SizedBox(height: 4),
-                          const Text('Adherencia al Plan', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Objetivos
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F192B),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Metas Atléticas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.track_changes_rounded, color: Color(0xFF8BE0C0)),
-                    title: const Text('Meta Activa (Fase en Curso)', style: TextStyle(fontSize: 12, color: Colors.white60)),
-                    subtitle: Text(_activeGoal, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                  const Divider(color: Colors.white10),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.next_plan_rounded, color: Colors.amber),
-                    title: const Text('Plan Secundario / Próxima Meta', style: TextStyle(fontSize: 12, color: Colors.white60)),
-                    subtitle: Text(_secondaryGoal, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Gestión de Alergias
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F192B),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.no_food_rounded, color: Color(0xFF8BE0C0)),
-                      SizedBox(width: 8),
-                      Text('Alergias y Exclusiones Alimentarias', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    children: _allergies.map((a) => Chip(
-                      label: Text(a),
-                      onDeleted: () => setState(() => _allergies.remove(a)),
-                    )).toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _allergyController,
-                          decoration: const InputDecoration(hintText: 'Agregar alergia...'),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_rounded, color: Color(0xFF8BE0C0)),
-                        onPressed: () => _addTag(_allergies, _allergyController),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Gestión de Lesiones
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F192B),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.healing_rounded, color: Color(0xFFFF3B30)),
-                      SizedBox(width: 8),
-                      Text('Registro de Lesiones o Dolor', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    children: _injuries.map((i) => Chip(
-                      backgroundColor: const Color(0xFF2A151B),
-                      label: Text(i, style: const TextStyle(color: Color(0xFFFF3B30))),
-                      onDeleted: () => setState(() => _injuries.remove(i)),
-                    )).toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _injuryController,
-                          decoration: const InputDecoration(hintText: 'Agregar molestia (ej. hombro)...'),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_rounded, color: Color(0xFFFF3B30)),
-                        onPressed: () => _addTag(_injuries, _injuryController),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-
-            // Configuracion del servidor
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF173B45),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Conexión con la IA (Servidor)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(AuthService.apiBaseUrl, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8BE0C0), foregroundColor: Colors.black),
-                      icon: const Icon(Icons.link, size: 18),
-                      label: const Text('Cambiar Servidor'),
-                      onPressed: () {
-                        final ctrl = TextEditingController(text: AuthService.apiBaseUrl);
-                        showDialog(context: context, builder: (_) => AlertDialog(
-                          backgroundColor: const Color(0xFF101B2D),
-                          title: const Text('Cambiar Servidor', style: TextStyle(color: Colors.white)),
-                          content: TextField(controller: ctrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'https://...', hintStyle: TextStyle(color: Colors.white38))),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
-                            TextButton(onPressed: () async { await AuthService.instance.saveServerConfig(ctrl.text); if(context.mounted){Navigator.pop(context); setState((){});} }, child: const Text('Guardar', style: TextStyle(color: Color(0xFF8BE0C0)))),
-                          ]
-                        ));
-                      },
                     ),
-                  )
-                ],
+                    const Divider(color: Colors.white10),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.bolt_rounded, color: Color(0xFFFFB340)),
+                      title: const Text('Nivel e Intensidad en Coach IA', style: TextStyle(fontSize: 12, color: Colors.white60)),
+                      subtitle: Text(
+                        '${_planService.userLevel} · Intensidad ${_planService.userIntensity}',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                      trailing: TextButton(
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const CoachScreen()));
+                        },
+                        child: const Text('Ir a Coach IA', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 11)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            // Verificador de actualizaciones de la app
-            const AppUpdatePanel(),
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 16),
+
+              // Historial de Sesiones Registradas para Análisis del Coach IA
+              if (_sessionHistory.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F192B),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.history_rounded, size: 18, color: Color(0xFF8BE0C0)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Historial de Sesiones (Datos para la IA)',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ..._sessionHistory.take(5).map((s) {
+                        final rpe = s['rpe'] ?? 7;
+                        final feeling = s['feeling'] ?? 'Con energía';
+                        final title = s['title'] ?? 'Sesión completada';
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF141F32),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF8BE0C0)),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      title,
+                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Esfuerzo: RPE $rpe/10 · $feeling',
+                                      style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Gestión de Alergias
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F192B),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.no_food_rounded, color: Color(0xFF8BE0C0)),
+                        SizedBox(width: 8),
+                        Text('Alergias y Exclusiones Alimentarias', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      children: _allergies
+                          .map((a) => Chip(
+                                label: Text(a),
+                                onDeleted: () => setState(() => _allergies.remove(a)),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _allergyController,
+                            decoration: const InputDecoration(hintText: 'Agregar alergia...'),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_rounded, color: Color(0xFF8BE0C0)),
+                          onPressed: () => _addTag(_allergies, _allergyController),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Lesiones
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F192B),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.healing_rounded, color: Color(0xFF8BE0C0)),
+                        SizedBox(width: 8),
+                        Text('Condiciones y Lesiones Físicas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      children: _injuries
+                          .map((i) => Chip(
+                                label: Text(i),
+                                onDeleted: () => setState(() => _injuries.remove(i)),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _injuryController,
+                            decoration: const InputDecoration(hintText: 'Agregar lesión o dolor...'),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_rounded, color: Color(0xFF8BE0C0)),
+                          onPressed: () => _addTag(_injuries, _injuryController),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _StreakCard extends StatelessWidget {
+  const _StreakCard({
+    required this.currentStreak,
+    required this.bestStreak,
+    required this.totalSessions,
+    required this.adherence,
+  });
+
+  final int currentStreak;
+  final int bestStreak;
+  final int totalSessions;
+  final double adherence;
+
+  @override
+  Widget build(BuildContext context) {
+    String badgeText = '🌱 Construyendo Hábito';
+    Color badgeColor = const Color(0xFF8BE0C0);
+    if (currentStreak >= 6) {
+      badgeText = '⚡ Atleta Imparable';
+      badgeColor = const Color(0xFFFF6B6B);
+    } else if (currentStreak >= 3) {
+      badgeText = '🔥 En Racha Fuerte';
+      badgeColor = const Color(0xFFFFB340);
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101C2F),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFFFB340).withOpacity(0.4),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🔥', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Racha de Entrenamientos',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: badgeColor.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: badgeColor.withOpacity(0.5)),
+                ),
+                child: Text(
+                  badgeText,
+                  style: TextStyle(color: badgeColor, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _metricColumn('Racha Actual', '$currentStreak', const Color(0xFFFFB340), 'sesiones'),
+              Container(width: 1, height: 40, color: Colors.white12),
+              _metricColumn('Récord Racha', '$bestStreak', const Color(0xFF8BE0C0), 'máxima'),
+              Container(width: 1, height: 40, color: Colors.white12),
+              _metricColumn('Total Hechas', '$totalSessions', Colors.white, 'sesiones'),
+              Container(width: 1, height: 40, color: Colors.white12),
+              _metricColumn('Adherencia', '${adherence.toStringAsFixed(0)}%', const Color(0xFF8BE0C0), 'semanal'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metricColumn(String label, String value, Color color, String sub) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w600)),
+        Text(sub, style: const TextStyle(color: Colors.white38, fontSize: 9.5)),
+      ],
     );
   }
 }

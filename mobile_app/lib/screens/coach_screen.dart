@@ -243,9 +243,12 @@ class _CoachScreenState extends State<CoachScreen> {
             body: jsonEncode({
               'message': text,
               'history': history,
-              'user_goal': 'Rendimiento general',
+              'user_goal': WeeklyPlanService.instance.userGoal,
               'user_level': _userLevel,
               'user_intensity': _userIntensity,
+              'user_streak': WeeklyPlanService.instance.currentStreak,
+              'total_completed_sessions': WeeklyPlanService.instance.totalCompletedSessions,
+              'rpe_feedback': WeeklyPlanService.instance.lastRpe,
               'allergies': profile?.foodAllergies,
               'injuries': profile?.currentInjuries,
               'motor_disability': profile?.motorDisability,
@@ -374,10 +377,14 @@ class _CoachScreenState extends State<CoachScreen> {
                               _userLevel = tier['level'] as String;
                               _userIntensity = tier['intensity'] as String;
                             });
+                            WeeklyPlanService.instance.updateUserPreferences(
+                              level: tier['level'] as String,
+                              intensity: tier['intensity'] as String,
+                            );
                             ScaffoldMessenger.of(context).hideCurrentSnackBar();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('⚡ Modo ${tier['label']} seleccionado para el Coach IA y ejercicios'),
+                                content: Text('⚡ Modo ${tier['label']} seleccionado y sincronizado en Inicio y Perfil'),
                                 backgroundColor: const Color(0xFF16253B),
                                 behavior: SnackBarBehavior.floating,
                                 duration: const Duration(seconds: 2),

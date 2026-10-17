@@ -39,15 +39,324 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     }
   }
 
-  Future<void> _toggleCompleted(int weekday) async {
-    setState(() {
-      if (_completed.contains(weekday)) {
-        _completed.remove(weekday);
-      } else {
-        _completed.add(weekday);
-      }
-    });
-    await DBHelper.instance.saveCompletedDays(_completed);
+  void _handleToggleCompletion(Map<String, dynamic> day) {
+    final weekday = day['weekday'] as int;
+    final isDone = _completed.contains(weekday);
+    if (isDone) {
+      _showUnmarkConfirmationDialog(day);
+    } else {
+      _showWorkoutCompletionSheet(day);
+    }
+  }
+
+  void _showUnmarkConfirmationDialog(Map<String, dynamic> day) {
+    final weekday = day['weekday'] as int;
+    final title = '${day['weekday_name']} · ${day['title']}';
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F192B),
+        title: const Text('¿Desmarcar sesión?'),
+        content: Text(
+          '¿Deseas desmarcar "$title"? Se recalculará tu racha de entrenamientos.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF173B45)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await DBHelper.instance.removeSessionRecord(weekday);
+              await _service.refreshWorkoutStats();
+              if (mounted) {
+                setState(() {
+                  _completed.remove(weekday);
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Sesión desmarcada.'),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: Color(0xFF173B45),
+                  ),
+                );
+              }
+            },
+            child: const Text('Desmarcar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWorkoutCompletionSheet(Map<String, dynamic> day) {
+    int selectedRpe = 7;
+    String selectedFeeling = '⚡ Con energía';
+    final TextEditingController noteCtrl = TextEditingController();
+    final weekday = day['weekday'] as int;
+    final title = '${day['weekday_name']} · ${day['title']}';
+    final exercises = (day['exercises'] as List<dynamic>?) ?? [];
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF173B45),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        color: Color(0xFF8BE0C0),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Confirmar Sesión Completada',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'Evita toques por error y registra datos para el Coach IA',
+                            style: TextStyle(color: Colors.white54, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16233A),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Color(0xFF8BE0C0),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${exercises.length} ejercicios planificados para hoy',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '1. Esfuerzo Percibido (RPE 1-10):',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _rpeChip(4, 'Fácil (4)', selectedRpe, (v) => setModalState(() => selectedRpe = v)),
+                    _rpeChip(6, 'Medio (6)', selectedRpe, (v) => setModalState(() => selectedRpe = v)),
+                    _rpeChip(8, 'Exigente (8)', selectedRpe, (v) => setModalState(() => selectedRpe = v)),
+                    _rpeChip(10, 'Máximo (10)', selectedRpe, (v) => setModalState(() => selectedRpe = v)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '2. Sensación post-entrenamiento:',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _feelingChip('⚡ Con energía', selectedFeeling, (v) => setModalState(() => selectedFeeling = v)),
+                    _feelingChip('🙂 Adecuado', selectedFeeling, (v) => setModalState(() => selectedFeeling = v)),
+                    _feelingChip('😴 Fatigado', selectedFeeling, (v) => setModalState(() => selectedFeeling = v)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: noteCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Comentario opcional para el Coach IA...',
+                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                    filled: true,
+                    fillColor: const Color(0xFF141F32),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF8BE0C0),
+                    foregroundColor: const Color(0xFF0B1220),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await DBHelper.instance.recordWorkoutSession(
+                      weekday: weekday,
+                      title: title,
+                      rpe: selectedRpe,
+                      feeling: selectedFeeling,
+                      notes: noteCtrl.text.trim(),
+                    );
+                    await _service.refreshWorkoutStats();
+                    if (mounted) {
+                      setState(() {
+                        _completed.add(weekday);
+                      });
+                      final streak = _service.currentStreak;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '🔥 ¡Sesión completada y registrada! Llevas una racha de $streak sesiones seguidas. Datos guardados en tu perfil para el Coach IA.',
+                          ),
+                          backgroundColor: const Color(0xFF1B4D3E),
+                          duration: const Duration(seconds: 4),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.local_fire_department_rounded),
+                  label: const Text(
+                    '¡Sí, registrar y sumar a mi racha! 🔥',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Cancelar (evitar registro por error)',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _rpeChip(int value, String label, int current, ValueChanged<int> onSelect) {
+    final isSelected = value == current;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => onSelect(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF8BE0C0) : const Color(0xFF141F32),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF8BE0C0) : Colors.white12,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF0B1220) : Colors.white70,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _feelingChip(String label, String current, ValueChanged<String> onSelect) {
+    final isSelected = label == current;
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => onSelect(label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF173B45) : const Color(0xFF141F32),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF8BE0C0) : Colors.white12,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF8BE0C0) : Colors.white70,
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -401,7 +710,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 day: day,
                 isToday: day['weekday'] == today,
                 isDone: false,
-                onToggle: () => _toggleCompleted(day['weekday'] as int),
+                onToggle: () => _handleToggleCompletion(day),
                 onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
               )),
         ],
@@ -412,7 +721,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 day: day,
                 isToday: day['weekday'] == today,
                 isDone: true,
-                onToggle: () => _toggleCompleted(day['weekday'] as int),
+                onToggle: () => _handleToggleCompletion(day),
                 onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
               )),
         ],
@@ -612,6 +921,32 @@ class _ActiveCycleCard extends StatelessWidget {
               ],
             ),
           ),
+          if (service.currentStreak > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF231A12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFB340).withOpacity(0.5)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('🔥', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Racha Activa: ${service.currentStreak} ${service.currentStreak == 1 ? "sesión consecutiva" : "sesiones consecutivas"}',
+                    style: const TextStyle(
+                      color: Color(0xFFFFB340),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
@@ -16,6 +17,38 @@ class WeeklyPlanService extends ChangeNotifier {
   bool loadedFromCache = false;
 
   Future<void>? _pending;
+
+  String _userGoal = 'Aumentar masa muscular';
+  String _userLevel = 'Principiante';
+  String _userIntensity = 'Baja';
+  Set<int> _completedDaysSet = {};
+  Map<String, dynamic> _workoutStats = {
+    'current_streak': 0,
+    'best_streak': 0,
+    'total_sessions': 0,
+    'last_rpe': 7,
+    'last_feeling': 'Con energía',
+  };
+
+  String get userGoal => _userGoal;
+  String get userLevel => _userLevel;
+  String get userIntensity => _userIntensity;
+  Set<int> get completedDays => _completedDaysSet;
+  int get currentStreak => (_workoutStats['current_streak'] as int?) ?? 0;
+  int get bestStreak => (_workoutStats['best_streak'] as int?) ?? 0;
+  int get totalCompletedSessions => (_workoutStats['total_sessions'] as int?) ?? 0;
+  int get lastRpe => (_workoutStats['last_rpe'] as int?) ?? 7;
+  String get lastFeeling => (_workoutStats['last_feeling'] as String?) ?? 'Con energía';
+
+  double get adherenceRate {
+    final scheduled = days.where((d) => (d['exercises'] as List?)?.isNotEmpty == true).length;
+    if (scheduled == 0) return 100.0;
+    final done = days.where((d) {
+      final isTraining = (d['exercises'] as List?)?.isNotEmpty == true;
+      return isTraining && _completedDaysSet.contains(d['weekday']);
+    }).length;
+    return ((done / scheduled) * 100).clamp(0.0, 100.0);
+  }
 
   int get todayIndex => DateTime.now().weekday - 1;
   String get todayName => _weekdayNames[todayIndex];
@@ -140,8 +173,66 @@ class WeeklyPlanService extends ChangeNotifier {
       }
     } catch (_) {}
 
+    try {
+      const storage = FlutterSecureStorage();
+      final prefStr = await storage.read(key: 'user_preferences_v1');
+      if (prefStr != null && prefStr.trim().isNotEmpty) {
+        final pref = jsonDecode(prefStr);
+        if (pref is Map) {
+          if (pref['goal'] != null) _userGoal = pref['goal'].toString();
+          if (pref['level'] != null) _userLevel = pref['level'].toString();
+          if (pref['intensity'] != null) _userIntensity = pref['intensity'].toString();
+        }
+      }
+    } catch (_) {}
+
+    try {
+      _workoutStats = await DBHelper.instance.getWorkoutStats();
+      _completedDaysSet = await DBHelper.instance.getCompletedDays();
+    } catch (_) {}
+
     isLoading = false;
     _pending = null;
+    notifyListeners();
+  }
+
+  Future<void> updateUserPreferences({
+    String? goal,
+    String? level,
+    String? intensity,
+  }) async {
+    bool changed = false;
+    if (goal != null && goal.trim().isNotEmpty && goal != _userGoal) {
+      _userGoal = goal.trim();
+      changed = true;
+    }
+    if (level != null && level.trim().isNotEmpty && level != _userLevel) {
+      _userLevel = level.trim();
+      changed = true;
+    }
+    if (intensity != null && intensity.trim().isNotEmpty && intensity != _userIntensity) {
+      _userIntensity = intensity.trim();
+      changed = true;
+    }
+    if (changed) {
+      notifyListeners();
+      try {
+        const storage = FlutterSecureStorage();
+        await storage.write(
+          key: 'user_preferences_v1',
+          value: jsonEncode({
+            'goal': _userGoal,
+            'level': _userLevel,
+            'intensity': _userIntensity,
+          }),
+        );
+      } catch (_) {}
+    }
+  }
+
+  Future<void> refreshWorkoutStats() async {
+    _workoutStats = await DBHelper.instance.getWorkoutStats();
+    _completedDaysSet = await DBHelper.instance.getCompletedDays();
     notifyListeners();
   }
 

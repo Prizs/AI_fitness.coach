@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/data/nutrition_database.dart';
 
-/// Nutricion del dia de la semana en el que esta el telefono.
-///
-/// Al abrir muestra siempre el dia actual (por ejemplo, el viernes) y permite
-/// moverse a cualquier otro dia. Cada dia trae su propio menu, y arriba se
-/// explica la sinergia entre el entrenamiento y la comida de ese dia.
+/// Nutrición de la semana diversificada por objetivos y guías nutricionales accesibles.
 class NutritionScreen extends StatefulWidget {
   const NutritionScreen({super.key});
 
@@ -18,8 +15,11 @@ class NutritionScreen extends StatefulWidget {
 class _NutritionScreenState extends State<NutritionScreen> {
   final WeeklyPlanService _service = WeeklyPlanService.instance;
 
-  /// Dia seleccionado. Arranca en el dia real del telefono.
+  /// Día seleccionado (0 = Lunes ... 6 = Domingo).
   late int _selected = _service.todayIndex;
+
+  /// Objetivo nutricional seleccionado. Por defecto 'musculo'.
+  String _selectedGoal = 'musculo';
 
   @override
   void initState() {
@@ -28,8 +28,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
   }
 
   void _ensure() {
-    // ensureLoaded no vuelve a pedir el plan si ya esta en memoria, por lo que
-    // la pantalla aparece de inmediato en lugar de quedarse en blanco.
     _service.ensureLoaded(AuthService.instance.loggedInUser);
   }
 
@@ -65,7 +63,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
+              CircularProgressIndicator(color: Color(0xFF8BE0C0)),
               SizedBox(height: 14),
               Text('Sincronizando tu semana...',
                   style: TextStyle(color: Colors.white70)),
@@ -83,15 +81,33 @@ class _NutritionScreenState extends State<NutritionScreen> {
     final day = _day;
     if (day == null) return const SizedBox.shrink();
 
+    final isTraining = day['is_training'] == true;
+    final databasePlan = NutritionDatabase.getPlanForDay(
+      goalId: _selectedGoal,
+      weekday: _selected,
+      isTrainingDay: isTraining,
+    );
+
+    // Revisar si el plan en memoria trae comidas reales o genéricas
     final rawNutrition = day['nutrition'];
     final List<Map<String, dynamic>> meals = [];
-    if (rawNutrition is List) {
+    bool hasCustomAiMeals = false;
+
+    if (rawNutrition is List && rawNutrition.isNotEmpty) {
       for (final m in rawNutrition) {
         if (m is Map) {
+          final items = m['items'];
+          if (items is List && items.isNotEmpty) {
+            final firstItem = items.first.toString().toLowerCase();
+            if (!firstItem.contains('según objetivo') &&
+                !firstItem.contains('segun objetivo')) {
+              hasCustomAiMeals = true;
+            }
+          }
           meals.add(Map<String, dynamic>.from(m));
         }
       }
-    } else if (rawNutrition is Map) {
+    } else if (rawNutrition is Map && rawNutrition.isNotEmpty) {
       rawNutrition.forEach((key, val) {
         final keyStr = key.toString();
         final title = keyStr.isEmpty
@@ -102,7 +118,10 @@ class _NutritionScreenState extends State<NutritionScreen> {
           items = val;
         } else if (val != null) {
           final str = val.toString().trim();
-          if (str.isNotEmpty) {
+          if (str.isNotEmpty &&
+              !str.toLowerCase().contains('según objetivo') &&
+              !str.toLowerCase().contains('segun objetivo')) {
+            hasCustomAiMeals = true;
             items = str
                 .split('\n')
                 .map((s) => s.trim().replaceAll(RegExp(r'^[•\-\*]\s*'), ''))
@@ -110,13 +129,31 @@ class _NutritionScreenState extends State<NutritionScreen> {
                 .toList();
           }
         }
-        meals.add({
-          'title': title,
-          'items': items,
-        });
+        if (items.isNotEmpty) {
+          meals.add({
+            'title': title,
+            'items': items,
+          });
+        }
       });
     }
+
+    // Si las comidas eran el placeholder genérico, usamos las comidas accesibles y completas de la base de datos
+    final activeMeals = (!hasCustomAiMeals || meals.isEmpty)
+        ? (databasePlan['meals'] as List<dynamic>)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList()
+        : meals;
+
+    final synergyText = (!hasCustomAiMeals || day['synergy'] == null || '${day['synergy']}'.contains('según el gasto'))
+        ? databasePlan['synergy'] as String
+        : '${day['synergy']}';
+
     final isToday = _selected == _service.todayIndex;
+    final currentGoalMeta = NutritionDatabase.goals.firstWhere(
+      (g) => g['id'] == _selectedGoal,
+      orElse: () => NutritionDatabase.goals[0],
+    );
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -151,11 +188,112 @@ class _NutritionScreenState extends State<NutritionScreen> {
         const SizedBox(height: 4),
         Text(
           isToday
-              ? 'Hoy es ${_service.todayName} · menu de hoy'
-              : 'Menu de ${_weekdayName(_selected)}',
+              ? 'Hoy es ${_service.todayName} · Menú sugerido del día'
+              : 'Menú de ${_weekdayName(_selected)}',
           style: const TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 16),
+
+        // Selector Horizontal de Objetivos y Guías Nutricionales Accesibles
+        const Text(
+          'GUÍA NUTRICIONAL Y OBJETIVO DE ALIMENTACIÓN:',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.0,
+            color: Color(0xFF8BE0C0),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: NutritionDatabase.goals.map((g) {
+              final isSelected = g['id'] == _selectedGoal;
+              final color = Color(g['color'] as int);
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    setState(() {
+                      _selectedGoal = g['id'] as String;
+                    });
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? color.withOpacity(0.2)
+                          : const Color(0xFF141F32),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? color : Colors.white12,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Text(
+                      g['label'] as String,
+                      style: TextStyle(
+                        color: isSelected ? color : Colors.white70,
+                        fontWeight:
+                            isSelected ? FontWeight.w800 : FontWeight.w500,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Tarjeta Explicativa de la Guía Seleccionada
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF101C2F),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Color(currentGoalMeta['color'] as int).withOpacity(0.3),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '🥗 ${currentGoalMeta['title']}',
+                style: TextStyle(
+                  color: Color(currentGoalMeta['color'] as int),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${currentGoalMeta['description']}',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '💡 Pauta práctica: ${currentGoalMeta['principles']}',
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
         _WeekStrip(
           selected: _selected,
           trainingDays: _trainingDays(),
@@ -163,31 +301,40 @@ class _NutritionScreenState extends State<NutritionScreen> {
         ),
         const SizedBox(height: 18),
         _DayHeader(day: day, isToday: isToday),
-        if (day['synergy'] != null && '${day['synergy']}'.isNotEmpty) ...[
+        if (synergyText.isNotEmpty) ...[
           const SizedBox(height: 14),
-          _SynergyCard(text: '${day['synergy']}'),
+          _SynergyCard(text: synergyText),
         ],
         const SizedBox(height: 18),
-        ...meals.map(
+        ...activeMeals.map(
           (meal) => _MealCard(meal: Map<String, dynamic>.from(meal as Map)),
         ),
-        if (meals.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 20),
-            child: Text('No hay menu para este dia.',
-                style: TextStyle(color: Colors.white54)),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141F32),
+            borderRadius: BorderRadius.circular(12),
           ),
-        const SizedBox(height: 8),
-        const Text(
-          'Plan general orientativo. Suspende si aparece dolor y consulta a un '
-          'profesional de salud.',
-          style: TextStyle(color: Colors.white54, fontSize: 12),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.eco_rounded, size: 16, color: Color(0xFF8BE0C0)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Alimentos accesibles: Este plan prioriza ingredientes económicos y fáciles de conseguir en tu mercado local (huevos, avena, pollo, caraotas/lentejas, arroz, batata, atún y vegetales frescos).',
+                  style: TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.35),
+                ),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(height: 80),
       ],
     );
   }
 
-  /// Dias marcados como entrenamiento, para distinguirlos en la tira.
   List<int> _trainingDays() => _service.days
       .where((d) => d['is_training'] == true)
       .map((d) => d['weekday'] as int)
@@ -196,15 +343,14 @@ class _NutritionScreenState extends State<NutritionScreen> {
   String _weekdayName(int index) => const [
         'Lunes',
         'Martes',
-        'Miercoles',
+        'Miércoles',
         'Jueves',
         'Viernes',
-        'Sabado',
+        'Sábado',
         'Domingo',
       ][index];
 }
 
-/// Tira de los 7 dias. El punto verde marca los dias con entrenamiento.
 class _WeekStrip extends StatelessWidget {
   const _WeekStrip({
     required this.selected,
@@ -218,7 +364,13 @@ class _WeekStrip extends StatelessWidget {
 
   static const _labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
   static const _names = [
-    'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo',
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado',
+    'Domingo',
   ];
 
   @override
@@ -238,8 +390,9 @@ class _WeekStrip extends StatelessWidget {
                 child: Tooltip(
                   message: trains
                       ? '${_names[index]} · entrenamiento'
-                      : _names[index],
-                  child: Container(
+                      : '${_names[index]} · descanso',
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? const Color(0xFF8BE0C0)
@@ -252,10 +405,11 @@ class _WeekStrip extends StatelessWidget {
                         Text(
                           _labels[index],
                           style: TextStyle(
+                            fontSize: 15,
                             fontWeight: FontWeight.w800,
                             color: isSelected
                                 ? const Color(0xFF0B1220)
-                                : Colors.white70,
+                                : Colors.white,
                           ),
                         ),
                         const SizedBox(height: 5),
@@ -263,12 +417,12 @@ class _WeekStrip extends StatelessWidget {
                           width: 6,
                           height: 6,
                           decoration: BoxDecoration(
+                            color: isSelected
+                                ? const Color(0xFF0B1220)
+                                : (trains
+                                    ? const Color(0xFF8BE0C0)
+                                    : Colors.white24),
                             shape: BoxShape.circle,
-                            color: trains
-                                ? (isSelected
-                                    ? const Color(0xFF0B1220)
-                                    : const Color(0xFF8BE0C0))
-                                : Colors.transparent,
                           ),
                         ),
                       ],
@@ -284,7 +438,6 @@ class _WeekStrip extends StatelessWidget {
   }
 }
 
-/// Encabezado del dia: que toca entrenar y si hoy es el dia actual.
 class _DayHeader extends StatelessWidget {
   const _DayHeader({required this.day, required this.isToday});
 
@@ -293,119 +446,119 @@ class _DayHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trains = day['is_training'] == true;
+    final title = '${day['title'] ?? 'Día'}';
+    final isTraining = day['is_training'] == true;
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(
-            '${day['title']}',
-            style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.w700),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
+        const SizedBox(width: 12),
         if (isToday)
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            margin: const EdgeInsets.only(right: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: const Color(0xFF8BE0C0),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Text('HOY',
+            child: const Text(
+              'HOY',
+              style: TextStyle(
+                color: Color(0xFF0B1220),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: isTraining
+                ? const Color(0xFF173B45)
+                : const Color(0xFF16233A),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isTraining
+                  ? const Color(0xFF8BE0C0).withOpacity(0.4)
+                  : Colors.white12,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isTraining
+                    ? Icons.fitness_center_rounded
+                    : Icons.self_improvement_rounded,
+                size: 14,
+                color: isTraining
+                    ? const Color(0xFF8BE0C0)
+                    : Colors.white60,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                isTraining ? 'Entrenamiento' : 'Descanso',
                 style: TextStyle(
-                    color: Color(0xFF0B1220),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800)),
+                  color: isTraining
+                      ? const Color(0xFF8BE0C0)
+                      : Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-        if (!trains)
-          const Padding(
-            padding: EdgeInsets.only(left: 8),
-            child: Text('Descanso',
-                style: TextStyle(color: Colors.white54, fontSize: 12)),
-          ),
+        ),
       ],
     );
   }
 }
 
-/// Explica como se combinan entrenamiento y alimentacion ese dia.
 class _SynergyCard extends StatelessWidget {
   const _SynergyCard({required this.text});
-
   final String text;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1D3557), Color(0xFF16233A)],
+        color: const Color(0xFF16233A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF8BE0C0).withOpacity(0.25),
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF8BE0C0), width: 1.2),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.bolt_rounded, color: Color(0xFF8BE0C0)),
-          const SizedBox(width: 12),
+          const Icon(Icons.bolt_rounded, size: 20, color: Color(0xFF8BE0C0)),
+          const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Sinergia del dia',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF8BE0C0))),
-                const SizedBox(height: 6),
-                Text(text, style: const TextStyle(color: Colors.white70)),
-              ],
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12.5,
+                height: 1.4,
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.restaurant_menu_rounded,
-                size: 56, color: Color(0xFF8BE0C0)),
-            const SizedBox(height: 14),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, height: 1.5)),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF2DD4BF),
-                foregroundColor: const Color(0xFF0B1220),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              ),
-              onPressed: onRetry,
-              icon: const Icon(Icons.smart_toy_rounded),
-              label: const Text(
-                'Crear mi plan en Coach IA',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -417,27 +570,108 @@ class _MealCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = '${meal['title'] ?? 'Comida'}';
     final items = (meal['items'] as List<dynamic>?) ?? [];
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 12),
+      color: const Color(0xFF101B2D),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Colors.white10),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              meal['title'] as String? ?? 'Comida',
+              title,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 15.5,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF2DD4BF),
+                color: Color(0xFF8BE0C0),
               ),
             ),
-            const SizedBox(height: 8),
-            ...items.map(
-              (item) => Text(
-                '• $item',
-                style: const TextStyle(color: Colors.white70),
+            const SizedBox(height: 10),
+            ...items.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '• ',
+                        style: TextStyle(
+                          color: Color(0xFF8BE0C0),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '$item',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.restaurant_menu_rounded,
+              size: 58,
+              color: Color(0xFF8BE0C0),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Plan Nutricional',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, height: 1.45),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF8BE0C0),
+                foregroundColor: const Color(0xFF0B1220),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              ),
+              onPressed: onRetry,
+              icon: const Icon(Icons.smart_toy_rounded),
+              label: const Text(
+                'Solicitar nutrición en Coach IA',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],

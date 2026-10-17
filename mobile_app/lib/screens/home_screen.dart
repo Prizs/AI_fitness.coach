@@ -51,7 +51,7 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
         title: const Text(
-          'Inicio (VERSIÓN 1.0.51 - Render Activo)',
+          'Inicio (VERSIÓN 1.0.52 - Render Activo)',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
@@ -130,12 +130,27 @@ class HomeScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 15, color: Colors.white70),
               ),
               const SizedBox(height: 24),
-              Row(
-                children: const [
-                  _StatusChip(label: 'Meta: Ganar fuerza'),
-                  SizedBox(width: 10),
-                  _StatusChip(label: 'Nivel: Intermedio'),
-                ],
+              AnimatedBuilder(
+                animation: planService,
+                builder: (context, _) {
+                  final levelText = planService.userLevel;
+                  final intensityText = planService.userIntensity;
+                  final goalText = planService.userGoal;
+                  final streak = planService.currentStreak;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _StatusChip(label: 'Meta: $goalText'),
+                      _StatusChip(label: 'Nivel: $levelText ($intensityText)'),
+                      if (streak > 0)
+                        _StatusChip(
+                          label: '🔥 Racha: $streak ${streak == 1 ? "sesión" : "sesiones"}',
+                          color: const Color(0xFFFFB340),
+                        ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 26),
               Expanded(
@@ -220,9 +235,10 @@ class _ModuleTile extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({super.key, required this.label});
+  const _StatusChip({super.key, required this.label, this.color});
 
   final String label;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -231,14 +247,14 @@ class _StatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF122033),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: color?.withOpacity(0.5) ?? Colors.white10),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: Colors.white70,
+          color: color ?? Colors.white70,
         ),
       ),
     );
