@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, date
 from app.services.supabase_service import get_supabase_admin_client
+from app.services.weekly_plan import _sessions
 
 router = APIRouter(prefix="/api/trainer", tags=["Trainer"])
 
@@ -267,144 +268,163 @@ def get_conversations(trainer_id: str):
         ]
 
 
+def _format_time_label(st: str, et: str) -> str:
+    try:
+        t1 = datetime.strptime(st[:5], "%H:%M")
+        t2 = datetime.strptime(et[:5], "%H:%M")
+        s1 = t1.strftime("%I:%M %p").lstrip("0")
+        s2 = t2.strftime("%I:%M %p").lstrip("0")
+        return f"{s1} - {s2}"
+    except Exception:
+        return f"{st[:5]} - {et[:5]}"
+
+
 @router.get("/agenda/{trainer_id}")
-def get_trainer_agenda(trainer_id: str):
+def get_trainer_agenda(trainer_id: str, target_date: Optional[str] = None):
     """
-    Retorna la agenda organizada cronológicamente por bloques horarios,
-    con capacidad, alumnos inscritos y etiquetas de riesgo o fatiga.
+    Retorna la agenda organizada cronológicamente por bloques horarios para una fecha dada,
+    con capacidad, alumnos reales inscritos y su planificación de ejercicios para ese día.
     """
     admin = get_supabase_admin_client()
     trainer = _resolve_user_id(admin, trainer_id)
     t_id = trainer["id"] if trainer else trainer_id
-    today_str = date.today().isoformat()
+
+    if not target_date:
+        target_date = date.today().isoformat()
+    else:
+        try:
+            datetime.strptime(target_date, "%Y-%m-%d")
+        except ValueError:
+            target_date = date.today().isoformat()
+
+    dt = datetime.strptime(target_date, "%Y-%m-%d")
+    weekday_idx = dt.weekday()  # 0=Lunes, 6=Domingo
+    day_num = dt.isoweekday()   # 1=Lunes, 7=Domingo
+    day_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    day_name = day_names[weekday_idx]
 
     try:
-        # 1. Obtener bloques horarios base de trainer_schedules
+        # 1. Obtener bloques horarios de trainer_schedules
         schedules_res = admin.table("trainer_schedules").select("*").eq("trainer_id", t_id).execute()
         base_schedules = schedules_res.data or []
 
-        # Bloques por defecto si el entrenador aún no los configuró
+        # Filtrar por día específico de la semana si existe configuración por día
+        day_schedules = [s for s in base_schedules if s.get("day_of_week") == day_num]
+        if not day_schedules and base_schedules:
+            day_schedules = base_schedules
+
         default_blocks = [
+            {"start_time": "08:00:00", "end_time": "10:00:00", "time_label": "8:00 AM - 10:00 AM", "capacity": 2},
+            {"start_time": "10:00:00", "end_time": "12:00:00", "time_label": "10:00 AM - 12:00 PM", "capacity": 2},
             {"start_time": "12:00:00", "end_time": "14:00:00", "time_label": "12:00 PM - 2:00 PM", "capacity": 2},
             {"start_time": "14:00:00", "end_time": "16:00:00", "time_label": "2:00 PM - 4:00 PM", "capacity": 2},
             {"start_time": "16:00:00", "end_time": "18:00:00", "time_label": "4:00 PM - 6:00 PM", "capacity": 2},
+            {"start_time": "18:00:00", "end_time": "20:00:00", "time_label": "6:00 PM - 8:00 PM", "capacity": 2},
         ]
 
         blocks_to_use = []
-        if base_schedules:
-            for s in base_schedules:
-                st = s.get("start_time") or "12:00:00"
-                et = s.get("end_time") or "14:00:00"
+        if day_schedules:
+            for s in sorted(day_schedules, key=lambda x: str(x.get("start_time", ""))):
+                st = str(s.get("start_time") or "12:00:00")
+                et = str(s.get("end_time") or "14:00:00")
+                if len(st) == 5:
+                    st += ":00"
+                if len(et) == 5:
+                    et += ":00"
                 blocks_to_use.append({
                     "id": s.get("id"),
                     "start_time": st,
                     "end_time": et,
-                    "time_label": f"{st[:5]} - {et[:5]}",
+                    "time_label": _format_time_label(st, et),
                     "capacity": s.get("max_capacity") or 2
                 })
         else:
             blocks_to_use = default_blocks
 
-        # 2. Obtener sesiones reservadas de hoy en workout_sessions
+        # 2. Obtener sesiones reservadas para la fecha seleccionada en workout_sessions
         sessions_res = (
             admin.table("workout_sessions")
-            .select("*, usuarios!workout_sessions_client_id_fkey(id, nombre, apellido, patologia_o_alergias, lesiones_actuales)")
+            .select("*, usuarios!workout_sessions_client_id_fkey(id, nombre, apellido, cedula, edad, peso, patologia_o_alergias, lesiones_actuales)")
             .eq("trainer_id", t_id)
-            .eq("schedule_date", today_str)
+            .eq("schedule_date", target_date)
             .execute()
         )
         sessions = sessions_res.data or []
 
+        # 3. Plan de entrenamiento del día correspondiente según el cronograma
+        try:
+            weekly_routines = _sessions("Media")
+            day_routine = weekly_routines[weekday_idx]
+            routine_title = day_routine.get("title", "Rutina Personalizada")
+            exercises_count = len(day_routine.get("exercises", []))
+            day_workout_label = f"{routine_title} ({exercises_count} ejercicios)"
+        except Exception:
+            day_workout_label = "Rutina del cronograma personalizada"
+
         agenda_blocks = []
+        total_students = 0
+
         for b in blocks_to_use:
-            # Encontrar clientes en este bloque horario
-            b_sessions = [s for s in sessions if s.get("start_time") == b["start_time"]]
+            b_st = b["start_time"][:5]
+            # Emparejar sesiones cuya hora de inicio coincida (HH:MM)
+            b_sessions = [s for s in sessions if str(s.get("start_time", ""))[:5] == b_st]
             students = []
+
             for s in b_sessions:
                 user_info = s.get("usuarios") or {}
                 name = f"{user_info.get('nombre', '')} {user_info.get('apellido', '')}".strip() or "Alumno"
+                cedula = user_info.get("cedula") or ""
                 injuries = str(user_info.get("lesiones_actuales") or user_info.get("patologia_o_alergias") or "")
-                
-                risk = "none"
-                if any(k in injuries.lower() for k in ("rodilla", "hombro", "espalda", "lumbar", "lesion", "dolor")):
+
+                risk = "🟢 Óptimo"
+                if injuries and injuries.lower() not in ("ninguna", "ninguno", "no", "sano", "none", ""):
                     risk = f"🔴 {injuries}"
-                elif any(k in injuries.lower() for k in ("fatiga", "cansancio")):
-                    risk = "⚠️ Fatiga Alta"
 
                 students.append({
                     "id": s.get("id"),
                     "client_id": s.get("client_id"),
                     "name": name,
-                    "workout": "Rutina personalizada asignada",
+                    "cedula": cedula,
+                    "workout": day_workout_label,
                     "risk": risk,
                     "status": s.get("status") or "scheduled"
                 })
 
             occupied = len(students)
+            total_students += occupied
             cap = b["capacity"]
-            capacity_text = f"{occupied}/{cap} Cupos Llenos" if occupied >= cap else f"{cap - occupied}/{cap} Cupos Libres"
+            if occupied >= cap:
+                capacity_text = f"{occupied}/{cap} Cupos Llenos"
+            elif occupied > 0:
+                capacity_text = f"{occupied}/{cap} Cupos ({cap - occupied} Libres)"
+            else:
+                capacity_text = f"{cap}/{cap} Cupos Libres"
 
             agenda_blocks.append({
+                "id": b.get("id"),
                 "time": b["time_label"],
                 "start_time": b["start_time"],
                 "end_time": b["end_time"],
                 "capacity": capacity_text,
+                "occupied": occupied,
+                "max_capacity": cap,
                 "is_full": occupied >= cap,
                 "students": students
             })
 
-        # Si no hay sesiones en la base de datos hoy, enriquecer con datos ilustrativos con alumnos reales para que la vista sea útil
-        if all(len(ab["students"]) == 0 for ab in agenda_blocks):
-            clients_res = admin.table("usuarios").select("id, nombre, apellido, lesiones_actuales, patologia_o_alergias").limit(3).execute()
-            demo_clients = clients_res.data or []
-            if len(demo_clients) >= 2:
-                c1 = demo_clients[0]
-                c2 = demo_clients[1]
-                agenda_blocks[0]["students"] = [
-                    {
-                        "name": f"{c1.get('nombre')} {c1.get('apellido')}",
-                        "workout": "Pecho y tren superior (Fase 1)",
-                        "risk": "none"
-                    },
-                    {
-                        "name": f"{c2.get('nombre')} {c2.get('apellido')}",
-                        "workout": "Piernas e hipertrofia",
-                        "risk": "🔴 Molestia Rodilla" if c2.get("lesiones_actuales") else "⚠️ Fatiga Alta"
-                    }
-                ]
-                agenda_blocks[0]["capacity"] = "2/2 Cupos Llenos"
-                agenda_blocks[0]["is_full"] = True
-
-        return {"date": today_str, "blocks": agenda_blocks}
-    except Exception as e:
-        # Fallback resiliente
         return {
-            "date": today_str,
-            "blocks": [
-                {
-                    "time": "12:00 PM - 2:00 PM",
-                    "capacity": "2/2 Cupos Llenos",
-                    "is_full": True,
-                    "students": [
-                        {"name": "Freddy Rincón", "workout": "Pecho e hipertrofia", "risk": "none"},
-                        {"name": "Emmanuel Guerra", "workout": "Piernas", "risk": "🔴 Molestia Rodilla"}
-                    ]
-                },
-                {
-                    "time": "2:00 PM - 4:00 PM",
-                    "capacity": "1/2 Cupos Libres",
-                    "is_full": False,
-                    "students": [
-                        {"name": "Jorbelin Zarraga", "workout": "Cardio y Movilidad", "risk": "⚠️ Fatiga Alta"}
-                    ]
-                },
-                {
-                    "time": "4:00 PM - 6:00 PM",
-                    "capacity": "2/2 Cupos Libres",
-                    "is_full": False,
-                    "students": []
-                }
-            ]
+            "date": target_date,
+            "day_name": day_name,
+            "total_students": total_students,
+            "blocks": agenda_blocks
+        }
+    except Exception as e:
+        return {
+            "date": target_date,
+            "day_name": "Hoy",
+            "total_students": 0,
+            "blocks": [],
+            "error": str(e)
         }
 
 
@@ -415,12 +435,15 @@ def add_or_update_slot(req: AddSlotReq):
     trainer = _resolve_user_id(admin, req.trainer_id)
     t_id = trainer["id"] if trainer else req.trainer_id
 
+    st = req.start_time if len(req.start_time) == 8 else f"{req.start_time[:5]}:00"
+    et = req.end_time if len(req.end_time) == 8 else f"{req.end_time[:5]}:00"
+
     try:
         new_slot = {
             "trainer_id": t_id,
             "day_of_week": req.day_of_week,
-            "start_time": req.start_time,
-            "end_time": req.end_time,
+            "start_time": st,
+            "end_time": et,
             "max_capacity": req.max_capacity
         }
         res = admin.table("trainer_schedules").insert(new_slot).execute()
@@ -429,26 +452,64 @@ def add_or_update_slot(req: AddSlotReq):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/agenda/slot/{slot_id}")
+def delete_slot(slot_id: str):
+    """Elimina un bloque horario configurado."""
+    admin = get_supabase_admin_client()
+    try:
+        res = admin.table("trainer_schedules").delete().eq("id", slot_id).execute()
+        return {"status": "ok", "message": "Bloque horario eliminado correctamente."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/agenda/book")
 def book_session(req: BookSlotReq):
-    """Permite a un alumno reservar un horario con su entrenador."""
+    """Permite a un alumno o al entrenador reservar/inscribir un horario en la agenda."""
     admin = get_supabase_admin_client()
     t = _resolve_user_id(admin, req.trainer_id)
     c = _resolve_user_id(admin, req.client_id)
     t_id = t["id"] if t else req.trainer_id
     c_id = c["id"] if c else req.client_id
 
+    st = req.start_time if len(req.start_time) == 8 else f"{req.start_time[:5]}:00"
+    et = req.end_time if len(req.end_time) == 8 else f"{req.end_time[:5]}:00"
+
     try:
+        # Verificar si ya está agendado en ese bloque y fecha
+        existing = (
+            admin.table("workout_sessions")
+            .select("id")
+            .eq("trainer_id", t_id)
+            .eq("client_id", c_id)
+            .eq("schedule_date", req.schedule_date)
+            .eq("start_time", st)
+            .execute()
+        )
+        if existing.data and len(existing.data) > 0:
+            return {"status": "ok", "message": "El alumno ya se encuentra inscrito en este horario.", "booking": existing.data[0]}
+
         new_booking = {
             "trainer_id": t_id,
             "client_id": c_id,
             "schedule_date": req.schedule_date,
-            "start_time": req.start_time,
-            "end_time": req.end_time,
+            "start_time": st,
+            "end_time": et,
             "status": "scheduled"
         }
         res = admin.table("workout_sessions").insert(new_booking).execute()
         return {"status": "ok", "booking": res.data[0] if res.data else new_booking}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/agenda/session/{session_id}")
+def cancel_session(session_id: str):
+    """Permite cancelar una sesión reservada de la agenda."""
+    admin = get_supabase_admin_client()
+    try:
+        res = admin.table("workout_sessions").delete().eq("id", session_id).execute()
+        return {"status": "ok", "message": "Sesión cancelada con éxito."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

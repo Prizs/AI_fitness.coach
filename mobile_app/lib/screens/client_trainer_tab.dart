@@ -180,46 +180,118 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
     }
   }
 
-  void _showBookingDialog() {
+  Future<void> _showBookingDialog() async {
+    final baseUrl = AuthService.apiBaseUrl;
+    final trainerId = _trainerInfo!['id'] ?? _trainerInfo!['cedula'];
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    List<dynamic> realBlocks = [];
+    bool loadingSlots = true;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0F192B),
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        final slots = [
-          {'label': '12:00 PM - 2:00 PM', 'st': '12:00:00', 'et': '14:00:00'},
-          {'label': '2:00 PM - 4:00 PM', 'st': '14:00:00', 'et': '16:00:00'},
-          {'label': '4:00 PM - 6:00 PM', 'st': '16:00:00', 'et': '18:00:00'},
-        ];
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            if (loadingSlots) {
+              http.get(Uri.parse('$baseUrl/api/trainer/agenda/$trainerId?target_date=$today')).then((res) {
+                if (res.statusCode == 200) {
+                  final data = json.decode(utf8.decode(res.bodyBytes));
+                  if (data is Map && ctx.mounted) {
+                    setModalState(() {
+                      realBlocks = data['blocks'] ?? [];
+                      loadingSlots = false;
+                    });
+                  }
+                } else if (ctx.mounted) {
+                  setModalState(() => loadingSlots = false);
+                }
+              }).catchError((e) {
+                if (ctx.mounted) setModalState(() => loadingSlots = false);
+              });
+            }
 
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Agendar Sesión con tu Entrenador', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Selecciona el horario en el que deseas asistir:', style: TextStyle(color: Colors.white70)),
-              const SizedBox(height: 20),
-              ...slots.map((s) => Card(
-                color: const Color(0xFF1E293B),
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: const Icon(Icons.access_time_filled, color: Color(0xFF1FAE87)),
-                  title: Text(s['label']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  trailing: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1FAE87)),
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await _bookSession(s['st']!, s['et']!);
-                    },
-                    child: const Text('Reservar', style: TextStyle(color: Colors.white)),
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Agendar Sesión con tu Entrenador', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
                   ),
-                ),
-              )),
-            ],
-          ),
+                  const SizedBox(height: 4),
+                  Text('Horarios en vivo para hoy ($today):', style: const TextStyle(color: Color(0xFF1FAE87), fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 16),
+                  if (loadingSlots)
+                    const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: Color(0xFF1FAE87))))
+                  else if (realBlocks.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('No hay bloques disponibles por el momento.', style: TextStyle(color: Colors.white54)),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.5),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: realBlocks.length,
+                        itemBuilder: (c, idx) {
+                          final b = realBlocks[idx];
+                          final timeLabel = b['time'] ?? 'Horario';
+                          final capacityText = b['capacity'] ?? '';
+                          final isFull = b['is_full'] == true;
+                          final students = (b['students'] as List<dynamic>?) ?? [];
+                          final bool alreadyBooked = students.any((s) => s['client_id'] == _myCedula || s['cedula'] == _myCedula);
+
+                          return Card(
+                            color: const Color(0xFF1E293B),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            child: ListTile(
+                              leading: Icon(Icons.access_time_filled, color: alreadyBooked ? Colors.greenAccent : (isFull ? Colors.redAccent : const Color(0xFF1FAE87))),
+                              title: Text(timeLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              subtitle: Text(
+                                alreadyBooked ? '✅ Ya estás inscrito en este bloque' : capacityText,
+                                style: TextStyle(
+                                  color: alreadyBooked ? Colors.greenAccent : (isFull ? Colors.redAccent : Colors.white60),
+                                  fontSize: 12,
+                                  fontWeight: alreadyBooked ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              trailing: alreadyBooked
+                                  ? const Icon(Icons.check_circle, color: Colors.greenAccent)
+                                  : ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isFull ? Colors.white24 : const Color(0xFF1FAE87),
+                                      ),
+                                      onPressed: isFull
+                                          ? null
+                                          : () async {
+                                              Navigator.pop(ctx);
+                                              await _bookSession(b['start_time'], b['end_time']);
+                                            },
+                                      child: Text(isFull ? 'Lleno' : 'Reservar', style: const TextStyle(color: Colors.white)),
+                                    ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -243,6 +315,7 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
         }),
       );
       if (res.statusCode == 200) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: Color(0xFF1FAE87),
@@ -251,6 +324,7 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error reservando sesión: $e')),
       );
