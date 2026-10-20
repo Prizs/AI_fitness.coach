@@ -1,3 +1,4 @@
+import 'package:mobile_app/widgets/performance_report_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
@@ -203,6 +204,27 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 bestStreak: _planService.bestStreak,
                 totalSessions: _planService.totalCompletedSessions,
                 adherence: _planService.adherenceRate,
+              ),
+              const SizedBox(height: 12),
+
+              // Botón de Reporte Detallado de Rendimiento
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF173B45),
+                  foregroundColor: const Color(0xFF8BE0C0),
+                  side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.assessment_rounded, size: 22),
+                label: const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Ver Reporte Detallado de Rendimiento', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  ],
+                ),
+                onPressed: () => PerformanceReportModal.show(context),
               ),
               const SizedBox(height: 16),
 

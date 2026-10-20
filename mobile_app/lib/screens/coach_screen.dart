@@ -33,6 +33,28 @@ class _CoachScreenState extends State<CoachScreen> {
   String _userLevel = 'Principiante';
   String _userIntensity = 'Baja';
   bool _isListening = false;
+  bool _showPreviousConversations = false;
+  int? _initialSessionStartIndex;
+
+  int _computeLastConversationStartIndex() {
+    if (_messages.length <= 2) return 0;
+    int lastAiIdx = -1;
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i]['isUser'] != true) {
+        lastAiIdx = i;
+        break;
+      }
+    }
+    if (lastAiIdx != -1) {
+      for (int i = lastAiIdx - 1; i >= 0; i--) {
+        if (_messages[i]['isUser'] == true) {
+          return i;
+        }
+      }
+      return lastAiIdx;
+    }
+    return (_messages.length - 2).clamp(0, _messages.length - 1);
+  }
   
   @override
   void initState() {
@@ -74,6 +96,7 @@ class _CoachScreenState extends State<CoachScreen> {
                   _messages.add(Map<String, dynamic>.from(item));
                 }
               }
+              _initialSessionStartIndex = _computeLastConversationStartIndex();
             });
           }
         }
@@ -107,6 +130,7 @@ class _CoachScreenState extends State<CoachScreen> {
             setState(() {
               _messages.clear();
               _messages.addAll(restored);
+              _initialSessionStartIndex = _computeLastConversationStartIndex();
             });
             await storage.write(key: localKey, value: jsonEncode(_messages));
           }
@@ -696,6 +720,13 @@ class _CoachScreenState extends State<CoachScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final int hiddenCount = _initialSessionStartIndex ?? _computeLastConversationStartIndex();
+    final bool hasPrevious = hiddenCount > 0;
+    final int startIndex = _showPreviousConversations ? 0 : hiddenCount;
+    final List<Map<String, dynamic>> visibleMessages =
+        startIndex < _messages.length ? _messages.sublist(startIndex) : _messages;
+    final int totalCount = hasPrevious ? (visibleMessages.length + 1) : visibleMessages.length;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0F1D),
       appBar: AppBar(
@@ -878,9 +909,49 @@ class _CoachScreenState extends State<CoachScreen> {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: _messages.length,
+                itemCount: totalCount,
                 itemBuilder: (context, index) {
-                  final msg = _messages[index];
+                  if (hasPrevious && index == 0) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 12),
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: const Color(0xFF142032),
+                            foregroundColor: const Color(0xFF8BE0C0),
+                            side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          icon: Icon(
+                            _showPreviousConversations
+                                ? Icons.unfold_less_rounded
+                                : Icons.history_rounded,
+                            size: 18,
+                            color: const Color(0xFF8BE0C0),
+                          ),
+                          label: Text(
+                            _showPreviousConversations
+                                ? 'Ocultar conversaciones anteriores'
+                                : 'Mostrar conversaciones anteriores',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF8BE0C0),
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _showPreviousConversations = !_showPreviousConversations;
+                            });
+                          },
+                        ),
+                      ),
+                    );
+                  }
+
+                  final msgIndex = hasPrevious ? (index - 1) : index;
+                  final msg = visibleMessages[msgIndex];
                   final isUser = msg['isUser'] as bool;
                   final text = msg['text'] as String;
                   final plan = msg['plan'] as Map<String, dynamic>?;
@@ -1224,17 +1295,19 @@ class _CoachScreenState extends State<CoachScreen> {
                                               );
                                               return;
                                             }
-                                            await WeeklyPlanService.instance.injectCustomPlanForToday(plan);
+                                            final scheduleResult = await WeeklyPlanService.instance.injectCustomPlanForToday(plan);
                                             if (!context.mounted) return;
                                             setState(() {
                                               plan['is_added_to_schedule'] = true;
                                             });
-                                            final recDays = (plan['recommended_days'] is List)
-                                                ? (plan['recommended_days'] as List).join(', ')
-                                                : 'días alternos';
+                                            final assignedDays = (scheduleResult['assigned_days'] as List?)?.join(', ') ?? 'fechas disponibles';
+                                            final bool preserved = (scheduleResult['preserved_routines_count'] as int? ?? 0) > 0;
+                                            final String message = preserved
+                                                ? '✅ ¡Rutinas y nutrición vigentes conservadas! Lo nuevo se programó en fechas disponibles: ' + assignedDays
+                                                : '✅ ¡Añadido al cronograma en: ' + assignedDays + '!';
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
-                                                content: Text('✅ ¡Añadido al cronograma el plan de nutrición y ejercicios en $recDays!'),
+                                                content: Text(message),
                                                 backgroundColor: const Color(0xFF1B4D3E),
                                                 behavior: SnackBarBehavior.floating,
                                                 duration: const Duration(seconds: 4),

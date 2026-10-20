@@ -1,3 +1,5 @@
+import 'package:mobile_app/services/daily_notification_service.dart';
+import 'package:mobile_app/widgets/fatigue_checkin_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:mobile_app/screens/user_profile_screen.dart';
@@ -156,7 +158,60 @@ class HomeScreen extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 26),
+              const SizedBox(height: 16),
+              FutureBuilder<bool>(
+                future: DailyNotificationService.instance.isFollowupCheckinDue(DateTime.now()),
+                builder: (context, snapshot) {
+                  if (snapshot.data == true) {
+                    final todayPlan = planService.today;
+                    final title = todayPlan?['title'] ?? 'Entrenamiento del día';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2A1B10), Color(0xFF1E293B)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.amberAccent.withOpacity(0.6)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.help_outline_rounded, color: Colors.amberAccent, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '¿Realizaste tu ejercicio de hoy?',
+                                  style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 13.5),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Sesión: ' + title + '. Responde tu encuesta de fatiga.',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amberAccent,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () => FatigueCheckinDialog.show(context),
+                            child: const Text('Responder', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
               Expanded(
                 child: ListView.separated(
                   itemCount: modules.length,

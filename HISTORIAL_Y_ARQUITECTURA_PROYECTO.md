@@ -35,6 +35,10 @@ Plataforma integral de entrenamiento deportivo, planificación nutricional y aco
    - Si el usuario ya tiene un plan activo en la semana actual (ej. 12/10 al 18/10), la IA reconoce las fechas vigentes y programa el nuevo plan para el ciclo siguiente sin pisar el entrenamiento en curso.
 6. **Tarjetas Interactivas de Rutina y Nutrición**:
    - La respuesta del Coach renderiza ejercicios con previsualización biomecánica (GIFs) y botones de acción rápida: *"Agregar a Cronograma y Nutrición"* y *"Ver en 3D"*.
+7. **Visualización Limpia de Chat y Foco en la Última Conversación**:
+   - Al abrir el Coach IA, la pantalla muestra de primera mano únicamente el último intercambio (la conversación activa o más reciente).
+   - Los mensajes de sesiones anteriores no se apilan directamente para evitar saturación visual y confusión en el usuario.
+   - En la parte superior se incluye un botón interactivo: *"Mostrar conversaciones anteriores"*, que al pulsarse despliega el historial previo completo y permite volver a contraerlo en cualquier momento.
 
 ---
 
@@ -57,19 +61,39 @@ Plataforma integral de entrenamiento deportivo, planificación nutricional y aco
 
 ---
 
-#### D. Sistema Dinámico de Notificaciones
-1. **Aviso Anticipado de Caducidad de Plan**:
+#### D. Sistema Dinámico de Notificaciones Móviles
+1. **Aviso con Anticipación de 3 Horas**:
+   - Según el bloque horario de entrenamiento fijado por el usuario (ej. 18:00), la app envía un recordatorio 3 horas antes (15:00) indicando la rutina del día, cantidad de ejercicios e indicaciones de comida pre-entreno e hidratación.
+2. **Aviso de Seguimiento y Encuesta de Fatiga (1h30 post-bloque)**:
+   - Si transcurren 90 minutos después del bloque horario (ej. 19:30) y el usuario no ha marcado el entrenamiento como completado, la app emite la alerta interactiva: *"¿Realizaste el ejercicio [X] planificado para hoy?"*.
+   - Al pulsar la alerta o ingresar a la app, se despliega la **Encuesta de Fatiga y Rendimiento**:
+     * Confirmación de ejecución (*Sí, lo realicé* / *No pude hoy*).
+     * Nivel de Esfuerzo Percibido (RPE de 1 a 10).
+     * Estado subjetivo de fatiga (*Con energía*, *Normal/Óptimo*, *Fatiga moderada*, *Agotado*, *Molestia*).
+     * Cálculo verificable de gasto calórico promedio (fórmula ACSM por METs según peso y duración).
+3. **Aviso Anticipado de Caducidad de Plan**:
    - Al aproximarse el fin de semana (viernes, sábado o domingo), la app alerta al usuario que su ciclo está por terminar para que programe la siguiente semana con anticipación.
-2. **Aviso de Cronograma Vacío**:
+4. **Aviso de Cronograma Vacío**:
    - Si el usuario no tiene plan activo, la campana de inicio muestra un punto rojo y genera una alerta con acceso directo al Coach IA.
-3. **Sesión de Hoy**:
-   - Notificación diaria indicando la rutina asignada y la cantidad de ejercicios.
 
 ---
 
-#### E. Seguridad, Failover y Autenticación
+#### E. Módulo de Reporte Detallado de Rendimiento (Usuario & Entrenador)
+1. **Botón en Perfil y en Ficha del Entrenador**:
+   - Acceso directo tanto para el alumno en su pantalla de *Perfil* como para el entrenador personal en *Ficha del Alumno -> Perfil & Progreso*.
+2. **Métricas Clínicas y Deportivas Verificables**:
+   - Tasa de adherencia (% de entrenamientos completados vs programados).
+   - Racha actual y récord histórico de constancia.
+   - Cálculo del gasto calórico total y promedio por sesión (fórmula biomecánica transparente: METs × Peso × Duración).
+   - RPE promedio y distribución de fatiga muscular post-entrenamiento.
+   - Historial cronológico sesión por sesión con fecha, hora, sensaciones y sello de validación.
+
+---
+
+#### F. Seguridad, Failover y Autenticación
 1. **Contraseña Universal de Auditoría**: `prueba123` activa para cualquier cuenta existente con soporte case-insensitive y sin conflicto de espacios.
 2. **Failover de Servidores (Local <-> Render)**:
    - La aplicación móvil detecta caídas y permite alternar fluidamente entre `http://localhost:8000` y `https://ai-fitness-coach-818a.onrender.com`.
 3. **Resiliencia de IA**:
    - Modo JSON nativo en Gemini + Regex extractor + Captura de texto libre en caso de anomalías para garantizar 100% de disponibilidad sin errores 503.
+

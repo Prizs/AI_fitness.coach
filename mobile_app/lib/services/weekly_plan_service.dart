@@ -643,7 +643,7 @@ class WeeklyPlanService extends ChangeNotifier {
     return null;
   }
 
-  Future<void> injectCustomPlanForToday(Map<String, dynamic> structuredPlan) async {
+  Future<Map<String, dynamic>> injectCustomPlanForToday(Map<String, dynamic> structuredPlan) async {
     final title = structuredPlan['title'] ?? 'Sesión Personalizada Coach IA';
     final exercises = structuredPlan['exercises'] ?? [];
     final nutrition = structuredPlan['nutrition'] ?? {};
@@ -660,17 +660,17 @@ class WeeklyPlanService extends ChangeNotifier {
       'domingo': 6,
     };
 
-    final Set<int> targetIndices = {};
+    final List<int> requestedIndices = [];
     if (rawRecommended is List && rawRecommended.isNotEmpty) {
       for (final d in rawRecommended) {
         final key = d.toString().trim().toLowerCase();
         if (dayNameToIndex.containsKey(key)) {
-          targetIndices.add(dayNameToIndex[key]!);
+          requestedIndices.add(dayNameToIndex[key]!);
         }
       }
     }
-    if (targetIndices.isEmpty) {
-      targetIndices.addAll({todayIndex, 0, 2}); // Lunes y Miércoles por defecto
+    if (requestedIndices.isEmpty) {
+      requestedIndices.addAll([todayIndex, (todayIndex + 2) % 7]);
     }
 
     final defaultNutrition = {
@@ -682,12 +682,19 @@ class WeeklyPlanService extends ChangeNotifier {
     final recoveryRule = structuredPlan['recovery_rule'] as String? ??
         'Sesión programada por el Coach IA respetando 48-72h de recuperación muscular.';
 
+    final List<String> assignedDayNames = [];
+    bool scheduledInNextCycle = false;
+    int preservedRoutinesCount = 0;
+
     if (week == null) {
+      // Si no hay plan previo, se inicializa la semana normalmente
+      final targetSet = requestedIndices.toSet();
       week = {
         'id': 'coach_plan_${DateTime.now().millisecondsSinceEpoch}',
         'goal': title,
         'days': List.generate(7, (i) {
-          final isTarget = targetIndices.contains(i);
+          final isTarget = targetSet.contains(i);
+          if (isTarget) assignedDayNames.add(_weekdayNames[i]);
           return {
             'weekday': i,
             'weekday_name': _weekdayNames[i],
@@ -706,28 +713,79 @@ class WeeklyPlanService extends ChangeNotifier {
         }),
       };
     } else {
+      // PRESERVACIÓN ESTRICTA: No sobreescribir rutinas ni nutrición ya planificadas
       final currentDays = List.from(week!['days'] ?? []);
-      for (final dayIdx in targetIndices) {
-        final idx = currentDays.indexWhere((d) => d['weekday'] == dayIdx);
+
+      for (final reqIdx in requestedIndices) {
+        int targetIdx = reqIdx;
+        final currentEntryIdx = currentDays.indexWhere((d) => d['weekday'] == targetIdx);
+        final bool isOccupied = currentEntryIdx != -1 &&
+            ((currentDays[currentEntryIdx]['exercises'] as List?)?.isNotEmpty == true ||
+                currentDays[currentEntryIdx]['is_training'] == true);
+
+        if (isOccupied) {
+          preservedRoutinesCount++;
+          // Buscar la siguiente fecha disponible (día libre en la semana)
+          int nextFree = -1;
+          for (int offset = 1; offset < 7; offset++) {
+            final testIdx = (reqIdx + offset) % 7;
+            final testEntryIdx = currentDays.indexWhere((d) => d['weekday'] == testIdx);
+            final bool testOccupied = testEntryIdx != -1 &&
+                ((currentDays[testEntryIdx]['exercises'] as List?)?.isNotEmpty == true ||
+                    currentDays[testEntryIdx]['is_training'] == true);
+            if (!testOccupied) {
+              nextFree = testIdx;
+              break;
+            }
+          }
+
+          if (nextFree != -1) {
+            targetIdx = nextFree;
+          } else {
+            // Toda la semana está ocupada: programar para el siguiente ciclo disponible
+            scheduledInNextCycle = true;
+            targetIdx = reqIdx; // Asignado a la posición del próximo ciclo
+          }
+        }
+
+        final existingIdx = currentDays.indexWhere((d) => d['weekday'] == targetIdx);
+        dynamic mergedNutrition = nutrition;
+        if (existingIdx != -1 && currentDays[existingIdx]['nutrition'] != null) {
+          final existingNutr = currentDays[existingIdx]['nutrition'];
+          if (existingNutr is Map && existingNutr.isNotEmpty && nutrition is Map) {
+            mergedNutrition = Map<String, dynamic>.from(existingNutr)..addAll(Map<String, dynamic>.from(nutrition));
+          }
+        }
+
         final newDay = {
-          'weekday': dayIdx,
-          'weekday_name': _weekdayNames[dayIdx.clamp(0, 6)],
+          'weekday': targetIdx,
+          'weekday_name': _weekdayNames[targetIdx.clamp(0, 6)],
           'title': title,
           'is_training': (exercises as List).isNotEmpty,
           'exercises': exercises,
-          'nutrition': (nutrition is Map && nutrition.isNotEmpty) ||
-                  (nutrition is List && nutrition.isNotEmpty)
-              ? nutrition
+          'nutrition': (mergedNutrition is Map && mergedNutrition.isNotEmpty) ||
+                  (mergedNutrition is List && mergedNutrition.isNotEmpty)
+              ? mergedNutrition
               : defaultNutrition,
           'synergy': recoveryRule,
+          if (scheduledInNextCycle) 'scheduled_cycle': nextCycleDateStr,
         };
 
-        if (idx != -1) {
-          currentDays[idx] = newDay;
+        if (existingIdx != -1) {
+          // Solo si estaba libre o en siguiente ciclo disponible
+          currentDays[existingIdx] = newDay;
         } else {
           currentDays.add(newDay);
         }
+
+        final dayLabel = scheduledInNextCycle
+            ? '${_weekdayNames[targetIdx]} (Próximo ciclo: $nextCycleDateStr)'
+            : _weekdayNames[targetIdx];
+        if (!assignedDayNames.contains(dayLabel)) {
+          assignedDayNames.add(dayLabel);
+        }
       }
+
       week!['days'] = currentDays;
     }
 
@@ -738,6 +796,12 @@ class WeeklyPlanService extends ChangeNotifier {
     try {
       await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
     } catch (_) {}
+
+    return {
+      'assigned_days': assignedDayNames,
+      'scheduled_in_next_cycle': scheduledInNextCycle,
+      'preserved_routines_count': preservedRoutinesCount,
+    };
   }
 
   Future<void> clearWeeklyPlan() async {

@@ -1,3 +1,4 @@
+import 'package:mobile_app/widgets/performance_report_modal.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -112,7 +113,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
               _infoRow('Frecuencia', '4 días a la semana'),
               _infoRow('Consistencia', '85% este mes'),
               const SizedBox(height: 12),
-              const Text('Evolución de Peso (íšltimas 4 semanas)', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const Text('Evolución de Peso (Últimas 4 semanas)', style: TextStyle(color: Colors.white70, fontSize: 13)),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -124,6 +125,27 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
               )
             ],
           ),
+        ),
+        const SizedBox(height: 16),
+
+        // Botón de Reporte Detallado de Rendimiento para el Entrenador
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF173B45),
+            foregroundColor: const Color(0xFF8BE0C0),
+            side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+          icon: const Icon(Icons.assessment_rounded, size: 22),
+          label: const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Ver Reporte Detallado de Rendimiento', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14),
+            ],
+          ),
+          onPressed: () => PerformanceReportModal.show(context, clientName: widget.clientName),
         ),
       ],
     );
