@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -16,10 +17,36 @@ class _TrainerMessagesTabState extends State<TrainerMessagesTab> {
 
   String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
 
+  Timer? _convTimer;
+
   @override
   void initState() {
     super.initState();
     _loadConversations();
+    _convTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _loadConversationsSilently();
+    });
+  }
+
+  @override
+  void dispose() {
+    _convTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadConversationsSilently() async {
+    final baseUrl = AuthService.apiBaseUrl;
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/trainer/conversations/$_trainerCedula'));
+      if (res.statusCode == 200) {
+        final list = json.decode(utf8.decode(res.bodyBytes));
+        if (list is List && mounted) {
+          setState(() {
+            _conversations = list;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadConversations() async {
@@ -150,17 +177,39 @@ class _TrainerClientChatScreenState extends State<TrainerClientChatScreen> {
 
   String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
 
+  Timer? _msgTimer;
+
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _msgTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      _loadMessagesSilently();
+    });
   }
 
   @override
   void dispose() {
+    _msgTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadMessagesSilently() async {
+    final baseUrl = AuthService.apiBaseUrl;
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/trainer/messages/$_trainerCedula/${widget.clientId}'));
+      if (res.statusCode == 200) {
+        final list = json.decode(utf8.decode(res.bodyBytes));
+        if (list is List && mounted && list.length != _messages.length) {
+          setState(() {
+            _messages = list;
+          });
+          _scrollToBottom();
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadMessages() async {

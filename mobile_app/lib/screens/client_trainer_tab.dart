@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +17,8 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
   Map<String, dynamic>? _trainerInfo;
   List<dynamic> _availableTrainers = [];
   List<dynamic> _messages = [];
+  List<dynamic> _trainerAnnouncements = [];
+  Timer? _pollTimer;
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
@@ -28,6 +31,7 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _msgController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -48,7 +52,10 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
             _trainerInfo = data['trainer'];
           });
           await _loadChatMessages();
+          await _loadTrainerAnnouncements();
+          _startPolling();
         } else {
+          _pollTimer?.cancel();
           setState(() {
             _hasTrainer = false;
             _trainerInfo = null;
@@ -64,6 +71,48 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      _loadChatMessagesSilently();
+    });
+  }
+
+  Future<void> _loadTrainerAnnouncements() async {
+    if (_trainerInfo == null) return;
+    final baseUrl = AuthService.apiBaseUrl;
+    final trainerId = _trainerInfo!['id'] ?? _trainerInfo!['cedula'];
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/trainer/announcements/$trainerId'));
+      if (res.statusCode == 200) {
+        final list = json.decode(utf8.decode(res.bodyBytes));
+        if (list is List && mounted) {
+          setState(() {
+            _trainerAnnouncements = list;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadChatMessagesSilently() async {
+    if (_trainerInfo == null) return;
+    final baseUrl = AuthService.apiBaseUrl;
+    final trainerId = _trainerInfo!['id'] ?? _trainerInfo!['cedula'];
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/trainer/messages/$trainerId/$_myCedula'));
+      if (res.statusCode == 200) {
+        final list = json.decode(utf8.decode(res.bodyBytes));
+        if (list is List && mounted && list.length != _messages.length) {
+          setState(() {
+            _messages = list;
+          });
+          _scrollToBottom();
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadAvailableTrainers() async {

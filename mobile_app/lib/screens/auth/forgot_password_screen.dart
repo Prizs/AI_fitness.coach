@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/services/auth_service.dart';
@@ -27,7 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
     setState(() { _isLoading = true; _error = null; });
     try {
-      final res = await http.get(Uri.parse('\/api/auth/security_question/\'));
+      final res = await http.get(Uri.parse('${AuthService.apiBaseUrl}/api/auth/security_question/$ced'));
       if (res.statusCode == 200) {
         setState(() {
           _question = jsonDecode(res.body)['question'];
@@ -52,7 +52,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() { _isLoading = true; _error = null; });
     try {
       final res = await http.post(
-        Uri.parse('\/api/auth/recover_password'),
+        Uri.parse('${AuthService.apiBaseUrl}/api/auth/recover_password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'cedula': ced, 'security_answer': ans, 'new_password': pwd}),
       );

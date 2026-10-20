@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/screens/trainer/client_detail_screen.dart';
+import 'package:mobile_app/screens/trainer/trainer_messages_tab.dart';
 import 'package:mobile_app/services/auth_service.dart';
 
 class TrainerAgendaTab extends StatefulWidget {
@@ -458,6 +459,241 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
     }
   }
 
+  void _showSessionSummaryFicha(Map<String, dynamic> student, Map<String, dynamic> block) {
+    final exercises = (student['exercises'] as List<dynamic>?) ?? [];
+    final clientName = student['name'] ?? 'Alumno';
+    final clientId = student['cedula'] ?? student['client_id'] ?? '';
+    final timeStr = block['time'] ?? 'Horario';
+    final riskStr = student['risk'] ?? '🟢 Óptimo';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F192B),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with Avatar and close
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: const Color(0xFF1FAE87),
+                        child: Text(
+                          clientName.isNotEmpty ? clientName[0].toUpperCase() : 'A',
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(clientName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text('C.I: $clientId', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.pop(ctx),
+                  )
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Turno & Alerta Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.access_time_filled, color: Color(0xFF1FAE87), size: 16),
+                            const SizedBox(width: 6),
+                            Text(timeStr, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: riskStr.startsWith('🔴') ? Colors.redAccent.withOpacity(0.2) : Colors.greenAccent.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: riskStr.startsWith('🔴') ? Colors.redAccent : Colors.greenAccent),
+                          ),
+                          child: Text(
+                            riskStr,
+                            style: TextStyle(
+                              color: riskStr.startsWith('🔴') ? Colors.redAccent : Colors.greenAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Edad: ${student['edad'] ?? 25} años', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text('Peso: ${student['peso'] ?? 70.0} kg', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text('Alergias: ${student['alergias'] ?? "Ninguna"}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Ejercicios planificados para este turno
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Ejercicios Planificados Hoy', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text('${exercises.length} ejercicios', style: const TextStyle(color: Color(0xFF1FAE87), fontSize: 12, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Exercise List
+              Expanded(
+                child: exercises.isEmpty
+                    ? const Center(child: Text('Sin ejercicios registrados para este día.', style: TextStyle(color: Colors.white54)))
+                    : ListView.builder(
+                        itemCount: exercises.length,
+                        itemBuilder: (context, exIdx) {
+                          final ex = exercises[exIdx];
+                          final exName = ex['name'] ?? 'Ejercicio';
+                          final sets = ex['sets'] ?? 3;
+                          final reps = ex['reps'] ?? '10-12';
+                          final muscle = ex['primary_muscle'] ?? 'General';
+                          final biomech = ex['biomechanics'] ?? '';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF1FAE87).withOpacity(0.2)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${exIdx + 1}. $exName',
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1FAE87).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '$sets series x $reps',
+                                        style: const TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold, fontSize: 12),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text('Enfoque muscular: $muscle', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                                if (biomech.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text('💡 $biomech', style: const TextStyle(color: Colors.white70, fontSize: 11, fontStyle: FontStyle.italic)),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+
+              const SizedBox(height: 16),
+              // Action Buttons Row
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E293B),
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0xFF1FAE87)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 16, color: Color(0xFF1FAE87)),
+                      label: const Text('Chat en Vivo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TrainerClientChatScreen(clientId: clientId, clientName: clientName),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1FAE87),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.badge, size: 16),
+                      label: const Text('Ficha Integral', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ClientDetailScreen(clientName: clientName),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isToday = _formatDate(_selectedDate) == _formatDate(DateTime.now());
@@ -737,38 +973,32 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
                 ),
               )
             else
-              ...students.map((s) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F192B),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withOpacity(0.06)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 14,
-                              backgroundColor: const Color(0xFF1FAE87),
-                              child: Text(
-                                (s['name'] as String? ?? 'A')[0].toUpperCase(),
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ...students.map((s) => InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _showSessionSummaryFicha(s, block),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F192B),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withOpacity(0.06)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundColor: const Color(0xFF1FAE87),
+                                child: Text(
+                                  (s['name'] as String? ?? 'A')[0].toUpperCase(),
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ClientDetailScreen(clientName: s['name'] ?? 'Alumno'),
-                                    ),
-                                  );
-                                },
+                              const SizedBox(width: 8),
+                              Expanded(
                                 child: Row(
                                   children: [
                                     Text(
@@ -777,80 +1007,87 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
                                         color: Colors.white,
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
-                                        decoration: TextDecoration.underline,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    const Icon(Icons.open_in_new, color: Color(0xFF1FAE87), size: 14),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1FAE87).withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text('Ver Ficha', style: TextStyle(color: Color(0xFF1FAE87), fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
                                   ],
                                 ),
                               ),
-                            ),
-                            // Risk / Health Badge
-                            if (s['risk'] != null && s['risk'] != 'none') ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: (s['risk'].toString().startsWith('🔴'))
-                                      ? Colors.redAccent.withOpacity(0.2)
-                                      : ((s['risk'].toString().startsWith('⚠️'))
-                                          ? Colors.orangeAccent.withOpacity(0.2)
-                                          : Colors.greenAccent.withOpacity(0.15)),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
+                              // Risk / Health Badge
+                              if (s['risk'] != null && s['risk'] != 'none') ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
                                     color: (s['risk'].toString().startsWith('🔴'))
-                                        ? Colors.redAccent.withOpacity(0.7)
+                                        ? Colors.redAccent.withOpacity(0.2)
                                         : ((s['risk'].toString().startsWith('⚠️'))
-                                            ? Colors.orangeAccent.withOpacity(0.7)
-                                            : Colors.greenAccent.withOpacity(0.5)),
+                                            ? Colors.orangeAccent.withOpacity(0.2)
+                                            : Colors.greenAccent.withOpacity(0.15)),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: (s['risk'].toString().startsWith('🔴'))
+                                          ? Colors.redAccent.withOpacity(0.7)
+                                          : ((s['risk'].toString().startsWith('⚠️'))
+                                              ? Colors.orangeAccent.withOpacity(0.7)
+                                              : Colors.greenAccent.withOpacity(0.5)),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    s['risk'],
+                                    style: TextStyle(
+                                      color: (s['risk'].toString().startsWith('🔴'))
+                                          ? Colors.redAccent
+                                          : ((s['risk'].toString().startsWith('⚠️'))
+                                              ? Colors.orangeAccent
+                                              : Colors.greenAccent),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                                child: Text(
-                                  s['risk'],
-                                  style: TextStyle(
-                                    color: (s['risk'].toString().startsWith('🔴'))
-                                        ? Colors.redAccent
-                                        : ((s['risk'].toString().startsWith('⚠️'))
-                                            ? Colors.orangeAccent
-                                            : Colors.greenAccent),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            // Cancel booking button
-                            IconButton(
-                              icon: const Icon(Icons.close, color: Colors.white38, size: 18),
-                              tooltip: 'Desvincular alumno de este horario',
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: () => _cancelSession(s),
-                            ),
-                          ],
-                        ),
-                        // Workout / Routine scheduled for the student
-                        const SizedBox(height: 6),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 36),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.fitness_center, color: Colors.white38, size: 13),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Plan: ${s['workout'] ?? "Rutina planificada"}',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              // Cancel booking button
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.white38, size: 18),
+                                tooltip: 'Desvincular alumno de este horario',
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => _cancelSession(s),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          // Workout / Routine scheduled for the student
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 36),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.fitness_center, color: Colors.white38, size: 13),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Plan: ${s['workout'] ?? "Rutina planificada"}',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right, color: Colors.white24, size: 16),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )),
           ],

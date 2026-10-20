@@ -5,6 +5,7 @@ import 'package:mobile_app/screens/trainer/trainer_clients_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_agenda_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_announcements_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_messages_tab.dart';
+import 'package:mobile_app/screens/trainer/trainer_profile_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/main.dart';
 
@@ -34,6 +35,16 @@ class _TrainerShellState extends State<TrainerShell> {
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
+            tooltip: 'Mi Perfil Profesional',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TrainerProfileScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_active, color: Color(0xFF1FAE87)),
             tooltip: 'Notificaciones y Alertas',
