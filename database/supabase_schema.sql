@@ -60,3 +60,28 @@ create table if not exists public.aprendizaje_plan_anonimo (
 
 alter table public.aprendizaje_plan_anonimo enable row level security;
 grant insert on public.aprendizaje_plan_anonimo to service_role;
+
+-- 3. Tabla para persistencia del historial de conversaciones del Coach IA
+create table if not exists public.coach_mensajes (
+    id uuid default gen_random_uuid() primary key,
+    user_id uuid references public.usuarios(id) on delete cascade,
+    cedula varchar(20),
+    role varchar(20) not null check (role in ('user', 'assistant', 'system')),
+    content text not null,
+    plan jsonb,
+    category text,
+    rule text,
+    suggest_questionnaire boolean default false,
+    quick_replies jsonb,
+    recommended_intensity varchar(50),
+    created_at timestamptz not null default now()
+);
+
+create index if not exists idx_coach_mensajes_user_id on public.coach_mensajes(user_id);
+create index if not exists idx_coach_mensajes_cedula on public.coach_mensajes(cedula);
+create index if not exists idx_coach_mensajes_created_at on public.coach_mensajes(created_at);
+
+alter table public.coach_mensajes enable row level security;
+drop policy if exists coach_mensajes_policy on public.coach_mensajes;
+create policy coach_mensajes_policy on public.coach_mensajes for all using (true) with check (true);
+grant all on public.coach_mensajes to postgres, service_role, anon, authenticated;

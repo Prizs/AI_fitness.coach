@@ -142,7 +142,11 @@ class HomeScreen extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       _StatusChip(label: 'Meta: $goalText'),
-                      _StatusChip(label: 'Nivel: $levelText ($intensityText)'),
+                      _StatusChip(label: 'Nivel: $levelText'),
+                      _StatusChip(
+                        label: 'Intensidad: $intensityText',
+                        color: const Color(0xFF60A5FA),
+                      ),
                       if (streak > 0)
                         _StatusChip(
                           label: '🔥 Racha: $streak ${streak == 1 ? "sesión" : "sesiones"}',

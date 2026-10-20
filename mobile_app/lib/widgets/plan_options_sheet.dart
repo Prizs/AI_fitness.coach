@@ -126,7 +126,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
     super.initState();
     _promptController = TextEditingController(text: widget.initialPrompt);
 
-    // Sincronizar nivel e intensidad con lo seleccionado en Coach o WeeklyPlanService
+    // Inicializar nivel e intensidad de forma 100% independiente
     final currentPrefLevel = widget.initialLevel ?? WeeklyPlanService.instance.userLevel;
     final currentPrefIntensity = widget.initialIntensity ?? WeeklyPlanService.instance.userIntensity;
 
@@ -134,39 +134,27 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
         currentPrefLevel.toLowerCase().contains('básico') ||
         currentPrefLevel.toLowerCase().contains('basico')) {
       _experience = 'Principiante';
-      _intensity = 'Bajo';
     } else if (currentPrefLevel.toLowerCase().contains('avanzado')) {
       _experience = 'Avanzado';
-      _intensity = 'Alto';
     } else {
       _experience = 'Intermedio';
-      _intensity = 'Medio';
     }
 
     if (currentPrefIntensity.toLowerCase() == 'baja' || currentPrefIntensity.toLowerCase() == 'bajo') {
       _intensity = 'Bajo';
-      _experience = 'Principiante';
     } else if (currentPrefIntensity.toLowerCase() == 'alta' ||
         currentPrefIntensity.toLowerCase() == 'alto' ||
         currentPrefIntensity.toLowerCase() == 'intenso') {
       _intensity = 'Alto';
-      _experience = 'Avanzado';
-    } else if (currentPrefIntensity.toLowerCase() == 'media' || currentPrefIntensity.toLowerCase() == 'medio') {
+    } else {
       _intensity = 'Medio';
-      _experience = 'Intermedio';
     }
   }
 
   void _onIntensityChanged(String newIntensity) {
     setState(() {
       _intensity = newIntensity;
-      if (newIntensity == 'Bajo') {
-        _experience = 'Principiante';
-      } else if (newIntensity == 'Medio') {
-        _experience = 'Intermedio';
-      } else if (newIntensity == 'Alto') {
-        _experience = 'Avanzado';
-      }
+      // Desacoplado: No altera el nivel de experiencia
     });
     _syncPreferences();
   }
@@ -174,13 +162,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
   void _onExperienceChanged(String newExperience) {
     setState(() {
       _experience = newExperience;
-      if (newExperience == 'Principiante') {
-        _intensity = 'Bajo';
-      } else if (newExperience == 'Intermedio') {
-        _intensity = 'Medio';
-      } else if (newExperience == 'Avanzado') {
-        _intensity = 'Alto';
-      }
+      // Desacoplado: No altera el nivel de intensidad
     });
     _syncPreferences();
   }
@@ -339,29 +321,8 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
 
               const SizedBox(height: 20),
 
-              // 3. Intensidad y sincronización
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Nivel de Intensidad', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16253B),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.sync_rounded, size: 12, color: Color(0xFF8BE0C0)),
-                        SizedBox(width: 4),
-                        Text('Sincronizado con Coach', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 10, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              // 3. Intensidad (Totalmente independiente)
+              const Text('Nivel de Intensidad', style: TextStyle(color: Colors.white70, fontSize: 14)),
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [

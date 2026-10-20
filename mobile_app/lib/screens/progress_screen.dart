@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -25,8 +25,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Future<void> _fetchPhotos() async {
     final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    if (uid.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
     try {
-      final url = Uri.parse('\/api/progress/');
+      final url = Uri.parse('${AuthService.apiBaseUrl}/api/progress/$uid');
       final res = await http.get(url);
       if (res.statusCode == 200) {
         setState(() {
@@ -48,7 +52,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _isUploading = true);
     try {
       final uid = AuthService.instance.loggedInUser?.cedula ?? '';
-      var request = http.MultipartRequest('POST', Uri.parse('\/api/progress/upload'));
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${AuthService.apiBaseUrl}/api/progress/upload'),
+      );
       request.fields['user_id'] = uid;
       
       final bytes = await image.readAsBytes();

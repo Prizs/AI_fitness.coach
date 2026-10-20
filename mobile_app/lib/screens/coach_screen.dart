@@ -42,6 +42,7 @@ class _CoachScreenState extends State<CoachScreen> {
     final prefInt = WeeklyPlanService.instance.userIntensity;
     if (prefInt.isNotEmpty) _userIntensity = prefInt;
     WeeklyPlanService.instance.addListener(_onWeeklyPlanUpdated);
+    _loadHistory();
   }
 
   void _onWeeklyPlanUpdated() {
@@ -51,6 +52,233 @@ class _CoachScreenState extends State<CoachScreen> {
         _userIntensity = WeeklyPlanService.instance.userIntensity;
       });
     }
+  }
+
+  Future<void> _loadHistory() async {
+    final profile = AuthService.instance.loggedInUser;
+    final cedula = profile?.cedula ?? 'default';
+    const storage = FlutterSecureStorage();
+    final localKey = 'coach_chat_history_$cedula';
+
+    // 1. Restauración local instantánea (0ms de espera)
+    try {
+      final cachedStr = await storage.read(key: localKey);
+      if (cachedStr != null && cachedStr.trim().isNotEmpty) {
+        final decoded = jsonDecode(cachedStr);
+        if (decoded is List && decoded.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _messages.clear();
+              for (final item in decoded) {
+                if (item is Map) {
+                  _messages.add(Map<String, dynamic>.from(item));
+                }
+              }
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 2. Sincronización en segundo plano con backend / Supabase
+    try {
+      final baseUrl = AuthService.apiBaseUrl;
+      final uri = Uri.parse('$baseUrl/api/coach/history?cedula=$cedula');
+      final res = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (res.statusCode == 200) {
+        final serverList = jsonDecode(res.body);
+        if (serverList is List && serverList.isNotEmpty) {
+          final List<Map<String, dynamic>> restored = [];
+          for (final item in serverList) {
+            if (item is Map) {
+              restored.add({
+                'isUser': item['isUser'] == true,
+                'text': item['text'] ?? '',
+                'plan': item['plan'],
+                'category': item['category'],
+                'rule': item['rule'],
+                'suggest_questionnaire': item['suggest_questionnaire'] == true,
+                'quick_replies': item['quick_replies'],
+                'recommended_intensity': item['recommended_intensity'],
+              });
+            }
+          }
+          if (mounted && restored.isNotEmpty) {
+            setState(() {
+              _messages.clear();
+              _messages.addAll(restored);
+            });
+            await storage.write(key: localKey, value: jsonEncode(_messages));
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Si no hay mensajes o solo queda el mensaje default inicial, disparar Saludo Contextual Hiperpersonalizado
+    if (_messages.isEmpty || (_messages.length == 1 && _messages.first['isWelcome'] == true)) {
+      _requestInitialGreeting();
+    }
+  }
+
+  Future<void> _requestInitialGreeting() async {
+    final profile = AuthService.instance.loggedInUser;
+    final cedula = profile?.cedula ?? 'default';
+    final userName = (profile != null && profile.name.trim().isNotEmpty)
+        ? '${profile.name} ${profile.lastName}'.trim()
+        : 'Atleta';
+    final baseUrl = AuthService.apiBaseUrl;
+
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/coach/chat'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'message': 'Hola Coach',
+              'is_initial_greeting': true,
+              'user_name': userName,
+              'cedula': cedula,
+              'user_id': cedula,
+              'user_goal': WeeklyPlanService.instance.userGoal,
+              'user_level': _userLevel,
+              'user_intensity': _userIntensity,
+              'weekly_metrics': {
+                'adherence_rate': WeeklyPlanService.instance.adherenceRate,
+                'completed_sessions': WeeklyPlanService.instance.totalCompletedSessions,
+                'date_range': WeeklyPlanService.instance.cycleDateRangeStr,
+                'streak': WeeklyPlanService.instance.currentStreak,
+                'last_rpe': WeeklyPlanService.instance.lastRpe,
+                'last_feeling': WeeklyPlanService.instance.lastFeeling,
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 40));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final replyText = (data['reply'] ?? '¡Hola! Bienvenido a tu entrenamiento.').toString();
+        final qReplies = data['quick_replies'] is List
+            ? List<String>.from(data['quick_replies'])
+            : <String>[
+                '¡Fue genial, quiero repetir intensidad!',
+                'Terminé cansado, bajemos un poco',
+                '¡Listo para el siguiente nivel!',
+                'Completar mi estado actual',
+              ];
+
+        if (mounted) {
+          setState(() {
+            _messages.clear();
+            _messages.add({
+              'isUser': false,
+              'text': replyText,
+              'plan': null,
+              'category': data['category'] ?? 'Revisión Semanal y Adaptación',
+              'suggest_questionnaire': data['suggest_questionnaire'] == true,
+              'quick_replies': qReplies,
+            });
+          });
+          _saveHistoryLocally();
+        }
+      }
+    } catch (_) {
+      if (mounted && (_messages.isEmpty || (_messages.length == 1 && _messages.first['isWelcome'] == true))) {
+        setState(() {
+          _messages.clear();
+          _messages.add({
+            'isUser': false,
+            'text': '¡Hola, $userName! 👋 ¡Excelente disciplina en tu semana! Soy tu Coach Inteligente. ¿Cómo sentiste tu rendimiento y fatiga? Cuéntame para calibrar a la perfección el nuevo ciclo hacia tu meta de ${WeeklyPlanService.instance.userGoal}.',
+            'isWelcome': true,
+            'plan': null,
+            'quick_replies': [
+              '¡Fue genial, quiero repetir intensidad!',
+              'Terminé cansado, bajemos un poco',
+              '¡Listo para el siguiente nivel!',
+              'Completar mi estado actual',
+            ],
+          });
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _saveHistoryLocally() async {
+    try {
+      final profile = AuthService.instance.loggedInUser;
+      final cedula = profile?.cedula ?? 'default';
+      const storage = FlutterSecureStorage();
+      final localKey = 'coach_chat_history_$cedula';
+      final toSave = _messages.length > 50 ? _messages.sublist(_messages.length - 50) : _messages;
+      await storage.write(key: localKey, value: jsonEncode(toSave));
+    } catch (_) {}
+  }
+
+  Future<void> _clearChatHistory() async {
+    final profile = AuthService.instance.loggedInUser;
+    final cedula = profile?.cedula ?? 'default';
+    const storage = FlutterSecureStorage();
+    final localKey = 'coach_chat_history_$cedula';
+
+    setState(() {
+      _messages.clear();
+      _isLoading = true;
+    });
+
+    await storage.delete(key: localKey);
+
+    try {
+      final baseUrl = AuthService.apiBaseUrl;
+      await http.delete(Uri.parse('$baseUrl/api/coach/history?cedula=$cedula'));
+    } catch (_) {}
+
+    await _requestInitialGreeting();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Conversación reiniciada exitosamente.'),
+          backgroundColor: Color(0xFF16253B),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _showClearChatConfirmation() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F192B),
+        title: const Text('¿Reiniciar conversación?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text(
+          'Se borrará el historial de este chat y comenzarás una nueva sesión activa con el Coach IA.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF6B6B)),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _clearChatHistory();
+            },
+            child: const Text('Reiniciar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -327,6 +555,7 @@ class _CoachScreenState extends State<CoachScreen> {
       _isLoading = true;
     });
     _controller.clear();
+    _saveHistoryLocally();
 
     final history = _messages
         .where((m) => (m['text'] as String?)?.isNotEmpty ?? false)
@@ -362,6 +591,8 @@ class _CoachScreenState extends State<CoachScreen> {
             body: jsonEncode({
               'message': text,
               'history': history,
+              'cedula': profile?.cedula,
+              'user_id': profile?.cedula,
               'user_goal': WeeklyPlanService.instance.userGoal,
               'user_level': _userLevel,
               'user_intensity': _userIntensity,
@@ -396,6 +627,29 @@ class _CoachScreenState extends State<CoachScreen> {
 
         final replyText = (data['reply'] ?? 'Sin respuesta del Coach.').toString();
         final bool showStateBtn = !isSubmission && data['suggest_questionnaire'] == true;
+        final qReplies = data['quick_replies'] is List ? List<String>.from(data['quick_replies']) : null;
+        final recIntensity = data['recommended_intensity'] as String?;
+
+        if (recIntensity != null &&
+            recIntensity.isNotEmpty &&
+            recIntensity.toLowerCase() != _userIntensity.toLowerCase()) {
+          setState(() {
+            _userIntensity = recIntensity;
+          });
+          WeeklyPlanService.instance.updateUserPreferences(intensity: recIntensity);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                data['fatigue_detected'] == true
+                    ? '🛡️ Ajuste por fatiga: Intensidad adaptada a $recIntensity para facilitar recuperación activa (Nivel $_userLevel conservado).'
+                    : '⚡ Intensidad adaptada a $recIntensity según tu progreso (Nivel $_userLevel conservado).',
+              ),
+              backgroundColor: const Color(0xFF16253B),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
 
         setState(() {
           _messages.add({
@@ -405,8 +659,11 @@ class _CoachScreenState extends State<CoachScreen> {
             'category': data['category'],
             'rule': data['progression_rule'],
             'suggest_questionnaire': showStateBtn,
+            'quick_replies': qReplies,
+            'recommended_intensity': recIntensity,
           });
         });
+        _saveHistoryLocally();
       } else {
         String detail =
             'El motor IA respondió con un error (${response.statusCode}).';
@@ -447,6 +704,11 @@ class _CoachScreenState extends State<CoachScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.restart_alt_rounded, color: Colors.white70),
+            tooltip: 'Reiniciar conversación',
+            onPressed: _showClearChatConfirmation,
+          ),
+          IconButton(
             icon: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF8BE0C0)),
             tooltip: 'Enviar Estado Actual',
             onPressed: () => _openStateSheet(),
@@ -464,10 +726,10 @@ class _CoachScreenState extends State<CoachScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Barra interactiva de Categorización de Nivel e Intensidad
+            // Barra interactiva de Nivel e Intensidad 100% Desacoplados
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: const BoxDecoration(
                 color: Color(0xFF0F192B),
                 border: Border(bottom: BorderSide(color: Colors.white10)),
@@ -476,56 +738,82 @@ class _CoachScreenState extends State<CoachScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    const Icon(Icons.tune_rounded, size: 15, color: Color(0xFF8BE0C0)),
-                    const SizedBox(width: 6),
-                    const Text('Categoría:', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 6),
-                    ...[
-                      {'label': '🟢 Básico (Baja)', 'level': 'Principiante', 'intensity': 'Baja', 'color': const Color(0xFF8BE0C0)},
-                      {'label': '🟠 Intermedio (Media)', 'level': 'Intermedio', 'intensity': 'Media', 'color': const Color(0xFFFFB340)},
-                      {'label': '🔴 Avanzado (Alta)', 'level': 'Avanzado', 'intensity': 'Alta', 'color': const Color(0xFFFF6B6B)},
-                    ].map((tier) {
-                      final bool isSelected = _userIntensity.toLowerCase() == (tier['intensity'] as String).toLowerCase();
-                      final Color tierColor = tier['color'] as Color;
+                    // Selector de Nivel de Experiencia (Desacoplado)
+                    const Icon(Icons.fitness_center_rounded, size: 14, color: Color(0xFF8BE0C0)),
+                    const SizedBox(width: 4),
+                    const Text('Nivel:', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 4),
+                    ...['Principiante', 'Intermedio', 'Avanzado'].map((lvl) {
+                      final bool isSelected = _userLevel.toLowerCase() == lvl.toLowerCase();
                       return Padding(
-                        padding: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.only(right: 4),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(12),
                           onTap: () {
-                            setState(() {
-                              _userLevel = tier['level'] as String;
-                              _userIntensity = tier['intensity'] as String;
-                            });
-                            WeeklyPlanService.instance.updateUserPreferences(
-                              level: tier['level'] as String,
-                              intensity: tier['intensity'] as String,
-                            );
-                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('⚡ Modo ${tier['label']} seleccionado y sincronizado en Inicio y Perfil'),
-                                backgroundColor: const Color(0xFF16253B),
-                                behavior: SnackBarBehavior.floating,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
+                            setState(() => _userLevel = lvl);
+                            WeeklyPlanService.instance.updateUserPreferences(level: lvl);
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isSelected ? const Color(0xFF8BE0C0).withValues(alpha: 0.22) : const Color(0xFF16253B),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected ? const Color(0xFF8BE0C0) : Colors.white12,
+                                width: isSelected ? 1.2 : 1.0,
+                              ),
+                            ),
+                            child: Text(
+                              lvl,
+                              style: TextStyle(
+                                color: isSelected ? const Color(0xFF8BE0C0) : Colors.white60,
+                                fontSize: 10.5,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(width: 6),
+                    Container(width: 1, height: 16, color: Colors.white12),
+                    const SizedBox(width: 6),
+                    // Selector de Intensidad (Desacoplado)
+                    const Icon(Icons.bolt_rounded, size: 15, color: Color(0xFFFFB340)),
+                    const SizedBox(width: 4),
+                    const Text('Intensidad:', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 4),
+                    ...[
+                      {'label': 'Baja', 'code': 'Baja', 'color': const Color(0xFF8BE0C0)},
+                      {'label': 'Media', 'code': 'Media', 'color': const Color(0xFFFFB340)},
+                      {'label': 'Alta', 'code': 'Alta', 'color': const Color(0xFFFF6B6B)},
+                    ].map((tier) {
+                      final bool isSelected = _userIntensity.toLowerCase() == (tier['code'] as String).toLowerCase();
+                      final Color tierColor = tier['color'] as Color;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () {
+                            setState(() => _userIntensity = tier['code'] as String);
+                            WeeklyPlanService.instance.updateUserPreferences(intensity: tier['code'] as String);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                             decoration: BoxDecoration(
                               color: isSelected ? tierColor.withValues(alpha: 0.22) : const Color(0xFF16253B),
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected ? tierColor : Colors.white12,
-                                width: isSelected ? 1.3 : 1.0,
+                                width: isSelected ? 1.2 : 1.0,
                               ),
                             ),
                             child: Text(
                               tier['label'] as String,
                               style: TextStyle(
                                 color: isSelected ? tierColor : Colors.white60,
-                                fontSize: 11,
-                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                                fontSize: 10.5,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                               ),
                             ),
                           ),
@@ -611,6 +899,47 @@ class _CoachScreenState extends State<CoachScreen> {
                         ),
                         child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
                       ),
+                      if (msg['quick_replies'] is List && (msg['quick_replies'] as List).isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, bottom: 8),
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: (msg['quick_replies'] as List).map<Widget>((qr) {
+                              final qrText = qr.toString();
+                              final lower = qrText.toLowerCase();
+                              final isStateBtn = lower.contains('completar') || lower.contains('estado actual');
+                              final isFatigue = lower.contains('cansado') || lower.contains('bajemos') || lower.contains('descarga');
+                              final isNextLvl = lower.contains('siguiente nivel') || lower.contains('alta');
+                              final Color color = isStateBtn
+                                  ? const Color(0xFF8BE0C0)
+                                  : (isFatigue ? const Color(0xFFFFB340) : (isNextLvl ? const Color(0xFFFF6B6B) : const Color(0xFF8BE0C0)));
+                              final IconData icon = isStateBtn
+                                  ? Icons.assignment_turned_in_rounded
+                                  : (isFatigue ? Icons.battery_charging_full_rounded : (isNextLvl ? Icons.trending_up_rounded : Icons.flash_on_rounded));
+
+                              return ActionChip(
+                                backgroundColor: const Color(0xFF16253B),
+                                side: BorderSide(color: color.withValues(alpha: 0.8), width: 1.1),
+                                avatar: Icon(icon, size: 14, color: color),
+                                label: Text(
+                                  qrText,
+                                  style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+                                ),
+                                onPressed: _isLoading
+                                    ? null
+                                    : () {
+                                        if (isStateBtn) {
+                                          _openStateSheet();
+                                        } else {
+                                          _sendMessage(qrText);
+                                        }
+                                      },
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
                       if (msg['suggest_questionnaire'] == true ||
                           (msg['isWelcome'] == true && _messages.length == 1)) ...[
                         Padding(
@@ -1007,6 +1336,12 @@ class _CoachScreenState extends State<CoachScreen> {
                 ),
               ),
 
+            if (_isLoading)
+              const LinearProgressIndicator(
+                backgroundColor: Color(0xFF0F192B),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8BE0C0)),
+              ),
+            _buildQuickRepliesBar(),
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
               decoration: const BoxDecoration(
@@ -1134,4 +1469,69 @@ class _CoachScreenState extends State<CoachScreen> {
       dynamicExercises: dyn.isNotEmpty ? dyn : null,
     )));
   }
+
+  List<String>? _getActiveQuickReplies() {
+    if (_isLoading) return null;
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      final m = _messages[i];
+      if (m['isUser'] == false && m['quick_replies'] is List && (m['quick_replies'] as List).isNotEmpty) {
+        return List<String>.from(m['quick_replies']);
+      }
+    }
+    return null;
+  }
+
+  Widget _buildQuickRepliesBar() {
+    final replies = _getActiveQuickReplies();
+    if (replies == null || replies.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F192B),
+        border: Border(top: BorderSide(color: Colors.white10)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: replies.map((qrText) {
+            final lower = qrText.toLowerCase();
+            final isStateBtn = lower.contains('completar') || lower.contains('estado actual');
+            final isFatigue = lower.contains('cansado') || lower.contains('bajemos') || lower.contains('descarga');
+            final isNextLvl = lower.contains('siguiente nivel') || lower.contains('alta');
+            final Color color = isStateBtn
+                ? const Color(0xFF8BE0C0)
+                : (isFatigue ? const Color(0xFFFFB340) : (isNextLvl ? const Color(0xFFFF6B6B) : const Color(0xFF8BE0C0)));
+            final IconData icon = isStateBtn
+                ? Icons.assignment_turned_in_rounded
+                : (isFatigue ? Icons.battery_charging_full_rounded : (isNextLvl ? Icons.trending_up_rounded : Icons.flash_on_rounded));
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                backgroundColor: const Color(0xFF16253B),
+                side: BorderSide(color: color.withValues(alpha: 0.8), width: 1.1),
+                avatar: Icon(icon, size: 15, color: color),
+                label: Text(
+                  qrText,
+                  style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w600),
+                ),
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        if (isStateBtn) {
+                          _openStateSheet();
+                        } else {
+                          _sendMessage(qrText);
+                        }
+                      },
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
 }
+
