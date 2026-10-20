@@ -1411,31 +1411,82 @@ Mensaje actual del usuario: {payload.message}
 Devuelve SOLO JSON."""
     )
 
-    result = generate_json_text(prompt, timeout=AI_TIMEOUT_SEC)
-    raw = (result.text or "").strip()
     data = None
+    provider_name = "ai"
+    raw = ""
     try:
-        data = json.loads(raw)
-    except Exception:
+        result = generate_json_text(prompt, timeout=AI_TIMEOUT_SEC)
+        raw = (result.text or "").strip()
+        provider_name = result.provider
         first_brace = raw.find("{")
         last_brace = raw.rfind("}")
         if first_brace != -1 and last_brace > first_brace:
-            try:
-                data = json.loads(raw[first_brace:last_brace + 1])
-            except Exception:
-                pass
+            data = json.loads(raw[first_brace:last_brace + 1])
+    except Exception as exc:
+        print("Aviso: Proveedores de IA no disponibles o con timeout, activando fallback local inteligente:", exc)
+        data = None
 
     if not isinstance(data, dict):
         reply_clean = re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
+        
+        # Seleccionar pool de ejercicios según la zona solicitada e intensidad
+        focus_key = requested_focus or "piernas"
+        if focus_key == "tren_superior":
+            chosen_pool = UPPER_BODY_POOLS.get(intensity_hint, UPPER_BODY_POOLS["media"])
+            focus_name = "Tren Superior (Espalda, Pecho y Brazos)"
+        elif focus_key == "core":
+            chosen_pool = CORE_POOLS.get(intensity_hint, CORE_POOLS["media"])
+            focus_name = "Core y Estabilidad Lumbar"
+        elif focus_key == "movilidad_cardio":
+            chosen_pool = MOBILITY_CARDIO_POOLS.get(intensity_hint, MOBILITY_CARDIO_POOLS["media"])
+            focus_name = "Movilidad Articular y Cardio Suave"
+        else:
+            chosen_pool = leg_pool
+            focus_name = "Piernas y Glúteos"
+
+        fallback_exercises = []
+        for ex in chosen_pool[:5]:
+            fallback_exercises.append({
+                "name": ex["name"],
+                "sets": ex.get("sets", 3),
+                "reps": ex.get("reps", "10-12"),
+                "animation_key": ex.get("animation_key", "generic"),
+                "primary_muscle": ex.get("primary_muscle", "Músculo principal"),
+                "secondary_muscle": ex.get("secondary_muscle", "Estabilizadores"),
+                "intensity_level": forced_label,
+                "biomechanics": "Mantén trayectoria controlada, retracción escapular y rango de movimiento completo.",
+                "posture": "Core activo y columna neutra durante todo el recorrido.",
+            })
+
         data = {
-            "reply": reply_clean or "¡Entendido! Vamos a continuar afinando tu plan de entrenamiento.",
-            "category": "Acondicionamiento y Fuerza",
+            "reply": reply_clean or (
+                f"¡Excelente decisión! He preparado tu plan de sesión enfocado en **{focus_name}**, "
+                f"calibrado para tu nivel de experiencia **{effective_level}** a una intensidad **{effective_intensity}**.\n\n"
+                f"Recuerda que para optimizar la hipertrofia y adaptación neuromuscular, este grupo muscular requiere entre "
+                f"**48 y 72 horas de recuperación** antes de volver a trabajarse."
+            ),
+            "category": f"Entrenamiento ({effective_level} · Intensidad {effective_intensity})",
             "duration_weeks": 4,
             "rest_between_sets_sec": 60,
-            "progression_rule": "Mantén técnica estricta y respeta 48-72h de recuperación muscular.",
+            "progression_rule": "Respeta 48-72h de recuperación entre sesiones del mismo grupo muscular.",
             "extracted_equipment": None,
-            "has_plan": False,
-            "structured_plan": None,
+            "suggest_questionnaire": False,
+            "has_plan": True,
+            "structured_plan": {
+                "day": "Martes y Jueves" if is_complementary else "Lunes y Miércoles",
+                "title": f"Rutina personalizada: {focus_name} ({effective_level} · Intensidad {effective_intensity})",
+                "recommended_days": ["Martes", "Jueves"] if is_complementary else ["Lunes", "Miércoles"],
+                "complementary_days": {
+                    "Martes": "Tren Superior Suave o Core",
+                    "Jueves": "Movilidad Articular o Tren Superior"
+                },
+                "exercises": fallback_exercises,
+                "nutrition": {
+                    "desayuno": "2 huevos revueltos con tomate y cebolla (perico criollo), 1 arepa de maíz asada y café o té.",
+                    "almuerzo": "150g de pechuga de pollo o carne molida magra, 1 taza de arroz blanco o batata y ensalada fresca.",
+                    "cena": "2 huevos sancochados o atún al agua con queso blanco llanero y 1/2 plátano maduro asado."
+                }
+            }
         }
 
     structured_plan = _normalize_structured_plan(
@@ -1553,7 +1604,7 @@ Devuelve SOLO JSON."""
         ]
 
     return {
-        "provider": result.provider,
+        "provider": provider_name,
         "reply": reply_str,
         "category": str(data.get("category") or f"Entrenamiento ({effective_level} · Intensidad {effective_intensity})"),
         "duration_weeks": int(data.get("duration_weeks") or 4),
