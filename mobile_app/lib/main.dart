@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/auth/login_screen.dart';
 import 'package:mobile_app/screens/trainer/trainer_shell.dart';
 import 'package:mobile_app/screens/auth/register_screen.dart';
-import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/screens/home_screen.dart';
 import 'package:mobile_app/screens/nutrition_screen.dart';
 import 'package:mobile_app/screens/progress_screen.dart';
@@ -171,6 +170,9 @@ class _AppShellState extends State<AppShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
+          if (_currentIndex == 1 && index != 1) {
+            ChatNotificationService.instance.clearAllActiveChats();
+          }
           setState(() {
             _currentIndex = index;
           });

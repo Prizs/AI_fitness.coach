@@ -438,6 +438,21 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             ],
           ),
         ),
+        // Barra de Consultas Rápidas Sugeridas
+        Container(
+          height: 38,
+          margin: const EdgeInsets.only(bottom: 4),
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            children: [
+              _buildQuickPromptChip('❓ ¿Cómo se siente este usuario?', Icons.sentiment_satisfied_alt),
+              _buildQuickPromptChip('🩺 ¿Tiene molestias o dolores?', Icons.healing),
+              _buildQuickPromptChip('⚙️ Adaptaciones biomecánicas hoy', Icons.fitness_center),
+              _buildQuickPromptChip('📈 ¿Cómo progresar en cargas?', Icons.trending_up),
+            ],
+          ),
+        ),
 
         // Chat Input Field
         Container(
@@ -545,36 +560,50 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     );
   }
 
-  Future<void> _sendMessageToAi() async {
-    final text = _chatController.text.trim();
+  Widget _buildQuickPromptChip(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ActionChip(
+        avatar: Icon(icon, color: const Color(0xFF1FAE87), size: 14),
+        backgroundColor: const Color(0xFF1E293B),
+        side: BorderSide(color: const Color(0xFF1FAE87).withOpacity(0.4)),
+        label: Text(title, style: const TextStyle(color: Colors.white, fontSize: 11)),
+        onPressed: _isLoadingAi ? null : () => _sendMessageToAi(title),
+      ),
+    );
+  }
+
+  Future<void> _sendMessageToAi([String? directText]) async {
+    final text = directText?.trim() ?? _chatController.text.trim();
     if (text.isEmpty || _isLoadingAi) return;
 
     final client = _clientData ?? {};
-    final clientName = client['fullName'] ?? widget.clientName;
+    final clientIdentifier = client['id'] ?? client['cedula'] ?? widget.clientName;
 
     setState(() {
       _aiChatHistory.add({'role': 'trainer', 'text': text});
-      _chatController.clear();
+      if (directText == null) _chatController.clear();
       _isLoadingAi = true;
     });
 
     final baseUrl = AuthService.apiBaseUrl;
+    final trainerId = AuthService.instance.loggedInUser?.cedula ?? '';
+
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/coach/chat'),
+        Uri.parse('$baseUrl/api/trainer/clinical-ai-consult'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'message': 'Soy el entrenador personal de $clientName. Te consulto sobre su rutina y salud: $text',
+          'trainer_id': trainerId,
+          'client_identifier': clientIdentifier.toString(),
+          'question': text,
           'history': _aiChatHistory
               .where((msg) => msg['text'] != text)
               .map((msg) => {
-                    'role': msg['role'] == 'trainer' ? 'user' : 'assistant',
-                    'content': msg['text']
+                    'role': msg['role'] == 'trainer' ? 'trainer' : 'assistant',
+                    'text': msg['text']
                   })
               .toList(),
-          'user_goal': client['objetivo'] ?? 'Ganancia muscular',
-          'allergies': client['alergias'] ?? 'Ninguna',
-          'injuries': client['lesiones'] ?? 'Ninguna',
         }),
       );
 
@@ -584,7 +613,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
           setState(() {
             _aiChatHistory.add({
               'role': 'ai',
-              'text': data['response'] ?? 'Entendido. Como recomendación técnica, mantén la supervisión del rango articular.'
+              'text': data['response'] ?? 'Información analizada con éxito.'
             });
           });
         }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/services/chat_notification_service.dart';
 
 class TrainerMessagesTab extends StatefulWidget {
   const TrainerMessagesTab({super.key});
@@ -184,6 +185,10 @@ class _TrainerClientChatScreenState extends State<TrainerClientChatScreen> {
   @override
   void initState() {
     super.initState();
+    ChatNotificationService.instance.pushActiveChat(
+      userId: widget.clientId,
+      userName: widget.clientName,
+    );
     _loadMessages();
     _msgTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
       _loadMessagesSilently();
@@ -192,6 +197,10 @@ class _TrainerClientChatScreenState extends State<TrainerClientChatScreen> {
 
   @override
   void dispose() {
+    ChatNotificationService.instance.popActiveChat(
+      userId: widget.clientId,
+      userName: widget.clientName,
+    );
     _msgTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
