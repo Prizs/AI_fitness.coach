@@ -315,9 +315,10 @@ class _TrainerClientChatScreenState extends State<TrainerClientChatScreen> {
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
                           final m = _messages[index];
-                          final senderId = (m['sender_id'] ?? '').toString();
-                          final isTrainer = senderId == _trainerCedula || senderId == AuthService.instance.loggedInUser?.cedula;
-                          return _buildBubble(m['message'] ?? '', isTrainer, m['created_at']);
+                          final bool isTrainer = m['is_from_trainer'] == true || m['sender_role'] == 'trainer';
+                          final bool isMe = isTrainer;
+                          final String senderLabel = isMe ? 'Tú (Coach)' : (widget.clientName.isNotEmpty ? widget.clientName : 'Alumno');
+                          return _buildBubble(m['message'] ?? '', isMe, m['created_at'], senderLabel);
                         },
                       ),
           ),
@@ -358,7 +359,7 @@ class _TrainerClientChatScreenState extends State<TrainerClientChatScreen> {
     );
   }
 
-  Widget _buildBubble(String text, bool isTrainer, dynamic createdAt) {
+  Widget _buildBubble(String text, bool isTrainer, dynamic createdAt, String senderLabel) {
     String timeStr = '';
     if (createdAt != null && createdAt is String && createdAt.length >= 16) {
       timeStr = createdAt.substring(11, 16);
@@ -372,15 +373,42 @@ class _TrainerClientChatScreenState extends State<TrainerClientChatScreen> {
         constraints: const BoxConstraints(maxWidth: 290),
         decoration: BoxDecoration(
           color: isTrainer ? const Color(0xFF1FAE87) : const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isTrainer ? 16 : 4),
+            bottomRight: Radius.circular(isTrainer ? 4 : 16),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: isTrainer ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            Text(
+              senderLabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isTrainer ? Colors.white70 : const Color(0xFF38BDF8),
+              ),
+            ),
+            const SizedBox(height: 4),
             Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
             if (timeStr.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(timeStr, style: TextStyle(color: isTrainer ? Colors.white70 : Colors.white38, fontSize: 10)),
+              Text(
+                timeStr,
+                style: TextStyle(
+                  color: isTrainer ? Colors.white70 : Colors.white38,
+                  fontSize: 10,
+                ),
+              ),
             ]
           ],
         ),

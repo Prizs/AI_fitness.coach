@@ -180,7 +180,17 @@ def get_messages(trainer_id: str, client_id: str):
             .order("created_at", desc=False)
             .execute()
         )
-        return res.data or []
+        messages = res.data or []
+        t_name = f"{t.get('nombre', '')} {t.get('apellido', '')}".strip() if t else "Entrenador"
+        c_name = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() if c else "Alumno"
+
+        for m in messages:
+            s_id = str(m.get("sender_id", ""))
+            is_from_trainer = (s_id == str(t_id))
+            m["is_from_trainer"] = is_from_trainer
+            m["sender_role"] = "trainer" if is_from_trainer else "client"
+            m["sender_name"] = f"Coach {t_name}" if is_from_trainer else c_name
+        return messages
     except Exception as e:
         # Fallback si el filtro OR falla en sintaxis PostgREST
         try:
@@ -192,7 +202,16 @@ def get_messages(trainer_id: str, client_id: str):
                 .order("created_at", desc=False)
                 .execute()
             )
-            return res.data or []
+            messages = res.data or []
+            t_name = f"{t.get('nombre', '')} {t.get('apellido', '')}".strip() if t else "Entrenador"
+            c_name = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() if c else "Alumno"
+            for m in messages:
+                s_id = str(m.get("sender_id", ""))
+                is_from_trainer = (s_id == str(t_id))
+                m["is_from_trainer"] = is_from_trainer
+                m["sender_role"] = "trainer" if is_from_trainer else "client"
+                m["sender_name"] = f"Coach {t_name}" if is_from_trainer else c_name
+            return messages
         except Exception as e2:
             raise HTTPException(status_code=500, detail=str(e2))
 
