@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, date
+import json
+import base64
+import time
+import os
 from app.services.supabase_service import get_supabase_admin_client
-from app.services.weekly_plan import _sessions
+from app.services.weekly_plan import _sessions, build_weekly_plan, WEEKDAY_NAMES
+from app.services.ai_providers import generate_json_text, configured_providers
 
 router = APIRouter(prefix="/api/trainer", tags=["Trainer"])
 
@@ -845,3 +850,236 @@ def get_client_detail(client_identifier: str):
         },
         "days": days_data
     }
+
+
+class AiCoachAssistReq(BaseModel):
+    trainer_id: str
+    client_id: str
+    recent_messages: List[dict] = []
+
+
+def _get_client_today_plan_data(admin, trainer_id: str, client_id: str) -> dict:
+    client = _resolve_user_id(admin, client_id)
+    trainer = _resolve_user_id(admin, trainer_id)
+    c_id = client["id"] if client else client_id
+    t_id = trainer["id"] if trainer else trainer_id
+    client_name = f"{client.get('nombre', '')} {client.get('apellido', '')}".strip() if client else "Alumno"
+    today_date = date.today().isoformat()
+    weekday_idx = date.today().weekday()  # 0=Lunes ... 6=Domingo
+    day_name = WEEKDAY_NAMES[weekday_idx] if weekday_idx < len(WEEKDAY_NAMES) else "Hoy"
+
+    # 1. Sesión agendada de hoy
+    session_info = None
+    try:
+        res_sess = (
+            admin.table("workout_sessions")
+            .select("*")
+            .eq("trainer_id", t_id)
+            .eq("client_id", c_id)
+            .eq("schedule_date", today_date)
+            .execute()
+        )
+        if res_sess.data and len(res_sess.data) > 0:
+            s = res_sess.data[0]
+            st = s.get("start_time", "")[:5]
+            et = s.get("end_time", "")[:5]
+            session_info = f"{st} - {et}"
+    except Exception:
+        pass
+
+    # 2. Rutina de hoy
+    weekly_routines = _sessions("Media")
+    routine_idx = weekday_idx % len(weekly_routines)
+    routine_data = weekly_routines[routine_idx]
+    routine_title = routine_data.get("title", "Rutina Integral")
+    exercises = routine_data.get("exercises", [])
+
+    time_line = f"⏰ Horario asignado: {session_info} (Recuerda llegar 10 min antes para calentar)" if session_info else "⏰ Horario: Por coordinar en el chat"
+    ex_list_str = "\n".join([f"• {e.get('name')}: {e.get('sets', 3)} series x {e.get('reps', '10-12')} reps" for e in exercises[:5]])
+
+    formatted_msg = (
+        f"🏋️‍♂️ *Plan de Entrenamiento de Hoy ({day_name})*\n"
+        f"🎯 *Enfoque:* {routine_title}\n"
+        f"{time_line}\n\n"
+        f"📋 *Ejercicios principales:*\n"
+        f"{ex_list_str}\n\n"
+        f"💪 ¡A darlo todo con técnica estricta y excelente energía!"
+    )
+
+    return {
+        "client_id": c_id,
+        "client_name": client_name,
+        "date": today_date,
+        "day_name": day_name,
+        "schedule_time": session_info,
+        "schedule_note": f"Sesión agendada para hoy a las {session_info.split(' - ')[0]}" if session_info else "Sin sesión presencial agendada para hoy",
+        "routine_title": routine_title,
+        "exercises": exercises,
+        "formatted_message": formatted_msg
+    }
+
+
+@router.get("/client-today-plan/{trainer_id}/{client_id}")
+def get_client_today_plan(trainer_id: str, client_id: str):
+    """Retorna el plan y horario asignado de hoy para un alumno específico."""
+    admin = get_supabase_admin_client()
+    try:
+        data = _get_client_today_plan_data(admin, trainer_id, client_id)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ai-coach-assist")
+def ai_coach_assist(req: AiCoachAssistReq):
+    """
+    Asistente IA para el entrenador: analiza el chat reciente y el plan de hoy,
+    generando una respuesta profesional, repaso de la conversación y consejo motivador.
+    """
+    admin = get_supabase_admin_client()
+    trainer = _resolve_user_id(admin, req.trainer_id)
+    client = _resolve_user_id(admin, req.client_id)
+    t_name = f"{trainer.get('nombre', '')} {trainer.get('apellido', '')}".strip() if trainer else "Coach"
+    c_name = f"{client.get('nombre', '')} {client.get('apellido', '')}".strip() if client else "Alumno"
+
+    plan_info = _get_client_today_plan_data(admin, req.trainer_id, req.client_id)
+
+    # Formatear últimos mensajes
+    chat_summary_lines = []
+    last_client_msg = ""
+    for m in req.recent_messages[-8:]:
+        sender = m.get("sender_name") or ("Coach" if m.get("is_from_trainer") else c_name)
+        text = m.get("message", "")
+        # Omitir etiquetas de imagenes para el resumen de texto
+        if text.startswith("[IMAGE]:"):
+            text = "[Foto enviada]" + (text.split("\n", 1)[1] if "\n" in text else "")
+        chat_summary_lines.append(f"{sender}: {text}")
+        if not m.get("is_from_trainer") and not m.get("sender_role") == "trainer":
+            last_client_msg = text
+
+    chat_str = "\n".join(chat_summary_lines) if chat_summary_lines else f"{c_name}: ¿Qué plan hay para hoy?"
+    if not last_client_msg:
+        last_client_msg = "Hola coach, ¿qué entrenamos hoy?"
+
+    ex_names = ", ".join([e.get("name", "") for e in plan_info.get("exercises", [])[:4]])
+
+    prompt = f"""
+    Actúa como un Entrenador Personal de gimnasio, motivador, empático y experto en biomecánica.
+    Estás redactando una respuesta sugerida para que el Coach ({t_name}) se la envíe por chat a su alumno ({c_name}).
+
+    Contexto del alumno:
+    - Nombre del alumno: {c_name}
+    - Entrenador: Coach {t_name}
+    - Rutina del día ({plan_info.get('day_name', 'Hoy')}): {plan_info.get('routine_title', 'Entrenamiento General')}
+    - Ejercicios clave: {ex_names}
+    - Horario agendado: {plan_info.get('schedule_time') or 'Sin horario específico agendado hoy'}
+
+    Conversación reciente en el chat:
+    {chat_str}
+
+    Último mensaje del alumno: "{last_client_msg}"
+
+    Instrucciones críticas:
+    1. Si el alumno pregunta qué plan hay para hoy, qué ejercicios o a qué hora presentarse:
+       Explícale con entusiasmo qué van a trabajar hoy ({plan_info.get('routine_title')}), menciona 2-3 de los ejercicios clave y recuérdale el horario si lo tiene ({plan_info.get('schedule_time') or 'invítalo a coordinar la hora si aún no la agendó'}).
+    2. Si el alumno menciona dolor, fatiga, nutrición, dudas de técnica o es una charla casual:
+       Haz un repaso breve de lo hablado, dale un consejo práctico y útil referente al tema que se esté hablando (o de recuperación si hay fatiga), y una palabra de motivación.
+    3. Escribe el mensaje en primera persona como el Coach hacia {c_name} (tono cercano, enérgico y profesional).
+    4. Prohibido diagnósticos médicos.
+
+    Devuelve ÚNICAMENTE un JSON con:
+    {{
+        "suggested_message": "Mensaje completo y natural listo para enviar",
+        "summary": "Breve repaso de lo conversado",
+        "key_point": "Punto relevante o consejo técnico",
+        "motivation_quote": "Frase motivacional breve"
+    }}
+    """
+
+    try:
+        res = generate_json_text(prompt, timeout=20.0)
+        parsed = json.loads(res.text)
+        return {
+            "status": "ok",
+            "suggested_message": parsed.get("suggested_message", plan_info["formatted_message"]),
+            "summary": parsed.get("summary", f"Revisión del entrenamiento de {plan_info.get('day_name')}"),
+            "key_point": parsed.get("key_point", f"Enfoque en {plan_info.get('routine_title')} con cadencia controlada."),
+            "motivation_quote": parsed.get("motivation_quote", "¡La constancia de hoy es tu fuerza de mañana!"),
+            "plan_info": plan_info
+        }
+    except Exception:
+        # Fallback inteligente inmediato sin bloqueo
+        sched_txt = f" a las {plan_info['schedule_time']}" if plan_info.get('schedule_time') else ""
+        fallback_msg = (
+            f"¡Hola {c_name}! Para hoy tenemos programada una sesión enfocada en {plan_info.get('routine_title')}{sched_txt}. "
+            f"Realizaremos ejercicios clave como {ex_names}. "
+            f"Recuerda hidratarte bien antes de empezar y calentar las articulaciones. ¡Vamos con toda la actitud!"
+        )
+        return {
+            "status": "ok",
+            "suggested_message": fallback_msg,
+            "summary": f"Repaso del plan de {plan_info.get('routine_title')}",
+            "key_point": "Enfoque biomecánico en fase concéntrica y excéntrica controlada.",
+            "motivation_quote": "¡Cada repetición cuenta para tu objetivo!",
+            "plan_info": plan_info
+        }
+
+
+@router.post("/upload-chat-image")
+async def upload_chat_image(
+    trainer_id: str = Form(...),
+    client_id: str = Form(...),
+    sender_id: str = Form(...),
+    caption: Optional[str] = Form(None),
+    file: UploadFile = File(...)
+):
+    """Permite al entrenador (o al cliente) enviar imágenes por chat con vista previa."""
+    admin = get_supabase_admin_client()
+    t = _resolve_user_id(admin, trainer_id)
+    c = _resolve_user_id(admin, client_id)
+    s = _resolve_user_id(admin, sender_id)
+
+    t_id = t["id"] if t else trainer_id
+    c_id = c["id"] if c else client_id
+    s_id = s["id"] if s else sender_id
+
+    try:
+        file_bytes = await file.read()
+        sanitized_filename = f"{int(time.time())}_{file.filename or 'chat_image.jpg'}"
+        file_path = f"chat/{t_id}_{c_id}/{sanitized_filename}"
+
+        public_url = ""
+        # 1. Intentar subir al bucket de Supabase
+        try:
+            admin.storage.from_("progress").upload(file_path, file_bytes, {"content-type": file.content_type or "image/jpeg"})
+            public_url = admin.storage.from_("progress").get_public_url(file_path)
+        except Exception as st_err:
+            print("Storage upload warning, using data URI fallback:", st_err)
+
+        # Si no hubo public_url o falló el bucket, usar base64 data URI (garantiza 100% éxito)
+        if not public_url:
+            b64 = base64.b64encode(file_bytes).decode("utf-8")
+            mime = file.content_type or "image/jpeg"
+            public_url = f"data:{mime};base64,{b64}"
+
+        # Construir mensaje con tag [IMAGE]:<url>
+        msg_text = f"[IMAGE]:{public_url}"
+        if caption and caption.strip():
+            msg_text += f"\n{caption.strip()}"
+
+        new_msg = {
+            "trainer_id": t_id,
+            "client_id": c_id,
+            "sender_id": s_id,
+            "message": msg_text,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        res = admin.table("trainer_chat").insert(new_msg).execute()
+        return {
+            "status": "ok",
+            "image_url": public_url,
+            "message": res.data[0] if res.data else new_msg
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

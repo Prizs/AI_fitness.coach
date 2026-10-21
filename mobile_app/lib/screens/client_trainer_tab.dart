@@ -595,10 +595,7 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              text,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-            ),
+            _buildMessageContent(text, isMe),
             if (timeStr.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
@@ -609,6 +606,103 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                 ),
               ),
             ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageContent(String rawText, bool isMe) {
+    if (rawText.startsWith('[IMAGE]:')) {
+      final firstLineEnd = rawText.indexOf('\n');
+      final imgUrl = firstLineEnd == -1 ? rawText.substring(8).trim() : rawText.substring(8, firstLineEnd).trim();
+      final caption = firstLineEnd == -1 ? '' : rawText.substring(firstLineEnd + 1).trim();
+
+      Widget imgWidget;
+      if (imgUrl.startsWith('data:image')) {
+        try {
+          final b64Part = imgUrl.split(',')[1];
+          final bytes = base64Decode(b64Part);
+          imgWidget = Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white54, size: 40),
+          );
+        } catch (_) {
+          imgWidget = const Icon(Icons.broken_image, color: Colors.white54, size: 40);
+        }
+      } else {
+        imgWidget = Image.network(
+          imgUrl,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          loadingBuilder: (ctx, child, progress) {
+            if (progress == null) return child;
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(color: Color(0xFF1FAE87), strokeWidth: 2),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white54, size: 40),
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => _showFullScreenImage(context, imgUrl),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 220, maxWidth: 260),
+                child: imgWidget,
+              ),
+            ),
+          ),
+          if (caption.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14)),
+          ],
+        ],
+      );
+    }
+
+    return Text(
+      rawText,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String imgUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: imgUrl.startsWith('data:image')
+                      ? Image.memory(base64Decode(imgUrl.split(',')[1]))
+                      : Image.network(imgUrl),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: Icon(Icons.close, color: Colors.white),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
           ],
         ),
       ),
