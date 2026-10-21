@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -22,6 +23,7 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
 
   List<dynamic> _clients = [];
   bool _isLoadingClients = false;
+  Timer? _pollTimer;
 
   String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
 
@@ -30,6 +32,15 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
     super.initState();
     _loadAgenda();
     _loadClients();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) _loadAgendaSilently();
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   String _formatDate(DateTime dt) {
@@ -83,6 +94,27 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadAgendaSilently() async {
+    final baseUrl = AuthService.apiBaseUrl;
+    final dateStr = _formatDate(_selectedDate);
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/trainer/agenda/$_trainerCedula?target_date=$dateStr'),
+      );
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is Map && mounted) {
+          setState(() {
+            _currentDate = data['date'] ?? dateStr;
+            _dayName = data['day_name'] ?? '';
+            _totalStudents = (data['total_students'] as int?) ?? 0;
+            _agendaBlocks = data['blocks'] ?? [];
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _changeDate(int offsetDays) {

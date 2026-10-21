@@ -498,6 +498,7 @@ def get_trainer_agenda(trainer_id: str, target_date: Optional[str] = None):
             day_workout_label = "Rutina del cronograma personalizada"
             day_exercises = []
 
+        matched_session_ids = set()
         agenda_blocks = []
         total_students = 0
 
@@ -508,6 +509,7 @@ def get_trainer_agenda(trainer_id: str, target_date: Optional[str] = None):
             students = []
 
             for s in b_sessions:
+                matched_session_ids.add(s.get("id"))
                 user_info = s.get("usuarios") or {}
                 name = f"{user_info.get('nombre', '')} {user_info.get('apellido', '')}".strip() or "Alumno"
                 cedula = user_info.get("cedula") or ""
@@ -562,6 +564,77 @@ def get_trainer_agenda(trainer_id: str, target_date: Optional[str] = None):
                 "is_full": occupied >= cap,
                 "students": students
             })
+
+        # Incluir sesiones adicionales agendadas o confirmadas que no coinciden con los bloques estándar
+        unmatched_sessions = [s for s in sessions if s.get("id") not in matched_session_ids]
+        if unmatched_sessions:
+            custom_map = {}
+            for s in unmatched_sessions:
+                st = str(s.get("start_time") or "12:00:00")[:5]
+                et = str(s.get("end_time") or "14:00:00")[:5]
+                key = (st, et)
+                if key not in custom_map:
+                    custom_map[key] = []
+                custom_map[key].append(s)
+
+            for (st, et), c_sessions in custom_map.items():
+                st_full = f"{st}:00" if len(st) == 5 else st
+                et_full = f"{et}:00" if len(et) == 5 else et
+                c_students = []
+                for s in c_sessions:
+                    user_info = s.get("usuarios") or {}
+                    name = f"{user_info.get('nombre', '')} {user_info.get('apellido', '')}".strip() or "Alumno"
+                    cedula = user_info.get("cedula") or ""
+                    injuries = str(user_info.get("lesiones_actuales") or user_info.get("patologia_o_alergias") or "")
+
+                    risk = "🟢 Óptimo"
+                    if injuries and injuries.lower() not in ("ninguna", "ninguno", "no", "sano", "none", ""):
+                        risk = f"🔴 {injuries}"
+
+                    s_status = s.get("status") or "scheduled"
+                    counter_time = None
+                    counter_note = None
+                    if s_status.startswith("counter_proposed"):
+                        parts = s_status.split(":", 1)[1].split("|") if ":" in s_status else ["", ""]
+                        counter_time = parts[0]
+                        counter_note = parts[1] if len(parts) > 1 else ""
+
+                    c_students.append({
+                        "id": s.get("id"),
+                        "client_id": s.get("client_id"),
+                        "name": name,
+                        "cedula": cedula,
+                        "edad": user_info.get("edad") or 25,
+                        "peso": user_info.get("peso") or 70.0,
+                        "alergias": user_info.get("alergias_alimentarias") or "Ninguna",
+                        "workout": day_workout_label,
+                        "exercises": day_exercises,
+                        "risk": risk,
+                        "status": s_status,
+                        "counter_time": counter_time,
+                        "counter_note": counter_note,
+                    })
+
+                occupied = len(c_students)
+                total_students += occupied
+                cap = max(2, occupied)
+                capacity_text = f"{occupied}/{cap} Cupos Llenos" if occupied >= cap else f"{occupied}/{cap} Cupos ({cap - occupied} Libres)"
+
+                agenda_blocks.append({
+                    "id": f"custom_{st}",
+                    "time": _format_time_label(st_full, et_full),
+                    "start_time": st_full,
+                    "end_time": et_full,
+                    "capacity": capacity_text,
+                    "occupied": occupied,
+                    "max_capacity": cap,
+                    "is_full": occupied >= cap,
+                    "is_custom": True,
+                    "students": c_students
+                })
+
+        # Ordenar todos los bloques cronológicamente
+        agenda_blocks.sort(key=lambda x: str(x.get("start_time", "")))
 
         return {
             "date": target_date,
