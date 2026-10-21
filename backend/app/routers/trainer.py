@@ -271,6 +271,41 @@ def get_latest_chat_message(user_id: str):
                     "client_id": str(m.get("client_id")),
                 }
 
+        # Si el usuario es un alumno, verificar si su entrenador publicó un anuncio reciente
+        if user and user.get("trainer_id"):
+            try:
+                ann_res = (
+                    admin.table("trainer_announcements")
+                    .select("*")
+                    .eq("trainer_id", user["trainer_id"])
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                if ann_res.data:
+                    ann = ann_res.data[0]
+                    ann_id = f"ann_{ann.get('id')}"
+                    ann_msg = ann.get("message") or ""
+                    ann_time = ann.get("created_at") or ""
+                    
+                    tr = _resolve_user_id(admin, user["trainer_id"])
+                    t_name = f"{tr.get('nombre', '')} {tr.get('apellido', '')}".strip() if tr else "Entrenador"
+                    t_cedula = str(tr.get("cedula") if tr else user["trainer_id"])
+                    return {
+                        "has_message": True,
+                        "message_id": ann_id,
+                        "sender_id": str(user["trainer_id"]),
+                        "sender_cedula": t_cedula,
+                        "sender_name": t_name,
+                        "sender_role": "trainer",
+                        "message": f"📢 AVISO OFICIAL:\n{ann_msg}",
+                        "created_at": ann_time,
+                        "trainer_id": str(user["trainer_id"]),
+                        "client_id": str(u_id),
+                    }
+            except Exception:
+                pass
+
         return {"has_message": False}
     except Exception as e:
         return {"has_message": False, "error": str(e)}
@@ -769,7 +804,7 @@ def get_announcements(trainer_id: str):
 
 @router.post("/announcements")
 def create_announcement(req: CreateAnnouncementReq):
-    """Publica un nuevo anuncio para los alumnos."""
+    """Publica un nuevo anuncio para los alumnos y los notifica en tiempo real."""
     admin = get_supabase_admin_client()
     trainer = _resolve_user_id(admin, req.trainer_id)
     t_id = trainer["id"] if trainer else req.trainer_id
@@ -781,7 +816,49 @@ def create_announcement(req: CreateAnnouncementReq):
             "created_at": datetime.utcnow().isoformat()
         }
         res = admin.table("trainer_announcements").insert(new_row).execute()
-        return {"status": "ok", "announcement": res.data[0] if res.data else new_row}
+        ann_data = res.data[0] if res.data else new_row
+
+        # Difundir el aviso a todos los alumnos vinculados para activar notificación y sonido
+        try:
+            target_clients = {}
+            # 1. Alumnos con trainer_id asignado en usuarios
+            clients_res = admin.table("usuarios").select("id, cedula").eq("trainer_id", t_id).execute()
+            for c in (clients_res.data or []):
+                target_clients[c["id"]] = c
+
+            # 2. Alumnos con sesiones de entrenamiento activas con este entrenador
+            try:
+                ses_res = admin.table("workout_sessions").select("client_id").eq("trainer_id", t_id).execute()
+                for s in (ses_res.data or []):
+                    cid = s.get("client_id")
+                    if cid and cid != t_id:
+                        target_clients[cid] = {"id": cid}
+            except Exception:
+                pass
+
+            # 3. Alumnos con chats previos con este entrenador
+            try:
+                chat_res = admin.table("trainer_chat").select("client_id").eq("trainer_id", t_id).execute()
+                for ch in (chat_res.data or []):
+                    cid = ch.get("client_id")
+                    if cid and cid != t_id:
+                        target_clients[cid] = {"id": cid}
+            except Exception:
+                pass
+
+            broadcast_msg = f"📢 AVISO OFICIAL DEL COACH:\n{req.message.strip()}"
+            for cid in target_clients.keys():
+                admin.table("trainer_chat").insert({
+                    "trainer_id": t_id,
+                    "client_id": cid,
+                    "sender_id": t_id,
+                    "message": broadcast_msg,
+                    "created_at": datetime.utcnow().isoformat()
+                }).execute()
+        except Exception as broadcast_err:
+            print(f"Error difundiendo anuncio en chat: {broadcast_err}")
+
+        return {"status": "ok", "announcement": ann_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

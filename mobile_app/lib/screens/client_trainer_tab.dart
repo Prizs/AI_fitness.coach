@@ -1233,50 +1233,72 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                 final a = _trainerAnnouncements[index];
                 final dateStr = (a['created_at'] != null && (a['created_at'] as String).length >= 10) ? (a['created_at'] as String).substring(0, 10) : 'Aviso';
 
-                return Card(
-                  color: const Color(0xFF1E293B),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: const [
-                                Icon(Icons.campaign, color: Color(0xFF1FAE87), size: 20),
-                                SizedBox(width: 8),
-                                Text('Comunicado Oficial', style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold, fontSize: 12)),
+                        final msg = (a['message'] ?? a['content'] ?? '').toString();
+                        final isHomeProposal = msg.toLowerCase().contains('casa') ||
+                            msg.toLowerCase().contains('no podre') ||
+                            msg.toLowerCase().contains('no podré');
+
+                        return Card(
+                          color: const Color(0xFF1E293B),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: BorderSide(
+                              color: isHomeProposal ? const Color(0xFFA855F7) : Colors.white12,
+                              width: isHomeProposal ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: const [
+                                        Icon(Icons.campaign, color: Color(0xFF1FAE87), size: 20),
+                                        SizedBox(width: 8),
+                                        Text('Comunicado Oficial', style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold, fontSize: 12)),
+                                      ],
+                                    ),
+                                    Text(dateStr, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  msg,
+                                  style: const TextStyle(color: Colors.white, fontSize: 14.5, height: 1.4),
+                                ),
+                                if (isHomeProposal) ...[
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFFA855F7),
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.home_rounded, color: Colors.white, size: 18),
+                                      label: const Text('🏠 Activar Entrenamiento en Casa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                      onPressed: _showHomeWorkoutDialog,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.person_pin, size: 14, color: Colors.white38),
+                                    const SizedBox(width: 4),
+                                    Text('Publicado por Coach $trainerName', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                  ],
+                                ),
                               ],
                             ),
-                            Text(dateStr, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          a['title'] ?? 'Aviso para alumnos',
-                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          a['content'] ?? '',
-                          style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            const Icon(Icons.person_pin, size: 14, color: Colors.white38),
-                            const SizedBox(width: 4),
-                            Text('Publicado por Coach $trainerName', style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+                          ),
+                        );
               },
             ),
     );

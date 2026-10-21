@@ -21,21 +21,118 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   final WeeklyPlanService _planService = WeeklyPlanService.instance;
 
   Map<String, dynamic>? _pendingSession;
-  bool _isLoadingSession = true;
+  Map<String, dynamic>? _trainerInfo;
+  List<dynamic> _trainerAnnouncements = [];
 
   @override
   void initState() {
     super.initState();
     _notifService.init();
-    _loadPendingSession();
+    _loadAllNotificationData();
+  }
+
+  Future<void> _loadAllNotificationData() async {
+    await Future.wait([
+      _loadPendingSession(),
+      _loadTrainerDataAndAnnouncements(),
+    ]);
+  }
+
+  Future<void> _loadTrainerDataAndAnnouncements() async {
+    final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    if (uid.isEmpty) return;
+    final baseUrl = AuthService.apiBaseUrl;
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/trainer/status/$uid'));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is Map && data['has_trainer'] == true) {
+          final t = data['trainer'];
+          final tId = t['id'] ?? t['cedula'];
+          if (mounted) setState(() => _trainerInfo = t);
+          final annRes = await http.get(Uri.parse('$baseUrl/api/trainer/announcements/$tId'));
+          if (annRes.statusCode == 200) {
+            final list = json.decode(utf8.decode(annRes.bodyBytes));
+            if (list is List && mounted) {
+              setState(() => _trainerAnnouncements = list);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _showHomeWorkoutConfirmDialog() async {
+    final shouldSwitch = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F192B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.home_rounded, color: Color(0xFFA855F7)),
+            SizedBox(width: 8),
+            Text('Entrenamiento en Casa', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          '¿Quieres que te asignemos una rutina adaptada para el día de hoy en casa?\n\n'
+          'Sustituimos máquinas de gimnasio por ejercicios validados de peso corporal / calistenia con la misma intensidad y grupo muscular.',
+          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFA855F7)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('¡Sí, asignar en casa!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSwitch != true) return;
+
+    final baseUrl = AuthService.apiBaseUrl;
+    final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/trainer/assign-home-workout'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'client_id': uid,
+          'intensity': 'Media',
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        final title = data['routine_title'] ?? 'Entrenamiento en Casa';
+        final exercises = data['exercises'] as List<dynamic>? ?? [];
+
+        WeeklyPlanService.instance.substituteTodayWithHomeWorkout(title: title, exercises: exercises);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFFA855F7),
+              content: Text('🏠 ¡Rutina de casa activada! $title (${exercises.length} ejercicios).'),
+            ),
+          );
+        }
+        await _loadAllNotificationData();
+      }
+    } catch (e) {
+      debugPrint('Error asignando rutina en casa: $e');
+    }
   }
 
   Future<void> _loadPendingSession() async {
     final uid = AuthService.instance.loggedInUser?.cedula ?? '';
-    if (uid.isEmpty) {
-      if (mounted) setState(() => _isLoadingSession = false);
-      return;
-    }
+    if (uid.isEmpty) return;
     final baseUrl = AuthService.apiBaseUrl;
     try {
       final res = await http.get(Uri.parse('$baseUrl/api/trainer/client-pending-session/$uid'));
@@ -44,15 +141,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         if (mounted) {
           setState(() {
             _pendingSession = (data is Map && data['has_session'] == true) ? data['session'] : null;
-            _isLoadingSession = false;
           });
         }
-      } else {
-        if (mounted) setState(() => _isLoadingSession = false);
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingSession = false);
-    }
+    } catch (_) {}
   }
 
   Future<void> _confirmSession(String sessionId, String startTime) async {
@@ -620,6 +712,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     final List<Map<String, dynamic>> dynamicNotifs = [];
 
+    // 0. Anuncios y Comunicados Oficiales del Coach
+    final coachName = _trainerInfo != null
+        ? '${_trainerInfo!['nombre'] ?? ''} ${_trainerInfo!['apellido'] ?? ''}'.trim()
+        : 'Tu Coach';
+
+    for (final ann in _trainerAnnouncements) {
+      final msg = (ann['message'] ?? ann['content'] ?? '').toString();
+      final createdAt = ann['created_at']?.toString() ?? '';
+      String timeLabel = 'Aviso Oficial';
+      if (createdAt.isNotEmpty) {
+        try {
+          final dt = DateTime.parse(createdAt).toLocal();
+          timeLabel = 'Hoy ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        } catch (_) {}
+      }
+
+      final isHomeOffer = msg.toLowerCase().contains('casa') ||
+          msg.toLowerCase().contains('no podre') ||
+          msg.toLowerCase().contains('no podré');
+
+      dynamicNotifs.add({
+        'title': '📢 Comunicado Oficial: $coachName',
+        'body': msg,
+        'time': timeLabel,
+        'icon': Icons.campaign_rounded,
+        'color': const Color(0xFF38BDF8),
+        'isHomeOffer': isHomeOffer,
+        'action': isHomeOffer ? () => _showHomeWorkoutConfirmDialog() : null,
+      });
+    }
+
     // 1. Notificación de Seguimiento / Verificación (1 hora y media después si no está marcado completado)
     if (todayDay != null) {
       final title = todayDay['title'] ?? 'Entrenamiento del día';
@@ -709,7 +832,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         elevation: 0,
       ),
       body: RefreshIndicator(
-        onRefresh: _loadPendingSession,
+        onRefresh: _loadAllNotificationData,
         color: const Color(0xFF1FAE87),
         backgroundColor: const Color(0xFF0F192B),
         child: ListView(
@@ -822,7 +945,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               n['body'],
                               style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.3),
                             ),
-                            if (action != null) ...[
+                            if (n['isHomeOffer'] == true) ...[
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFA855F7),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  icon: const Icon(Icons.home_rounded, size: 16),
+                                  label: const Text('🏠 Activar Rutina en Casa para Hoy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  onPressed: _showHomeWorkoutConfirmDialog,
+                                ),
+                              ),
+                            ] else if (action != null) ...[
                               const SizedBox(height: 8),
                               Row(
                                 children: [

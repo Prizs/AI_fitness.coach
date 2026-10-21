@@ -156,7 +156,11 @@ class ChatNotificationService {
               SoundService.playChime();
 
               // 2. Notificación del sistema navegador/Android
-              final bannerTitle = senderRole == 'trainer' ? 'Coach $senderName' : senderName;
+              final isAnnouncement = messageId.startsWith('ann_') || messageText.contains('AVISO OFICIAL');
+              final bannerTitle = isAnnouncement
+                  ? '📢 Comunicado Oficial: Coach $senderName'
+                  : (senderRole == 'trainer' ? 'Coach $senderName' : senderName);
+
               SoundService.showSystemNotification(bannerTitle, messageText);
 
               // 3. Notificación flotante animada en la parte superior de la app
