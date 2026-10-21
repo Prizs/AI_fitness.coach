@@ -108,6 +108,26 @@ class WeeklyPlanService extends ChangeNotifier {
     return '${m.day}/$mMonth al ${s.day}/$sMonth';
   }
 
+  void substituteTodayWithHomeWorkout({
+    required String title,
+    required List<dynamic> exercises,
+  }) {
+    if (week == null || week!['days'] is! List) return;
+    final daysList = List<dynamic>.from(week!['days']);
+    for (int i = 0; i < daysList.length; i++) {
+      if (daysList[i] is Map && daysList[i]['weekday'] == todayIndex) {
+        final current = Map<String, dynamic>.from(daysList[i]);
+        current['title'] = title;
+        current['exercises'] = exercises;
+        current['is_home_workout'] = true;
+        daysList[i] = current;
+        break;
+      }
+    }
+    week!['days'] = daysList;
+    notifyListeners();
+  }
+
   String get nextCycleDateStr {
     final n = nextCycleMonday;
     final nMonth = n.month < 10 ? '0${n.month}' : '${n.month}';

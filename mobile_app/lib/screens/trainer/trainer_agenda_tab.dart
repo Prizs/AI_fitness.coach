@@ -249,6 +249,14 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
   }
 
   void _showAssignClientModal(Map<String, dynamic> block) {
+    if (_isLoadingClients) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cargando lista de alumnos... por favor espera un momento.'),
+        ),
+      );
+      return;
+    }
     if (_clients.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -391,7 +399,7 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF1FAE87),
-            content: Text('¡${client['nombre']} agendado correctamente para ${block['time']}!'),
+            content: Text('¡Invitación enviada a ${client['nombre']} para las ${block['time']}! Quedó pendiente de su confirmación.'),
           ),
         );
         await _loadAgenda();
@@ -407,6 +415,74 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
         SnackBar(content: Text('Error al asignar: $e')),
       );
     }
+  }
+
+  Future<void> _handleTrainerCounterResponse(String sessionId, String action, String? counterTime) async {
+    final baseUrl = AuthService.apiBaseUrl;
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/trainer/trainer-counter-response'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'session_id': sessionId,
+          'action': action,
+          'trainer_id': _trainerCedula,
+          if (counterTime != null) 'counter_time': counterTime,
+        }),
+      );
+      if (res.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: action == 'accept' ? const Color(0xFF1FAE87) : Colors.orangeAccent,
+            content: Text(action == 'accept'
+                ? '✅ Contrapropuesta aceptada: Sesión confirmada a las $counterTime hrs.'
+                : '⚠️ Has indicado no tener disponibilidad para ese horario. Se le notificó al alumno.'),
+          ),
+        );
+        await _loadAgenda();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al responder contrapropuesta: $e')),
+      );
+    }
+  }
+
+  Widget _buildStatusBadge(String status) {
+    String label = 'Agendado';
+    Color color = const Color(0xFF1FAE87);
+
+    if (status == 'pending_confirmation') {
+      label = '⏳ Pendiente Confirmar';
+      color = Colors.amberAccent;
+    } else if (status == 'confirmed') {
+      label = '🟢 Confirmado';
+      color = const Color(0xFF1FAE87);
+    } else if (status.startsWith('counter_proposed')) {
+      label = '🔄 Contrapropuesta';
+      color = const Color(0xFF38BDF8);
+    } else if (status == 'home_assigned') {
+      label = '🏠 En Casa';
+      color = const Color(0xFFA855F7);
+    } else if (status == 'rejected') {
+      label = '❌ Rechazado';
+      color = Colors.redAccent;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.6), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 
   Future<void> _cancelSession(Map<String, dynamic> student) async {
@@ -999,7 +1075,9 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Row(
+                                child: Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 6,
                                   children: [
                                     Text(
                                       s['name'] ?? 'Alumno',
@@ -1009,7 +1087,6 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
@@ -1018,6 +1095,7 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
                                       ),
                                       child: const Text('Ver Ficha', style: TextStyle(color: Color(0xFF1FAE87), fontSize: 10, fontWeight: FontWeight.bold)),
                                     ),
+                                    _buildStatusBadge(s['status']?.toString() ?? 'scheduled'),
                                   ],
                                 ),
                               ),
@@ -1086,6 +1164,85 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
                               ],
                             ),
                           ),
+                          // Bloque interactivo si el alumno envió una contrapropuesta de hora
+                          if (s['status'].toString().startsWith('counter_proposed')) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0284C7).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.swap_horiz_rounded, color: Color(0xFF38BDF8), size: 18),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'Alumno propone entrenar a las ${s['counter_time'] ?? 'otro horario'} hrs',
+                                          style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 12.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if ((s['counter_note'] ?? '').toString().isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Nota: "${s['counter_note']}"',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontStyle: FontStyle.italic),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF1FAE87),
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          onPressed: () => _handleTrainerCounterResponse(
+                                            s['id']?.toString() ?? '',
+                                            'accept',
+                                            s['counter_time']?.toString() ?? '18:00',
+                                          ),
+                                          child: Text(
+                                            'Aceptar (${s['counter_time'] ?? '18:00'})',
+                                            style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.orangeAccent,
+                                            side: const BorderSide(color: Colors.orangeAccent),
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          onPressed: () => _handleTrainerCounterResponse(
+                                            s['id']?.toString() ?? '',
+                                            'reject',
+                                            s['counter_time']?.toString(),
+                                          ),
+                                          child: const Text(
+                                            'No disponible',
+                                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

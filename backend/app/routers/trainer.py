@@ -60,6 +60,9 @@ class BookSlotReq(BaseModel):
     schedule_date: str  # "YYYY-MM-DD"
     start_time: str
     end_time: str
+    booked_by: Optional[str] = "trainer"
+    status: Optional[str] = None
+
 
 
 class CreateAnnouncementReq(BaseModel):
@@ -476,6 +479,14 @@ def get_trainer_agenda(trainer_id: str, target_date: Optional[str] = None):
                 if injuries and injuries.lower() not in ("ninguna", "ninguno", "no", "sano", "none", ""):
                     risk = f"🔴 {injuries}"
 
+                s_status = s.get("status") or "scheduled"
+                counter_time = None
+                counter_note = None
+                if s_status.startswith("counter_proposed"):
+                    parts = s_status.split(":", 1)[1].split("|") if ":" in s_status else ["", ""]
+                    counter_time = parts[0]
+                    counter_note = parts[1] if len(parts) > 1 else ""
+
                 students.append({
                     "id": s.get("id"),
                     "client_id": s.get("client_id"),
@@ -487,7 +498,9 @@ def get_trainer_agenda(trainer_id: str, target_date: Optional[str] = None):
                     "workout": day_workout_label,
                     "exercises": day_exercises,
                     "risk": risk,
-                    "status": s.get("status") or "scheduled"
+                    "status": s_status,
+                    "counter_time": counter_time,
+                    "counter_note": counter_note,
                 })
 
             occupied = len(students)
@@ -576,28 +589,68 @@ def book_session(req: BookSlotReq):
     et = req.end_time if len(req.end_time) == 8 else f"{req.end_time[:5]}:00"
 
     try:
-        # Verificar si ya está agendado en ese bloque y fecha
+        # Verificar si ya existe una reserva activa para esa fecha y hora
         existing = (
             admin.table("workout_sessions")
-            .select("id")
+            .select("id, status")
             .eq("trainer_id", t_id)
             .eq("client_id", c_id)
             .eq("schedule_date", req.schedule_date)
-            .eq("start_time", st)
             .execute()
         )
         if existing.data and len(existing.data) > 0:
-            return {"status": "ok", "message": "El alumno ya se encuentra inscrito en este horario.", "booking": existing.data[0]}
+            existing_id = existing.data[0]["id"]
+            initial_status = req.status or ("pending_confirmation" if req.booked_by == "trainer" else "confirmed")
+            # Actualizar horario y estado si se reasigna
+            admin.table("workout_sessions").update({
+                "start_time": st,
+                "end_time": et,
+                "status": initial_status
+            }).eq("id", existing_id).execute()
+            
+            # Notificar al chat del alumno
+            t_name = f"{t.get('nombre', '')} {t.get('apellido', '')}".strip() if t else "Coach"
+            c_name = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() if c else "Alumno"
+            if initial_status == "pending_confirmation":
+                try:
+                    admin.table("trainer_chat").insert({
+                        "trainer_id": t_id,
+                        "client_id": c_id,
+                        "sender_id": t_id,
+                        "message": f"📅 ¡Hola {c_name}! Te he asignado un bloque de entrenamiento presencial para el {req.schedule_date} de {st[:5]} a {et[:5]} hrs. Por favor ingresa a tus notificaciones para confirmar tu asistencia o proponer un horario alternativo.",
+                        "created_at": datetime.utcnow().isoformat()
+                    }).execute()
+                except Exception:
+                    pass
 
+            return {"status": "ok", "message": "Horario actualizado y enviado para confirmación al alumno.", "booking": {"id": existing_id, "status": initial_status, "start_time": st, "end_time": et}}
+
+        initial_status = req.status or ("pending_confirmation" if req.booked_by == "trainer" else "confirmed")
         new_booking = {
             "trainer_id": t_id,
             "client_id": c_id,
             "schedule_date": req.schedule_date,
             "start_time": st,
             "end_time": et,
-            "status": "scheduled"
+            "status": initial_status
         }
         res = admin.table("workout_sessions").insert(new_booking).execute()
+
+        # Notificar al chat del alumno
+        t_name = f"{t.get('nombre', '')} {t.get('apellido', '')}".strip() if t else "Coach"
+        c_name = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() if c else "Alumno"
+        if initial_status == "pending_confirmation":
+            try:
+                admin.table("trainer_chat").insert({
+                    "trainer_id": t_id,
+                    "client_id": c_id,
+                    "sender_id": t_id,
+                    "message": f"📅 ¡Hola {c_name}! Te he asignado un bloque de entrenamiento presencial para el {req.schedule_date} de {st[:5]} a {et[:5]} hrs. Por favor ingresa a tus notificaciones para confirmar tu asistencia o proponer un horario alternativo.",
+                    "created_at": datetime.utcnow().isoformat()
+                }).execute()
+            except Exception:
+                pass
+
         return {"status": "ok", "booking": res.data[0] if res.data else new_booking}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1082,4 +1135,353 @@ async def upload_chat_image(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class SessionResponseReq(BaseModel):
+    session_id: str
+    client_id: str
+    action: str  # "accept" | "counter" | "reject"
+    counter_time: Optional[str] = None
+    counter_note: Optional[str] = None
+
+
+class TrainerCounterResponseReq(BaseModel):
+    session_id: str
+    trainer_id: str
+    action: str  # "accept" | "reject"
+    counter_time: Optional[str] = None
+
+
+class AssignHomeWorkoutReq(BaseModel):
+    client_id: str
+    target_date: Optional[str] = None
+    intensity: Optional[str] = None
+
+
+@router.get("/client-pending-session/{client_id}")
+def get_client_pending_session(client_id: str):
+    """
+    Busca si el cliente tiene una sesión presencial agendada o propuesta por el coach
+    para hoy o días futuros que requiera confirmación, esté confirmada, o tenga contrapropuesta.
+    """
+    admin = get_supabase_admin_client()
+    client = _resolve_user_id(admin, client_id)
+    c_id = client["id"] if client else client_id
+    today_str = date.today().isoformat()
+
+    try:
+        # Buscar sesiones activas (desde hoy en adelante)
+        res = (
+            admin.table("workout_sessions")
+            .select("*, usuarios!workout_sessions_trainer_id_fkey(id, nombre, apellido, cedula)")
+            .eq("client_id", c_id)
+            .gte("schedule_date", today_str)
+            .order("schedule_date", desc=False)
+            .order("start_time", desc=False)
+            .limit(5)
+            .execute()
+        )
+        sessions = res.data or []
+        for s in sessions:
+            st_val = s.get("status") or "scheduled"
+            if st_val in ("pending_confirmation", "confirmed", "scheduled") or st_val.startswith("counter_proposed") or st_val == "home_assigned":
+                t_info = s.get("usuarios") or {}
+                t_name = f"{t_info.get('nombre', '')} {t_info.get('apellido', '')}".strip() or "Coach"
+
+                counter_time = None
+                counter_note = None
+                if st_val.startswith("counter_proposed"):
+                    parts = st_val.split(":", 1)[1].split("|") if ":" in st_val else ["", ""]
+                    counter_time = parts[0]
+                    counter_note = parts[1] if len(parts) > 1 else ""
+
+                # Obtener rutina del día
+                plan_info = _get_client_today_plan_data(admin, s.get("trainer_id"), c_id)
+
+                return {
+                    "has_session": True,
+                    "session": {
+                        "id": s.get("id"),
+                        "trainer_id": s.get("trainer_id"),
+                        "trainer_name": f"Coach {t_name}",
+                        "schedule_date": s.get("schedule_date"),
+                        "start_time": s.get("start_time", "")[:5],
+                        "end_time": s.get("end_time", "")[:5],
+                        "status": st_val if not st_val.startswith("counter_proposed") else "counter_proposed",
+                        "raw_status": st_val,
+                        "counter_time": counter_time,
+                        "counter_note": counter_note,
+                        "workout_title": plan_info.get("routine_title", "Entrenamiento del día"),
+                        "exercises_count": len(plan_info.get("exercises", [])),
+                        "exercises": plan_info.get("exercises", []),
+                    }
+                }
+
+        return {"has_session": False}
+    except Exception as e:
+        return {"has_session": False, "error": str(e)}
+
+
+@router.post("/session-response")
+def respond_to_session(req: SessionResponseReq):
+    """
+    Permite al alumno responder a la propuesta de sesión del coach:
+    - 'accept': Confirma la sesión (status = 'confirmed') y actualiza la hora acordada.
+    - 'counter': Rechaza ese horario específico y envía una contrapropuesta con la hora deseada.
+    - 'reject': Rechaza sin contrapropuesta presencial (abre opción de entrenamiento en casa).
+    """
+    admin = get_supabase_admin_client()
+    client = _resolve_user_id(admin, req.client_id)
+    c_id = client["id"] if client else req.client_id
+    c_name = f"{client.get('nombre', '')} {client.get('apellido', '')}".strip() if client else "Alumno"
+
+    try:
+        ses_res = admin.table("workout_sessions").select("*").eq("id", req.session_id).execute()
+        if not ses_res.data:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+        ses = ses_res.data[0]
+        t_id = ses["trainer_id"]
+        start_time = ses.get("start_time", "")[:5]
+
+        if req.action == "accept":
+            admin.table("workout_sessions").update({
+                "status": "confirmed"
+            }).eq("id", req.session_id).execute()
+
+            # Notificar por chat
+            msg_text = f"✅ ¡Confirmado! Asistiré a la sesión de hoy de {start_time} a {ses.get('end_time', '')[:5]} hrs con mi Coach."
+            admin.table("trainer_chat").insert({
+                "trainer_id": t_id,
+                "client_id": c_id,
+                "sender_id": c_id,
+                "message": msg_text,
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+
+            return {
+                "status": "ok",
+                "result": "confirmed",
+                "time": start_time,
+                "message": f"¡Asistencia confirmada para las {start_time} hrs!"
+            }
+
+        elif req.action == "counter":
+            ct = req.counter_time or "18:00"
+            note = req.counter_note or ""
+            status_val = f"counter_proposed:{ct}|{note}"
+            admin.table("workout_sessions").update({
+                "status": status_val
+            }).eq("id", req.session_id).execute()
+
+            note_str = f" ('{note}')" if note else ""
+            msg_text = f"🔄 Hola Coach, hoy no puedo a las {start_time}. ¿Tendrías disponibilidad para atenderme a las {ct} hrs?{note_str}"
+            admin.table("trainer_chat").insert({
+                "trainer_id": t_id,
+                "client_id": c_id,
+                "sender_id": c_id,
+                "message": msg_text,
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+
+            return {
+                "status": "ok",
+                "result": "counter_proposed",
+                "counter_time": ct,
+                "message": f"Contrapropuesta de {ct} hrs enviada a tu Coach."
+            }
+
+        else:  # reject
+            admin.table("workout_sessions").update({
+                "status": "rejected"
+            }).eq("id", req.session_id).execute()
+
+            msg_text = f"❌ Hola Coach, hoy no podré asistir al gimnasio de forma presencial."
+            admin.table("trainer_chat").insert({
+                "trainer_id": t_id,
+                "client_id": c_id,
+                "sender_id": c_id,
+                "message": msg_text,
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+
+            return {
+                "status": "ok",
+                "result": "rejected",
+                "offer_home": True,
+                "message": "Sesión presencial declinada. Puedes realizar tu entrenamiento en casa hoy."
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/trainer-counter-response")
+def trainer_counter_response(req: TrainerCounterResponseReq):
+    """
+    Permite al entrenador aceptar o rechazar la contrapropuesta de horario del alumno:
+    - 'accept': reasigna la sesión a la hora solicitada por el alumno y marca 'confirmed'.
+    - 'reject': indica que no tiene disponibilidad a esa hora y activa el plan de casa.
+    """
+    admin = get_supabase_admin_client()
+    try:
+        ses_res = admin.table("workout_sessions").select("*").eq("id", req.session_id).execute()
+        if not ses_res.data:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+        ses = ses_res.data[0]
+        c_id = ses["client_id"]
+        t_id = ses["trainer_id"]
+
+        if req.action == "accept":
+            new_st = (req.counter_time or "18:00")[:5]
+            st_full = f"{new_st}:00"
+            h = int(new_st.split(":")[0])
+            m = new_st.split(":")[1]
+            end_h = (h + 2) % 24
+            et_full = f"{end_h:02d}:{m}:00"
+
+            admin.table("workout_sessions").update({
+                "start_time": st_full,
+                "end_time": et_full,
+                "status": "confirmed"
+            }).eq("id", req.session_id).execute()
+
+            msg = f"🎉 ¡Hola! He revisado mi agenda y acepto tu horario propuesto. Tu entrenamiento presencial quedó confirmado para hoy a las {new_st} hrs. ¡Nos vemos en el gimnasio!"
+            admin.table("trainer_chat").insert({
+                "trainer_id": t_id,
+                "client_id": c_id,
+                "sender_id": t_id,
+                "message": msg,
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+
+            return {
+                "status": "ok",
+                "result": "confirmed",
+                "new_time": new_st,
+                "message": f"Sesión reasignada y confirmada a las {new_st} hrs."
+            }
+        else:
+            admin.table("workout_sessions").update({
+                "status": "rejected"
+            }).eq("id", req.session_id).execute()
+
+            ct = (req.counter_time or "")[:5]
+            msg = f"Hola, lamentablemente para hoy a las {ct or 'esa hora'} no dispongo de cupo libre en mi agenda. ¡No dejes de entrenar! En tu app tienes disponible la rutina adaptada para realizar hoy en casa con tu peso corporal."
+            admin.table("trainer_chat").insert({
+                "trainer_id": t_id,
+                "client_id": c_id,
+                "sender_id": t_id,
+                "message": msg,
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+
+            return {
+                "status": "ok",
+                "result": "rejected",
+                "offer_home": True,
+                "message": "Contrapropuesta rechazada por falta de cupo. Se sugiere entrenamiento en casa."
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/assign-home-workout")
+def assign_home_workout(req: AssignHomeWorkoutReq):
+    """
+    Sustituye el entrenamiento de gimnasio por una rutina validada para CASA (peso corporal / sin equipo)
+    manteniendo el mismo grupo muscular programado para hoy y la intensidad del usuario.
+    """
+    admin = get_supabase_admin_client()
+    client = _resolve_user_id(admin, req.client_id)
+    c_id = client["id"] if client else req.client_id
+    c_name = f"{client.get('nombre', '')} {client.get('apellido', '')}".strip() if client else "Alumno"
+    trainer_id = client.get("trainer_id") if client else None
+
+    weekday_idx = date.today().weekday()
+    day_name = WEEKDAY_NAMES[weekday_idx] if weekday_idx < len(WEEKDAY_NAMES) else "Hoy"
+
+    raw_intensity = req.intensity or (client.get("nivel_experiencia") if client else "Media") or "Media"
+    is_low = any(k in raw_intensity.lower() for k in ("baja", "bajo", "principiante", "novato"))
+    is_high = any(k in raw_intensity.lower() for k in ("alta", "alto", "avanzado", "intenso"))
+    level_label = "Básico (Intensidad Baja)" if is_low else ("Avanzado (Intensidad Alta)" if is_high else "Intermedio (Intensidad Media)")
+
+    if weekday_idx in (0, 2, 4):  # Tren Inferior
+        routine_title = f"Tren Inferior en Casa (Sin Equipo) · {level_label}"
+        if is_low:
+            exercises = [
+                {"name": "Sentadilla asistida con silla", "sets": 3, "reps": "12", "animation_key": "chair-squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos", "biomechanics": "Usa una silla de referencia, desciende con la espalda recta y el abdomen activo."},
+                {"name": "Puente de glúteos en colchoneta", "sets": 3, "reps": "15", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales", "biomechanics": "Eleva la pelvis apretando glúteos 2 segundos arriba."},
+                {"name": "Elevación de talones en suelo", "sets": 3, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Pantorrillas", "secondary_muscle": "Sóleo", "biomechanics": "Sube en puntillas controlando la bajada lenta."},
+            ]
+        elif is_high:
+            exercises = [
+                {"name": "Sentadilla con salto explosivo (Jump Squats)", "sets": 4, "reps": "15", "animation_key": "chair-squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos", "biomechanics": "Aterriza suavemente absorbiendo el impacto con las rodillas flexionadas."},
+                {"name": "Zancadas búlgaras en sofá o silla", "sets": 4, "reps": "12 por pierna", "animation_key": "assisted-lunge", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos", "biomechanics": "Apoya el empeine trasero en el sofá y desciende verticalmente."},
+                {"name": "Puente de glúteos unilateral en suelo", "sets": 3, "reps": "12 por pierna", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales", "biomechanics": "Eleva una pierna estirada mientras la otra empuja el suelo con el talón."},
+                {"name": "Sentadilla isométrica en pared (Wall Sit)", "sets": 3, "reps": "45 s", "animation_key": "chair-squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Core", "biomechanics": "Espalda pegada a la pared, muslos paralelos al suelo a 90 grados."},
+            ]
+        else:
+            exercises = [
+                {"name": "Sentadilla con peso corporal (Tempo 3-1-1)", "sets": 4, "reps": "15", "animation_key": "chair-squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos", "biomechanics": "Baja en 3 segundos, pausa 1 segundo abajo y sube en 1 segundo."},
+                {"name": "Zancadas estáticas alternas", "sets": 3, "reps": "12 por pierna", "animation_key": "assisted-lunge", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos", "biomechanics": "Paso amplio manteniendo el torso erguido sin que la rodilla toque el suelo bruscamente."},
+                {"name": "Puente de glúteos en suelo", "sets": 3, "reps": "15", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales", "biomechanics": "Empuje con los talones y contracción voluntaria máxima en el punto más alto."},
+                {"name": "Plancha abdominal isométrica", "sets": 3, "reps": "35 s", "animation_key": "front-plank", "primary_muscle": "Core", "secondary_muscle": "Recto abdominal", "biomechanics": "Línea recta entre tobillos, cadera y hombros, apretando el ombligo."},
+            ]
+    else:  # Tren Superior
+        routine_title = f"Tren Superior & Core en Casa · {level_label}"
+        if is_low:
+            exercises = [
+                {"name": "Flexiones inclinadas con apoyo en mesa o pared", "sets": 3, "reps": "10-12", "animation_key": "incline-push-up", "primary_muscle": "Pectorales", "secondary_muscle": "Tríceps", "biomechanics": "Cuerpo recto, codos a 45 grados respecto al torso."},
+                {"name": "Remo invertido en puerta con toalla", "sets": 3, "reps": "10-12", "animation_key": "seated-row", "primary_muscle": "Dorsales", "secondary_muscle": "Bíceps", "biomechanics": "Tracciona con los codos juntos hacia atrás sintiendo la espalda media."},
+                {"name": "Fondos de tríceps en silla con rodillas flexionadas", "sets": 3, "reps": "10", "animation_key": "bench-dip", "primary_muscle": "Tríceps", "secondary_muscle": "Pectorales", "biomechanics": "Baja flexionando codos sin despegar la espalda de la silla."},
+            ]
+        elif is_high:
+            exercises = [
+                {"name": "Flexiones declinadas con pies en silla", "sets": 4, "reps": "12-15", "animation_key": "incline-push-up", "primary_muscle": "Pectorales", "secondary_muscle": "Hombros", "biomechanics": "Pies elevados para mayor énfasis en la porción clavicular del pectoral."},
+                {"name": "Pike Push-Ups (Flexiones en V para Hombros)", "sets": 4, "reps": "10-12", "animation_key": "seated-shoulder-press", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps", "biomechanics": "Cadera arriba en ángulo agudo empujando verticalmente hacia la cabeza."},
+                {"name": "Fondos de tríceps en silla con piernas extendidas", "sets": 4, "reps": "15", "animation_key": "bench-dip", "primary_muscle": "Tríceps", "secondary_muscle": "Pectorales", "biomechanics": "Rango completo de recorrido bloqueando suavemente arriba."},
+                {"name": "Plancha con toques de hombro dinámicos", "sets": 3, "reps": "20 toques", "animation_key": "front-plank", "primary_muscle": "Core", "secondary_muscle": "Deltoides", "biomechanics": "Evita rotar la cadera al levantar cada mano del suelo."},
+            ]
+        else:
+            exercises = [
+                {"name": "Flexiones de brazos tradicionales en suelo", "sets": 4, "reps": "12", "animation_key": "incline-push-up", "primary_muscle": "Pectorales", "secondary_muscle": "Tríceps", "biomechanics": "Baja hasta que el pecho quede a dos dedos del suelo con escápulas activas."},
+                {"name": "Remo en marco de puerta / toalla", "sets": 3, "reps": "12", "animation_key": "seated-row", "primary_muscle": "Dorsales", "secondary_muscle": "Bíceps", "biomechanics": "Tracción firme apretando las escápulas 1 segundo."},
+                {"name": "Fondos de tríceps en silla", "sets": 3, "reps": "12", "animation_key": "bench-dip", "primary_muscle": "Tríceps", "secondary_muscle": "Deltoides", "biomechanics": "Descenso controlado y empuje vertical con los talones de las manos."},
+                {"name": "Plancha abdominal frontal isométrica", "sets": 3, "reps": "35 s", "animation_key": "front-plank", "primary_muscle": "Core", "secondary_muscle": "Recto abdominal", "biomechanics": "Activación constante del transverso abdominal y glúteos."},
+            ]
+
+    try:
+        today_str = date.today().isoformat()
+        admin.table("workout_sessions").update({
+            "status": "home_assigned"
+        }).eq("client_id", c_id).eq("schedule_date", today_str).execute()
+    except Exception:
+        pass
+
+    if trainer_id:
+        try:
+            admin.table("trainer_chat").insert({
+                "trainer_id": trainer_id,
+                "client_id": c_id,
+                "sender_id": c_id,
+                "message": f"🏠 He activado mi entrenamiento de hoy en casa: '{routine_title}'. ¡Rutina sin máquinas cumplida!",
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+        except Exception:
+            pass
+
+    return {
+        "status": "ok",
+        "routine_title": routine_title,
+        "is_home": True,
+        "intensity_level": level_label,
+        "exercises": exercises,
+        "message": f"¡Rutina de casa activada con éxito para {c_name}! Se ajustaron los ejercicios a peso corporal."
+    }
+
 

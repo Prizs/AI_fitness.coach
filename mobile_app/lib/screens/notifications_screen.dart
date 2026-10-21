@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/services/daily_notification_service.dart';
+import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/services/sound_service.dart';
 import 'package:mobile_app/widgets/fatigue_checkin_dialog.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/screens/workout_schedule_screen.dart';
@@ -16,10 +20,326 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   final DailyNotificationService _notifService = DailyNotificationService.instance;
   final WeeklyPlanService _planService = WeeklyPlanService.instance;
 
+  Map<String, dynamic>? _pendingSession;
+  bool _isLoadingSession = true;
+
   @override
   void initState() {
     super.initState();
     _notifService.init();
+    _loadPendingSession();
+  }
+
+  Future<void> _loadPendingSession() async {
+    final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    if (uid.isEmpty) {
+      if (mounted) setState(() => _isLoadingSession = false);
+      return;
+    }
+    final baseUrl = AuthService.apiBaseUrl;
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/trainer/client-pending-session/$uid'));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (mounted) {
+          setState(() {
+            _pendingSession = (data is Map && data['has_session'] == true) ? data['session'] : null;
+            _isLoadingSession = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoadingSession = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingSession = false);
+    }
+  }
+
+  Future<void> _confirmSession(String sessionId, String startTime) async {
+    final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    final baseUrl = AuthService.apiBaseUrl;
+
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/trainer/session-response'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'session_id': sessionId,
+          'client_id': uid,
+          'action': 'accept',
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        SoundService.playChime();
+        // Actualizar bloque diario a la hora acordada
+        if (startTime.contains(':')) {
+          final parts = startTime.split(':');
+          final h = int.tryParse(parts[0]) ?? 8;
+          final m = int.tryParse(parts[1]) ?? 0;
+          await _notifService.setWorkoutBlockTime(TimeOfDay(hour: h, minute: m));
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF1FAE87),
+              content: Text('✅ ¡Asistencia confirmada! Tu bloque diario se actualizó a las $startTime hrs.'),
+            ),
+          );
+        }
+        await _loadPendingSession();
+      }
+    } catch (e) {
+      debugPrint('Error confirmando sesión: $e');
+    }
+  }
+
+  void _showRejectOrCounterModal(Map<String, dynamic> session) {
+    String selectedTime = '18:00';
+    final noteController = TextEditingController();
+    final quickHours = ['10:00', '12:00', '14:00', '16:00', '18:00', '20:00'];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Ajuste de Horario / Opciones',
+                        style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(icon: const Icon(Icons.close, color: Colors.white70), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'No puedes a las ${session['start_time']} hrs. ¿A qué hora te gustaría entrenar hoy con tu coach?',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Horarios rápidos propuestos:', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: quickHours.map((qh) {
+                      final isSel = selectedTime == qh;
+                      return ChoiceChip(
+                        label: Text('$qh hrs'),
+                        selected: isSel,
+                        selectedColor: const Color(0xFF1FAE87),
+                        backgroundColor: const Color(0xFF1E293B),
+                        labelStyle: TextStyle(
+                          color: isSel ? Colors.white : Colors.white70,
+                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                        onSelected: (val) {
+                          if (val) setModalState(() => selectedTime = qh);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: noteController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Comentario para tu coach (ej: Trabajo en la mañana)...',
+                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                      filled: true,
+                      fillColor: const Color(0xFF1E293B),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF38BDF8),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _sendCounterProposal(session['id'], selectedTime, noteController.text.trim());
+                      },
+                      child: Text(
+                        'Proponer a las $selectedTime hrs al Coach',
+                        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white12),
+                  const SizedBox(height: 10),
+                  // Tarjeta alternativa de Casa
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFA855F7).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFA855F7).withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.home_rounded, color: Color(0xFFA855F7), size: 28),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text('¿Prefieres entrenar en casa hoy?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                              SizedBox(height: 2),
+                              Text('Sustituye por ejercicios validados de peso corporal de la misma intensidad.', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFA855F7),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showHomeWorkoutDialog();
+                          },
+                          child: const Text('En Casa', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _sendCounterProposal(String sessionId, String time, String note) async {
+    final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    final baseUrl = AuthService.apiBaseUrl;
+
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/trainer/session-response'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'session_id': sessionId,
+          'client_id': uid,
+          'action': 'counter',
+          'counter_time': time,
+          'counter_note': note,
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF38BDF8),
+              content: Text('🔄 Propuesta de $time hrs enviada a tu coach.'),
+            ),
+          );
+        }
+        await _loadPendingSession();
+      }
+    } catch (e) {
+      debugPrint('Error enviando contrapropuesta: $e');
+    }
+  }
+
+  Future<void> _showHomeWorkoutDialog() async {
+    final shouldSwitch = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F192B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.home_rounded, color: Color(0xFFA855F7)),
+            SizedBox(width: 8),
+            Text('Entrenamiento en Casa', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          '¿Quieres que te asignemos una rutina adaptada para el día de hoy en casa?\n\n'
+          'Buscamos en nuestra base de datos ejercicios validados sin equipo (peso corporal / calistenia) con la misma intensidad y grupo muscular programado.',
+          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFA855F7)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('¡Sí, asignar en casa!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSwitch != true) return;
+
+    final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    final baseUrl = AuthService.apiBaseUrl;
+
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/trainer/assign-home-workout'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'client_id': uid,
+          'intensity': 'Media',
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        final title = data['routine_title'] ?? 'Entrenamiento en Casa';
+        final exercises = data['exercises'] as List<dynamic>? ?? [];
+
+        // Sustituir en plan semanal
+        _planService.substituteTodayWithHomeWorkout(title: title, exercises: exercises);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFFA855F7),
+              content: Text('🏠 ¡Rutina de casa activada! $title (${exercises.length} ejercicios).'),
+            ),
+          );
+        }
+        await _loadPendingSession();
+      }
+    } catch (e) {
+      debugPrint('Error asignando rutina en casa: $e');
+    }
   }
 
   Future<void> _selectBlockTime() async {
@@ -42,6 +362,236 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         );
       }
     }
+  }
+
+  Widget _buildSessionProposalCard() {
+    if (_pendingSession == null) return const SizedBox.shrink();
+
+    final s = _pendingSession!;
+    final status = s['status']?.toString() ?? 'pending_confirmation';
+    final st = s['start_time'] ?? '08:00';
+    final et = s['end_time'] ?? '10:00';
+    final trainerName = s['trainer_name'] ?? 'Tu Coach';
+    final workoutTitle = s['workout_title'] ?? 'Entrenamiento del día';
+
+    if (status == 'pending_confirmation' || status == 'scheduled') {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.amberAccent, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.amberAccent.withOpacity(0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.schedule_send_rounded, color: Colors.amberAccent, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Propuesta de Sesión Presencial',
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.amberAccent.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Confirmación Requerida',
+                    style: TextStyle(color: Colors.amberAccent, fontSize: 10.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '¡$trainerName te ha asignado una sesión presencial en el gimnasio!',
+              style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.access_time_filled, color: Color(0xFF1FAE87), size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  'Horario propuesto: $st - $et hrs (Hoy)',
+                  style: const TextStyle(color: Color(0xFF1FAE87), fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.fitness_center, color: Color(0xFF38BDF8), size: 16),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Plan: $workoutTitle',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F192B),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Nota: Tu bloque diario actual está fijado a las ${_notifService.formattedBlockTime} hrs. Si confirmas asistencia, tu hora se ajustará automáticamente a las $st hrs.',
+                style: const TextStyle(color: Colors.white54, fontSize: 11, fontStyle: FontStyle.italic),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white38),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => _showRejectOrCounterModal(s),
+                    child: const Text('No puedo a esta hora', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1FAE87),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => _confirmSession(s['id'], st),
+                    child: const Text('Confirmar Asistencia', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'confirmed') {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF1FAE87), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            const CircleAvatar(
+              backgroundColor: Color(0xFF1FAE87),
+              radius: 18,
+              child: Icon(Icons.check, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Sesión Presencial Confirmada', style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text('Asistirás hoy de $st a $et hrs con $trainerName en el gimnasio.', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'counter_proposed') {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            const CircleAvatar(
+              backgroundColor: Color(0xFF38BDF8),
+              radius: 18,
+              child: Icon(Icons.swap_horiz, color: Colors.black87, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Contrapropuesta de Horario Enviada', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text('Has propuesto entrenar a las ${s['counter_time'] ?? 'otro horario'} hrs. Esperando confirmación de tu coach.', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'home_assigned') {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFA855F7), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            const CircleAvatar(
+              backgroundColor: Color(0xFFA855F7),
+              radius: 18,
+              child: Icon(Icons.home_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Entrenamiento en Casa Activo', style: TextStyle(color: Color(0xFFA855F7), fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text('Rutina adaptada para realizar en casa con tu peso corporal.', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   @override
@@ -141,10 +691,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Tarjeta de Configuración del Bloque Horario
+      body: RefreshIndicator(
+        onRefresh: _loadPendingSession,
+        color: const Color(0xFF1FAE87),
+        backgroundColor: const Color(0xFF0F192B),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildSessionProposalCard(),
+            // Tarjeta de Configuración del Bloque Horario
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -274,6 +829,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           }),
         ],
       ),
-    );
+    ),
+  );
   }
 }
