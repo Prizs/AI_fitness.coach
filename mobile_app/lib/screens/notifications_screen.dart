@@ -96,9 +96,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _showRejectOrCounterModal(Map<String, dynamic> session) {
-    String selectedTime = '18:00';
+    final sessionStartTime = (session['start_time']?.toString() ?? '').split(':').take(2).join(':');
     final noteController = TextEditingController();
-    final quickHours = ['10:00', '12:00', '14:00', '16:00', '18:00', '20:00'];
+
+    final blockOptions = [
+      {'time': '08:00', 'label': '08:00 - 10:00'},
+      {'time': '10:30', 'label': '10:30 - 12:30'},
+      {'time': '13:00', 'label': '13:00 - 15:00'},
+      {'time': '15:30', 'label': '15:30 - 17:30'},
+      {'time': '18:00', 'label': '18:00 - 20:00'},
+      {'time': '20:30', 'label': '20:30 - 22:30'},
+    ].where((b) => b['time'] != sessionStartTime).toList();
+
+    String selectedTime = blockOptions.isNotEmpty ? blockOptions.first['time']! : '10:30';
 
     showModalBottomSheet(
       context: context,
@@ -131,28 +141,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'No puedes a las ${session['start_time']} hrs. ¿A qué hora te gustaría entrenar hoy con tu coach?',
+                    'No puedes a las ${session['start_time']} hrs. ¿A qué bloque de tu coach te gustaría asistir hoy?',
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                   const SizedBox(height: 14),
-                  const Text('Horarios rápidos propuestos:', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold)),
+                  const Text('Bloques de atención (2h de sesión + 30m descanso):', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: quickHours.map((qh) {
-                      final isSel = selectedTime == qh;
+                    runSpacing: 8,
+                    children: blockOptions.map((b) {
+                      final time = b['time']!;
+                      final label = b['label']!;
+                      final isSel = selectedTime == time;
                       return ChoiceChip(
-                        label: Text('$qh hrs'),
+                        label: Text(label),
                         selected: isSel,
-                        selectedColor: const Color(0xFF1FAE87),
+                        selectedColor: const Color(0xFF38BDF8),
                         backgroundColor: const Color(0xFF1E293B),
                         labelStyle: TextStyle(
-                          color: isSel ? Colors.white : Colors.white70,
+                          color: isSel ? Colors.black : Colors.white70,
                           fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
                           fontSize: 12,
                         ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: isSel ? const Color(0xFF38BDF8) : Colors.white24),
+                        ),
                         onSelected: (val) {
-                          if (val) setModalState(() => selectedTime = qh);
+                          if (val) setModalState(() => selectedTime = time);
                         },
                       );
                     }).toList(),

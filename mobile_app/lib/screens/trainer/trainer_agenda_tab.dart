@@ -133,48 +133,90 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Añadir Bloque Horario a la Agenda',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final standardPresets = [
+              {'st': '08:00', 'et': '10:00'},
+              {'st': '10:30', 'et': '12:30'},
+              {'st': '13:00', 'et': '15:00'},
+              {'st': '15:30', 'et': '17:30'},
+              {'st': '18:00', 'et': '20:00'},
+              {'st': '20:30', 'et': '22:30'},
+            ];
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 24,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Se añadirá para el día ${_dayName.isNotEmpty ? _dayName : "seleccionado"}.',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: startController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Hora Inicio (ej: 08:00)',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  filled: true,
-                  fillColor: Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: endController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'Hora Fin (ej: 10:00)',
-                  labelStyle: TextStyle(color: Colors.white70),
-                  filled: true,
-                  fillColor: Color(0xFF1E293B),
-                ),
-              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Añadir Bloque Horario a la Agenda',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Configura la jornada para el día ${_dayName.isNotEmpty ? _dayName : "seleccionado"}.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Bloques estándar (2h sesión + 30 min descanso):',
+                    style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: standardPresets.map((p) {
+                      final isSel = startController.text == p['st'] && endController.text == p['et'];
+                      return ChoiceChip(
+                        label: Text('${p['st']} - ${p['et']}', style: TextStyle(color: isSel ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 11.5)),
+                        selected: isSel,
+                        selectedColor: const Color(0xFF38BDF8),
+                        backgroundColor: const Color(0xFF1E293B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: isSel ? const Color(0xFF38BDF8) : Colors.white24),
+                        ),
+                        onSelected: (val) {
+                          if (val) {
+                            setModalState(() {
+                              startController.text = p['st']!;
+                              endController.text = p['et']!;
+                            });
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: startController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Hora Inicio (ej: 08:00)',
+                      labelStyle: TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: endController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Hora Fin (ej: 10:00)',
+                      labelStyle: TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: Color(0xFF1E293B),
+                    ),
+                  ),
               const SizedBox(height: 12),
               TextField(
                 controller: capacityController,
@@ -211,6 +253,8 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
               ),
             ],
           ),
+        );
+          },
         );
       },
     );

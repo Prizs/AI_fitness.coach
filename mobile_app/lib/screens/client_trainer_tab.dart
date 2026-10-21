@@ -348,8 +348,45 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
 
   void _showRejectOrCounterModal(Map<String, dynamic> session) {
     final sessionId = session['id']?.toString() ?? '';
-    final suggestedHours = ['07:00', '18:00', '19:00', '20:00'];
-    String selectedTime = '18:00';
+    final sessionStartTime = (session['start_time']?.toString() ?? '').split(':').take(2).join(':');
+
+    // 1. Obtener la lista de bloques de trabajo reales del entrenador
+    final List<Map<String, String>> blockOptions = [];
+
+    if (_agendaBlocks.isNotEmpty) {
+      for (final b in _agendaBlocks) {
+        final rawSt = b['start_time']?.toString() ?? '';
+        final rawEt = b['end_time']?.toString() ?? '';
+        final st = rawSt.length >= 5 ? rawSt.substring(0, 5) : rawSt;
+        final et = rawEt.length >= 5 ? rawEt.substring(0, 5) : rawEt;
+        if (st.isNotEmpty && st != sessionStartTime) {
+          blockOptions.add({
+            'time': st,
+            'label': '$st - $et',
+          });
+        }
+      }
+    }
+
+    // 2. Si no hay bloques cargados en memoria, usar los bloques estándar oficiales:
+    // 2 horas de sesión + 30 minutos de descanso entre bloques
+    if (blockOptions.isEmpty) {
+      final defaultStandard = [
+        {'time': '08:00', 'label': '08:00 - 10:00'},
+        {'time': '10:30', 'label': '10:30 - 12:30'},
+        {'time': '13:00', 'label': '13:00 - 15:00'},
+        {'time': '15:30', 'label': '15:30 - 17:30'},
+        {'time': '18:00', 'label': '18:00 - 20:00'},
+        {'time': '20:30', 'label': '20:30 - 22:30'},
+      ];
+      for (final d in defaultStandard) {
+        if (d['time'] != sessionStartTime) {
+          blockOptions.add(d);
+        }
+      }
+    }
+
+    String selectedTime = blockOptions.isNotEmpty ? blockOptions.first['time']! : '10:30';
     final noteController = TextEditingController();
 
     showModalBottomSheet(
@@ -383,19 +420,31 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'No puedes asistir de ${session['start_time']} a ${session['end_time']}. Selecciona a qué hora puedes entrenar hoy:',
+                    'No puedes asistir de ${session['start_time']} a ${session['end_time']}. Selecciona el bloque del entrenador que prefieres:',
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Bloques de atención (2h de sesión con 30 min de descanso):',
+                    style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: suggestedHours.map((h) {
+                    runSpacing: 8,
+                    children: blockOptions.map((opt) {
+                      final h = opt['time']!;
+                      final lbl = opt['label']!;
                       final isSel = selectedTime == h;
                       return ChoiceChip(
-                        label: Text('$h hrs', style: TextStyle(color: isSel ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
+                        label: Text(lbl, style: TextStyle(color: isSel ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                         selected: isSel,
                         selectedColor: const Color(0xFF38BDF8),
                         backgroundColor: const Color(0xFF1E293B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: isSel ? const Color(0xFF38BDF8) : Colors.white24),
+                        ),
                         onSelected: (val) {
                           if (val) setModalState(() => selectedTime = h);
                         },

@@ -406,11 +406,11 @@ def get_trainer_agenda(trainer_id: str, target_date: Optional[str] = None):
 
         default_blocks = [
             {"start_time": "08:00:00", "end_time": "10:00:00", "time_label": "8:00 AM - 10:00 AM", "capacity": 2},
-            {"start_time": "10:00:00", "end_time": "12:00:00", "time_label": "10:00 AM - 12:00 PM", "capacity": 2},
-            {"start_time": "12:00:00", "end_time": "14:00:00", "time_label": "12:00 PM - 2:00 PM", "capacity": 2},
-            {"start_time": "14:00:00", "end_time": "16:00:00", "time_label": "2:00 PM - 4:00 PM", "capacity": 2},
-            {"start_time": "16:00:00", "end_time": "18:00:00", "time_label": "4:00 PM - 6:00 PM", "capacity": 2},
+            {"start_time": "10:30:00", "end_time": "12:30:00", "time_label": "10:30 AM - 12:30 PM", "capacity": 2},
+            {"start_time": "13:00:00", "end_time": "15:00:00", "time_label": "1:00 PM - 3:00 PM", "capacity": 2},
+            {"start_time": "15:30:00", "end_time": "17:30:00", "time_label": "3:30 PM - 5:30 PM", "capacity": 2},
             {"start_time": "18:00:00", "end_time": "20:00:00", "time_label": "6:00 PM - 8:00 PM", "capacity": 2},
+            {"start_time": "20:30:00", "end_time": "22:30:00", "time_label": "8:30 PM - 10:30 PM", "capacity": 2},
         ]
 
         blocks_to_use = []
