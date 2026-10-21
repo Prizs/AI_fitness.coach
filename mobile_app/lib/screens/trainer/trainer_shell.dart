@@ -8,6 +8,7 @@ import 'package:mobile_app/screens/trainer/trainer_messages_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_profile_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/main.dart';
+import 'package:mobile_app/services/chat_notification_service.dart';
 
 class TrainerShell extends StatefulWidget {
   const TrainerShell({super.key});
@@ -25,6 +26,25 @@ class _TrainerShellState extends State<TrainerShell> {
     TrainerAnnouncementsTab(),
     TrainerMessagesTab(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ChatNotificationService.instance.startPolling(
+        appNavigatorKey,
+        onNavigateTab: (index) {
+          if (mounted) setState(() => _currentIndex = index);
+        },
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    ChatNotificationService.instance.stopPolling();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

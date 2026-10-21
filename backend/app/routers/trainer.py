@@ -197,6 +197,55 @@ def get_messages(trainer_id: str, client_id: str):
             raise HTTPException(status_code=500, detail=str(e2))
 
 
+@router.get("/latest-chat-message/{user_id}")
+def get_latest_chat_message(user_id: str):
+    """
+    Retorna el mensaje más reciente recibido por este usuario (donde sender_id != user_id),
+    con el nombre y rol del remitente para disparar la notificación flotante con sonido.
+    """
+    admin = get_supabase_admin_client()
+    user = _resolve_user_id(admin, user_id)
+    u_id = user["id"] if user else user_id
+    u_cedula = user.get("cedula") if user else user_id
+
+    try:
+        # En Supabase trainer_chat, client_id y trainer_id son UUIDs
+        res = (
+            admin.table("trainer_chat")
+            .select("*")
+            .or_(f"client_id.eq.{u_id},trainer_id.eq.{u_id}")
+            .order("created_at", desc=True)
+            .limit(10)
+            .execute()
+        )
+        messages = res.data or []
+        for m in messages:
+            s_id = str(m.get("sender_id", ""))
+            if s_id != str(u_id) and s_id != str(u_cedula):
+                sender_user = _resolve_user_id(admin, s_id)
+                sender_name = "Entrenador"
+                sender_role = "trainer"
+                if sender_user:
+                    sender_name = f"{sender_user.get('nombre', '')} {sender_user.get('apellido', '')}".strip()
+                    sender_role = sender_user.get("role", "trainer")
+                
+                return {
+                    "has_message": True,
+                    "message_id": str(m.get("id")),
+                    "sender_id": s_id,
+                    "sender_name": sender_name,
+                    "sender_role": sender_role,
+                    "message": m.get("message"),
+                    "created_at": m.get("created_at"),
+                    "trainer_id": str(m.get("trainer_id")),
+                    "client_id": str(m.get("client_id")),
+                }
+
+        return {"has_message": False}
+    except Exception as e:
+        return {"has_message": False, "error": str(e)}
+
+
 @router.post("/messages")
 def send_message(req: SendMessageReq):
     """Envía un mensaje en el chat entre entrenador y cliente."""

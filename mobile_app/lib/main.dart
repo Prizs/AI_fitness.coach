@@ -11,6 +11,10 @@ import 'package:mobile_app/screens/workouts_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/widgets/app_update.dart';
+import 'package:mobile_app/widgets/top_notification_banner.dart';
+import 'package:mobile_app/services/chat_notification_service.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +30,11 @@ class AiFitnessCoachApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AI Fitness Coach',
+      navigatorKey: appNavigatorKey,
+      builder: (context, child) => TopNotificationBannerWrapper(
+        key: TopNotificationBanner.bannerKey,
+        child: child!,
+      ),
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -128,7 +137,23 @@ class _AppShellState extends State<AppShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       WeeklyPlanService.instance
           .ensureLoaded(AuthService.instance.loggedInUser);
+      ChatNotificationService.instance.startPolling(
+        appNavigatorKey,
+        onNavigateTab: (index) {
+          if (mounted) {
+            setState(() {
+              _currentIndex = index;
+            });
+          }
+        },
+      );
     });
+  }
+
+  @override
+  void dispose() {
+    ChatNotificationService.instance.stopPolling();
+    super.dispose();
   }
 
   final List<Widget> _screens = const [
