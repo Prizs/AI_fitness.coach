@@ -42,24 +42,24 @@ def resolve_user_context(user_id: str, admin):
     en columnas de tipo UUID como progress_photos.user_id.
     """
     user_info = None
+    u_str = str(user_id).strip()
     try:
-        if "-" in user_id and len(user_id) >= 32:
-            res = admin.table("usuarios").select("*").eq("id", user_id).execute()
+        # 1. Probar búsqueda por ID UUID directo
+        if "-" in u_str and len(u_str) >= 32:
+            res = admin.table("usuarios").select("*").eq("id", u_str).execute()
             if res.data:
                 user_info = res.data[0]
-        else:
-            res = admin.table("usuarios").select("*").eq("cedula", user_id).execute()
-            if res.data:
-                user_info = res.data[0]
-            else:
-                res_email = admin.table("usuarios").select("*").eq("email", user_id).execute()
-                if res_email.data:
-                    user_info = res_email.data[0]
+        
+        # 2. Si no se encontró por ID, buscar por cédula
+        if not user_info:
+            res_ced = admin.table("usuarios").select("*").eq("cedula", u_str).execute()
+            if res_ced.data:
+                user_info = res_ced.data[0]
     except Exception as e_res:
         print("Aviso resolviendo contexto de usuario:", e_res)
 
-    u_id = user_info["id"] if user_info else user_id
-    u_cedula = user_info.get("cedula", user_id) if user_info else user_id
+    u_id = user_info["id"] if user_info else u_str
+    u_cedula = user_info.get("cedula", u_str) if user_info else u_str
     u_name = f"{user_info.get('nombre', '')} {user_info.get('apellido', '')}".strip() if user_info else "Atleta"
     u_weight = float(user_info.get("peso", 70.0) if user_info else 70.0)
     u_goal = user_info.get("objetivo", "Recomposición corporal y definición muscular") if user_info else "Recomposición corporal"
@@ -364,9 +364,10 @@ def get_progress_photos(user_id: str):
     try:
         u_id, u_cedula, _, _, _ = resolve_user_context(user_id, admin)
 
-        # Buscar por el UUID resuelto
-        res = admin.table("progress_photos").select("*").eq("user_id", u_id).order("created_at", desc=False).execute()
-        photos = res.data or []
+        photos = []
+        if "-" in str(u_id) and len(str(u_id)) >= 32:
+            res = admin.table("progress_photos").select("*").eq("user_id", u_id).order("created_at", desc=False).execute()
+            photos = res.data or []
 
         processed_photos = []
         evolution_chart = []
@@ -482,6 +483,8 @@ def generate_demo_flash_progress(user_id: str):
     """
     admin = get_supabase_admin_client()
     u_id, u_cedula, u_name, u_weight, u_goal = resolve_user_context(user_id, admin)
+    if "-" not in str(u_id) or len(str(u_id)) < 32:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado. Inicie sesión para generar la prueba.")
 
     prev_res = admin.table("progress_photos").select("*").eq("user_id", u_id).order("created_at", desc=False).execute()
     prev_photos = prev_res.data or []
@@ -572,6 +575,8 @@ def clear_demo_flash(user_id: str):
     """
     admin = get_supabase_admin_client()
     u_id, _, _, _, _ = resolve_user_context(user_id, admin)
+    if "-" not in str(u_id) or len(str(u_id)) < 32:
+        return {"status": "ok", "deleted_count": 0}
 
     res = admin.table("progress_photos").select("id, ai_analysis, photo_url").eq("user_id", u_id).execute()
     deleted_count = 0
