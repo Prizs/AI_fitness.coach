@@ -70,6 +70,25 @@ class CreateAnnouncementReq(BaseModel):
     message: str
 
 
+class DeleteBlockReq(BaseModel):
+    trainer_id: str
+    schedule_date: str
+    day_of_week: Optional[int] = None
+    start_time: str
+    end_time: str
+    block_id: Optional[str] = None
+
+
+class CompleteSessionLogReq(BaseModel):
+    session_id: str
+    trainer_id: str
+    client_id: str
+    technical_notes: str
+    rpe: int = 7
+    recommendations: Optional[str] = ""
+    biomechanics_checklist: Optional[List[str]] = []
+
+
 class UpdateProfileReq(BaseModel):
     trainer_id: str
     specialty: Optional[str] = None
@@ -654,7 +673,7 @@ def get_trainer_agenda(trainer_id: str, target_date: Optional[str] = None):
 
 @router.post("/agenda/slot")
 def add_or_update_slot(req: AddSlotReq):
-    """Permite al entrenador crear o ajustar un bloque horario en su agenda base."""
+    """Permite al entrenador crear o ajustar un bloque horario en su agenda base y notifica a sus alumnos."""
     admin = get_supabase_admin_client()
     trainer = _resolve_user_id(admin, req.trainer_id)
     t_id = trainer["id"] if trainer else req.trainer_id
@@ -671,6 +690,30 @@ def add_or_update_slot(req: AddSlotReq):
             "max_capacity": req.max_capacity
         }
         res = admin.table("trainer_schedules").insert(new_slot).execute()
+
+        # Notificar a los clientes vinculados al entrenador que se abrió un nuevo horario
+        try:
+            t_name = f"{trainer.get('nombre', '')} {trainer.get('apellido', '')}".strip() if trainer else "Tu Entrenador"
+            clients_res = admin.table("usuarios").select("id, nombre, apellido").eq("trainer_id", t_id).execute()
+            assigned_clients = clients_res.data or []
+            
+            day_labels = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado", 7: "Domingo"}
+            day_str = day_labels.get(req.day_of_week, "esta semana")
+            
+            for ac in assigned_clients:
+                cid = ac.get("id")
+                cname = ac.get("nombre") or "Alumno"
+                if cid:
+                    admin.table("trainer_chat").insert({
+                        "trainer_id": t_id,
+                        "client_id": cid,
+                        "sender_id": t_id,
+                        "message": f"📢 ¡Hola {cname}! Tu entrenador {t_name} acaba de abrir su agenda: nuevo horario disponible para los días {day_str} de {st[:5]} a {et[:5]} hrs. ¡Aprovecha e ingresa para reservar tu cupo!",
+                        "created_at": datetime.utcnow().isoformat()
+                    }).execute()
+        except Exception as notify_err:
+            print("Warning notifying clients of new slot:", notify_err)
+
         return {"status": "ok", "slot": res.data[0] if res.data else new_slot}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -683,6 +726,157 @@ def delete_slot(slot_id: str):
     try:
         res = admin.table("trainer_schedules").delete().eq("id", slot_id).execute()
         return {"status": "ok", "message": "Bloque horario eliminado correctamente."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/agenda/delete-block")
+def delete_agenda_block(req: DeleteBlockReq):
+    """
+    Elimina un bloque horario (de trainer_schedules o de sesiones reservadas)
+    y notifica inmediatamente a todos los alumnos vinculados y a los que tenían sesión en ese horario.
+    """
+    admin = get_supabase_admin_client()
+    trainer = _resolve_user_id(admin, req.trainer_id)
+    t_id = trainer["id"] if trainer else req.trainer_id
+    t_name = f"{trainer.get('nombre', '')} {trainer.get('apellido', '')}".strip() if trainer else "Tu Entrenador"
+
+    st = req.start_time if len(req.start_time) == 8 else f"{req.start_time[:5]}:00"
+    et = req.end_time if len(req.end_time) == 8 else f"{req.end_time[:5]}:00"
+
+    try:
+        # 1. Si se pasó un block_id de trainer_schedules, borrarlo
+        if req.block_id and not str(req.block_id).startswith("custom_"):
+            admin.table("trainer_schedules").delete().eq("id", req.block_id).execute()
+        else:
+            query = admin.table("trainer_schedules").delete().eq("trainer_id", t_id).eq("start_time", st).eq("end_time", et)
+            if req.day_of_week:
+                query = query.eq("day_of_week", req.day_of_week)
+            query.execute()
+
+        # 2. Buscar sesiones programadas o confirmadas en este horario para la fecha
+        sessions_res = (
+            admin.table("workout_sessions")
+            .select("id, client_id, status")
+            .eq("trainer_id", t_id)
+            .eq("schedule_date", req.schedule_date)
+            .eq("start_time", st)
+            .execute()
+        )
+        affected_sessions = sessions_res.data or []
+
+        # Cancelar las sesiones afectadas
+        for s in affected_sessions:
+            admin.table("workout_sessions").update({
+                "status": "cancelled_by_trainer"
+            }).eq("id", s["id"]).execute()
+
+            # Mensaje directo de cancelación al alumno que tenía la reserva
+            cid = s.get("client_id")
+            if cid:
+                try:
+                    admin.table("trainer_chat").insert({
+                        "trainer_id": t_id,
+                        "client_id": cid,
+                        "sender_id": t_id,
+                        "message": f"⚠️ ATENCIÓN: Tu entrenador {t_name} ha debido cancelar y retirar el bloque de entrenamiento de {st[:5]} a {et[:5]} del día {req.schedule_date}. Por favor comunícate por este chat o revisa otros horarios disponibles.",
+                        "created_at": datetime.utcnow().isoformat()
+                    }).execute()
+                except Exception:
+                    pass
+
+        # 3. Notificar a todos los alumnos asignados del retiro del bloque
+        clients_res = admin.table("usuarios").select("id, nombre").eq("trainer_id", t_id).execute()
+        for ac in (clients_res.data or []):
+            cid = ac.get("id")
+            if cid and not any(s.get("client_id") == cid for s in affected_sessions):
+                try:
+                    admin.table("trainer_chat").insert({
+                        "trainer_id": t_id,
+                        "client_id": cid,
+                        "sender_id": t_id,
+                        "message": f"ℹ️ Tu entrenador {t_name} ha cerrado temporalmente el bloque de {st[:5]} a {et[:5]} para el día {req.schedule_date}.",
+                        "created_at": datetime.utcnow().isoformat()
+                    }).execute()
+                except Exception:
+                    pass
+
+        return {
+            "status": "ok",
+            "message": f"Bloque horario {st[:5]} - {et[:5]} eliminado correctamente.",
+            "cancelled_sessions": len(affected_sessions)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/complete-session-log")
+def complete_session_log(req: CompleteSessionLogReq):
+    """
+    Marca el entrenamiento como completado y registra la bitácora técnica del entrenador.
+    Almacena los datos en workout_sessions, coach_mensajes (para la IA clínica) y trainer_chat.
+    """
+    admin = get_supabase_admin_client()
+    t = _resolve_user_id(admin, req.trainer_id)
+    c = _resolve_user_id(admin, req.client_id)
+    t_id = t["id"] if t else req.trainer_id
+    c_id = c["id"] if c else req.client_id
+
+    t_name = f"{t.get('nombre', '')} {t.get('apellido', '')}".strip() if t else "Coach"
+    c_name = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() if c else "Alumno"
+
+    try:
+        # 1. Actualizar workout_sessions a completed
+        checklist_str = ", ".join(req.biomechanics_checklist) if req.biomechanics_checklist else "Sin observaciones específicas"
+        log_summary = (
+            f"Bitácora de {t_name}:\n"
+            f"• Desempeño: {req.technical_notes}\n"
+            f"• RPE: {req.rpe}/10\n"
+            f"• Observaciones biomecánicas: {checklist_str}\n"
+            f"• Recomendaciones: {req.recommendations or 'Mantener constancia'}"
+        )
+
+        admin.table("workout_sessions").update({
+            "status": "completed",
+            "completed_at": datetime.utcnow().isoformat(),
+            "notes": log_summary
+        }).eq("id", req.session_id).execute()
+
+        # 2. Almacenar en coach_mensajes como registro técnico clínico del entrenador para el asistente de IA
+        try:
+            admin.table("coach_mensajes").insert({
+                "usuario_id": c_id,
+                "remitente": "trainer_log",
+                "mensaje": f"[BITÁCORA TÉCNICA ENTRENADOR {t_name}]: {req.technical_notes} | RPE: {req.rpe}/10 | Checklist: {checklist_str} | Recomendaciones: {req.recommendations}",
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+        except Exception as e_coach:
+            print("Warning saving to coach_mensajes:", e_coach)
+
+        # 3. Notificar al alumno en trainer_chat
+        try:
+            recs = f"\n💡 Recomendaciones: {req.recommendations}" if req.recommendations else ""
+            admin.table("trainer_chat").insert({
+                "trainer_id": t_id,
+                "client_id": c_id,
+                "sender_id": t_id,
+                "message": (
+                    f"🏁 ¡Entrenamiento Completado y Evaluado!\n\n"
+                    f"📝 Desempeño: {req.technical_notes}\n"
+                    f"⚡ Esfuerzo Percibido (RPE): {req.rpe}/10\n"
+                    f"🔬 Biomecánica: {checklist_str}"
+                    f"{recs}\n\n"
+                    f"¡Excelente sesión hoy con tu entrenador {t_name}!"
+                ),
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+        except Exception as e_chat:
+            print("Warning sending completion message to trainer_chat:", e_chat)
+
+        return {
+            "status": "ok",
+            "message": "Entrenamiento completado y bitácora registrada con éxito."
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1293,6 +1487,25 @@ def clinical_ai_consult(req: ClinicalAiConsultReq):
 
     coach_interactions_str = "\n".join(coach_interactions) if coach_interactions else "Sin registros de chat previos con el Coach IA."
 
+    # 1.1 Bitácoras y anotaciones previas del entrenador para este alumno
+    trainer_logs = []
+    try:
+        ws_logs = (
+            admin.table("workout_sessions")
+            .select("schedule_date, notes, rpe")
+            .eq("client_id", c_id)
+            .eq("status", "completed")
+            .order("schedule_date", desc=True)
+            .limit(5)
+            .execute()
+        )
+        for s_log in (ws_logs.data or []):
+            if s_log.get("notes"):
+                trainer_logs.append(f"• [{s_log.get('schedule_date')}]: {s_log.get('notes')} (RPE: {s_log.get('rpe', 7)}/10)")
+    except Exception:
+        pass
+    trainer_logs_str = "\n".join(trainer_logs) if trainer_logs else "No hay bitácoras previas registradas por el entrenador aún."
+
     # 2. Plan del día y ejercicios
     weekday_idx = date.today().weekday()
     day_name = WEEKDAY_NAMES[weekday_idx] if weekday_idx < len(WEEKDAY_NAMES) else "Hoy"
@@ -1323,6 +1536,9 @@ def clinical_ai_consult(req: ClinicalAiConsultReq):
     - Alergias alimentarias: {alergias}
     - Día actual ({day_name}): {routine_title}
     - Ejercicios programados: {exercises_str}
+
+    Historial de Bitácoras previas del Entrenador para este alumno:
+    {trainer_logs_str}
 
     Historial de conversaciones y reportes del alumno con el Coach IA de la app:
     {coach_interactions_str}

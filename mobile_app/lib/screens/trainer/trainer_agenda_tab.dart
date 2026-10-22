@@ -24,6 +24,7 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
   List<dynamic> _clients = [];
   bool _isLoadingClients = false;
   Timer? _pollTimer;
+  String _lastBlocksHash = '';
 
   String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
 
@@ -41,6 +42,48 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
   void dispose() {
     _pollTimer?.cancel();
     super.dispose();
+  }
+
+  DateTime _getVenezuelaTime() {
+    return DateTime.now().toUtc().subtract(const Duration(hours: 4));
+  }
+
+  String _getUnlockTimeStr(Map<String, dynamic> block) {
+    try {
+      final endTimeStr = block['end_time']?.toString() ?? '10:00:00';
+      final parts = endTimeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final min = int.parse(parts[1]);
+      final unlockedMin = min + 5;
+      final unlockedHour = hour + (unlockedMin ~/ 60);
+      final finalMin = unlockedMin % 60;
+      final hStr = unlockedHour.toString().padLeft(2, '0');
+      final mStr = finalMin.toString().padLeft(2, '0');
+      return '$hStr:$mStr';
+    } catch (_) {
+      return 'fin +5 min';
+    }
+  }
+
+  bool _isSessionEligibleForCompletion(Map<String, dynamic> block) {
+    try {
+      final dateParts = _currentDate.split('-');
+      if (dateParts.length != 3) return false;
+      final y = int.parse(dateParts[0]);
+      final m = int.parse(dateParts[1]);
+      final d = int.parse(dateParts[2]);
+
+      final endTimeStr = block['end_time']?.toString() ?? '10:00:00';
+      final parts = endTimeStr.split(':');
+      final hour = int.parse(parts[0]);
+      final min = int.parse(parts[1]);
+
+      final nowVet = _getVenezuelaTime();
+      final unlockVet = DateTime(y, m, d, hour, min).add(const Duration(minutes: 5));
+      return nowVet.isAfter(unlockVet);
+    } catch (_) {
+      return false;
+    }
   }
 
   String _formatDate(DateTime dt) {
@@ -81,6 +124,7 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data is Map && mounted) {
+          _lastBlocksHash = json.encode(data['blocks'] ?? []);
           setState(() {
             _currentDate = data['date'] ?? dateStr;
             _dayName = data['day_name'] ?? '';
@@ -106,12 +150,17 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data is Map && mounted) {
-          setState(() {
-            _currentDate = data['date'] ?? dateStr;
-            _dayName = data['day_name'] ?? '';
-            _totalStudents = (data['total_students'] as int?) ?? 0;
-            _agendaBlocks = data['blocks'] ?? [];
-          });
+          final newHash = json.encode(data['blocks'] ?? []);
+          // Previene parpadeo / flickering: solo reconstruye si los datos cambiaron
+          if (newHash != _lastBlocksHash) {
+            _lastBlocksHash = newHash;
+            setState(() {
+              _currentDate = data['date'] ?? dateStr;
+              _dayName = data['day_name'] ?? '';
+              _totalStudents = (data['total_students'] as int?) ?? 0;
+              _agendaBlocks = data['blocks'] ?? [];
+            });
+          }
         }
       }
     } catch (_) {}
@@ -536,6 +585,9 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
     } else if (status == 'confirmed') {
       label = '🟢 Confirmado';
       color = const Color(0xFF1FAE87);
+    } else if (status == 'completed') {
+      label = '🏁 Completado';
+      color = const Color(0xFF10B981);
     } else if (status.startsWith('counter_proposed')) {
       label = '🔄 Contrapropuesta';
       color = const Color(0xFF38BDF8);
@@ -609,6 +661,374 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
         SnackBar(content: Text('Error cancelando sesión: $e')),
       );
     }
+  }
+
+  Future<void> _confirmDeleteBlock(Map<String, dynamic> block) async {
+    final timeStr = block['time'] ?? 'este horario';
+    final occupied = block['occupied'] ?? 0;
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F192B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+            SizedBox(width: 8),
+            Text('Eliminar Bloque Horario', style: TextStyle(color: Colors.white, fontSize: 17)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Deseas retirar el bloque de $timeStr de tu agenda para el día $_currentDate?',
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            if (occupied > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+                ),
+                child: Text(
+                  '⚠️ Hay $occupied alumno(s) agendado(s). Sus turnos se cancelarán y se les enviará una notificación inmediata.',
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí, eliminar horario'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final baseUrl = AuthService.apiBaseUrl;
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/trainer/agenda/delete-block'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'trainer_id': _trainerCedula,
+          'schedule_date': _formatDate(_selectedDate),
+          'day_of_week': _selectedDate.weekday,
+          'start_time': block['start_time'],
+          'end_time': block['end_time'],
+          'block_id': block['id'],
+        }),
+      );
+      if (res.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF1FAE87),
+            content: Text('Bloque horario eliminado y alumnos notificados.'),
+          ),
+        );
+        await _loadAgenda();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error eliminando horario: $e')),
+      );
+    }
+  }
+
+  void _showBitacoraModal(Map<String, dynamic> student, Map<String, dynamic> block) {
+    final clientName = student['name'] ?? 'Alumno';
+    final sessionId = student['id']?.toString() ?? '';
+    final clientId = student['cedula'] ?? student['client_id'] ?? '';
+    final workout = student['workout'] ?? 'Entrenamiento del día';
+
+    final notesController = TextEditingController(
+      text: '$clientName tuvo un desempeño fluido hoy. Realizó los ejercicios con buena técnica y control articular.',
+    );
+    final recsController = TextEditingController(
+      text: 'Mantener sobrecarga progresiva en próxima sesión y vigilar recuperación.',
+    );
+    int rpe = 7;
+    final Map<String, bool> checklist = {
+      'Técnica y postura correctas': true,
+      'Rango completo de movimiento': true,
+      'Control de respiración y cadencia': true,
+      'Sin dolor articular ni molestias': true,
+      'Buena hidratación y recuperación': true,
+    };
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F192B),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1FAE87).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.assignment_turned_in, color: Color(0xFF1FAE87), size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Bitácora del Entrenador',
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  '$clientName • $workout',
+                                  style: const TextStyle(color: Color(0xFF1FAE87), fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white60),
+                          onPressed: () => Navigator.pop(modalCtx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Technical observations
+                    const Text(
+                      'Evaluación Técnica & Desempeño:',
+                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 3,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Anota cómo se comportó el alumno, fluidez, peso o cambios...',
+                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF1E293B),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // RPE Slider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Esfuerzo Percibido (RPE):',
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1FAE87).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '$rpe / 10 ${rpe <= 4 ? "Ligero" : rpe <= 6 ? "Moderado" : rpe <= 8 ? "Óptimo" : "Máximo"}',
+                            style: const TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: rpe.toDouble(),
+                      min: 1,
+                      max: 10,
+                      divisions: 9,
+                      activeColor: const Color(0xFF1FAE87),
+                      inactiveColor: Colors.white12,
+                      label: '$rpe',
+                      onChanged: (val) {
+                        setModalState(() => rpe = val.round());
+                      },
+                    ),
+
+                    // Biomechanics checklist
+                    const Text(
+                      'Checklist Biomecánico & Salud:',
+                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    ...checklist.keys.map((key) {
+                      final isChecked = checklist[key] ?? false;
+                      return InkWell(
+                        onTap: () {
+                          setModalState(() {
+                            checklist[key] = !isChecked;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isChecked ? Icons.check_box : Icons.check_box_outline_blank,
+                                color: isChecked ? const Color(0xFF1FAE87) : Colors.white38,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  key,
+                                  style: TextStyle(
+                                    color: isChecked ? Colors.white : Colors.white60,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 14),
+
+                    // Recommendations
+                    const Text(
+                      'Recomendaciones para próximas sesiones / Asistente IA:',
+                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: recsController,
+                      maxLines: 2,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Indicaciones clínicas o de progresión para el alumno e IA...',
+                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF1E293B),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Submit button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1FAE87),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: isSubmitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.save_rounded, size: 20),
+                        label: Text(
+                          isSubmitting ? 'Guardando bitácora...' : 'Guardar Bitácora y Finalizar Sesión',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                setModalState(() => isSubmitting = true);
+                                final selectedChecklist = checklist.entries
+                                    .where((e) => e.value)
+                                    .map((e) => e.key)
+                                    .toList();
+
+                                final baseUrl = AuthService.apiBaseUrl;
+                                try {
+                                  final res = await http.post(
+                                    Uri.parse('$baseUrl/api/trainer/complete-session-log'),
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: json.encode({
+                                      'session_id': sessionId,
+                                      'trainer_id': _trainerCedula,
+                                      'client_id': clientId,
+                                      'technical_notes': notesController.text.trim(),
+                                      'rpe': rpe,
+                                      'recommendations': recsController.text.trim(),
+                                      'biomechanics_checklist': selectedChecklist,
+                                    }),
+                                  );
+
+                                  if (res.statusCode == 200) {
+                                    if (!mounted) return;
+                                    Navigator.pop(modalCtx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        backgroundColor: const Color(0xFF1FAE87),
+                                        content: Text('🏁 Bitácora de $clientName registrada con éxito. Notificado al alumno y archivado para reportes.'),
+                                      ),
+                                    );
+                                    await _loadAgenda();
+                                  } else {
+                                    setModalState(() => isSubmitting = false);
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Error al guardar la bitácora.')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  setModalState(() => isSubmitting = false);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e')),
+                                  );
+                                }
+                              },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showSessionSummaryFicha(Map<String, dynamic> student, Map<String, dynamic> block) {
@@ -1101,6 +1521,15 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
                         ),
                       ),
                     ],
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.white38, size: 20),
+                      tooltip: 'Eliminar este bloque horario',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => _confirmDeleteBlock(block),
+                    ),
                   ],
                 ),
               ],
@@ -1239,6 +1668,71 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
                                 const Icon(Icons.chevron_right, color: Colors.white24, size: 16),
                               ],
                             ),
+                          ),
+                          // Estado de Finalización / Botón de Bitácora
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 36),
+                            child: s['status'] == 'completed'
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.check_circle, color: Color(0xFF10B981), size: 14),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'Entrenamiento Completado (Bitácora Registrada)',
+                                          style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : _isSessionEligibleForCompletion(block)
+                                    ? ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF1FAE87),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        icon: const Icon(Icons.assignment_turned_in, size: 15),
+                                        label: const Text(
+                                          '🏁 Completar & Llenar Bitácora',
+                                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                        ),
+                                        onPressed: () => _showBitacoraModal(s, block),
+                                      )
+                                    : InkWell(
+                                        onTap: () => _showBitacoraModal(s, block),
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.06),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Colors.white12),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.timer_outlined, color: Colors.white54, size: 14),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Completar disponible: ${_getUnlockTimeStr(block)} VET (+5 min)',
+                                                style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              const Icon(Icons.edit_note, color: Color(0xFF1FAE87), size: 14),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                           ),
                           // Bloque interactivo si el alumno envió una contrapropuesta de hora
                           if (s['status'].toString().startsWith('counter_proposed')) ...[
