@@ -2349,6 +2349,7 @@ def get_trainer_metrics_dashboard(trainer_id: str):
             },
             "recent_logs": [],
             "report_export_text": "Error generando reporte."
+        }
 
 @router.get("/bitacora/export")
 def export_trainer_bitacora(trainer_id: str, print_auto: bool = True):
