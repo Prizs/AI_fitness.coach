@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/widgets/biomechanical_kinematics_view.dart';
+import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
 import 'package:mobile_app/widgets/muscle_map_view.dart';
 
 /// Pantalla de demostración didáctica del modelo anatómico y técnica.
@@ -10,7 +11,7 @@ import 'package:mobile_app/widgets/muscle_map_view.dart';
 /// 0: Técnica Real (GIF) animado en bucle adaptado.
 /// 1: Atlas Anatómico de Músculos (resaltado interactivo frontal/dorsal de agonistas y sinergistas).
 /// 2: Modelo Anatómico 3D Muscular (360°) con Balizas Holográficas de Activación.
-/// 3: Cinemática & Biomecánica Articular (Goniómetro ROM, Curva de Torque τ = F×d⊥ y Diagnóstico IA).
+/// 3: Muñeco 3D Biomecánico (haciendo el ejercicio en vivo en 3D con goniómetro y telemetría).
 class AnatomyWorkoutScreen extends StatefulWidget {
   const AnatomyWorkoutScreen({
     super.key,
@@ -30,7 +31,7 @@ class AnatomyWorkoutScreen extends StatefulWidget {
 class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
   late AnatomyExercise _exercise;
   bool _autoRotate = true;
-  int _viewMode = 0; // 0: GIF, 1: Atlas Muscular, 2: 3D Muscular con Marcadores, 3: Cinemática & Biomecánica
+  int _viewMode = 0; // 0: GIF, 1: Atlas Muscular, 2: 3D Muscular con Marcadores, 3: Muñeco 3D en Vivo
 
   /// Altura de la zona visual: la mitad superior de la pantalla.
   static const double _viewerHeight = 330;
@@ -61,7 +62,7 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
       case 2:
         return 'Modelo 3D Muscular (360° Marcadores)';
       case 3:
-        return 'Cinemática & Biomecánica Articular';
+        return 'Muñeco 3D Biomecánico (Ejercicio en Vivo)';
       default:
         return 'Guía de Ejecución y Técnica';
     }
@@ -124,8 +125,8 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
                   const SizedBox(width: 8),
                   _buildModeChip(
                     mode: 3,
-                    icon: Icons.speed_rounded,
-                    label: 'Cinemática & Biomecánica',
+                    icon: Icons.view_in_ar_rounded,
+                    label: 'Muñeco 3D (Ejercicio en Vivo)',
                     color: const Color(0xFF64B5F6),
                   ),
                 ],
@@ -233,11 +234,17 @@ class _Viewer extends StatelessWidget {
       );
     }
 
-    // Modo 3: Cinemática & Biomecánica Articular (Goniómetro ROM, Curva de Torque y Kinesiología IA)
+    // Modo 3: Muñeco 3D Biomecánico Haciendo el Ejercicio en Tiempo Real con Goniómetro Articular y Volúmenes Musculares
     if (viewMode == 3) {
-      return BiomechanicalKinematicsView(
-        exercise: exercise,
-        height: 330,
+      return Container(
+        color: const Color(0xFF070C16),
+        child: Exercise3DViewer(
+          animationKey: exercise.id,
+          primaryMuscle: exercise.agonist,
+          secondaryMuscle: exercise.synergists.isNotEmpty ? exercise.synergists.first : null,
+          height: 330,
+          showMuscleLegend: true,
+        ),
       );
     }
 
