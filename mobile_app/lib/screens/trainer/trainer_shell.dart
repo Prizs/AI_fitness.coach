@@ -5,6 +5,7 @@ import 'package:mobile_app/screens/trainer/trainer_clients_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_agenda_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_announcements_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_messages_tab.dart';
+import 'package:mobile_app/screens/trainer/trainer_metrics_tab.dart';
 import 'package:mobile_app/screens/trainer/trainer_profile_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/main.dart';
@@ -25,6 +26,7 @@ class _TrainerShellState extends State<TrainerShell> {
     TrainerClientsTab(),
     TrainerAnnouncementsTab(),
     TrainerMessagesTab(),
+    TrainerMetricsTab(),
   ];
 
   @override
@@ -96,6 +98,7 @@ class _TrainerShellState extends State<TrainerShell> {
           BottomNavigationBarItem(icon: Icon(Icons.people_alt), label: 'Alumnos'),
           BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Anuncios'),
           BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Chats'),
+          BottomNavigationBarItem(icon: Icon(Icons.insights_rounded), label: 'Métricas'),
         ],
       ),
     );

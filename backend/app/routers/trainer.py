@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import json
 import base64
 import time
@@ -836,18 +836,31 @@ def complete_session_log(req: CompleteSessionLogReq):
             f"• Recomendaciones: {req.recommendations or 'Mantener constancia'}"
         )
 
+        # 1. Actualizar workout_sessions a completed
         admin.table("workout_sessions").update({
             "status": "completed",
             "completed_at": datetime.utcnow().isoformat(),
-            "notes": log_summary
         }).eq("id", req.session_id).execute()
 
-        # 2. Almacenar en coach_mensajes como registro técnico clínico del entrenador para el asistente de IA
+        # 2. Almacenar en coach_mensajes como registro técnico clínico del entrenador para el asistente de IA y dashboard
         try:
             admin.table("coach_mensajes").insert({
-                "usuario_id": c_id,
-                "remitente": "trainer_log",
-                "mensaje": f"[BITÁCORA TÉCNICA ENTRENADOR {t_name}]: {req.technical_notes} | RPE: {req.rpe}/10 | Checklist: {checklist_str} | Recomendaciones: {req.recommendations}",
+                "user_id": c_id,
+                "role": "system",
+                "category": "trainer_bitacora",
+                "content": f"[BITÁCORA TÉCNICA ENTRENADOR {t_name}]: {req.technical_notes} | RPE: {req.rpe}/10 | Checklist: {checklist_str} | Recomendaciones: {req.recommendations}",
+                "plan": {
+                    "session_id": req.session_id,
+                    "trainer_id": t_id,
+                    "trainer_name": t_name,
+                    "client_id": c_id,
+                    "client_name": c_name,
+                    "technical_notes": req.technical_notes,
+                    "rpe": req.rpe,
+                    "checklist": req.biomechanics_checklist,
+                    "recommendations": req.recommendations,
+                    "logged_at": datetime.utcnow().isoformat()
+                },
                 "created_at": datetime.utcnow().isoformat()
             }).execute()
         except Exception as e_coach:
@@ -2015,5 +2028,161 @@ def assign_home_workout(req: AssignHomeWorkoutReq):
         "exercises": exercises,
         "message": f"¡Rutina de casa activada con éxito para {c_name}! Se ajustaron los ejercicios a peso corporal."
     }
+
+
+@router.get("/metrics-dashboard/{trainer_id}")
+def get_trainer_metrics_dashboard(trainer_id: str):
+    """
+    Retorna el resumen de métricas del entrenador: sesiones completadas de la semana,
+    promedio de RPE de alumnos, tasa de adherencia y bitácoras acumuladas para reporte en PDF.
+    """
+    admin = get_supabase_admin_client()
+    trainer = _resolve_user_id(admin, trainer_id)
+    t_id = trainer["id"] if trainer else trainer_id
+    t_name = f"{trainer.get('nombre', '')} {trainer.get('apellido', '')}".strip() if trainer else "Entrenador"
+
+    try:
+        # 1. Alumnos asignados
+        clients_res = admin.table("usuarios").select("id, cedula, nombre, apellido, peso").eq("trainer_id", t_id).execute()
+        clients = clients_res.data or []
+        client_map = {c["id"]: f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() or c.get("cedula") for c in clients}
+
+        # 2. Todas las sesiones del entrenador
+        sessions_res = (
+            admin.table("workout_sessions")
+            .select("id, client_id, schedule_date, start_time, end_time, status, completed_at, created_at")
+            .eq("trainer_id", t_id)
+            .order("schedule_date", desc=True)
+            .execute()
+        )
+        all_sessions = sessions_res.data or []
+
+        # 3. Bitácoras técnicas guardadas en coach_mensajes
+        bitacoras = []
+        try:
+            bit_res = (
+                admin.table("coach_mensajes")
+                .select("id, user_id, content, plan, created_at")
+                .eq("category", "trainer_bitacora")
+                .order("created_at", desc=True)
+                .limit(40)
+                .execute()
+            )
+            bitacoras = bit_res.data or []
+        except Exception:
+            pass
+
+        # Calcular fechas de la semana actual
+        today = date.today()
+        start_of_week = today - timedelta(days=today.weekday())
+        start_of_week_str = start_of_week.isoformat()
+
+        completed_sessions = [s for s in all_sessions if s.get("status") == "completed"]
+        week_completed = [s for s in completed_sessions if str(s.get("schedule_date", "")) >= start_of_week_str]
+        cancelled_sessions = [s for s in all_sessions if "cancelled" in str(s.get("status", "")).lower() or s.get("status") == "rejected"]
+
+        # RPE promedio y distribución a partir de las bitácoras
+        rpe_values = []
+        rpe_dist = {"1-4 (Ligero)": 0, "5-6 (Moderado)": 0, "7-8 (Óptimo)": 0, "9-10 (Máximo)": 0}
+
+        for b in bitacoras:
+            p = b.get("plan") or {}
+            r_val = p.get("rpe") or 7
+            try:
+                r_val = int(r_val)
+            except Exception:
+                r_val = 7
+            rpe_values.append(r_val)
+            if r_val <= 4:
+                rpe_dist["1-4 (Ligero)"] += 1
+            elif r_val <= 6:
+                rpe_dist["5-6 (Moderado)"] += 1
+            elif r_val <= 8:
+                rpe_dist["7-8 (Óptimo)"] += 1
+            else:
+                rpe_dist["9-10 (Máximo)"] += 1
+
+        if not rpe_values:
+            rpe_values = [7]
+
+        avg_rpe = round(sum(rpe_values) / len(rpe_values), 1)
+
+        # Tasa de adherencia (% de completadas vs total programadas)
+        total_scheduled = len(all_sessions)
+        adherence_rate = round((len(completed_sessions) / total_scheduled * 100), 1) if total_scheduled > 0 else 100.0
+
+        # Bitácoras recientes con nombre de alumno
+        recent_logs = []
+        for b in bitacoras[:15]:
+            p = b.get("plan") or {}
+            c_name = p.get("client_name") or client_map.get(b.get("user_id"), "Alumno")
+            log_date = str(p.get("logged_at") or b.get("created_at") or "")[:10]
+            recent_logs.append({
+                "session_id": p.get("session_id", ""),
+                "client_name": c_name,
+                "schedule_date": log_date,
+                "time": "Presencial",
+                "rpe": p.get("rpe") or 7,
+                "notes": p.get("technical_notes") or b.get("content") or "Sesión completada satisfactoriamente.",
+            })
+
+        # Resumen formateado para exportación / PDF
+        report_export_text = (
+            f"=====================================================\n"
+            f"REPORTE EJECUTIVO DE RENDIMIENTO - ENTRENADOR PRO\n"
+            f"Coach: {t_name}\n"
+            f"Fecha de Emisión: {today.isoformat()}\n"
+            f"=====================================================\n\n"
+            f"1. RESUMEN DE GESTIÓN SEMANAL:\n"
+            f" • Sesiones Completadas (Esta Semana): {len(week_completed)}\n"
+            f" • Sesiones Completadas (Histórico): {len(completed_sessions)}\n"
+            f" • Total Alumnos Asignados: {len(clients)}\n"
+            f" • Promedio de Esfuerzo de Alumnos (RPE): {avg_rpe} / 10\n"
+            f" • Tasa de Asistencia y Adherencia: {adherence_rate}%\n\n"
+            f"2. DISTRIBUCIÓN DE INTENSIDAD (RPE):\n"
+            f" • RPE 1-4 (Recuperación / Ligero): {rpe_dist['1-4 (Ligero)']} sesiones\n"
+            f" • RPE 5-6 (Moderado): {rpe_dist['5-6 (Moderado)']} sesiones\n"
+            f" • RPE 7-8 (Óptimo / Hipertrofia): {rpe_dist['7-8 (Óptimo)']} sesiones\n"
+            f" • RPE 9-10 (Exigencia Máxima): {rpe_dist['9-10 (Máximo)']} sesiones\n\n"
+            f"3. BITÁCORAS TÉCNICAS RECIENTES:\n"
+        )
+        for idx, log in enumerate(recent_logs[:8], 1):
+            report_export_text += (
+                f"\n [{idx}] Alumno: {log['client_name']} | Fecha: {log['schedule_date']} ({log['time']})\n"
+                f"     Esfuerzo: RPE {log['rpe']}/10\n"
+                f"     Observaciones Técnicas: {log['notes']}\n"
+            )
+
+        return {
+            "status": "ok",
+            "trainer_name": t_name,
+            "metrics": {
+                "week_completed_sessions": len(week_completed),
+                "total_completed_sessions": len(completed_sessions),
+                "total_clients": len(clients),
+                "avg_rpe": avg_rpe,
+                "adherence_rate": adherence_rate,
+                "cancelled_sessions": len(cancelled_sessions),
+                "rpe_distribution": rpe_dist,
+            },
+            "recent_logs": recent_logs,
+            "report_export_text": report_export_text
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "metrics": {
+                "week_completed_sessions": 0,
+                "total_completed_sessions": 0,
+                "total_clients": 0,
+                "avg_rpe": 7.0,
+                "adherence_rate": 100.0,
+                "cancelled_sessions": 0,
+                "rpe_distribution": {"1-4 (Ligero)": 0, "5-6 (Moderado)": 0, "7-8 (Óptimo)": 0, "9-10 (Máximo)": 0},
+            },
+            "recent_logs": [],
+            "report_export_text": "Error generando reporte."
+        }
 
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/widgets/performance_report_modal.dart';
+import 'package:mobile_app/screens/body_metrics_screen.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class ClientDetailScreen extends StatefulWidget {
@@ -220,6 +221,35 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             ],
           ),
           onPressed: () => PerformanceReportModal.show(context, clientName: widget.clientName),
+        ),
+        const SizedBox(height: 10),
+
+        // Body Metrics Evolution Button
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0F192B),
+            foregroundColor: const Color(0xFF1FAE87),
+            side: const BorderSide(color: Color(0xFF1FAE87), width: 1.2),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+          icon: const Icon(Icons.show_chart_rounded, size: 22),
+          label: const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Ver Evolución Corporal & Métricas del Alumno', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14),
+            ],
+          ),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BodyMetricsScreen(
+                clientCedula: client['cedula']?.toString() ?? client['id']?.toString() ?? '',
+                clientName: widget.clientName,
+              ),
+            ),
+          ),
         ),
       ],
     );

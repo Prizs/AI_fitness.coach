@@ -4,6 +4,7 @@ import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/database/db_helper.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
+import 'package:mobile_app/screens/body_metrics_screen.dart';
 import 'package:mobile_app/main.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -225,6 +226,30 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ],
                 ),
                 onPressed: () => PerformanceReportModal.show(context),
+              ),
+              const SizedBox(height: 10),
+
+              // Botón de Evolución Corporal & Métricas (Peso, Grasa, Medidas)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F192B),
+                  foregroundColor: const Color(0xFF1FAE87),
+                  side: const BorderSide(color: Color(0xFF1FAE87), width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.show_chart_rounded, size: 22),
+                label: const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Evolución Corporal, Peso & Medidas', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  ],
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BodyMetricsScreen()),
+                ),
               ),
               const SizedBox(height: 16),
 
