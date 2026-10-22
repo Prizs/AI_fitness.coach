@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
-import 'package:mobile_app/widgets/exercise_detail.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/database/db_helper.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 /// Rutinas de la semana, con el ciclo activo, días programados y fechas de periodización.
 class WorkoutsScreen extends StatefulWidget {
@@ -1073,15 +1070,45 @@ class _DayCard extends StatelessWidget {
                               isDone ? TextDecoration.lineThrough : null,
                         ),
                       ),
-                      if (isToday)
-                        const Text(
-                          'HOY',
-                          style: TextStyle(
-                            color: Color(0xFF8BE0C0),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        children: [
+                          if (isToday)
+                            const Text(
+                              'HOY',
+                              style: TextStyle(
+                                color: Color(0xFF8BE0C0),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          if (day['is_home_workout'] == true)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1B4332),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF40916C)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.home_rounded, size: 12, color: Color(0xFF8BE0C0)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'RUTINA EN CASA',
+                                    style: TextStyle(
+                                      color: Color(0xFF8BE0C0),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -1121,6 +1148,29 @@ class _DayCard extends StatelessWidget {
                         synergy,
                         style: const TextStyle(
                             color: Colors.white70, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (day['is_home_workout'] == true) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF162E25),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF2D6A4F)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.home_work_rounded, size: 16, color: Color(0xFF8BE0C0)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Rutina adaptada a peso corporal / sin equipo por aviso de inasistencia del entrenador.',
+                        style: TextStyle(color: Color(0xFFD8F3DC), fontSize: 11.5),
                       ),
                     ),
                   ],

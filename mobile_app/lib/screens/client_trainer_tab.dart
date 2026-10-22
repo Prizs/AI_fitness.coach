@@ -32,6 +32,7 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
   List<dynamic> _agendaBlocks = [];
   bool _isLoadingAgenda = false;
 
+  final Set<String> _confirmedAnnouncements = {};
   final DailyNotificationService _notifService = DailyNotificationService.instance;
 
   @override
@@ -303,6 +304,40 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
       debugPrint('Error enviando mensaje: $e');
     } finally {
       if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _sendQuickResponseToTrainer(String text, {String? successNotification}) async {
+    if (_trainerInfo == null) return;
+    final baseUrl = AuthService.apiBaseUrl;
+    final trainerId = _trainerInfo!['id'] ?? _trainerInfo!['cedula'];
+
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/trainer/messages'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'trainer_id': trainerId,
+          'client_id': _myCedula,
+          'sender_id': _myCedula,
+          'message': text,
+        }),
+      );
+      if (res.statusCode == 200) {
+        await _loadChatMessages();
+        if (mounted && successNotification != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF1FAE87),
+              content: Text(successNotification),
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error enviando respuesta al coach: $e');
     }
   }
 
@@ -589,15 +624,18 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
         final title = data['routine_title'] ?? 'Entrenamiento en Casa';
         final exercises = data['exercises'] as List<dynamic>? ?? [];
 
-        WeeklyPlanService.instance.substituteTodayWithHomeWorkout(title: title, exercises: exercises);
+        await WeeklyPlanService.instance.substituteTodayWithHomeWorkout(title: title, exercises: exercises);
 
         if (mounted) {
+          setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: const Color(0xFFA855F7),
               content: Text('🏠 ¡Rutina de casa activada! $title (${exercises.length} ejercicios).'),
+              duration: const Duration(seconds: 3),
             ),
           );
+          _showHomeWorkoutDetailsSheet(title: title, exercises: exercises);
         }
         await _loadPendingSession();
         await _loadAgendaSlots();
@@ -605,6 +643,195 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
     } catch (e) {
       debugPrint('Error asignando rutina en casa: $e');
     }
+  }
+
+  void _showHomeWorkoutDetailsSheet({String? title, List<dynamic>? exercises}) {
+    final today = WeeklyPlanService.instance.today;
+    final rTitle = title ?? today?['title'] ?? 'Entrenamiento en Casa';
+    final exList = exercises ?? (today?['exercises'] as List<dynamic>? ?? []);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scrollController) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: ListView(
+            controller: scrollController,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFA855F7).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.home_rounded, color: Color(0xFFA855F7), size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Rutina Sustituta en Casa Activa',
+                          style: TextStyle(color: Color(0xFFA855F7), fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          rTitle,
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16233A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Color(0xFF8BE0C0), size: 18),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Los ejercicios fueron adaptados para ejecutarse con peso corporal y calistenia sin requerir máquinas de gimnasio.',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Ejercicios Asignados para Hoy:',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 10),
+              if (exList.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: Text('No hay ejercicios registrados.', style: TextStyle(color: Colors.white54)),
+                  ),
+                )
+              else
+                ...exList.map((ex) {
+                  final eMap = ex is Map ? ex : {};
+                  final name = eMap['name'] ?? 'Ejercicio';
+                  final sets = eMap['sets']?.toString() ?? '3';
+                  final reps = eMap['reps']?.toString() ?? '12';
+                  final prime = eMap['primary_muscle'] ?? '';
+                  final bio = eMap['biomechanics'] ?? '';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFA855F7).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFA855F7).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$sets series × $reps',
+                                style: const TextStyle(color: Color(0xFFA855F7), fontWeight: FontWeight.bold, fontSize: 11),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (prime.toString().isNotEmpty)
+                              Text(
+                                prime.toString(),
+                                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          name.toString(),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        if (bio.toString().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            bio.toString(),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.3),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1FAE87),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.fitness_center_rounded, color: Colors.white),
+                label: const Text(
+                  'Ir a la pestaña de Rutinas para Entrenar',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  WeeklyPlanService.instance.notifyUpdate();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('👉 Toca "Rutinas" en la barra inferior para ver y marcar tu sesión de casa.'),
+                      backgroundColor: Color(0xFF1FAE87),
+                      duration: Duration(seconds: 4),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Entendido, cerrar', style: TextStyle(color: Colors.white60)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _bookSession(String st, String et) async {
@@ -1231,62 +1458,318 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
               itemCount: _trainerAnnouncements.length,
               itemBuilder: (context, index) {
                 final a = _trainerAnnouncements[index];
-                final dateStr = (a['created_at'] != null && (a['created_at'] as String).length >= 10) ? (a['created_at'] as String).substring(0, 10) : 'Aviso';
+                String dateStr = 'Aviso';
+                final rawCreated = a['created_at'];
+                if (rawCreated != null && rawCreated.toString().isNotEmpty) {
+                  try {
+                    final dt = DateTime.parse(rawCreated.toString()).toLocal();
+                    final dayStr = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+                    final hour12 = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+                    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+                    final minStr = dt.minute.toString().padLeft(2, '0');
+                    dateStr = '$dayStr · $hour12:$minStr $ampm';
+                  } catch (_) {
+                    final s = rawCreated.toString();
+                    dateStr = s.length >= 10 ? s.substring(0, 10) : s;
+                  }
+                }
 
-                        final msg = (a['message'] ?? a['content'] ?? '').toString();
-                        final isHomeProposal = msg.toLowerCase().contains('casa') ||
-                            msg.toLowerCase().contains('no podre') ||
-                            msg.toLowerCase().contains('no podré');
+                final msg = (a['message'] ?? a['content'] ?? '').toString();
+                final msgLower = msg.toLowerCase();
+                final announcementId = (a['id'] ?? index).toString();
 
-                        return Card(
-                          color: const Color(0xFF1E293B),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(
-                              color: isHomeProposal ? const Color(0xFFA855F7) : Colors.white12,
-                              width: isHomeProposal ? 1.5 : 1,
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                // 1. Condicional: Ausencia del entrenador o propuesta de rutina en casa
+                final isCoachAbsence = msgLower.contains('casa') ||
+                    msgLower.contains('no podre') ||
+                    msgLower.contains('no podré') ||
+                    msgLower.contains('no voy a poder') ||
+                    msgLower.contains('no asistire') ||
+                    msgLower.contains('no asistiré') ||
+                    msgLower.contains('entreno en casa');
+
+                // 2. Condicional: Convocatoria para confirmar asistencia presencial u horario
+                final isAttendanceCall = !isCoachAbsence && (
+                    msgLower.contains('confirmar') ||
+                    msgLower.contains('confirmen') ||
+                    msgLower.contains('asistencia') ||
+                    msgLower.contains('quiénes asisten') ||
+                    msgLower.contains('quienes asisten') ||
+                    msgLower.contains('quién va') ||
+                    msgLower.contains('quien va') ||
+                    msgLower.contains('cupo') ||
+                    msgLower.contains('horario')
+                );
+
+                final isGeneralInfo = !isCoachAbsence && !isAttendanceCall;
+
+                return Card(
+                  color: const Color(0xFF1E293B),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(
+                      color: isCoachAbsence
+                          ? const Color(0xFFA855F7)
+                          : (isAttendanceCall ? const Color(0xFF1FAE87) : Colors.white12),
+                      width: (isCoachAbsence || isAttendanceCall) ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                Icon(
+                                  isCoachAbsence
+                                      ? Icons.home_repair_service_rounded
+                                      : (isAttendanceCall ? Icons.how_to_reg_rounded : Icons.campaign),
+                                  color: isCoachAbsence
+                                      ? const Color(0xFFA855F7)
+                                      : const Color(0xFF1FAE87),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isCoachAbsence
+                                      ? 'Aviso de Ausencia / Casa'
+                                      : (isAttendanceCall ? 'Convocatoria de Asistencia' : 'Comunicado Oficial'),
+                                  style: TextStyle(
+                                    color: isCoachAbsence ? const Color(0xFFA855F7) : const Color(0xFF1FAE87),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time_rounded, size: 12, color: Colors.white38),
+                                const SizedBox(width: 4),
+                                Text(dateStr, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          msg,
+                          style: const TextStyle(color: Colors.white, fontSize: 14.5, height: 1.4),
+                        ),
+
+                        // CONDICIONAL 1: El coach no podrá asistir / Propuesta de casa
+                        if (isCoachAbsence) ...[
+                          const SizedBox(height: 12),
+                          Builder(
+                            builder: (context) {
+                              final isHomeActive = WeeklyPlanService.instance.isTodayHomeWorkout;
+                              if (isHomeActive) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF1FAE87),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        elevation: 2,
+                                      ),
+                                      icon: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                                      label: const Text(
+                                        '✅ Entrenamiento en Casa Activo (Hoy) · Ver Ejercicios',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      onPressed: () => _showHomeWorkoutDetailsSheet(),
+                                    ),
+                                    const SizedBox(height: 6),
                                     Row(
-                                      children: const [
-                                        Icon(Icons.campaign, color: Color(0xFF1FAE87), size: 20),
-                                        SizedBox(width: 8),
-                                        Text('Comunicado Oficial', style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold, fontSize: 12)),
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        TextButton.icon(
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            visualDensity: VisualDensity.compact,
+                                          ),
+                                          icon: const Icon(Icons.replay_rounded, size: 14, color: Color(0xFFA855F7)),
+                                          label: const Text(
+                                            'Reasignar / Cambiar ejercicios de casa',
+                                            style: TextStyle(color: Color(0xFFA855F7), fontSize: 11.5, fontWeight: FontWeight.w600),
+                                          ),
+                                          onPressed: _showHomeWorkoutDialog,
+                                        ),
                                       ],
                                     ),
-                                    Text(dateStr, style: const TextStyle(color: Colors.white38, fontSize: 11)),
                                   ],
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  msg,
-                                  style: const TextStyle(color: Colors.white, fontSize: 14.5, height: 1.4),
-                                ),
-                                if (isHomeProposal) ...[
-                                  const SizedBox(height: 12),
-                                  SizedBox(
-                                    width: double.infinity,
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFA855F7),
+                                      padding: const EdgeInsets.symmetric(vertical: 11),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    icon: const Icon(Icons.home_rounded, color: Colors.white, size: 18),
+                                    label: const Text('🏠 Activar Entrenamiento en Casa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    onPressed: _showHomeWorkoutDialog,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.white60),
+                                    label: const Text(
+                                      '💬 Responder: "Entendido coach, entrenaré en casa hoy"',
+                                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                                    ),
+                                    onPressed: () {
+                                      _sendQuickResponseToTrainer(
+                                        'Entendido coach, hoy realizaré la rutina sustituta en casa 🏠',
+                                        successNotification: '✓ Mensaje enviado a Coach $trainerName',
+                                      );
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+
+                        // CONDICIONAL 2: Convocatoria para confirmar asistencia presencial
+                        if (isAttendanceCall) ...[
+                          const SizedBox(height: 12),
+                          Builder(
+                            builder: (context) {
+                              final hasConfirmed = _confirmedAnnouncements.contains(announcementId);
+                              if (hasConfirmed) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1FAE87).withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFF1FAE87), width: 1.2),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, color: Color(0xFF1FAE87), size: 18),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        '✅ ¡Asistencia confirmada para hoy! (Enviado al Coach)',
+                                        style: TextStyle(color: Color(0xFF1FAE87), fontWeight: FontWeight.bold, fontSize: 12.5),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    flex: 6,
                                     child: ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFFA855F7),
+                                        backgroundColor: const Color(0xFF1FAE87),
                                         padding: const EdgeInsets.symmetric(vertical: 10),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
-                                      icon: const Icon(Icons.home_rounded, color: Colors.white, size: 18),
-                                      label: const Text('🏠 Activar Entrenamiento en Casa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                      onPressed: _showHomeWorkoutDialog,
+                                      icon: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                                      label: const Text(
+                                        '🙋‍♂️ Sí, allí estaré',
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
+                                      ),
+                                      onPressed: () {
+                                        setState(() => _confirmedAnnouncements.add(announcementId));
+                                        _sendQuickResponseToTrainer(
+                                          '¡Hola Coach $trainerName! Confirmado, sí allí estaré presente en el entrenamiento 💪',
+                                          successNotification: '✅ ¡Asistencia confirmada enviada a Coach $trainerName!',
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 5,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFFA855F7),
+                                        side: const BorderSide(color: Color(0xFFA855F7)),
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.home_outlined, size: 16),
+                                      label: const Text(
+                                        '🏠 En casa',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                      ),
+                                      onPressed: () {
+                                        _sendQuickResponseToTrainer(
+                                          'Hola Coach, hoy no podré asistir presencialmente. Haré la rutina sustituta en casa 🏠',
+                                        );
+                                        _showHomeWorkoutDialog();
+                                      },
                                     ),
                                   ),
                                 ],
+                              );
+                            },
+                          ),
+                        ],
+
+                        // CONDICIONAL 3: Comunicado general o informativo
+                        if (isGeneralInfo) ...[
+                          const SizedBox(height: 10),
+                          Builder(
+                            builder: (context) {
+                              final hasAcknowledged = _confirmedAnnouncements.contains(announcementId);
+                              if (hasAcknowledged) {
+                                return const Row(
+                                  children: [
+                                    Icon(Icons.done_all_rounded, size: 14, color: Color(0xFF1FAE87)),
+                                    SizedBox(width: 4),
+                                    Text('✓ Leído y confirmado', style: TextStyle(color: Color(0xFF1FAE87), fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ],
+                                );
+                              }
+                              return Row(
+                                children: [
+                                  ActionChip(
+                                    backgroundColor: const Color(0xFF0F1E2E),
+                                    side: const BorderSide(color: Color(0xFF8BE0C0), width: 1),
+                                    avatar: const Icon(Icons.thumb_up_alt_rounded, size: 14, color: Color(0xFF8BE0C0)),
+                                    label: const Text('👍 ¡Entendido, gracias Coach!', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
+                                    onPressed: () {
+                                      setState(() => _confirmedAnnouncements.add(announcementId));
+                                      _sendQuickResponseToTrainer(
+                                        '¡Entendido el comunicado, muchas gracias Coach $trainerName! 🙌',
+                                        successNotification: '✓ Confirmación de lectura enviada al Coach',
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.white54),
+                                    label: const Text('Abrir chat', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                                    onPressed: () {
+                                      setState(() => _activeHubTab = 0);
+                                      _registerActiveChatWithCoach();
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
                                 const SizedBox(height: 10),
                                 Row(
                                   children: [

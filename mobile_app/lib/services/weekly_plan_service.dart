@@ -108,10 +108,15 @@ class WeeklyPlanService extends ChangeNotifier {
     return '${m.day}/$mMonth al ${s.day}/$sMonth';
   }
 
-  void substituteTodayWithHomeWorkout({
+  bool get isTodayHomeWorkout {
+    final t = today;
+    return t != null && t['is_home_workout'] == true;
+  }
+
+  Future<void> substituteTodayWithHomeWorkout({
     required String title,
     required List<dynamic> exercises,
-  }) {
+  }) async {
     if (week == null || week!['days'] is! List) return;
     final daysList = List<dynamic>.from(week!['days']);
     for (int i = 0; i < daysList.length; i++) {
@@ -125,6 +130,17 @@ class WeeklyPlanService extends ChangeNotifier {
       }
     }
     week!['days'] = daysList;
+    notifyListeners();
+    try {
+      await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
+    } catch (_) {}
+    try {
+      const storage = FlutterSecureStorage();
+      await storage.write(key: 'cached_weekly_plan_v1', value: jsonEncode(week!));
+    } catch (_) {}
+  }
+
+  void notifyUpdate() {
     notifyListeners();
   }
 
