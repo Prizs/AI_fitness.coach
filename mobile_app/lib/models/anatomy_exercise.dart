@@ -123,23 +123,29 @@ String resolveGuaranteedGifUrl({
                 ? 'glutes/barbell-full-squat.gif'
                 : 'quads/dumbbell-goblet-squat.gif'));
   }
-  if (text.contains('pecho') || text.contains('pectoral') || text.contains('flexion') || text.contains('push')) {
-    return _kGifBase +
-        (isLow ? 'pectorals/incline-push-up.gif' : 'pectorals/push-up.gif');
+  if (text.contains('bicep') || text.contains('bícep') || text.contains('curl')) {
+    return _kGifBase + 'biceps/dumbbell-seated-biceps-curl.gif';
   }
-  if (text.contains('espalda') || text.contains('dorsal') || text.contains('remo') || text.contains('dominada')) {
+  if (text.contains('tricep') || text.contains('trícep') || text.contains('fondo') || text.contains('copa')) {
+    return _kGifBase + 'triceps/seated-dumbbell-triceps-extension.gif';
+  }
+  if (text.contains('pecho') || text.contains('pectoral') || text.contains('banca') || text.contains('bench') || text.contains('apertura')) {
     return _kGifBase +
-        (isLow
+        (isLow ? 'pectorals/incline-push-up.gif' : 'pectorals/dumbbell-bench-press.gif');
+  }
+  if (text.contains('espalda') || text.contains('dorsal') || text.contains('remo') || text.contains('jalon') || text.contains('jalón') || text.contains('dominada')) {
+    return _kGifBase +
+        (text.contains('remo')
             ? 'upper-back/band-one-arm-twisting-seated-row.gif'
             : 'lats/cable-pulldown.gif');
   }
-  if (text.contains('hombro') || text.contains('deltoid') || text.contains('militar')) {
+  if (text.contains('hombro') || text.contains('deltoid') || text.contains('militar') || text.contains('lateral') || text.contains('pajaro') || text.contains('pájaro')) {
     return _kGifBase +
-        (isLow
-            ? 'delts/band-shoulder-press.gif'
-            : 'delts/dumbbell-seated-shoulder-press.gif');
+        (text.contains('lateral') || text.contains('pajaro') || text.contains('pájaro')
+            ? 'delts/dumbbell-lateral-raise.gif'
+            : (isLow ? 'delts/band-shoulder-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif'));
   }
-  if (text.contains('core') || text.contains('abdom') || text.contains('plancha') || text.contains('dead bug')) {
+  if (text.contains('core') || text.contains('abdom') || text.contains('plancha') || text.contains('giro') || text.contains('isometr') || text.contains('isométr') || text.contains('dead bug')) {
     return _kGifBase + 'abs/dead-bug.gif';
   }
   return _kGifBase + 'glutes/potty-squat-with-support.gif';

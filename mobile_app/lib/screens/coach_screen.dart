@@ -9,6 +9,7 @@ import 'package:lottie/lottie.dart';
 import 'package:mobile_app/services/voice_service.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
+import 'package:mobile_app/screens/adaptive_workout_screen.dart';
 import 'package:mobile_app/widgets/plan_options_sheet.dart';
 
 class CoachScreen extends StatefulWidget {
@@ -811,6 +812,14 @@ class _CoachScreenState extends State<CoachScreen> {
             icon: const Icon(Icons.restart_alt_rounded, color: Colors.white70),
             tooltip: 'Reiniciar conversación',
             onPressed: _showClearChatConfirmation,
+          ),
+          IconButton(
+            icon: const Icon(Icons.accessible_forward_rounded, color: Color(0xFF8BE0C0)),
+            tooltip: 'Test Ejercicios Adaptados (Discapacidad Motora)',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdaptiveWorkoutScreen()),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF8BE0C0)),
@@ -1647,13 +1656,26 @@ class _CoachScreenState extends State<CoachScreen> {
 
   List<String>? _getActiveQuickReplies() {
     if (_isLoading) return null;
+    List<String> list = [];
     for (int i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
       if (m['isUser'] == false && m['quick_replies'] is List && (m['quick_replies'] as List).isNotEmpty) {
-        return List<String>.from(m['quick_replies']);
+        list = List<String>.from(m['quick_replies']);
+        break;
       }
     }
-    return null;
+    if (list.isEmpty) {
+      list = [
+        '📋 Completar mi estado de salud',
+        '🏋️ Ver ejercicios de hoy',
+        '♿ Test Torso Adaptado (Discapacidad)',
+        '💪 ¡Me siento al 100%, listo para entrenar!',
+      ];
+    }
+    if (!list.any((e) => e.contains('♿') || e.toLowerCase().contains('adaptad'))) {
+      list.add('♿ Test Torso Adaptado (Discapacidad)');
+    }
+    return list;
   }
 
   Widget _buildQuickRepliesBar() {
@@ -1672,6 +1694,7 @@ class _CoachScreenState extends State<CoachScreen> {
         child: Row(
           children: replies.map((qrText) {
             final lower = qrText.toLowerCase();
+            final isAdaptive = lower.contains('adaptad') || lower.contains('discapacidad') || lower.contains('♿');
             final isStateBtn = lower.contains('completar') || lower.contains('estado actual') || lower.contains('estado de salud');
             final isWhereTrain = lower.contains('dónde vas a entrenar') || lower.contains('donde vas a entrenar') || lower.contains('gimnasio o casa');
             final isViewEx = lower.contains('ver ejercicios');
@@ -1679,33 +1702,37 @@ class _CoachScreenState extends State<CoachScreen> {
             final isFatigue = lower.contains('cansado') || lower.contains('bajemos') || lower.contains('descarga');
             final isNextLvl = lower.contains('siguiente nivel') || lower.contains('alta');
 
-            final Color color = isStateBtn
+            final Color color = isAdaptive
                 ? const Color(0xFF8BE0C0)
-                : (isWhereTrain
-                    ? const Color(0xFF64B5F6)
-                    : (isViewEx
-                        ? const Color(0xFF8BE0C0)
-                        : (isReady
-                            ? const Color(0xFF81C784)
-                            : (isFatigue
-                                ? const Color(0xFFFFB340)
-                                : (isNextLvl
-                                    ? const Color(0xFFFF6B6B)
-                                    : const Color(0xFF8BE0C0))))));
+                : (isStateBtn
+                    ? const Color(0xFF8BE0C0)
+                    : (isWhereTrain
+                        ? const Color(0xFF64B5F6)
+                        : (isViewEx
+                            ? const Color(0xFF8BE0C0)
+                            : (isReady
+                                ? const Color(0xFF81C784)
+                                : (isFatigue
+                                    ? const Color(0xFFFFB340)
+                                    : (isNextLvl
+                                        ? const Color(0xFFFF6B6B)
+                                        : const Color(0xFF8BE0C0)))))));
 
-            final IconData icon = isStateBtn
-                ? Icons.assignment_turned_in_rounded
-                : (isWhereTrain
-                    ? Icons.home_work_rounded
-                    : (isViewEx
-                        ? Icons.fitness_center_rounded
-                        : (isReady
-                            ? Icons.bolt_rounded
-                            : (isFatigue
-                                ? Icons.battery_charging_full_rounded
-                                : (isNextLvl
-                                    ? Icons.trending_up_rounded
-                                    : Icons.flash_on_rounded)))));
+            final IconData icon = isAdaptive
+                ? Icons.accessible_forward_rounded
+                : (isStateBtn
+                    ? Icons.assignment_turned_in_rounded
+                    : (isWhereTrain
+                        ? Icons.home_work_rounded
+                        : (isViewEx
+                            ? Icons.fitness_center_rounded
+                            : (isReady
+                                ? Icons.bolt_rounded
+                                : (isFatigue
+                                    ? Icons.battery_charging_full_rounded
+                                    : (isNextLvl
+                                        ? Icons.trending_up_rounded
+                                        : Icons.flash_on_rounded))))));
 
             return Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -1720,7 +1747,12 @@ class _CoachScreenState extends State<CoachScreen> {
                 onPressed: _isLoading
                     ? null
                     : () {
-                        if (isStateBtn || isWhereTrain) {
+                        if (isAdaptive) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AdaptiveWorkoutScreen()),
+                          );
+                        } else if (isStateBtn || isWhereTrain) {
                           _openStateSheet();
                         } else {
                           _sendMessage(qrText);

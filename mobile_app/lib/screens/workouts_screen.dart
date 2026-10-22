@@ -5,6 +5,7 @@ import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/database/db_helper.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
+import 'package:mobile_app/screens/adaptive_workout_screen.dart';
 
 /// Rutinas de la semana, con el ciclo activo, días programados y fechas de periodización.
 class WorkoutsScreen extends StatefulWidget {
@@ -691,6 +692,59 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           style: const TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 16),
+
+        // Banner de Accesibilidad / Módulo de Ejercicios Adaptados
+        Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF102820),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.35)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8BE0C0).withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.accessible_forward_rounded, color: Color(0xFF8BE0C0), size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '♿ Test Módulo Adaptado (Torso)',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    Text(
+                      'Ejercicios sentados para personas con discapacidad motora en piernas (3D & GIF).',
+                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF8BE0C0),
+                  foregroundColor: const Color(0xFF0B1220),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AdaptiveWorkoutScreen()),
+                  );
+                },
+                child: const Text('Ver Test', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+              ),
+            ],
+          ),
+        ),
 
         // Banner informativo del Ciclo Semanal Activo y Próxima Planificación
         _ActiveCycleCard(

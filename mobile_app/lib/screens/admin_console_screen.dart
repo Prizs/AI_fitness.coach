@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:mobile_app/database/db_helper.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/screens/adaptive_workout_screen.dart';
 
 class AdminConsoleScreen extends StatefulWidget {
   const AdminConsoleScreen({super.key});
@@ -328,6 +329,27 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF8BE0C0),
+                        side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.accessible_forward_rounded, size: 18),
+                      label: const Text('Test Módulo Adaptado (Torso Sentado & 3D)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        _log('Abriendo módulo de prueba de ejercicios adaptados (torso sentado)...');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdaptiveWorkoutScreen()),
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 20),
 
