@@ -460,6 +460,117 @@ def get_progress_photos(user_id: str):
         }
 
 
+@router.post("/demo-flash/{user_id}")
+def generate_demo_flash_progress(user_id: str):
+    """
+    Genera una prueba flash simulando la evaluación de progreso tras 1 mes (Día 30)
+    de entrenamiento, vinculando la comparativa real con la foto inicial del usuario.
+    """
+    admin = get_supabase_admin_client()
+    u_id, u_cedula, u_name, u_weight, u_goal = resolve_user_context(user_id, admin)
+
+    prev_res = admin.table("progress_photos").select("*").eq("user_id", u_id).order("created_at", desc=False).execute()
+    prev_photos = prev_res.data or []
+
+    base_fat = 26.0
+    base_def = 3.5
+    base_posture = 6.5
+    base_date = date.today().isoformat()
+
+    if prev_photos:
+        first_rec = prev_photos[0]
+        base_date = str(first_rec.get("created_at") or "")[:10]
+        raw_first = first_rec.get("ai_analysis") or ""
+        if raw_first.startswith("{"):
+            try:
+                p_first = json.loads(raw_first)
+                base_fat = parse_numeric(p_first.get("estimated_body_fat"), 26.0)
+                base_def = parse_numeric(p_first.get("muscle_definition_score"), 3.5)
+                base_posture = parse_numeric(p_first.get("posture_score"), 6.5)
+            except Exception:
+                pass
+
+    # Calcular métricas realistas tras 1 mes de entrenamiento
+    cur_fat = round(max(10.0, base_fat - 2.8), 1)
+    cur_def = round(min(10.0, base_def + 1.7), 1)
+    cur_posture = round(min(10.0, base_posture + 1.3), 1)
+    fat_delta = round(cur_fat - base_fat, 1)
+    def_delta = round(cur_def - base_def, 1)
+    posture_delta = round(cur_posture - base_posture, 1)
+
+    photo_number = len(prev_photos) + 1
+    demo_url = "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?q=80&w=800&auto=format&fit=crop"
+
+    demo_analysis = {
+        "headline": f"Evaluación Mes 1: Notable reducción de {abs(fat_delta)}% de grasa periumbilical y aumento visible en tono muscular",
+        "photo_stage": "Evaluación Mes 1 (Día 30 · Prueba Flash)",
+        "photo_number": photo_number,
+        "is_demo_flash": True,
+        "estimated_body_fat": cur_fat,
+        "muscle_definition_score": cur_def,
+        "posture_score": cur_posture,
+        "biotype": "Mesomorfo atlético en recomposición activa",
+        "comparison_with_previous": {
+            "previous_date": base_date,
+            "body_fat_delta": fat_delta,
+            "muscle_definition_delta": def_delta,
+            "posture_delta": posture_delta,
+            "clinical_comparison": f"Tras 30 días continuos con el plan de fuerza y cardio, {u_name} muestra una evolución evidente. La convexidad periumbilical se contrajo significativamente, el contorno de la cintura disminuyó y la musculatura pectoral y deltoidea superior presenta mayor firmeza, relieve y vascularización incipiente.",
+            "specific_anatomical_changes": [
+                f"Reducción de {abs(fat_delta)}% en grasa periumbilical y flancos lumbares",
+                f"Aumento de +{def_delta} puntos en definición y separación pectoral",
+                "Mayor tono y corte lateral en deltoides y tríceps",
+                f"Alineación escapular corregida (+{posture_delta} pts en postura)"
+            ]
+        },
+        "positive_changes": [
+            "Excelente respuesta metabólica al déficit calórico y sobrecarga",
+            "Cintura visiblemente más compacta y definida",
+            "Aumento en densidad muscular sin pérdida de masa magra"
+        ],
+        "areas_to_improve": [
+            "Iniciar fase de sobrecarga progresiva en sentadillas y press inclinado",
+            "Mantener la ingesta proteica y 3 sesiones semanales de cardio moderado"
+        ],
+        "physiological_composition": f"{u_name} ha culminado su primer mes con éxito rotundo. La recomposición corporal es palpable: el porcentaje graso descendió de {base_fat}% a {cur_fat}%, mientras que el tono muscular saltó de {base_def} a {cur_def}/10. Su base mesomórfica responde con rapidez.",
+        "training_plan_feedback": "Avanzar a microciclo de hipertrofia con rangos de 8-12 repeticiones efectivas y descansos de 90 segundos.",
+        "motivational_quote": "¡30 días de disciplina transformaron tu cuerpo! Este es solo el primer escalón de tu mejor versión."
+    }
+
+    insert_res = admin.table("progress_photos").insert({
+        "user_id": u_id,
+        "photo_url": demo_url,
+        "ai_analysis": json.dumps(demo_analysis, ensure_ascii=False)
+    }).execute()
+
+    return {
+        "status": "ok",
+        "message": "Prueba flash de Mes 1 generada con éxito.",
+        "analysis": demo_analysis,
+        "record": insert_res.data[0] if insert_res.data else None
+    }
+
+
+@router.delete("/demo-flash/{user_id}")
+def clear_demo_flash(user_id: str):
+    """
+    Elimina las fotos generadas como prueba flash para dejar limpio el historial real.
+    """
+    admin = get_supabase_admin_client()
+    u_id, _, _, _, _ = resolve_user_context(user_id, admin)
+
+    res = admin.table("progress_photos").select("id, ai_analysis, photo_url").eq("user_id", u_id).execute()
+    deleted_count = 0
+    for r in res.data or []:
+        raw = r.get("ai_analysis") or ""
+        url = r.get("photo_url") or ""
+        if "is_demo_flash" in raw or "unsplash.com" in url or "Prueba Flash" in raw:
+            admin.table("progress_photos").delete().eq("id", r["id"]).execute()
+            deleted_count += 1
+
+    return {"status": "ok", "deleted_count": deleted_count}
+
+
 class BodyMetricReq(BaseModel):
     user_id: str  # Cédula o UUID del usuario
     weight: float

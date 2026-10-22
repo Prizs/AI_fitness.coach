@@ -69,6 +69,88 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
+  bool get _hasDemoFlash {
+    return _photos.any((p) {
+      final raw = p is Map ? (p['ai_analysis'] ?? '') : '';
+      return raw.contains('is_demo_flash') || raw.contains('Prueba Flash') || raw.contains('unsplash.com');
+    });
+  }
+
+  Future<void> _triggerDemoFlash() async {
+    final user = AuthService.instance.loggedInUser;
+    final uid = user?.cedula ?? '';
+    if (uid.isEmpty) return;
+
+    setState(() => _isUploading = true);
+    try {
+      final res = await http.post(
+        Uri.parse('${AuthService.apiBaseUrl}/api/progress/demo-flash/$uid'),
+      );
+      if (res.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.flash_on_rounded, color: Color(0xFF8BE0C0)),
+                  SizedBox(width: 10),
+                  Expanded(child: Text('¡Prueba Flash generada! Revisa el gráfico y la comparativa de 1 Mes.')),
+                ],
+              ),
+              backgroundColor: Color(0xFF0F192B),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        await _fetchPhotos();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo generar la prueba flash.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _clearDemoFlash() async {
+    final user = AuthService.instance.loggedInUser;
+    final uid = user?.cedula ?? '';
+    if (uid.isEmpty) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final res = await http.delete(
+        Uri.parse('${AuthService.apiBaseUrl}/api/progress/demo-flash/$uid'),
+      );
+      if (res.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Simulación de Prueba Flash eliminada. Historial limpio.'),
+              backgroundColor: Color(0xFF0F192B),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        await _fetchPhotos();
+      }
+    } catch (_) {
+      setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _pickAndUploadPhoto(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -359,10 +441,60 @@ class _ProgressScreenState extends State<ProgressScreen> {
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF8BE0C0)),
-            tooltip: 'Actualizar',
-            onPressed: _fetchPhotos,
+          // Botón destacado de Prueba Flash Mes 1
+          TextButton.icon(
+            onPressed: _isUploading ? null : _triggerDemoFlash,
+            icon: const Icon(Icons.flash_on_rounded, color: Color(0xFF8BE0C0), size: 16),
+            label: const Text(
+              'Test Mes 1',
+              style: TextStyle(color: Color(0xFF8BE0C0), fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white70),
+            color: const Color(0xFF0F192B),
+            onSelected: (val) {
+              if (val == 'test_flash') {
+                _triggerDemoFlash();
+              } else if (val == 'clear_flash') {
+                _clearDemoFlash();
+              } else if (val == 'refresh') {
+                _fetchPhotos();
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'test_flash',
+                child: Row(
+                  children: [
+                    Icon(Icons.flash_on_rounded, color: Color(0xFF8BE0C0), size: 18),
+                    SizedBox(width: 8),
+                    Text('Generar Test Mes 1', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+              if (_hasDemoFlash)
+                const PopupMenuItem(
+                  value: 'clear_flash',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                      SizedBox(width: 8),
+                      Text('Limpiar Test Mes 1', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh, color: Colors.white70, size: 18),
+                    SizedBox(width: 8),
+                    Text('Actualizar Fotos', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -394,6 +526,39 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Banner si hay simulación de prueba flash activa
+                    if (_hasDemoFlash)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF132238),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, color: Color(0xFF38BDF8), size: 16),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Mostrando simulación de Prueba Flash (Mes 1).',
+                                style: TextStyle(color: Colors.white70, fontSize: 11.5),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _clearDemoFlash,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Quitar Test', style: TextStyle(color: Colors.redAccent, fontSize: 11.5, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // Mini Gráfico Superior de Evolución
                     _buildCompactEvolutionCard(),
                     const SizedBox(height: 16),
@@ -406,6 +571,62 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       if (_photos.length >= 2) ...[
                         _buildBeforeAfterCard(),
                         const SizedBox(height: 16),
+                      ] else if (_photos.length == 1) ...[
+                        // Banner didáctico invitando a probar flash
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF1FAE87).withOpacity(0.18),
+                                const Color(0xFF0F192B),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.35)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1FAE87).withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.flash_on_rounded, color: Color(0xFF8BE0C0), size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '¿Quieres ver tu comparativa de 1 Mes?',
+                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Prueba flash para visualizar el gráfico de recomposición y las métricas.',
+                                      style: TextStyle(color: Colors.white60, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: _isUploading ? null : _triggerDemoFlash,
+                                icon: const Icon(Icons.bolt, size: 15),
+                                label: const Text('Test Mes 1', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF8BE0C0),
+                                  foregroundColor: const Color(0xFF0A0F1D),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
 
                       // Lista de fotos
