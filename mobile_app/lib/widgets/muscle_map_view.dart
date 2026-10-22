@@ -28,6 +28,44 @@ class _MuscleMapViewState extends State<MuscleMapView> {
   String? _tapped;
 
   @override
+  void initState() {
+    super.initState();
+    _determineInitialView();
+  }
+
+  @override
+  void didUpdateWidget(covariant MuscleMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.primaryMuscle != widget.primaryMuscle) {
+      _determineInitialView();
+    }
+  }
+
+  void _determineInitialView() {
+    final m = (widget.primaryMuscle ?? '').toLowerCase();
+    if (m.contains('dorsal') ||
+        m.contains('espalda') ||
+        m.contains('glute') ||
+        m.contains('glúte') ||
+        m.contains('isquio') ||
+        m.contains('femoral') ||
+        m.contains('hamstring') ||
+        m.contains('tricep') ||
+        m.contains('trícep') ||
+        m.contains('lumbar') ||
+        m.contains('pantorrilla') ||
+        m.contains('gemelo') ||
+        m.contains('posterior') ||
+        m.contains('trapecio') ||
+        m.contains('pajaro') ||
+        m.contains('pájaro')) {
+      _showBack = true;
+    } else {
+      _showBack = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final primary = MuscleMap.idsFor(widget.primaryMuscle);
     final secondary = MuscleMap.idsFor(widget.secondaryMuscle)
@@ -53,13 +91,13 @@ class _MuscleMapViewState extends State<MuscleMapView> {
                 segments: const [
                   ButtonSegment<bool>(
                     value: false,
-                    label: Text('Vista frontal'),
-                    icon: Icon(Icons.accessibility_new_rounded, size: 16),
+                    label: Text('Vista frontal', style: TextStyle(fontSize: 11)),
+                    icon: Icon(Icons.accessibility_new_rounded, size: 15),
                   ),
                   ButtonSegment<bool>(
                     value: true,
-                    label: Text('Vista posterior'),
-                    icon: Icon(Icons.back_hand_outlined, size: 16),
+                    label: Text('Vista posterior', style: TextStyle(fontSize: 11)),
+                    icon: Icon(Icons.back_hand_outlined, size: 15),
                   ),
                 ],
                 selected: {_showBack},
@@ -70,40 +108,39 @@ class _MuscleMapViewState extends State<MuscleMapView> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Container(
-          height: widget.height,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F192B),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF173B45), width: 1.5),
-          ),
-          child: colorMapping.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Este ejercicio no tiene musculos destacados.\n'
-                      'Toca la vista frontal o posterior para explorar '
-                      'la anatomia.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                  ),
-                )
-              : BodyAtlasView<MuscleInfo>(
-                  view: _showBack
-                      ? AtlasAsset.musclesBack
-                      : AtlasAsset.musclesFront,
-                  resolver: const MuscleResolver(),
-                  colorMapping: colorMapping,
-                  onTapElement: (muscle) {
-                    setState(() => _tapped = muscle.displayName);
-                  },
-                ),
-        ),
         const SizedBox(height: 8),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F192B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF173B45), width: 1.2),
+            ),
+            child: colorMapping.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        'Este ejercicio no tiene músculos destacados.\nToca la vista frontal o posterior para explorar la anatomía.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white54, fontSize: 11),
+                      ),
+                    ),
+                  )
+                : BodyAtlasView<MuscleInfo>(
+                    view: _showBack
+                        ? AtlasAsset.musclesBack
+                        : AtlasAsset.musclesFront,
+                    resolver: const MuscleResolver(),
+                    colorMapping: colorMapping,
+                    onTapElement: (muscle) {
+                      setState(() => _tapped = muscle.displayName);
+                    },
+                  ),
+          ),
+        ),
+        const SizedBox(height: 4),
         SizedBox(
           height: 34,
           child: _tapped == null
