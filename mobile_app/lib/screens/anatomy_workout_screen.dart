@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
-import 'package:mobile_app/widgets/biomechanical_kinematics_view.dart';
-import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
 import 'package:mobile_app/widgets/muscle_map_view.dart';
 
 /// Pantalla de demostración didáctica del modelo anatómico y técnica.
 ///
-/// Ofrece 4 modos de visualización avanzados:
+/// Ofrece 3 modos de visualización avanzados y certificados:
 /// 0: Técnica Real (GIF) animado en bucle adaptado.
 /// 1: Atlas Anatómico de Músculos (resaltado interactivo frontal/dorsal de agonistas y sinergistas).
-/// 2: Modelo Anatómico 3D Muscular (360°) con Balizas Holográficas de Activación.
-/// 3: Muñeco 3D Biomecánico (haciendo el ejercicio en vivo en 3D con goniómetro y telemetría).
+/// 2: Modelo Anatómico 3D Muscular (360°) con Balizas Holográficas de Activación y Presets de Cámara.
 class AnatomyWorkoutScreen extends StatefulWidget {
   const AnatomyWorkoutScreen({
     super.key,
@@ -31,7 +28,7 @@ class AnatomyWorkoutScreen extends StatefulWidget {
 class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
   late AnatomyExercise _exercise;
   bool _autoRotate = true;
-  int _viewMode = 0; // 0: GIF, 1: Atlas Muscular, 2: 3D Muscular con Marcadores, 3: Muñeco 3D en Vivo
+  int _viewMode = 0; // 0: GIF, 1: Atlas Muscular, 2: 3D Muscular con Marcadores
 
   /// Altura de la zona visual: la mitad superior de la pantalla.
   static const double _viewerHeight = 330;
@@ -61,8 +58,6 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
         return 'Atlas Anatómico de Músculos';
       case 2:
         return 'Modelo 3D Muscular (360° Marcadores)';
-      case 3:
-        return 'Muñeco 3D Biomecánico (Ejercicio en Vivo)';
       default:
         return 'Guía de Ejecución y Técnica';
     }
@@ -94,7 +89,7 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
       ),
       body: Column(
         children: [
-          // Selector dinámico con 4 modos de visualización
+          // Selector dinámico con 3 modos de visualización de alta fidelidad
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             color: kAnatomySurface,
@@ -108,26 +103,19 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
                     label: 'Técnica Real (GIF)',
                     color: const Color(0xFF1FAE87),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   _buildModeChip(
                     mode: 1,
                     icon: Icons.accessibility_new_rounded,
                     label: 'Atlas Muscular',
                     color: const Color(0xFFFFB340),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   _buildModeChip(
                     mode: 2,
                     icon: Icons.threed_rotation_rounded,
                     label: 'Modelo 3D (Marcadores)',
                     color: const Color(0xFF8BE0C0),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildModeChip(
-                    mode: 3,
-                    icon: Icons.view_in_ar_rounded,
-                    label: 'Muñeco 3D (Ejercicio en Vivo)',
-                    color: const Color(0xFF64B5F6),
                   ),
                 ],
               ),
@@ -186,7 +174,7 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
   }
 }
 
-/// Visor polivalente interactivo con 4 modos de alta fidelidad.
+/// Visor polivalente interactivo con 3 modos de alta fidelidad.
 class _Viewer extends StatelessWidget {
   const _Viewer({
     required this.exercise,
@@ -213,7 +201,7 @@ class _Viewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Modo 1: Atlas Anatómico de Músculos (flutter_body_atlas con auto-orientación)
+    // Modo 1: Atlas Anatómico de Músculos (flutter_body_atlas con auto-orientación frontal/posterior)
     if (viewMode == 1) {
       return Container(
         color: const Color(0xFF070C16),
@@ -231,20 +219,6 @@ class _Viewer extends StatelessWidget {
       return _Muscular3DViewer(
         exercise: exercise,
         autoRotate: autoRotate,
-      );
-    }
-
-    // Modo 3: Muñeco 3D Biomecánico Haciendo el Ejercicio en Tiempo Real con Goniómetro Articular y Volúmenes Musculares
-    if (viewMode == 3) {
-      return Container(
-        color: const Color(0xFF070C16),
-        child: Exercise3DViewer(
-          animationKey: exercise.id,
-          primaryMuscle: exercise.agonist,
-          secondaryMuscle: exercise.synergists.isNotEmpty ? exercise.synergists.first : null,
-          height: 330,
-          showMuscleLegend: true,
-        ),
       );
     }
 
