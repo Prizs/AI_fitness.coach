@@ -68,7 +68,26 @@ CREATE TABLE cached_plan (
     }
   }
 
+  Future<void> clearWeeklyPlanCache() async {
+    _memoryCache = null;
+    if (kIsWeb) {
+      try {
+        await _secureStorage.delete(key: _webStorageKey);
+      } catch (_) {}
+      return;
+    }
+    try {
+      final db = await instance.database;
+      await db.delete('cached_plan');
+    } catch (_) {
+      try {
+        await _secureStorage.delete(key: _webStorageKey);
+      } catch (_) {}
+    }
+  }
+
   Future<String?> getCachedWeeklyPlan() async {
+
     if (_memoryCache != null && _memoryCache!.trim().isNotEmpty) {
       return _memoryCache;
     }

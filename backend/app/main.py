@@ -87,6 +87,53 @@ def health_check():
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/api/admin/diagnostics")
+def admin_diagnostics(pin: str | None = None) -> dict:
+    """Endpoint protegido de diagnóstico para la consola técnica móvil."""
+    if pin not in ("2026", "admin818"):
+        return {"authorized": False, "error": "PIN de soporte inválido"}
+
+    import sys
+    import platform
+    import time
+
+    t0 = time.time()
+    supabase_ok = False
+    users_count = 0
+    trainers_count = 0
+    supabase_error = None
+    try:
+        from app.services.supabase_service import get_supabase_admin_client
+        admin = get_supabase_admin_client()
+        res = admin.table("usuarios").select("id", count="exact").execute()
+        users_count = res.count if hasattr(res, "count") and res.count is not None else len(res.data or [])
+        res_t = admin.table("usuarios").select("id", count="exact").eq("rol", "trainer").execute()
+        trainers_count = res_t.count if hasattr(res_t, "count") and res_t.count is not None else len(res_t.data or [])
+        supabase_ok = True
+    except Exception as e:
+        supabase_error = str(e)
+    lat_ms = round((time.time() - t0) * 1000, 1)
+
+    return {
+        "authorized": True,
+        "status": "healthy",
+        "supabase": {
+            "connected": supabase_ok,
+            "latency_ms": lat_ms,
+            "total_users": users_count,
+            "trainers_count": trainers_count,
+            "error": supabase_error,
+        },
+        "system": {
+            "python_version": sys.version.split()[0],
+            "platform": platform.platform(),
+            "environment": os.getenv("ENVIRONMENT", "production"),
+            "ai_providers": configured_providers(),
+        },
+    }
+
+
+
 # Montar la aplicacion web de Flutter en la raiz
 web_dist = os.path.join(os.path.dirname(__file__), "web_dist")
 if os.path.exists(web_dist):

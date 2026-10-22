@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:mobile_app/services/auth_service.dart';
 
 class TrainerMetricsTab extends StatefulWidget {
@@ -20,6 +21,28 @@ class _TrainerMetricsTabState extends State<TrainerMetricsTab> {
   void initState() {
     super.initState();
     _fetchDashboard();
+  }
+
+  Future<void> _downloadTrainerBitacoraPdf() async {
+    final baseUrl = AuthService.apiBaseUrl;
+    final url = '$baseUrl/api/trainer/bitacora/export?trainer_id=$_trainerCedula&print_auto=true';
+    final uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar bitácora: $e'),
+            backgroundColor: const Color(0xFFFF6B6B),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _fetchDashboard() async {
@@ -87,8 +110,11 @@ class _TrainerMetricsTabState extends State<TrainerMetricsTab> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cerrar', style: TextStyle(color: Colors.white54)),
           ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1FAE87)),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF8BE0C0),
+              side: const BorderSide(color: Color(0xFF8BE0C0)),
+            ),
             icon: const Icon(Icons.copy, size: 16),
             label: const Text('Copiar Texto'),
             onPressed: () {
@@ -97,15 +123,25 @@ class _TrainerMetricsTabState extends State<TrainerMetricsTab> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   backgroundColor: Color(0xFF1FAE87),
-                  content: Text('📋 Reporte copiado al portapapeles. Listo para exportar a PDF o enviar.'),
+                  content: Text('📋 Reporte copiado al portapapeles.'),
                 ),
               );
+            },
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1FAE87)),
+            icon: const Icon(Icons.download_rounded, size: 16),
+            label: const Text('Descargar PDF'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _downloadTrainerBitacoraPdf();
             },
           ),
         ],
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {

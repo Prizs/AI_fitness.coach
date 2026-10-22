@@ -156,6 +156,20 @@ class _CoachScreenState extends State<CoachScreen> {
         : 'Atleta';
     final baseUrl = AuthService.apiBaseUrl;
 
+    final planService = WeeklyPlanService.instance;
+    final t = planService.today;
+    final bool todayHasWorkout = (t != null && (t['exercises'] as List?)?.isNotEmpty == true);
+    final bool todayIsCompleted = planService.completedDays.contains(planService.todayIndex);
+    final String? todayTitle = (t?['title'] ?? t?['focus'])?.toString();
+    final List<String> todayExercises = (t?['exercises'] as List?)
+            ?.map((e) => (e is Map ? (e['name'] ?? '').toString() : e.toString()))
+            .where((s) => s.isNotEmpty)
+            .toList() ??
+        [];
+    final bool todayIsHome = planService.isTodayHomeWorkout;
+    final String todayDayName = planService.todayName;
+    final bool hasActivePlan = planService.hasActivePlan;
+
     if (mounted) {
       setState(() => _isLoading = true);
     }
@@ -171,16 +185,23 @@ class _CoachScreenState extends State<CoachScreen> {
               'user_name': userName,
               'cedula': cedula,
               'user_id': cedula,
-              'user_goal': WeeklyPlanService.instance.userGoal,
+              'user_goal': planService.userGoal,
               'user_level': _userLevel,
               'user_intensity': _userIntensity,
+              'has_active_plan': hasActivePlan,
+              'today_has_workout': todayHasWorkout,
+              'today_is_completed': todayIsCompleted,
+              'today_title': todayTitle,
+              'today_exercises': todayExercises,
+              'today_day_name': todayDayName,
+              'today_is_home': todayIsHome,
               'weekly_metrics': {
-                'adherence_rate': WeeklyPlanService.instance.adherenceRate,
-                'completed_sessions': WeeklyPlanService.instance.totalCompletedSessions,
-                'date_range': WeeklyPlanService.instance.cycleDateRangeStr,
-                'streak': WeeklyPlanService.instance.currentStreak,
-                'last_rpe': WeeklyPlanService.instance.lastRpe,
-                'last_feeling': WeeklyPlanService.instance.lastFeeling,
+                'adherence_rate': planService.adherenceRate,
+                'completed_sessions': planService.totalCompletedSessions,
+                'date_range': planService.cycleDateRangeStr,
+                'streak': planService.currentStreak,
+                'last_rpe': planService.lastRpe,
+                'last_feeling': planService.lastFeeling,
               },
             }),
           )
@@ -192,10 +213,10 @@ class _CoachScreenState extends State<CoachScreen> {
         final qReplies = data['quick_replies'] is List
             ? List<String>.from(data['quick_replies'])
             : <String>[
-                '¡Fue genial, quiero repetir intensidad!',
-                'Terminé cansado, bajemos un poco',
-                '¡Listo para el siguiente nivel!',
-                'Completar mi estado actual',
+                '📋 Completar mi estado de salud',
+                '🏋️ Ver ejercicios de hoy',
+                '🏠 ¿Dónde vas a entrenar? (Gimnasio o Casa)',
+                '💪 ¡Me siento al 100%, listo para entrenar!',
               ];
 
         if (mounted) {
@@ -215,19 +236,49 @@ class _CoachScreenState extends State<CoachScreen> {
       }
     } catch (_) {
       if (mounted && (_messages.isEmpty || (_messages.length == 1 && _messages.first['isWelcome'] == true))) {
+        String fallbackText;
+        List<String> fallbackQuickReplies;
+        if (todayHasWorkout && !todayIsCompleted) {
+          final exStr = todayExercises.isNotEmpty ? ' (${todayExercises.take(3).join(', ')})' : '';
+          final placeStr = todayIsHome ? 'en casa 🏠' : 'en el gimnasio 🏋️';
+          fallbackText = '¡Hola, $userName! 👋 Para hoy $todayDayName tenemos programado: "${todayTitle ?? 'Entrenamiento'}"$exStr $placeStr.\n\n¿Cómo te sientes hoy para entrenar? Cuéntame si tienes alguna molestia física o si necesitas adaptar los ejercicios según tu estado actual y el lugar donde vas a entrenar.';
+          fallbackQuickReplies = [
+            '📋 Completar mi estado de salud',
+            '🏋️ Ver ejercicios de hoy',
+            '🏠 ¿Dónde vas a entrenar? (Gimnasio o Casa)',
+            '💪 ¡Me siento al 100%, listo para entrenar!',
+          ];
+        } else if (todayIsCompleted) {
+          fallbackText = '¡Hola, $userName! 🎉 ¡Excelente trabajo completando tu sesión de hoy $todayDayName! Recuerda hidratarte bien y permitir que tus fibras musculares descansen entre 48 y 72 horas para una supercompensación óptima. ¿Cómo terminaste?';
+          fallbackQuickReplies = [
+            'Terminé genial, descansando',
+            'Siento algo de fatiga muscular',
+            '📋 Registrar sensaciones de hoy',
+          ];
+        } else if (!hasActivePlan) {
+          fallbackText = '¡Hola, $userName! 👋 ¡Bienvenido nuevamente a tu centro de entrenamiento inteligente! No tienes un ciclo activo programado para esta semana. ¿Cómo estuvo tu jornada anterior? Vamos a planificar tus sesiones.';
+          fallbackQuickReplies = [
+            '🚀 Planificar mi semana de entrenamiento',
+            '📋 Completar mi estado actual',
+            '💡 ¿Qué rutina me recomiendas hoy?',
+          ];
+        } else {
+          fallbackText = '¡Hola, $userName! 👋 Hoy $todayDayName es tu día de recuperación activa. El descanso neuromuscular es fundamental para consolidar el progreso y prevenir sobrecargas. ¿Cómo te sientes?';
+          fallbackQuickReplies = [
+            'Me siento recuperado y con energía',
+            'Siento algo de tensión muscular',
+            '📋 Completar mi estado actual',
+          ];
+        }
+
         setState(() {
           _messages.clear();
           _messages.add({
             'isUser': false,
-            'text': '¡Hola, $userName! 👋 ¡Excelente disciplina en tu semana! Soy tu Coach Inteligente. ¿Cómo sentiste tu rendimiento y fatiga? Cuéntame para calibrar a la perfección el nuevo ciclo hacia tu meta de ${WeeklyPlanService.instance.userGoal}.',
+            'text': fallbackText,
             'isWelcome': true,
             'plan': null,
-            'quick_replies': [
-              '¡Fue genial, quiero repetir intensidad!',
-              'Terminé cansado, bajemos un poco',
-              '¡Listo para el siguiente nivel!',
-              'Completar mi estado actual',
-            ],
+            'quick_replies': fallbackQuickReplies,
           });
         });
       }
@@ -1001,15 +1052,40 @@ class _CoachScreenState extends State<CoachScreen> {
                             children: (msg['quick_replies'] as List).map<Widget>((qr) {
                               final qrText = qr.toString();
                               final lower = qrText.toLowerCase();
-                              final isStateBtn = lower.contains('completar') || lower.contains('estado actual');
+                              final isStateBtn = lower.contains('completar') || lower.contains('estado actual') || lower.contains('estado de salud');
+                              final isWhereTrain = lower.contains('dónde vas a entrenar') || lower.contains('donde vas a entrenar') || lower.contains('gimnasio o casa');
+                              final isViewEx = lower.contains('ver ejercicios');
+                              final isReady = lower.contains('100%') || lower.contains('listo para entrenar');
                               final isFatigue = lower.contains('cansado') || lower.contains('bajemos') || lower.contains('descarga');
                               final isNextLvl = lower.contains('siguiente nivel') || lower.contains('alta');
+
                               final Color color = isStateBtn
                                   ? const Color(0xFF8BE0C0)
-                                  : (isFatigue ? const Color(0xFFFFB340) : (isNextLvl ? const Color(0xFFFF6B6B) : const Color(0xFF8BE0C0)));
+                                  : (isWhereTrain
+                                      ? const Color(0xFF64B5F6)
+                                      : (isViewEx
+                                          ? const Color(0xFF8BE0C0)
+                                          : (isReady
+                                              ? const Color(0xFF81C784)
+                                              : (isFatigue
+                                                  ? const Color(0xFFFFB340)
+                                                  : (isNextLvl
+                                                      ? const Color(0xFFFF6B6B)
+                                                      : const Color(0xFF8BE0C0))))));
+
                               final IconData icon = isStateBtn
                                   ? Icons.assignment_turned_in_rounded
-                                  : (isFatigue ? Icons.battery_charging_full_rounded : (isNextLvl ? Icons.trending_up_rounded : Icons.flash_on_rounded));
+                                  : (isWhereTrain
+                                      ? Icons.home_work_rounded
+                                      : (isViewEx
+                                          ? Icons.fitness_center_rounded
+                                          : (isReady
+                                              ? Icons.bolt_rounded
+                                              : (isFatigue
+                                                  ? Icons.battery_charging_full_rounded
+                                                  : (isNextLvl
+                                                      ? Icons.trending_up_rounded
+                                                      : Icons.flash_on_rounded)))));
 
                               return ActionChip(
                                 backgroundColor: const Color(0xFF16253B),
@@ -1022,7 +1098,7 @@ class _CoachScreenState extends State<CoachScreen> {
                                 onPressed: _isLoading
                                     ? null
                                     : () {
-                                        if (isStateBtn) {
+                                        if (isStateBtn || isWhereTrain) {
                                           _openStateSheet();
                                         } else {
                                           _sendMessage(qrText);
@@ -1596,15 +1672,40 @@ class _CoachScreenState extends State<CoachScreen> {
         child: Row(
           children: replies.map((qrText) {
             final lower = qrText.toLowerCase();
-            final isStateBtn = lower.contains('completar') || lower.contains('estado actual');
+            final isStateBtn = lower.contains('completar') || lower.contains('estado actual') || lower.contains('estado de salud');
+            final isWhereTrain = lower.contains('dónde vas a entrenar') || lower.contains('donde vas a entrenar') || lower.contains('gimnasio o casa');
+            final isViewEx = lower.contains('ver ejercicios');
+            final isReady = lower.contains('100%') || lower.contains('listo para entrenar');
             final isFatigue = lower.contains('cansado') || lower.contains('bajemos') || lower.contains('descarga');
             final isNextLvl = lower.contains('siguiente nivel') || lower.contains('alta');
+
             final Color color = isStateBtn
                 ? const Color(0xFF8BE0C0)
-                : (isFatigue ? const Color(0xFFFFB340) : (isNextLvl ? const Color(0xFFFF6B6B) : const Color(0xFF8BE0C0)));
+                : (isWhereTrain
+                    ? const Color(0xFF64B5F6)
+                    : (isViewEx
+                        ? const Color(0xFF8BE0C0)
+                        : (isReady
+                            ? const Color(0xFF81C784)
+                            : (isFatigue
+                                ? const Color(0xFFFFB340)
+                                : (isNextLvl
+                                    ? const Color(0xFFFF6B6B)
+                                    : const Color(0xFF8BE0C0))))));
+
             final IconData icon = isStateBtn
                 ? Icons.assignment_turned_in_rounded
-                : (isFatigue ? Icons.battery_charging_full_rounded : (isNextLvl ? Icons.trending_up_rounded : Icons.flash_on_rounded));
+                : (isWhereTrain
+                    ? Icons.home_work_rounded
+                    : (isViewEx
+                        ? Icons.fitness_center_rounded
+                        : (isReady
+                            ? Icons.bolt_rounded
+                            : (isFatigue
+                                ? Icons.battery_charging_full_rounded
+                                : (isNextLvl
+                                    ? Icons.trending_up_rounded
+                                    : Icons.flash_on_rounded)))));
 
             return Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -1619,7 +1720,7 @@ class _CoachScreenState extends State<CoachScreen> {
                 onPressed: _isLoading
                     ? null
                     : () {
-                        if (isStateBtn) {
+                        if (isStateBtn || isWhereTrain) {
                           _openStateSheet();
                         } else {
                           _sendMessage(qrText);

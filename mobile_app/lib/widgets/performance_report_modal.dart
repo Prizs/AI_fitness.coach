@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:mobile_app/database/db_helper.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/services/auth_service.dart';
 
 class PerformanceReportModal extends StatefulWidget {
   final String? clientName; // Si es null, es el perfil del propio usuario
@@ -339,6 +341,34 @@ class _PerformanceReportModalState extends State<PerformanceReportModal> {
                     }),
 
                   const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF102820),
+                      foregroundColor: const Color(0xFF8BE0C0),
+                      side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.picture_as_pdf_rounded, size: 20, color: Color(0xFF8BE0C0)),
+                    label: const Text('Descargar Bitácora Oficial (PDF)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    onPressed: () async {
+                      final baseUrl = AuthService.apiBaseUrl;
+                      final user = AuthService.instance.loggedInUser;
+                      final cedula = user?.cedula ?? 'default';
+                      final url = '$baseUrl/api/coach/bitacora/export?cedula=$cedula&print_auto=true';
+                      final uri = Uri.parse(url);
+                      try {
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } else {
+                          await launchUrl(uri);
+                        }
+                      } catch (_) {
+                        await launchUrl(uri);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF173B45),
