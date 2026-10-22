@@ -1131,6 +1131,26 @@ class _TrainerClientChatScreenState extends State<TrainerClientChatScreen> {
       );
     }
 
+    if (rawText.startsWith('[FEEDBACK_ANUNCIO:')) {
+      final closeIdx = rawText.indexOf(']');
+      final cleanText = closeIdx != -1 ? rawText.substring(closeIdx + 1).trim() : rawText;
+      return Column(
+        crossAxisAlignment: isTrainer ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white12,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text('RESPUESTA A COMUNICADO', style: TextStyle(color: Colors.white70, fontSize: 9.5, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 4),
+          Text(cleanText, style: const TextStyle(color: Colors.white, fontSize: 13.5)),
+        ],
+      );
+    }
+
     return Text(
       rawText,
       style: const TextStyle(color: Colors.white, fontSize: 14),

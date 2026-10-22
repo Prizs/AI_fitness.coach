@@ -68,6 +68,16 @@ class BookSlotReq(BaseModel):
 class CreateAnnouncementReq(BaseModel):
     trainer_id: str
     message: str
+    tag: Optional[str] = "tip_advice"
+
+
+class AnnouncementResponseReq(BaseModel):
+    announcement_id: str
+    trainer_id: str
+    client_id: str
+    response_type: str  # attendance_confirmed, attendance_declined, home_workout, postponed, acknowledged
+    reason: Optional[str] = ""
+    client_name: Optional[str] = ""
 
 
 class DeleteBlockReq(BaseModel):
@@ -1064,7 +1074,7 @@ def get_trainer_notifications(trainer_id: str):
 
 @router.get("/announcements/{trainer_id}")
 def get_announcements(trainer_id: str):
-    """Retorna los anuncios publicados por el entrenador."""
+    """Retorna los anuncios publicados por el entrenador con su etiqueta y resumen de feedback de alumnos."""
     admin = get_supabase_admin_client()
     trainer = _resolve_user_id(admin, trainer_id)
     t_id = trainer["id"] if trainer else trainer_id
@@ -1077,22 +1087,129 @@ def get_announcements(trainer_id: str):
             .order("created_at", desc=True)
             .execute()
         )
-        return res.data or []
+        raw_list = res.data or []
+
+        # Obtener feedback de los alumnos desde trainer_chat
+        feedbacks_by_announcement = {}
+        try:
+            chat_res = (
+                admin.table("trainer_chat")
+                .select("id, client_id, message, created_at")
+                .eq("trainer_id", t_id)
+                .order("created_at", desc=False)
+                .execute()
+            )
+            chat_msgs = chat_res.data or []
+
+            client_ids = list({m["client_id"] for m in chat_msgs if m.get("client_id")})
+            client_names = {}
+            if client_ids:
+                try:
+                    u_res = admin.table("usuarios").select("id, cedula, nombre, apellido").in_("id", client_ids).execute()
+                    for u in (u_res.data or []):
+                        name = f"{u.get('nombre', '')} {u.get('apellido', '')}".strip()
+                        client_names[u["id"]] = name or u.get("cedula") or "Alumno"
+                except Exception:
+                    pass
+
+            for m in chat_msgs:
+                msg_txt = m.get("message") or ""
+                if msg_txt.startswith("[FEEDBACK_ANUNCIO:"):
+                    try:
+                        header = msg_txt.split("]", 1)[0].replace("[FEEDBACK_ANUNCIO:", "").strip()
+                        parts = [p.strip() for p in header.split("|")]
+                        ann_id = parts[0] if len(parts) > 0 else ""
+                        resp_type = parts[1] if len(parts) > 1 else ""
+                        reason = parts[2] if len(parts) > 2 else ""
+
+                        cid = m.get("client_id")
+                        cname = client_names.get(cid, "Alumno")
+
+                        if ann_id not in feedbacks_by_announcement:
+                            feedbacks_by_announcement[ann_id] = {}
+                        # Guardar la respuesta más reciente de cada alumno para este anuncio
+                        feedbacks_by_announcement[ann_id][cid] = {
+                            "client_id": cid,
+                            "client_name": cname,
+                            "type": resp_type,
+                            "reason": reason,
+                            "created_at": m.get("created_at")
+                        }
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"Error cargando feedback de anuncios: {e}")
+
+        processed = []
+        for ann in raw_list:
+            raw_msg = ann.get("message") or ""
+            ann_id = str(ann.get("id"))
+            tag = "tip_advice"
+            clean_msg = raw_msg
+
+            if raw_msg.startswith("[TAG:") and "]" in raw_msg:
+                tag_part, clean_part = raw_msg.split("]", 1)
+                tag = tag_part.replace("[TAG:", "").strip()
+                clean_msg = clean_part.strip()
+            elif raw_msg.startswith("[MOTIVO:") and "]" in raw_msg:
+                tag_part, clean_part = raw_msg.split("]", 1)
+                tag = tag_part.replace("[MOTIVO:", "").strip()
+                clean_msg = clean_part.strip()
+            else:
+                lower = raw_msg.lower()
+                if any(w in lower for w in ["casa", "no podre", "no podré", "no voy a poder", "no asistire", "no asistiré"]):
+                    tag = "coach_absence"
+                elif any(w in lower for w in ["confirmar", "confirmen", "asistencia", "quienes asisten", "quiénes asisten", "cupo", "horario"]):
+                    tag = "attendance_call"
+                else:
+                    tag = "tip_advice"
+
+            ann_feedbacks_dict = feedbacks_by_announcement.get(ann_id, {})
+            feedback_list = list(ann_feedbacks_dict.values())
+
+            attending = [f for f in feedback_list if f["type"] == "attendance_confirmed"]
+            declined = [f for f in feedback_list if f["type"] == "attendance_declined"]
+            home_workouts = [f for f in feedback_list if f["type"] == "home_workout"]
+            postponed = [f for f in feedback_list if f["type"] == "postponed"]
+            acknowledged = [f for f in feedback_list if f["type"] in ("acknowledged", "lectura_confirmada")]
+
+            processed.append({
+                **ann,
+                "tag": tag,
+                "clean_message": clean_msg,
+                "message": clean_msg,
+                "raw_message": raw_msg,
+                "feedback_summary": {
+                    "total": len(feedback_list),
+                    "attending": attending,
+                    "declined": declined,
+                    "home_workouts": home_workouts,
+                    "postponed": postponed,
+                    "acknowledged": acknowledged,
+                    "all": feedback_list
+                }
+            })
+
+        return processed
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/announcements")
 def create_announcement(req: CreateAnnouncementReq):
-    """Publica un nuevo anuncio para los alumnos y los notifica en tiempo real."""
+    """Publica un nuevo anuncio para los alumnos con su motivo/etiqueta y los notifica en tiempo real."""
     admin = get_supabase_admin_client()
     trainer = _resolve_user_id(admin, req.trainer_id)
     t_id = trainer["id"] if trainer else req.trainer_id
 
+    tag = (req.tag or "tip_advice").strip()
+    clean_body = req.message.strip()
+    stored_message = f"[TAG:{tag}]\n{clean_body}"
+
     try:
         new_row = {
             "trainer_id": t_id,
-            "message": req.message.strip(),
+            "message": stored_message,
             "created_at": datetime.utcnow().isoformat()
         }
         res = admin.table("trainer_announcements").insert(new_row).execute()
@@ -1126,7 +1243,14 @@ def create_announcement(req: CreateAnnouncementReq):
             except Exception:
                 pass
 
-            broadcast_msg = f"📢 AVISO OFICIAL DEL COACH:\n{req.message.strip()}"
+            tag_headers = {
+                "coach_absence": "📢 AVISO DE AUSENCIA DEL COACH (RUTINA EN CASA)",
+                "attendance_call": "🏋️ CONVOCATORIA DE ASISTENCIA EN EL GIMNASIO",
+                "tip_advice": "📢 COMUNICADO OFICIAL DEL COACH",
+            }
+            broadcast_header = tag_headers.get(tag, "📢 AVISO OFICIAL DEL COACH")
+            broadcast_msg = f"{broadcast_header}:\n{clean_body}"
+
             for cid in target_clients.keys():
                 admin.table("trainer_chat").insert({
                     "trainer_id": t_id,
@@ -1139,6 +1263,48 @@ def create_announcement(req: CreateAnnouncementReq):
             print(f"Error difundiendo anuncio en chat: {broadcast_err}")
 
         return {"status": "ok", "announcement": ann_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/announcements/respond")
+def respond_to_announcement(req: AnnouncementResponseReq):
+    """Registra la respuesta de un alumno a un anuncio específico y notifica al coach en tiempo real."""
+    admin = get_supabase_admin_client()
+    trainer = _resolve_user_id(admin, req.trainer_id)
+    t_id = trainer["id"] if trainer else req.trainer_id
+
+    client = _resolve_user_id(admin, req.client_id)
+    c_id = client["id"] if client else req.client_id
+    trainer_name = f"{trainer.get('nombre', '')} {trainer.get('apellido', '')}".strip() if trainer else "Coach"
+
+    human_msg = ""
+    if req.response_type == "attendance_confirmed":
+        human_msg = f"🙋‍♂️ ¡Hola Coach {trainer_name}! Confirmado, sí asistiré puntual a la sesión en el gimnasio 💪"
+    elif req.response_type == "attendance_declined":
+        reason_txt = f" Motivo: {req.reason.strip()}" if req.reason and req.reason.strip() else ""
+        human_msg = f"❌ Hola Coach {trainer_name}, hoy no podré asistir al gimnasio.{reason_txt}"
+    elif req.response_type == "home_workout":
+        human_msg = f"🏠 Entendido Coach {trainer_name}, hoy realizaré la rutina adaptada en casa 💪"
+    elif req.response_type == "postponed":
+        human_msg = f"⏭️ Hola Coach {trainer_name}, hoy descansaré y pospondré la sesión de entrenamiento para mañana."
+    elif req.response_type == "acknowledged":
+        human_msg = f"👍 ¡Aviso recibido y comprendido, muchas gracias Coach {trainer_name}! 🙌"
+    else:
+        human_msg = f"Respuesta al aviso: {req.response_type}"
+
+    structured_msg = f"[FEEDBACK_ANUNCIO: {req.announcement_id} | {req.response_type} | {req.reason or ''}] {human_msg}"
+
+    try:
+        new_row = {
+            "trainer_id": t_id,
+            "client_id": c_id,
+            "sender_id": c_id,
+            "message": structured_msg,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        res = admin.table("trainer_chat").insert(new_row).execute()
+        return {"status": "ok", "message": "Feedback registrado correctamente", "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

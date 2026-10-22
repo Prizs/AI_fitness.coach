@@ -33,6 +33,8 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
   bool _isLoadingAgenda = false;
 
   final Set<String> _confirmedAnnouncements = {};
+  final Map<String, String> _declinedAnnouncements = {};
+  final Set<String> _postponedAnnouncements = {};
   final DailyNotificationService _notifService = DailyNotificationService.instance;
 
   @override
@@ -339,6 +341,189 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
     } catch (e) {
       debugPrint('Error enviando respuesta al coach: $e');
     }
+  }
+
+  Future<void> _sendAnnouncementFeedback({
+    required String announcementId,
+    required String responseType,
+    String? reason,
+    String? successNotification,
+  }) async {
+    if (_trainerInfo == null) return;
+    final baseUrl = AuthService.apiBaseUrl;
+    final trainerId = _trainerInfo!['id'] ?? _trainerInfo!['cedula'];
+    final user = AuthService.instance.loggedInUser;
+    final clientName = '${user?.name ?? ""} ${user?.lastName ?? ""}'.trim();
+
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/trainer/announcements/respond'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'announcement_id': announcementId,
+          'trainer_id': trainerId,
+          'client_id': _myCedula,
+          'response_type': responseType,
+          'reason': reason ?? '',
+          'client_name': clientName.isNotEmpty ? clientName : 'Alumno',
+        }),
+      );
+      if (res.statusCode == 200) {
+        await _loadChatMessages();
+        if (mounted && successNotification != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF1FAE87),
+              content: Text(successNotification),
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error enviando feedback de anuncio: $e');
+    }
+  }
+
+  void _showDeclineAttendanceSheet(String announcementId) {
+    String selectedReason = '💼 Motivos laborales / trabajo';
+    final customCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final reasons = [
+            '💼 Motivos laborales / trabajo',
+            '🚗 Problemas de transporte o tiempo',
+            '🤒 Malestar físico / fatiga muscular',
+            '🌧️ Imprevisto personal de fuerza mayor',
+            '✏️ Otro motivo personal',
+          ];
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                Row(
+                  children: const [
+                    Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 22),
+                    SizedBox(width: 10),
+                    Text(
+                      'Aviso de Inasistencia al Gimnasio',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Indica el motivo para que tu entrenador lo verifique y planifique el seguimiento de tus cargas:',
+                  style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                ),
+                const SizedBox(height: 14),
+                ...reasons.map((r) => Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: selectedReason == r ? const Color(0xFF3B1818) : const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: selectedReason == r ? Colors.redAccent : Colors.white10),
+                  ),
+                  child: RadioListTile<String>(
+                    dense: true,
+                    title: Text(
+                      r,
+                      style: TextStyle(
+                        color: selectedReason == r ? Colors.white : Colors.white70,
+                        fontSize: 13,
+                        fontWeight: selectedReason == r ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    value: r,
+                    groupValue: selectedReason,
+                    activeColor: Colors.redAccent,
+                    onChanged: (val) {
+                      if (val != null) setSheetState(() => selectedReason = val);
+                    },
+                  ),
+                )),
+                if (selectedReason.contains('Otro')) ...[
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: customCtrl,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Describe brevemente el motivo...',
+                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                      filled: true,
+                      fillColor: const Color(0xFF16233A),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white60,
+                          side: const BorderSide(color: Colors.white24),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          final finalReason = selectedReason.contains('Otro') && customCtrl.text.trim().isNotEmpty
+                              ? customCtrl.text.trim()
+                              : selectedReason;
+                          Navigator.pop(ctx);
+                          setState(() {
+                            _declinedAnnouncements[announcementId] = finalReason;
+                          });
+                          _sendAnnouncementFeedback(
+                            announcementId: announcementId,
+                            responseType: 'attendance_declined',
+                            reason: finalReason,
+                            successNotification: '❌ Aviso enviado al Coach: No asistirás hoy ($finalReason)',
+                          );
+                        },
+                        child: const Text('Confirmar Aviso', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _confirmSession(String sessionId, String startTime) async {
@@ -1474,21 +1659,36 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                   }
                 }
 
-                final msg = (a['message'] ?? a['content'] ?? '').toString();
+                final rawMsg = (a['message'] ?? a['content'] ?? '').toString();
+                String msg = rawMsg;
+                String tag = (a['tag'] ?? '').toString();
+
+                if (rawMsg.startsWith('[TAG:') && rawMsg.contains(']')) {
+                  final parts = rawMsg.split(']');
+                  tag = parts[0].replaceAll('[TAG:', '').trim();
+                  msg = parts.sublist(1).join(']').trim();
+                } else if (rawMsg.startsWith('[MOTIVO:') && rawMsg.contains(']')) {
+                  final parts = rawMsg.split(']');
+                  tag = parts[0].replaceAll('[MOTIVO:', '').trim();
+                  msg = parts.sublist(1).join(']').trim();
+                }
+
                 final msgLower = msg.toLowerCase();
                 final announcementId = (a['id'] ?? index).toString();
 
                 // 1. Condicional: Ausencia del entrenador o propuesta de rutina en casa
-                final isCoachAbsence = msgLower.contains('casa') ||
+                final isCoachAbsence = tag == 'coach_absence' || (tag.isEmpty && (
+                    msgLower.contains('casa') ||
                     msgLower.contains('no podre') ||
                     msgLower.contains('no podré') ||
                     msgLower.contains('no voy a poder') ||
                     msgLower.contains('no asistire') ||
                     msgLower.contains('no asistiré') ||
-                    msgLower.contains('entreno en casa');
+                    msgLower.contains('entreno en casa')
+                ));
 
                 // 2. Condicional: Convocatoria para confirmar asistencia presencial u horario
-                final isAttendanceCall = !isCoachAbsence && (
+                final isAttendanceCall = tag == 'attendance_call' || (tag.isEmpty && !isCoachAbsence && (
                     msgLower.contains('confirmar') ||
                     msgLower.contains('confirmen') ||
                     msgLower.contains('asistencia') ||
@@ -1498,20 +1698,32 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                     msgLower.contains('quien va') ||
                     msgLower.contains('cupo') ||
                     msgLower.contains('horario')
-                );
+                ));
 
                 final isGeneralInfo = !isCoachAbsence && !isAttendanceCall;
 
+                String tagTitle = 'Comunicado Oficial';
+                Color tagColor = const Color(0xFF38BDF8);
+                IconData tagIcon = Icons.campaign_rounded;
+
+                if (isCoachAbsence) {
+                  tagTitle = 'Inasistencia del Coach (Rutina Casa)';
+                  tagColor = const Color(0xFFA855F7);
+                  tagIcon = Icons.home_repair_service_rounded;
+                } else if (isAttendanceCall) {
+                  tagTitle = 'Convocatoria Asistencia al Gym';
+                  tagColor = const Color(0xFF1FAE87);
+                  tagIcon = Icons.how_to_reg_rounded;
+                }
+
                 return Card(
                   color: const Color(0xFF1E293B),
-                  margin: const EdgeInsets.only(bottom: 12),
+                  margin: const EdgeInsets.only(bottom: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                     side: BorderSide(
-                      color: isCoachAbsence
-                          ? const Color(0xFFA855F7)
-                          : (isAttendanceCall ? const Color(0xFF1FAE87) : Colors.white12),
-                      width: (isCoachAbsence || isAttendanceCall) ? 1.5 : 1,
+                      color: tagColor.withOpacity(0.6),
+                      width: 1.3,
                     ),
                   ),
                   child: Padding(
@@ -1525,21 +1737,15 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                             Row(
                               children: [
                                 Icon(
-                                  isCoachAbsence
-                                      ? Icons.home_repair_service_rounded
-                                      : (isAttendanceCall ? Icons.how_to_reg_rounded : Icons.campaign),
-                                  color: isCoachAbsence
-                                      ? const Color(0xFFA855F7)
-                                      : const Color(0xFF1FAE87),
+                                  tagIcon,
+                                  color: tagColor,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  isCoachAbsence
-                                      ? 'Aviso de Ausencia / Casa'
-                                      : (isAttendanceCall ? 'Convocatoria de Asistencia' : 'Comunicado Oficial'),
+                                  tagTitle,
                                   style: TextStyle(
-                                    color: isCoachAbsence ? const Color(0xFFA855F7) : const Color(0xFF1FAE87),
+                                    color: tagColor,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
@@ -1561,12 +1767,42 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                           style: const TextStyle(color: Colors.white, fontSize: 14.5, height: 1.4),
                         ),
 
-                        // CONDICIONAL 1: El coach no podrá asistir / Propuesta de casa
+                        // CONDICIONAL 1: El coach no podrá asistir / Propuesta de casa o descanso
                         if (isCoachAbsence) ...[
                           const SizedBox(height: 12),
                           Builder(
                             builder: (context) {
+                              final isPostponed = _postponedAnnouncements.contains(announcementId);
                               final isHomeActive = WeeklyPlanService.instance.isTodayHomeWorkout;
+
+                              if (isPostponed) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amberAccent.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.amberAccent.withOpacity(0.6)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.pause_circle_filled_rounded, color: Colors.amberAccent, size: 18),
+                                      const SizedBox(width: 8),
+                                      const Expanded(
+                                        child: Text(
+                                          '⏸️ Has pospuesto la sesión para mañana (Coach informado)',
+                                          style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                                        onPressed: _showHomeWorkoutDialog,
+                                        child: const Text('Hacer en casa', style: TextStyle(color: Color(0xFFA855F7), fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+
                               if (isHomeActive) {
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1598,7 +1834,7 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                                           ),
                                           icon: const Icon(Icons.replay_rounded, size: 14, color: Color(0xFFA855F7)),
                                           label: const Text(
-                                            'Reasignar / Cambiar ejercicios de casa',
+                                            'Reasignar ejercicios de casa',
                                             style: TextStyle(color: Color(0xFFA855F7), fontSize: 11.5, fontWeight: FontWeight.w600),
                                           ),
                                           onPressed: _showHomeWorkoutDialog,
@@ -1608,6 +1844,7 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                                   ],
                                 );
                               }
+
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -1618,24 +1855,35 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
                                     icon: const Icon(Icons.home_rounded, color: Colors.white, size: 18),
-                                    label: const Text('🏠 Activar Entrenamiento en Casa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                    onPressed: _showHomeWorkoutDialog,
+                                    label: const Text('🏠 Sí, haré la rutina en casa hoy', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    onPressed: () {
+                                      _sendAnnouncementFeedback(
+                                        announcementId: announcementId,
+                                        responseType: 'home_workout',
+                                        successNotification: '🏠 ¡Rutina en casa activada y notificada a tu coach!',
+                                      );
+                                      _showHomeWorkoutDialog();
+                                    },
                                   ),
                                   const SizedBox(height: 6),
-                                  TextButton.icon(
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      visualDensity: VisualDensity.compact,
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.white70,
+                                      side: const BorderSide(color: Colors.white24),
+                                      padding: const EdgeInsets.symmetric(vertical: 9),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
-                                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.white60),
+                                    icon: const Icon(Icons.pause_circle_outline_rounded, size: 16, color: Colors.amberAccent),
                                     label: const Text(
-                                      '💬 Responder: "Entendido coach, entrenaré en casa hoy"',
-                                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                                      '⏭️ Posponer al día siguiente / Descanso',
+                                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
                                     ),
                                     onPressed: () {
-                                      _sendQuickResponseToTrainer(
-                                        'Entendido coach, hoy realizaré la rutina sustituta en casa 🏠',
-                                        successNotification: '✓ Mensaje enviado a Coach $trainerName',
+                                      setState(() => _postponedAnnouncements.add(announcementId));
+                                      _sendAnnouncementFeedback(
+                                        announcementId: announcementId,
+                                        responseType: 'postponed',
+                                        successNotification: '⏭️ Has pospuesto la sesión para mañana. Descanso registrado.',
                                       );
                                     },
                                   ),
@@ -1651,6 +1899,8 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                           Builder(
                             builder: (context) {
                               final hasConfirmed = _confirmedAnnouncements.contains(announcementId);
+                              final declinedReason = _declinedAnnouncements[announcementId];
+
                               if (hasConfirmed) {
                                 return Container(
                                   padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
@@ -1672,6 +1922,42 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                                   ),
                                 );
                               }
+
+                              if (declinedReason != null) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    color: Colors.redAccent.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.redAccent.withOpacity(0.6)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '❌ Avisaste que no asistirás ($declinedReason)',
+                                              style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      TextButton.icon(
+                                        style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                                        icon: const Icon(Icons.home_outlined, size: 14, color: Color(0xFFA855F7)),
+                                        label: const Text('¿Hacer rutina alternativa en casa hoy?', style: TextStyle(color: Color(0xFFA855F7), fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                        onPressed: _showHomeWorkoutDialog,
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+
                               return Row(
                                 children: [
                                   Expanded(
@@ -1679,7 +1965,7 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                                     child: ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(0xFF1FAE87),
-                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        padding: const EdgeInsets.symmetric(vertical: 11),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
                                       icon: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
@@ -1689,9 +1975,10 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                                       ),
                                       onPressed: () {
                                         setState(() => _confirmedAnnouncements.add(announcementId));
-                                        _sendQuickResponseToTrainer(
-                                          '¡Hola Coach $trainerName! Confirmado, sí allí estaré presente en el entrenamiento 💪',
-                                          successNotification: '✅ ¡Asistencia confirmada enviada a Coach $trainerName!',
+                                        _sendAnnouncementFeedback(
+                                          announcementId: announcementId,
+                                          responseType: 'attendance_confirmed',
+                                          successNotification: '✅ ¡Asistencia confirmada enviada a tu Coach!',
                                         );
                                       },
                                     ),
@@ -1701,22 +1988,17 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                                     flex: 5,
                                     child: OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
-                                        foregroundColor: const Color(0xFFA855F7),
-                                        side: const BorderSide(color: Color(0xFFA855F7)),
-                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        foregroundColor: Colors.redAccent,
+                                        side: const BorderSide(color: Colors.redAccent),
+                                        padding: const EdgeInsets.symmetric(vertical: 11),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
-                                      icon: const Icon(Icons.home_outlined, size: 16),
+                                      icon: const Icon(Icons.cancel_outlined, size: 16),
                                       label: const Text(
-                                        '🏠 En casa',
+                                        '❌ No podré',
                                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                                       ),
-                                      onPressed: () {
-                                        _sendQuickResponseToTrainer(
-                                          'Hola Coach, hoy no podré asistir presencialmente. Haré la rutina sustituta en casa 🏠',
-                                        );
-                                        _showHomeWorkoutDialog();
-                                      },
+                                      onPressed: () => _showDeclineAttendanceSheet(announcementId),
                                     ),
                                   ),
                                 ],
@@ -1749,8 +2031,9 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
                                     label: const Text('👍 ¡Entendido, gracias Coach!', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
                                     onPressed: () {
                                       setState(() => _confirmedAnnouncements.add(announcementId));
-                                      _sendQuickResponseToTrainer(
-                                        '¡Entendido el comunicado, muchas gracias Coach $trainerName! 🙌',
+                                      _sendAnnouncementFeedback(
+                                        announcementId: announcementId,
+                                        responseType: 'acknowledged',
                                         successNotification: '✓ Confirmación de lectura enviada al Coach',
                                       );
                                     },
@@ -2232,6 +2515,26 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
             const SizedBox(height: 6),
             Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14)),
           ],
+        ],
+      );
+    }
+
+    if (rawText.startsWith('[FEEDBACK_ANUNCIO:')) {
+      final closeIdx = rawText.indexOf(']');
+      final cleanText = closeIdx != -1 ? rawText.substring(closeIdx + 1).trim() : rawText;
+      return Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white12,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text('RESPUESTA A COMUNICADO', style: TextStyle(color: Colors.white70, fontSize: 9.5, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 4),
+          Text(cleanText, style: const TextStyle(color: Colors.white, fontSize: 13.5)),
         ],
       );
     }
