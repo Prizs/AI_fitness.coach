@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
 import 'package:mobile_app/services/auth_service.dart';
 
@@ -25,8 +26,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
     _fetchPhotos();
   }
 
+  double _safeDouble(dynamic val, [double fallback = 0.0]) {
+    if (val == null) return fallback;
+    if (val is num) return val.toDouble();
+    final s = val.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(s) ?? fallback;
+  }
+
   Future<void> _fetchPhotos() async {
-    final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+    final user = AuthService.instance.loggedInUser;
+    final uid = user?.cedula ?? '';
     if (uid.isEmpty) {
       setState(() => _isLoading = false);
       return;
@@ -71,7 +80,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
       setState(() => _isUploading = true);
 
-      final uid = AuthService.instance.loggedInUser?.cedula ?? '';
+      final user = AuthService.instance.loggedInUser;
+      final uid = user?.cedula ?? '';
+
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('${AuthService.apiBaseUrl}/api/progress/upload'),
@@ -79,7 +90,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
       request.fields['user_id'] = uid;
 
       final bytes = await image.readAsBytes();
-      request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: image.name));
+      final ext = image.name.split('.').last.toLowerCase();
+      final mimeSubtype = (ext == 'png') ? 'png' : (ext == 'webp' ? 'webp' : 'jpeg');
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: image.name.isNotEmpty ? image.name : 'progress.jpg',
+          contentType: MediaType('image', mimeSubtype),
+        ),
+      );
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
@@ -102,11 +123,23 @@ class _ProgressScreenState extends State<ProgressScreen> {
         }
         await _fetchPhotos();
       } else {
+        String detailMsg = 'Error en el servidor al analizar imagen.';
+        try {
+          final errJson = jsonDecode(response.body);
+          if (errJson is Map && errJson['detail'] != null) {
+            detailMsg = errJson['detail'].toString();
+          }
+        } catch (_) {
+          if (response.body.isNotEmpty) detailMsg = response.body;
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No se pudo procesar la imagen. Intenta de nuevo.'),
+            SnackBar(
+              content: Text('No se pudo procesar: $detailMsg'),
               backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
             ),
           );
         }
@@ -117,6 +150,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           SnackBar(
             content: Text('Error al subir: $e'),
             backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -211,36 +245,47 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Map<String, dynamic> _parseStructuredAnalysis(dynamic item) {
+    Map<String, dynamic> data = {};
     if (item is Map && item['structured_analysis'] is Map) {
-      return Map<String, dynamic>.from(item['structured_analysis']);
+      data = Map<String, dynamic>.from(item['structured_analysis']);
+    } else {
+      final raw = item is Map ? item['ai_analysis'] : null;
+      if (raw is String && raw.trim().startsWith('{')) {
+        try {
+          final parsed = jsonDecode(raw);
+          if (parsed is Map) data = Map<String, dynamic>.from(parsed);
+        } catch (_) {}
+      }
     }
-    final raw = item['ai_analysis'];
-    if (raw is String && raw.trim().startsWith('{')) {
-      try {
-        final parsed = jsonDecode(raw);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      } catch (_) {}
+
+    if (data.isEmpty) {
+      final rawStr = (item is Map ? item['ai_analysis'] : null) ?? '';
+      data = {
+        'headline': rawStr is String && rawStr.isNotEmpty ? rawStr : 'Análisis Fisiológico de Progreso',
+        'photo_stage': 'Foto de Seguimiento',
+        'photo_number': 1,
+        'estimated_body_fat': 22.0,
+        'muscle_definition_score': 6.0,
+        'posture_score': 7.5,
+        'biotype': 'Mesomorfo',
+        'positive_changes': [
+          'Alineación y compostura corporal estable',
+          'Buena base para sobrecarga progresiva',
+        ],
+        'areas_to_improve': [
+          'Enfocar el trabajo de core y deltoides en tus rutinas',
+          'Mantener cadencia controlada en las repeticiones',
+        ],
+        'physiological_composition': rawStr is String ? rawStr : 'Compostura física en proceso activo de recomposición.',
+        'training_plan_feedback': 'Cumple con los días programados y consulta a tu Coach cualquier duda.',
+        'motivational_quote': 'La constancia en este mes de entrenamiento revelará los mejores resultados.',
+      };
+    } else {
+      data['estimated_body_fat'] = _safeDouble(data['estimated_body_fat'], 22.0);
+      data['muscle_definition_score'] = _safeDouble(data['muscle_definition_score'], 6.0);
+      data['posture_score'] = _safeDouble(data['posture_score'], 7.5);
     }
-    return {
-      'headline': raw is String && raw.isNotEmpty ? raw : 'Análisis Fisiológico de Progreso',
-      'photo_stage': 'Foto de Seguimiento',
-      'photo_number': 1,
-      'estimated_body_fat': 21.0,
-      'muscle_definition_score': 6.5,
-      'posture_score': 7.5,
-      'biotype': 'Mesomorfo',
-      'positive_changes': [
-        'Alineación y compostura corporal estable',
-        'Buena base para sobrecarga progresiva',
-      ],
-      'areas_to_improve': [
-        'Enfocar el trabajo de core y deltoides en tus rutinas',
-        'Mantener cadencia controlada en las repeticiones',
-      ],
-      'physiological_composition': raw is String ? raw : 'Compostura física en proceso activo de recomposición.',
-      'training_plan_feedback': 'Cumple con los días programados y consulta a tu Coach cualquier duda.',
-      'motivational_quote': 'La constancia en este mes de entrenamiento revelará los mejores resultados.',
-    };
+    return data;
   }
 
   void _showImageZoom(String imageUrl, String title) {
@@ -412,12 +457,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
     if (hasData) {
       final firstP = _evolutionChart.first;
       final lastP = _evolutionChart.last;
-      final firstDef = (firstP['definition_score'] as num?)?.toDouble() ?? 6.0;
-      final lastDef = (lastP['definition_score'] as num?)?.toDouble() ?? 6.0;
+      final firstDef = _safeDouble(firstP['definition_score'], 6.0);
+      final lastDef = _safeDouble(lastP['definition_score'], 6.0);
       defDelta = lastDef - firstDef;
 
-      final firstFat = (firstP['body_fat'] as num?)?.toDouble() ?? 22.0;
-      final lastFat = (lastP['body_fat'] as num?)?.toDouble() ?? 22.0;
+      final firstFat = _safeDouble(firstP['body_fat'], 22.0);
+      final lastFat = _safeDouble(lastP['body_fat'], 22.0);
       fatDelta = lastFat - firstFat;
     }
 
@@ -740,10 +785,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final oldestAnalysis = _parseStructuredAnalysis(oldest);
     final latestAnalysis = _parseStructuredAnalysis(latest);
 
-    final fat1 = (oldestAnalysis['estimated_body_fat'] as num?)?.toDouble() ?? 22.0;
-    final fat2 = (latestAnalysis['estimated_body_fat'] as num?)?.toDouble() ?? 20.0;
-    final def1 = (oldestAnalysis['muscle_definition_score'] as num?)?.toDouble() ?? 6.0;
-    final def2 = (latestAnalysis['muscle_definition_score'] as num?)?.toDouble() ?? 7.5;
+    final fat1 = _safeDouble(oldestAnalysis['estimated_body_fat'], 25.0);
+    final fat2 = _safeDouble(latestAnalysis['estimated_body_fat'], 22.0);
+    final def1 = _safeDouble(oldestAnalysis['muscle_definition_score'], 5.0);
+    final def2 = _safeDouble(latestAnalysis['muscle_definition_score'], 6.5);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -806,7 +851,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text('$fat1% Grasa · $def1 Def', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text('${fat1.toStringAsFixed(1)}% Grasa · ${def1.toStringAsFixed(1)} Def', style: const TextStyle(color: Colors.white70, fontSize: 11)),
                   ],
                 ),
               ),
@@ -849,7 +894,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text('$fat2% Grasa · $def2 Def', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text('${fat2.toStringAsFixed(1)}% Grasa · ${def2.toStringAsFixed(1)} Def', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -871,9 +916,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final stage = analysis['photo_stage'] ?? (index == _photos.length - 1 ? 'Foto Inicial (Día 1)' : 'Foto de Seguimiento');
     final isBaseline = index == _photos.length - 1;
     final headline = analysis['headline'] ?? 'Evaluación de condición física';
-    final estFat = analysis['estimated_body_fat'] ?? 20.0;
-    final muscleDef = analysis['muscle_definition_score'] ?? 7.0;
-    final posture = analysis['posture_score'] ?? 8.0;
+    final estFat = _safeDouble(analysis['estimated_body_fat'], 22.0);
+    final muscleDef = _safeDouble(analysis['muscle_definition_score'], 6.0);
+    final posture = _safeDouble(analysis['posture_score'], 7.5);
     final biotype = analysis['biotype'] ?? 'Mesomorfo';
 
     final positiveChanges = (analysis['positive_changes'] as List?)?.cast<String>() ?? [];
@@ -1015,13 +1060,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 12),
 
-            // 4 KPIs en grid / badges
+            // 3 KPIs en grid / badges
             Row(
               children: [
                 Expanded(
                   child: _buildMetricBadge(
                     label: 'Definición',
-                    value: '$muscleDef/10',
+                    value: '${muscleDef.toStringAsFixed(1)}/10',
                     icon: Icons.flash_on_rounded,
                     color: const Color(0xFF8BE0C0),
                   ),
@@ -1030,7 +1075,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 Expanded(
                   child: _buildMetricBadge(
                     label: 'Grasa Est.',
-                    value: '$estFat%',
+                    value: '${estFat.toStringAsFixed(1)}%',
                     icon: Icons.pie_chart_rounded,
                     color: const Color(0xFFF59E0B),
                   ),
@@ -1039,7 +1084,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 Expanded(
                   child: _buildMetricBadge(
                     label: 'Postura',
-                    value: '$posture/10',
+                    value: '${posture.toStringAsFixed(1)}/10',
                     icon: Icons.accessibility_rounded,
                     color: const Color(0xFF38BDF8),
                   ),
@@ -1287,6 +1332,13 @@ class _MiniProgressChartPainter extends CustomPainter {
 
   _MiniProgressChartPainter({required this.data, required this.metricIndex});
 
+  double _safeDouble(dynamic val, [double fallback = 0.0]) {
+    if (val == null) return fallback;
+    if (val is num) return val.toDouble();
+    final s = val.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(s) ?? fallback;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (data.isEmpty) return;
@@ -1296,9 +1348,9 @@ class _MiniProgressChartPainter extends CustomPainter {
 
     final values = data.map((d) {
       if (isDef) {
-        return (d['definition_score'] as num?)?.toDouble() ?? 6.0;
+        return _safeDouble(d['definition_score'], 6.0);
       } else {
-        return (d['body_fat'] as num?)?.toDouble() ?? 20.0;
+        return _safeDouble(d['body_fat'], 20.0);
       }
     }).toList();
 

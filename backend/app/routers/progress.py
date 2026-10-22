@@ -1,11 +1,64 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
-from app.services.supabase_service import get_supabase_admin_client
+from typing import Optional, List
+from datetime import datetime, date
 import google.generativeai as genai
 import os
 import io
+import json
+import re
+import time
+from app.services.supabase_service import get_supabase_admin_client
 
 router = APIRouter(prefix="/api/progress", tags=["Progress"])
+
+
+def parse_numeric(val, default=20.0) -> float:
+    """
+    Convierte cualquier valor a un float seguro.
+    Si recibe strings como '35-40%', calcula el promedio o extrae el número.
+    """
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, str):
+        nums = re.findall(r"[-+]?\d*\.\d+|\d+", val)
+        if len(nums) == 1:
+            return float(nums[0])
+        elif len(nums) >= 2:
+            return (float(nums[0]) + float(nums[1])) / 2.0
+    return float(default)
+
+
+def resolve_user_context(user_id: str, admin):
+    """
+    Resuelve el UUID real de la tabla usuarios para evitar el error 22P02 de PostgreSQL
+    en columnas de tipo UUID como progress_photos.user_id.
+    """
+    user_info = None
+    try:
+        if "-" in user_id and len(user_id) >= 32:
+            res = admin.table("usuarios").select("*").eq("id", user_id).execute()
+            if res.data:
+                user_info = res.data[0]
+        else:
+            res = admin.table("usuarios").select("*").eq("cedula", user_id).execute()
+            if res.data:
+                user_info = res.data[0]
+            else:
+                # Intento por email si el id fuera un correo
+                res_email = admin.table("usuarios").select("*").eq("email", user_id).execute()
+                if res_email.data:
+                    user_info = res_email.data[0]
+    except Exception as e_res:
+        print("Aviso resolviendo contexto de usuario:", e_res)
+
+    u_id = user_info["id"] if user_info else user_id
+    u_cedula = user_info.get("cedula", user_id) if user_info else user_id
+    u_name = f"{user_info.get('nombre', '')} {user_info.get('apellido', '')}".strip() if user_info else "Atleta"
+    u_weight = float(user_info.get("peso", 70.0) if user_info else 70.0)
+    u_goal = user_info.get("objetivo", "Recomposición corporal y definición muscular") if user_info else "Recomposición corporal"
+    return u_id, u_cedula, u_name, u_weight, u_goal
+
 
 @router.post("/upload")
 async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = File(...)):
@@ -13,32 +66,27 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
     try:
         file_bytes = await file.read()
 
-        # 1. Resolver información del usuario
-        user_info = None
-        try:
-            if "-" in user_id:
-                u_res = admin.table("usuarios").select("*").eq("id", user_id).execute()
-            else:
-                u_res = admin.table("usuarios").select("*").eq("cedula", user_id).execute()
-            if u_res.data:
-                user_info = u_res.data[0]
-        except Exception:
-            pass
-
-        u_id = user_info["id"] if user_info else user_id
-        u_cedula = user_info.get("cedula", user_id) if user_info else user_id
-        u_name = f"{user_info.get('nombre', '')} {user_info.get('apellido', '')}".strip() if user_info else "Atleta"
-        u_weight = user_info.get("peso", 70.0) if user_info else 70.0
-        u_goal = user_info.get("objetivo", "Recomposición corporal y definición muscular") if user_info else "Recomposición corporal"
+        # 1. Resolver información del usuario con UUID válido
+        u_id, u_cedula, u_name, u_weight, u_goal = resolve_user_context(user_id, admin)
 
         # 2. Historial de fotos para contextualizar si es foto inicial o avance
-        prev_photos_res = admin.table("progress_photos").select("id, created_at").or_(f"user_id.eq.{u_id},user_id.eq.{u_cedula}").order("created_at", desc=False).execute()
-        prev_photos = prev_photos_res.data or []
-        photo_number = len(prev_photos) + 1
+        # Se filtra ÚNICAMENTE por u_id (UUID) para prevenir error 22P02 en PostgreSQL
+        photo_number = 1
+        try:
+            prev_photos_res = admin.table("progress_photos").select("id, created_at").eq("user_id", u_id).order("created_at", desc=False).execute()
+            prev_photos = prev_photos_res.data or []
+            photo_number = len(prev_photos) + 1
+        except Exception as e_hist:
+            print("Aviso consultando historial de fotos:", e_hist)
+            photo_number = 1
+
         is_first = photo_number == 1
 
         # 3. Analizar con Gemini Vision
-        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+
         vision_model_name = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
         try:
             model = genai.GenerativeModel(vision_model_name)
@@ -60,7 +108,7 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
         Contexto del momento: {stage_desc}.
 
         Analiza rigurosa y visualmente la imagen:
-        1. Estima el % de grasa corporal visible aproximado.
+        1. Estima el % de grasa corporal visible aproximado (como número decimal o porcentaje).
         2. Califica de 1.0 a 10.0 el Tono y Definición Muscular.
         3. Califica de 1.0 a 10.0 la Alineación Postural y Simetría.
         4. Identifica cambios positivos y fortalezas visibles.
@@ -73,17 +121,17 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
             "headline": "Frase resumen de impacto clínico y motivacional",
             "photo_stage": "{'Foto Inicial (Día 1)' if is_first else f'Progreso Foto #{photo_number}'}",
             "photo_number": {photo_number},
-            "estimated_body_fat": 21.0,
-            "muscle_definition_score": 6.5,
-            "posture_score": 8.0,
-            "biotype": "Mesomorfo con tendencia a retención adiposa periumbilical",
+            "estimated_body_fat": 24.0,
+            "muscle_definition_score": 5.5,
+            "posture_score": 7.5,
+            "biotype": "Endomorfo con base mesomórfica",
             "positive_changes": [
-                "Buen ancho clavicular y postura de hombros",
-                "Base muscular adecuada para sobrecarga progresiva"
+                "Estructura ósea sólida y clavículas niveladas",
+                "Buena base de soporte para iniciar sobrecarga progresiva"
             ],
             "areas_to_improve": [
-                "Priorizar hipertrofia en deltoides lateral y dorsal para acentuar forma en V",
-                "Controlar déficit calórico moderado para destapar zona abdominal media"
+                "Priorizar déficit calórico moderado para reducir tejido adiposo periumbilical",
+                "Enfocar hipertrofia en tren superior (deltoides y dorsales)"
             ],
             "physiological_composition": "Análisis clínico y visual detallado de la compostura física...",
             "training_plan_feedback": "Ajuste específico para sus rutinas de entrenamiento asignadas...",
@@ -91,7 +139,12 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
         }}
         """
 
-        image_parts = [{"mime_type": file.content_type or "image/jpeg", "data": file_bytes}]
+        # Normalizar tipo MIME de imagen para Gemini
+        mime = file.content_type or "image/jpeg"
+        if mime not in ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]:
+            mime = "image/jpeg"
+
+        image_parts = [{"mime_type": mime, "data": file_bytes}]
 
         structured_analysis = None
         analysis_raw = ""
@@ -105,7 +158,23 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                 cleaned = cleaned.split("```")[1].split("```")[0].strip()
 
             parsed = json.loads(cleaned)
-            if isinstance(parsed, dict) and "estimated_body_fat" in parsed:
+            if isinstance(parsed, dict):
+                # Sanitizar números a tipos estrictamente flotantes
+                parsed["estimated_body_fat"] = parse_numeric(parsed.get("estimated_body_fat"), 22.0)
+                parsed["muscle_definition_score"] = min(10.0, max(1.0, parse_numeric(parsed.get("muscle_definition_score"), 6.0)))
+                parsed["posture_score"] = min(10.0, max(1.0, parse_numeric(parsed.get("posture_score"), 7.5)))
+
+                # Asegurar listas en fortalezas y áreas a mejorar
+                if isinstance(parsed.get("positive_changes"), str):
+                    parsed["positive_changes"] = [parsed["positive_changes"]]
+                elif not isinstance(parsed.get("positive_changes"), list):
+                    parsed["positive_changes"] = ["Alineación anatómica adecuada", "Buena base de soporte muscular"]
+
+                if isinstance(parsed.get("areas_to_improve"), str):
+                    parsed["areas_to_improve"] = [parsed["areas_to_improve"]]
+                elif not isinstance(parsed.get("areas_to_improve"), list):
+                    parsed["areas_to_improve"] = ["Mantener adherencia y sobrecarga progresiva controlada"]
+
                 structured_analysis = parsed
                 analysis_raw = json.dumps(parsed, ensure_ascii=False)
         except Exception as e_ai:
@@ -113,42 +182,41 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
 
         if not structured_analysis:
             structured_analysis = {
-                "headline": "Registro de Condición Física Inicial Completado",
+                "headline": "Registro Inicial de Condición Física Completado",
                 "photo_stage": "Foto Inicial (Día 1)" if is_first else f"Progreso Foto #{photo_number}",
                 "photo_number": photo_number,
-                "estimated_body_fat": 22.0 if is_first else 20.5,
-                "muscle_definition_score": 6.0 if is_first else 7.2,
+                "estimated_body_fat": 25.0 if is_first else 22.5,
+                "muscle_definition_score": 5.5 if is_first else 6.5,
                 "posture_score": 7.5,
-                "biotype": "Mesomorfo en fase de acondicionamiento",
+                "biotype": "Endomorfo con potencial de recomposición",
                 "positive_changes": [
-                    "Alineación de columna y cintura escapular adecuada",
-                    "Excelente predisposición para hipertrofia con los planes asignados"
+                    "Alineación simétrica de columna y postura frontal",
+                    "Excelente predisposición para recomposición corporal con los planes del Coach"
                 ],
                 "areas_to_improve": [
-                    "Mantener tempo controlado en las series efectivas",
-                    "Aumentar ingesta hídrica y vigilar descanso nocturno"
+                    "Mantener tempo controlado en cada repetición",
+                    "Controlar ingesta calórica para reducir grasa abdominal"
                 ],
-                "physiological_composition": "Compostura física con potencial para recomposición. La masa muscular responderá rápidamente a la sobrecarga progresiva durante las próximas 4 semanas.",
-                "training_plan_feedback": "Ejecuta los planes asignados respetando los rangos de repeticiones y la cadencia excéntrica recomendada por el Coach.",
+                "physiological_composition": "Compostura física con sólida base estructural. Al cumplir el plan de 30 días, el déficit y la sobrecarga progresiva destaparán masa muscular magra.",
+                "training_plan_feedback": "Ejecuta los planes asignados respetando los descansos y la técnica recomendada.",
                 "motivational_quote": "El cambio de 30 días comienza hoy con tu primera foto de punto de partida."
             }
             analysis_raw = json.dumps(structured_analysis, ensure_ascii=False)
 
         # 4. Upload to Supabase Storage
-        import time
         sanitized_filename = f"{int(time.time())}_{file.filename or 'photo.jpg'}"
-        file_path = f"{u_cedula}/{sanitized_filename}"
+        file_path = f"{u_id}/{sanitized_filename}"
         public_url = ""
         try:
-            admin.storage.from_("progress").upload(file_path, file_bytes, {"content-type": file.content_type or "image/jpeg"})
+            admin.storage.from_("progress").upload(file_path, file_bytes, {"content-type": mime})
             public_url = admin.storage.from_("progress").get_public_url(file_path)
         except Exception as storage_err:
             print("Aviso storage Supabase:", storage_err)
             public_url = f"https://placehold.co/600x400/1E293B/1FAE87.png?text=Foto+Progreso+{int(time.time())}"
 
-        # 5. Save to DB
+        # 5. Guardar en Base de Datos (USANDO SIEMPRE u_id que es UUID válido)
         admin.table("progress_photos").insert({
-            "user_id": u_cedula,
+            "user_id": u_id,
             "photo_url": public_url,
             "ai_analysis": analysis_raw
         }).execute()
@@ -171,8 +239,8 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                     },
                     "created_at": datetime.utcnow().isoformat()
                 }).execute()
-        except Exception:
-            pass
+        except Exception as e_sync:
+            print("Aviso sincronizando métricas con coach_mensajes:", e_sync)
 
         return {
             "status": "ok",
@@ -181,89 +249,90 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
             "photo_url": public_url
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{user_id}")
 def get_progress_photos(user_id: str):
     admin = get_supabase_admin_client()
-    q = admin.table("progress_photos").select("*")
-    if "-" in user_id:
-        try:
-            u_r = admin.table("usuarios").select("cedula").eq("id", user_id).execute()
-            c_val = u_r.data[0]["cedula"] if u_r.data else None
-            if c_val:
-                q = q.or_(f"user_id.eq.{user_id},user_id.eq.{c_val}")
+    try:
+        u_id, u_cedula, _, _, _ = resolve_user_context(user_id, admin)
+
+        # Buscar por el UUID resuelto
+        res = admin.table("progress_photos").select("*").eq("user_id", u_id).order("created_at", desc=False).execute()
+        photos = res.data or []
+
+        processed_photos = []
+        evolution_chart = []
+
+        for idx, p in enumerate(photos, 1):
+            raw_analysis = p.get("ai_analysis") or ""
+            parsed_dict = None
+            if raw_analysis.startswith("{"):
+                try:
+                    parsed_dict = json.loads(raw_analysis)
+                except Exception:
+                    pass
+
+            if not parsed_dict:
+                parsed_dict = {
+                    "headline": raw_analysis[:120] if raw_analysis else "Evaluación de condición física",
+                    "photo_stage": f"Foto #{idx}" if idx > 1 else "Foto Inicial (Día 1)",
+                    "photo_number": idx,
+                    "estimated_body_fat": 25.0 - (idx - 1) * 0.8,
+                    "muscle_definition_score": 5.5 + (idx - 1) * 0.5,
+                    "posture_score": 7.5 + (idx - 1) * 0.2,
+                    "biotype": "Endomorfo con base mesomórfica",
+                    "positive_changes": [
+                        "Alineación simétrica y postura adecuada",
+                        "Respuesta positiva al plan de entrenamiento"
+                    ],
+                    "areas_to_improve": [
+                        "Continuar con la sobrecarga progresiva en los ejercicios compuestos",
+                        "Enfocar la porción media del abdomen y descanso nocturno"
+                    ],
+                    "physiological_composition": raw_analysis or "Compostura física en progreso activo.",
+                    "training_plan_feedback": "Ajuste continuo a las rutinas asignadas en la app.",
+                    "motivational_quote": "La constancia en cada sesión marca la diferencia semana a semana."
+                }
             else:
-                q = q.eq("user_id", user_id)
-        except Exception:
-            q = q.eq("user_id", user_id)
-    else:
-        q = q.eq("user_id", user_id)
+                # Asegurar tipos flotantes
+                parsed_dict["estimated_body_fat"] = parse_numeric(parsed_dict.get("estimated_body_fat"), 22.0)
+                parsed_dict["muscle_definition_score"] = min(10.0, max(1.0, parse_numeric(parsed_dict.get("muscle_definition_score"), 6.0)))
+                parsed_dict["posture_score"] = min(10.0, max(1.0, parse_numeric(parsed_dict.get("posture_score"), 7.5)))
 
-    res = q.order("created_at", desc=False).execute()
-    photos = res.data or []
+            p["structured_analysis"] = parsed_dict
+            processed_photos.append(p)
 
-    processed_photos = []
-    evolution_chart = []
-
-    for idx, p in enumerate(photos, 1):
-        raw_analysis = p.get("ai_analysis") or ""
-        parsed_dict = None
-        if raw_analysis.startswith("{") and "estimated_body_fat" in raw_analysis:
-            try:
-                parsed_dict = json.loads(raw_analysis)
-            except Exception:
-                pass
-
-        if not parsed_dict:
-            parsed_dict = {
-                "headline": raw_analysis[:120] if raw_analysis else "Evaluación de condición física",
-                "photo_stage": f"Foto #{idx}" if idx > 1 else "Foto Inicial (Día 1)",
+            date_str = str(p.get("created_at", ""))[:10]
+            evolution_chart.append({
+                "date": date_str,
                 "photo_number": idx,
-                "estimated_body_fat": 22.0 - (idx - 1) * 0.8,
-                "muscle_definition_score": 6.0 + (idx - 1) * 0.5,
-                "posture_score": 7.5 + (idx - 1) * 0.2,
-                "biotype": "Mesomorfo en recomposición",
-                "positive_changes": [
-                    "Alineación simétrica y postura adecuada",
-                    "Respuesta positiva al plan de entrenamiento"
-                ],
-                "areas_to_improve": [
-                    "Continuar con la sobrecarga progresiva en los ejercicios compuestos",
-                    "Enfocar la porción media del abdomen y descanso nocturno"
-                ],
-                "physiological_composition": raw_analysis or "Compostura física en progreso activo.",
-                "training_plan_feedback": "Ajuste continuo a las rutinas asignadas en la app.",
-                "motivational_quote": "La constancia en cada sesión marca la diferencia semana a semana."
-            }
+                "body_fat": parsed_dict.get("estimated_body_fat", 22.0),
+                "definition_score": parsed_dict.get("muscle_definition_score", 6.0),
+                "posture_score": parsed_dict.get("posture_score", 7.5)
+            })
 
-        p["structured_analysis"] = parsed_dict
-        processed_photos.append(p)
+        # Mostrar la más reciente primero en la lista de fotos
+        processed_photos.reverse()
 
-        date_str = str(p.get("created_at", ""))[:10]
-        evolution_chart.append({
-            "date": date_str,
-            "photo_number": idx,
-            "body_fat": parsed_dict.get("estimated_body_fat", 21.0),
-            "definition_score": parsed_dict.get("muscle_definition_score", 6.5),
-            "posture_score": parsed_dict.get("posture_score", 8.0)
-        })
-
-    # Mostrar la más reciente primero en la lista de fotos
-    processed_photos.reverse()
-
-    return {
-        "photos": processed_photos,
-        "evolution_chart": evolution_chart,
-        "total_photos": len(processed_photos),
-        "has_photos": len(processed_photos) > 0
-    }
-
-
-from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime, date
+        return {
+            "photos": processed_photos,
+            "evolution_chart": evolution_chart,
+            "total_photos": len(processed_photos),
+            "has_photos": len(processed_photos) > 0
+        }
+    except Exception as e:
+        print("Error obteniendo fotos de progreso:", e)
+        return {
+            "photos": [],
+            "evolution_chart": [],
+            "total_photos": 0,
+            "has_photos": False,
+            "error": str(e)
+        }
 
 
 class BodyMetricReq(BaseModel):
@@ -288,24 +357,12 @@ def record_body_metric(req: BodyMetricReq):
     measured_date = req.measured_at or date.today().isoformat()
     
     # Resolver usuario por cédula o id
-    user_row = None
-    try:
-        if "-" in req.user_id:
-            u_res = admin.table("usuarios").select("id, cedula, nombre, peso").eq("id", req.user_id).execute()
-        else:
-            u_res = admin.table("usuarios").select("id, cedula, nombre, peso").eq("cedula", req.user_id).execute()
-        if u_res.data:
-            user_row = u_res.data[0]
-    except Exception:
-        pass
-
-    uid = user_row["id"] if user_row else req.user_id
-    cedula = user_row.get("cedula", req.user_id) if user_row else req.user_id
+    u_id, u_cedula, _, _, _ = resolve_user_context(req.user_id, admin)
 
     # 1. Actualizar peso en tabla usuarios
-    if user_row and req.weight > 0:
+    if req.weight > 0:
         try:
-            admin.table("usuarios").update({"peso": req.weight}).eq("id", uid).execute()
+            admin.table("usuarios").update({"peso": req.weight}).eq("id", u_id).execute()
         except Exception as e_up:
             print("Warning updating peso in usuarios:", e_up)
 
@@ -323,8 +380,8 @@ def record_body_metric(req: BodyMetricReq):
 
     try:
         admin.table("coach_mensajes").insert({
-            "user_id": uid,
-            "cedula": cedula,
+            "user_id": u_id,
+            "cedula": u_cedula,
             "role": "system",
             "category": "body_metric",
             "content": f"Registro Métrico: {req.weight} kg" + (f" | {req.body_fat}% grasa" if req.body_fat else ""),
@@ -348,11 +405,9 @@ def get_body_metrics(user_id: str):
     """
     admin = get_supabase_admin_client()
     try:
+        u_id, u_cedula, _, _, _ = resolve_user_context(user_id, admin)
         q = admin.table("coach_mensajes").select("*").eq("category", "body_metric")
-        if "-" in user_id:
-            q = q.eq("user_id", user_id)
-        else:
-            q = q.eq("cedula", user_id)
+        q = q.or_(f"user_id.eq.{u_id},cedula.eq.{u_cedula}")
         res = q.order("created_at", desc=False).execute()
         raw_list = res.data or []
 
@@ -373,12 +428,7 @@ def get_body_metrics(user_id: str):
         # Si no hay mediciones, buscar el peso inicial en usuarios
         if not metrics:
             try:
-                u_q = admin.table("usuarios").select("peso, created_at")
-                if "-" in user_id:
-                    u_q = u_q.eq("id", user_id)
-                else:
-                    u_q = u_q.eq("cedula", user_id)
-                u_res = u_q.execute()
+                u_res = admin.table("usuarios").select("peso, created_at").eq("id", u_id).execute()
                 if u_res.data:
                     init_w = float(u_res.data[0].get("peso") or 70.0)
                     init_d = str(u_res.data[0].get("created_at") or date.today().isoformat())[:10]
