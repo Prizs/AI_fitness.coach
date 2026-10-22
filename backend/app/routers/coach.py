@@ -50,6 +50,8 @@ class ChatMessage(BaseModel):
     user_name: str | None = Field(default=None, max_length=200)
     weekly_metrics: dict | None = Field(default=None)
     is_initial_greeting: bool = Field(default=False)
+    today_routine: dict | None = Field(default=None)
+    weekly_schedule: list | dict | None = Field(default=None)
 
 
 def _extract_effective_level_and_intensity(payload: ChatMessage) -> tuple[str, str]:
@@ -943,6 +945,38 @@ def _profile_context(payload: ChatMessage, effective_level: str, effective_inten
             f"y que el nuevo ciclo completo se podrá planificar a partir de {next_str} para respetar 48-72h de descanso. "
             f"Para esta semana, ofrécele rutinas complementarias para sus días libres (Martes/Jueves: Tren Superior, Core o Movilidad).] "
         )
+
+    today_info = ""
+    if payload.today_routine and isinstance(payload.today_routine, dict):
+        d_name = payload.today_routine.get("day_name", "Hoy")
+        d_focus = payload.today_routine.get("focus") or payload.today_routine.get("title") or "Entrenamiento"
+        is_rest = bool(payload.today_routine.get("is_rest", False))
+        exs = payload.today_routine.get("exercises") or []
+        ex_names = []
+        if isinstance(exs, list):
+            for e in exs:
+                if isinstance(e, dict):
+                    ex_names.append(f"{e.get('name', 'Ejercicio')} ({e.get('sets', 3)} series de {e.get('reps', '10-12')})")
+                elif isinstance(e, str):
+                    ex_names.append(e)
+        ex_str = "; ".join(ex_names) if ex_names else "Sin ejercicios pesados"
+        if is_rest:
+            today_info = f" [ENTRENAMIENTO DE HOY ({d_name}): DÍA DE DESCANSO ACTIVO / RECUPERACIÓN. No tiene sesión de sobrecarga programada para hoy.] "
+        else:
+            today_info = f" [ENTRENAMIENTO DE HOY ({d_name}): Enfoque '{d_focus}'. Ejercicios estructurados en su plan: {ex_str}.] "
+
+    schedule_info = ""
+    if payload.weekly_schedule and isinstance(payload.weekly_schedule, list):
+        sched_items = []
+        for s in payload.weekly_schedule:
+            if isinstance(s, dict):
+                dn = s.get("day") or s.get("weekday_name") or ""
+                df = s.get("focus") or s.get("title") or ""
+                if dn and df:
+                    sched_items.append(f"{dn}: {df}")
+        if sched_items:
+            schedule_info = f" [CRONOGRAMA DE LA SEMANA: {'; '.join(sched_items)}.] "
+
     equip_info = f" Equipamiento reportado: {payload.equipment_details}." if payload.equipment_details else ""
     return (
         f"Edad: {payload.age if payload.age is not None else 'No indicada'}. "
@@ -956,7 +990,7 @@ def _profile_context(payload: ChatMessage, effective_level: str, effective_inten
         f"RPE reportado: {payload.rpe_feedback if payload.rpe_feedback is not None else 'no indicado'}. "
         f"Racha actual de entrenamientos completados: {payload.user_streak or 0} sesiones consecutivas. "
         f"Total de sesiones completadas históricas: {payload.total_completed_sessions or 0}."
-        f"{plan_info}{equip_info}"
+        f"{plan_info}{today_info}{schedule_info}{equip_info}"
     )
 
 
@@ -1740,7 +1774,7 @@ def get_coach_history(cedula: str | None = None, user_id: str | None = None, lim
     try:
         from app.services.supabase_service import get_supabase_admin_client
         admin = get_supabase_admin_client()
-        query = admin.table("coach_mensajes").select("*")
+        query = admin.table("coach_mensajes").select("*").neq("category", "body_metric")
         if user_id and "-" in user_id:
             query = query.eq("user_id", user_id)
         elif cedula:

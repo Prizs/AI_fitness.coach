@@ -114,10 +114,14 @@ class _CoachScreenState extends State<CoachScreen> {
           final List<Map<String, dynamic>> restored = [];
           for (final item in serverList) {
             if (item is Map) {
+              if (item['category'] == 'body_metric' || item['role'] == 'system') continue;
+              final p = item['plan'];
+              final bool hasValidPlan = p is Map &&
+                  ((p['exercises'] is List && (p['exercises'] as List).isNotEmpty) || p.containsKey('days') || p.containsKey('routine_name'));
               restored.add({
                 'isUser': item['isUser'] == true,
                 'text': item['text'] ?? '',
-                'plan': item['plan'],
+                'plan': hasValidPlan ? p : null,
                 'category': item['category'],
                 'rule': item['rule'],
                 'suggest_questionnaire': item['suggest_questionnaire'] == true,
@@ -603,10 +607,26 @@ class _CoachScreenState extends State<CoachScreen> {
       final endStr = hasPlan ? formatDate(sunday) : null;
       final nextStartStr = hasPlan ? formatDate(nextMonday) : null;
       final activeDays = hasPlan ? WeeklyPlanService.instance.activeTrainingDayNames : <String>[];
-
       const storage = FlutterSecureStorage();
       final userKey = 'user_equipment_${profile?.cedula ?? "default"}';
       final savedEquipment = await storage.read(key: userKey) ?? await storage.read(key: 'user_equipment');
+
+      final today = WeeklyPlanService.instance.today;
+      final todayRoutine = today != null
+          ? {
+              'day_name': WeeklyPlanService.instance.todayName,
+              'is_rest': (today['exercises'] as List?)?.isEmpty ?? true,
+              'focus': today['focus'] ?? today['title'] ?? 'Entrenamiento',
+              'exercises': today['exercises'] ?? [],
+              'nutrition': today['nutrition'],
+            }
+          : null;
+
+      final weeklySchedule = WeeklyPlanService.instance.days.map((d) => {
+            'day': d['weekday_name'] ?? '',
+            'focus': d['focus'] ?? d['title'] ?? 'Descanso activo',
+            'is_training': (d['exercises'] as List?)?.isNotEmpty == true,
+          }).toList();
 
       final response = await http
           .post(
@@ -634,6 +654,8 @@ class _CoachScreenState extends State<CoachScreen> {
               'next_cycle_start': nextStartStr,
               'active_training_days': activeDays,
               'equipment_details': savedEquipment,
+              'today_routine': todayRoutine,
+              'weekly_schedule': weeklySchedule,
             }),
           )
           .timeout(const Duration(seconds: 120));
@@ -1029,7 +1051,11 @@ class _CoachScreenState extends State<CoachScreen> {
                           ),
                         ),
                       ],
-                      if (plan != null) ...[
+                      if (plan != null &&
+                          msg['category'] != 'body_metric' &&
+                          ((plan['exercises'] is List && (plan['exercises'] as List).isNotEmpty) ||
+                           plan.containsKey('days') ||
+                           plan.containsKey('routine_name'))) ...[
                         Container(
                           margin: const EdgeInsets.symmetric(vertical: 8),
                           padding: const EdgeInsets.all(16),

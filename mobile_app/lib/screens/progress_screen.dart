@@ -441,14 +441,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
         actions: [
-          // Botón destacado de Prueba Flash Mes 1
-          TextButton.icon(
-            onPressed: _isUploading ? null : _triggerDemoFlash,
-            icon: const Icon(Icons.flash_on_rounded, color: Color(0xFF8BE0C0), size: 16),
-            label: const Text(
-              'Test Mes 1',
-              style: TextStyle(color: Color(0xFF8BE0C0), fontWeight: FontWeight.bold, fontSize: 12),
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+            tooltip: 'Actualizar',
+            onPressed: _isUploading ? null : _fetchPhotos,
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white70),
@@ -571,62 +567,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       if (_photos.length >= 2) ...[
                         _buildBeforeAfterCard(),
                         const SizedBox(height: 16),
-                      ] else if (_photos.length == 1) ...[
-                        // Banner didáctico invitando a probar flash
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF1FAE87).withOpacity(0.18),
-                                const Color(0xFF0F192B),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.35)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1FAE87).withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.flash_on_rounded, color: Color(0xFF8BE0C0), size: 20),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '¿Quieres ver tu comparativa de 1 Mes?',
-                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
-                                    ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      'Prueba flash para visualizar el gráfico de recomposición y las métricas.',
-                                      style: TextStyle(color: Colors.white60, fontSize: 11),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: _isUploading ? null : _triggerDemoFlash,
-                                icon: const Icon(Icons.bolt, size: 15),
-                                label: const Text('Test Mes 1', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8BE0C0),
-                                  foregroundColor: const Color(0xFF0A0F1D),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
 
                       // Lista de fotos
