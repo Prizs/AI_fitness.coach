@@ -777,7 +777,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   // -------------------------------------------------------------
-  // COMPARADOR ANTES / DESPUÉS
+  // COMPARADOR ANTES / DESPUÉS (LÍNEA BASE VS ACTUALIDAD)
   // -------------------------------------------------------------
   Widget _buildBeforeAfterCard() {
     final oldest = _photos.last;
@@ -785,32 +785,77 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final oldestAnalysis = _parseStructuredAnalysis(oldest);
     final latestAnalysis = _parseStructuredAnalysis(latest);
 
-    final fat1 = _safeDouble(oldestAnalysis['estimated_body_fat'], 25.0);
-    final fat2 = _safeDouble(latestAnalysis['estimated_body_fat'], 22.0);
-    final def1 = _safeDouble(oldestAnalysis['muscle_definition_score'], 5.0);
-    final def2 = _safeDouble(latestAnalysis['muscle_definition_score'], 6.5);
+    final fat1 = _safeDouble(oldestAnalysis['estimated_body_fat'], 26.0);
+    final fat2 = _safeDouble(latestAnalysis['estimated_body_fat'], 24.0);
+    final fatDelta = fat2 - fat1;
+
+    final def1 = _safeDouble(oldestAnalysis['muscle_definition_score'], 3.5);
+    final def2 = _safeDouble(latestAnalysis['muscle_definition_score'], 4.5);
+    final defDelta = def2 - def1;
+
+    final posture1 = _safeDouble(oldestAnalysis['posture_score'], 6.5);
+    final posture2 = _safeDouble(latestAnalysis['posture_score'], 7.0);
+    final postureDelta = posture2 - posture1;
+
+    final comp = latestAnalysis['comparison_with_previous'] is Map
+        ? Map<String, dynamic>.from(latestAnalysis['comparison_with_previous'])
+        : null;
+    final clinicalNotes = comp?['clinical_comparison']?.toString() ?? '';
+    final anatomicalChanges = (comp?['specific_anatomical_changes'] as List?)?.cast<String>() ?? [];
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF0F192B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.compare_arrows_rounded, color: Color(0xFF8BE0C0), size: 18),
-              SizedBox(width: 8),
-              Text(
-                'Comparativa: Punto de Inicio vs Actualidad',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1FAE87).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.compare_arrows_rounded, color: Color(0xFF8BE0C0), size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Comparativa de Recomposición (Línea Base vs Actual)',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF162338),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${_photos.length} Jornadas',
+                  style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+
+          // Fotos lado a lado
           Row(
             children: [
               // Foto Inicial
@@ -820,16 +865,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     Stack(
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           child: GestureDetector(
-                            onTap: () => _showImageZoom(oldest['photo_url'] ?? '', 'Foto Inicial (Día 1)'),
+                            onTap: () => _showImageZoom(oldest['photo_url'] ?? '', 'Línea Base · Día 1'),
                             child: Image.network(
                               oldest['photo_url'] ?? '',
-                              height: 120,
+                              height: 140,
                               width: double.infinity,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
-                                height: 120,
+                                height: 140,
                                 color: const Color(0xFF1E293B),
                                 child: const Icon(Icons.image, color: Colors.white24),
                               ),
@@ -840,18 +885,39 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           top: 6,
                           left: 6,
                           child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.75),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text('Línea Base (Día 1)', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 6,
+                          right: 6,
+                          child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.7),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text('Inicio (Día 1)', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.zoom_in, color: Colors.white, size: 12),
+                                SizedBox(width: 2),
+                                Text('Zoom', style: TextStyle(color: Colors.white, fontSize: 9.5)),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text('${fat1.toStringAsFixed(1)}% Grasa · ${def1.toStringAsFixed(1)} Def', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                    Text(
+                      '${fat1.toStringAsFixed(1)}% Grasa · ${def1.toStringAsFixed(1)} Def',
+                      style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
                   ],
                 ),
               ),
@@ -863,16 +929,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     Stack(
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           child: GestureDetector(
-                            onTap: () => _showImageZoom(latest['photo_url'] ?? '', 'Foto Reciente'),
+                            onTap: () => _showImageZoom(latest['photo_url'] ?? '', 'Jornada Actual'),
                             child: Image.network(
                               latest['photo_url'] ?? '',
-                              height: 120,
+                              height: 140,
                               width: double.infinity,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
-                                height: 120,
+                                height: 140,
                                 color: const Color(0xFF1E293B),
                                 child: const Icon(Icons.image, color: Colors.white24),
                               ),
@@ -883,25 +949,175 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           top: 6,
                           left: 6,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1FAE87),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text('Jornada Actual', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 6,
+                          right: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text('Actual', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.zoom_in, color: Colors.white, size: 12),
+                                SizedBox(width: 2),
+                                Text('Zoom', style: TextStyle(color: Colors.white, fontSize: 9.5)),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text('${fat2.toStringAsFixed(1)}% Grasa · ${def2.toStringAsFixed(1)} Def', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text(
+                      '${fat2.toStringAsFixed(1)}% Grasa · ${def2.toStringAsFixed(1)} Def',
+                      style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 16),
+
+          // Scoreboard de variación métrica
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF162338),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildScoreboardItem(
+                  label: '% Grasa Corporal',
+                  fromVal: '${fat1.toStringAsFixed(1)}%',
+                  toVal: '${fat2.toStringAsFixed(1)}%',
+                  delta: '${fatDelta <= 0 ? "" : "+"}${fatDelta.toStringAsFixed(1)}%',
+                  isPositive: fatDelta <= 0,
+                  icon: Icons.pie_chart_rounded,
+                ),
+                Container(width: 1, height: 35, color: Colors.white12),
+                _buildScoreboardItem(
+                  label: 'Definición Muscular',
+                  fromVal: def1.toStringAsFixed(1),
+                  toVal: def2.toStringAsFixed(1),
+                  delta: '${defDelta >= 0 ? "+" : ""}${defDelta.toStringAsFixed(1)} pts',
+                  isPositive: defDelta >= 0,
+                  icon: Icons.bolt_rounded,
+                ),
+                Container(width: 1, height: 35, color: Colors.white12),
+                _buildScoreboardItem(
+                  label: 'Postura & Simetría',
+                  fromVal: posture1.toStringAsFixed(1),
+                  toVal: posture2.toStringAsFixed(1),
+                  delta: '${postureDelta >= 0 ? "+" : ""}${postureDelta.toStringAsFixed(1)} pts',
+                  isPositive: postureDelta >= 0,
+                  icon: Icons.accessibility_rounded,
+                ),
+              ],
+            ),
+          ),
+
+          if (clinicalNotes.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF132238),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.biotech_rounded, color: Color(0xFF38BDF8), size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Evaluación Anatómica Contrastada (IA Vision):',
+                        style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 11.5),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(clinicalNotes, style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.35)),
+                  if (anatomicalChanges.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: anatomicalChanges.map((change) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D2E24),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF1FAE87).withOpacity(0.4)),
+                        ),
+                        child: Text('✓ $change', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 10.5, fontWeight: FontWeight.w600)),
+                      )).toList(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildScoreboardItem({
+    required String label,
+    required String fromVal,
+    required String toVal,
+    required String delta,
+    required bool isPositive,
+    required IconData icon,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: Colors.white54),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9.5)),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          '$fromVal ➔ $toVal',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(
+            color: (isPositive ? const Color(0xFF1FAE87) : Colors.orangeAccent).withOpacity(0.2),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            delta,
+            style: TextStyle(
+              color: isPositive ? const Color(0xFF8BE0C0) : Colors.orangeAccent,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -926,6 +1142,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final composition = analysis['physiological_composition'] ?? '';
     final trainingFeedback = analysis['training_plan_feedback'] ?? '';
     final quote = analysis['motivational_quote'] ?? '';
+
+    final comp = analysis['comparison_with_previous'] is Map
+        ? Map<String, dynamic>.from(analysis['comparison_with_previous'])
+        : null;
+    final compNotes = comp?['clinical_comparison']?.toString() ?? '';
+    final compChanges = (comp?['specific_anatomical_changes'] as List?)?.cast<String>() ?? [];
+    final prevDateStr = comp?['previous_date']?.toString() ?? '';
+    final bfDelta = comp != null ? _safeDouble(comp['body_fat_delta']) : 0.0;
+    final defDelta = comp != null ? _safeDouble(comp['muscle_definition_delta']) : 0.0;
 
     return Card(
       color: const Color(0xFF101B2D),
@@ -1116,6 +1341,91 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
             ),
             const SizedBox(height: 14),
+
+            // Bloque Comparativo con Registro Anterior (si existe)
+            if (comp != null && !isBaseline) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF132238),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.insights_rounded, color: Color(0xFF38BDF8), size: 15),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Evolución vs Jornada Previa ${prevDateStr.isNotEmpty ? "($prevDateStr)" : ""}',
+                              style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 11.5),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (bfDelta <= 0 ? const Color(0xFF1FAE87) : Colors.orangeAccent).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Grasa: ${bfDelta <= 0 ? "" : "+"}${bfDelta.toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  color: bfDelta <= 0 ? const Color(0xFF8BE0C0) : Colors.orangeAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (defDelta >= 0 ? const Color(0xFF1FAE87) : Colors.orangeAccent).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Def: ${defDelta >= 0 ? "+" : ""}${defDelta.toStringAsFixed(1)} pts',
+                                style: TextStyle(
+                                  color: defDelta >= 0 ? const Color(0xFF8BE0C0) : Colors.orangeAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    if (compNotes.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(compNotes, style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.35)),
+                    ],
+                    if (compChanges.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      ...compChanges.map((c) => Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('✓ ', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 11)),
+                            Expanded(child: Text(c, style: const TextStyle(color: Colors.white70, fontSize: 10.5))),
+                          ],
+                        ),
+                      )),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
 
             // Bloque Verde: Fortalezas y Cambios Positivos
             if (positiveChanges.isNotEmpty) ...[
