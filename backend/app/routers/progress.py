@@ -174,6 +174,20 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                     "y reporta los cambios observados."
                 )
 
+        comparison_example = ""
+        if not is_first:
+            comparison_example = f'''"comparison_with_previous": {{
+                "previous_date": "{prev_date}",
+                "body_fat_delta": -1.5,
+                "muscle_definition_delta": 0.8,
+                "posture_delta": 0.3,
+                "clinical_comparison": "Explicación clínica detallada y contrastada de los cambios anatómicos reales respecto a la foto previa...",
+                "specific_anatomical_changes": [
+                    "Reducción visible en el pliegue periumbilical inferior",
+                    "Mayor firmeza en la base de los pectorales"
+                ]
+            }},'''
+
         prompt = f"""
         Actúa como un Especialista en Cineantropometría, Biomecánica y Recomposición Corporal.
         Estás evaluando la fotografía de progreso físico de {u_name} (Peso: {u_weight} kg, Objetivo: {u_goal}).
@@ -198,7 +212,7 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
             "muscle_definition_score": 5.5,
             "posture_score": 7.5,
             "biotype": "Endomorfo con base mesomórfica",
-            {"\"comparison_with_previous\": {\n                \"previous_date\": \"" + prev_date + "\",\n                \"body_fat_delta\": -1.5,\n                \"muscle_definition_delta\": 0.8,\n                \"posture_delta\": 0.3,\n                \"clinical_comparison\": \"Explicación clínica detallada y contrastada de los cambios anatómicos reales respecto a la foto previa...\",\n                \"specific_anatomical_changes\": [\n                    \"Reducción visible en el pliegue periumbilical inferior\",\n                    \"Mayor firmeza en la base de los pectorales\"\n                ]\n            }," if not is_first else ""}
+            {comparison_example}
             "positive_changes": [
                 "Estructura ósea sólida y clavículas niveladas",
                 "Buena base de soporte para iniciar sobrecarga progresiva"
