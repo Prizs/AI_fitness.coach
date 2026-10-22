@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 import httpx
 
-GEMINI_TIMEOUT_SEC = 20.0
+GEMINI_TIMEOUT_SEC = 35.0
 
 OPENAI_COMPATIBLE_BASE_URLS = {
     "groq": "https://api.groq.com/openai/v1",
@@ -41,12 +41,8 @@ DEFAULT_MODELS = {
 # intermitente con HTTP 429. Se prueban en orden hasta que uno responda.
 MODEL_CANDIDATES = {
     "openrouter": (
-        "qwen/qwen3.8-27b:free",
-        "google/gemma-4-26b-a4b-it:free",
-        "google/gemma-4-31b-it:free",
-        "nvidia/nemotron-3-super-120b-a12b:free",
-        "inclusionai/ling-3.0-flash-sante:free",
-        "liquid/lfm-2.5-2.6b:free",
+        "nvidia/nemotron-3.5-lightning:free",
+        "recursive/flint-v1.0:free",
     ),
 }
 
@@ -147,7 +143,7 @@ def _call_openai_compatible(provider: str, prompt: str, timeout: float) -> str:
         headers["X-Title"] = "AI Fitness Coach"
 
     last_error: Exception | None = None
-    per_model_timeout = max(timeout / 2, 5.0)
+    per_model_timeout = min(max(timeout / 3, 4.0), 8.0)
 
     for model in _model_candidates(provider):
         payload = {

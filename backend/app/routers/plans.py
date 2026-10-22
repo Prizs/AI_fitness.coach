@@ -14,7 +14,7 @@ from app.services.weekly_plan import build_weekly_plan
 router = APIRouter()
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-GEMINI_TIMEOUT_SEC = 20.0
+GEMINI_TIMEOUT_SEC = 35.0
 
 # Cache de la semana: la app la pide al abrir, asi que se evita regenerarla.
 WEEK_CACHE_TTL_SEC = 3600

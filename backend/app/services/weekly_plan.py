@@ -8,13 +8,13 @@ Cuando la IA no esta disponible se usa un plan base seguro y orientativo.
 """
 
 from app.routers.exercises import classify_intensity, get_exercise_gif
-from app.services.ai_providers import configured_providers, generate_json_text
+from app.services.ai_providers import _call_gemini, configured_providers, generate_json_text
 
 WEEKDAY_NAMES = [
     "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo",
 ]
 
-AI_TIMEOUT_SEC = 20.0
+AI_TIMEOUT_SEC = 35.0
 
 
 def _fallback_synergy(index: int, title: str) -> str:
@@ -344,15 +344,14 @@ def _ai_week(profile):
         "No diagnostiques ni prescribas tratamientos."
     )
     try:
-        result = generate_json_text(prompt, timeout=AI_TIMEOUT_SEC)
-        data = json.loads(result.text)
+        raw_json = _call_gemini(prompt, timeout=20.0)
+        data = json.loads(raw_json)
         days = _normalize_days(data.get("days"), f"{intensity} {exp}")
-        # Solo se acepta si la IA trajo contenido real para varios dias.
         completos = sum(1 for d in days if d["exercises"] and d["nutrition"])
         if completos < 3:
             return None
         return {
-            "provider": result.provider,
+            "provider": "gemini",
             "days": days,
             "training_days": [d["weekday_name"] for d in days if d["is_training"]],
         }
