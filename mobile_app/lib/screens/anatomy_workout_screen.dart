@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
+import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
 
 
 /// Pantalla de demostracion didactica del modelo anatomico 3D.
@@ -37,6 +38,7 @@ class AnatomyWorkoutScreen extends StatefulWidget {
 class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
   late AnatomyExercise _exercise;
   bool _autoRotate = true;
+  bool _show3dModel = false;
 
   /// Altura de la zona 3D: la mitad superior de la pantalla.
   static const double _viewerHeight = 300;
@@ -54,13 +56,11 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
     return _exercisesList.isNotEmpty ? _exercisesList.first : kAnatomyExercises.first;
   }
 
-
   List<AnatomyExercise> get _exercisesList => widget.dynamicExercises ?? kAnatomyExercises;
 
   void _select(AnatomyExercise exercise) {
     setState(() => _exercise = exercise);
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -70,27 +70,81 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
         backgroundColor: kAnatomySurface,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Anatomia 3D',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+        title: Text(
+          _show3dModel ? 'Anatomía 3D (360°)' : 'Guía de Ejecución y Técnica',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5),
         ),
         actions: [
           IconButton(
-            tooltip: _autoRotate
-                ? 'Pausar autorrotacion'
-                : 'Activar autorrotacion',
-            onPressed: () => setState(() => _autoRotate = !_autoRotate),
+            tooltip: _show3dModel
+                ? (_autoRotate ? 'Pausar autorrotación' : 'Activar giro 360°')
+                : 'Ver modelo anatómico 3D',
+            onPressed: () {
+              if (!_show3dModel) {
+                setState(() {
+                  _show3dModel = true;
+                  _autoRotate = true;
+                });
+              } else {
+                setState(() => _autoRotate = !_autoRotate);
+              }
+            },
             icon: Icon(
-              _autoRotate
-                  ? Icons.threesixty_rounded
-                  : Icons.rotate_right_rounded,
-              color: _autoRotate ? kAgonistColor : Colors.white38,
+              _show3dModel
+                  ? (_autoRotate ? Icons.threesixty_rounded : Icons.rotate_right_rounded)
+                  : Icons.threed_rotation_rounded,
+              color: _show3dModel && _autoRotate ? kAgonistColor : Colors.white70,
             ),
           ),
         ],
       ),
       body: Column(
         children: [
+          // Selector dinámico entre Técnica GIF y Modelo 3D rotativo
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+            color: kAnatomySurface,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ChoiceChip(
+                  avatar: Icon(Icons.play_circle_fill_rounded,
+                      size: 15, color: !_show3dModel ? Colors.black : Colors.white70),
+                  label: const Text('Técnica Real (GIF)'),
+                  selected: !_show3dModel,
+                  selectedColor: const Color(0xFF1FAE87),
+                  backgroundColor: const Color(0xFF16253B),
+                  side: BorderSide.none,
+                  labelStyle: TextStyle(
+                    color: !_show3dModel ? Colors.black : Colors.white70,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11.5,
+                  ),
+                  onSelected: (val) {
+                    if (val) setState(() => _show3dModel = false);
+                  },
+                ),
+                const SizedBox(width: 10),
+                ChoiceChip(
+                  avatar: Icon(Icons.threed_rotation_rounded,
+                      size: 15, color: _show3dModel ? const Color(0xFF0B1220) : const Color(0xFF8BE0C0)),
+                  label: const Text('Modelo 3D 360°'),
+                  selected: _show3dModel,
+                  selectedColor: const Color(0xFF8BE0C0),
+                  backgroundColor: const Color(0xFF16253B),
+                  side: BorderSide.none,
+                  labelStyle: TextStyle(
+                    color: _show3dModel ? const Color(0xFF0B1220) : const Color(0xFF8BE0C0),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11.5,
+                  ),
+                  onSelected: (val) {
+                    if (val) setState(() => _show3dModel = true);
+                  },
+                ),
+              ],
+            ),
+          ),
           SizedBox(
             height: _viewerHeight,
             width: double.infinity,
@@ -99,7 +153,12 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
                   _exercise,
                   _autoRotate,
                 ) ??
-                _Viewer(exercise: _exercise, autoRotate: _autoRotate),
+                _Viewer(
+                  exercise: _exercise,
+                  autoRotate: _autoRotate,
+                  show3dModel: _show3dModel,
+                  onToggleMode: () => setState(() => _show3dModel = !_show3dModel),
+                ),
           ),
           Expanded(
             child: _DidacticPanel(
@@ -120,9 +179,17 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
 /// necesita la permision de INTERNET para descargar el modelo. La aceleracion
 /// por hardware ya esta activa en el manifiesto de Android.
 class _Viewer extends StatelessWidget {
-  const _Viewer({required this.exercise, required this.autoRotate});
+  const _Viewer({
+    required this.exercise,
+    required this.autoRotate,
+    required this.show3dModel,
+    required this.onToggleMode,
+  });
+
   final AnatomyExercise exercise;
   final bool autoRotate;
+  final bool show3dModel;
+  final VoidCallback onToggleMode;
 
   Color _intensityColor(String level) {
     final l = level.toLowerCase();
@@ -137,6 +204,51 @@ class _Viewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (show3dModel) {
+      return Container(
+        color: const Color(0xFF070C16),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Exercise3DViewer(
+              animationKey: exercise.id,
+              primaryMuscle: exercise.agonist,
+              secondaryMuscle: exercise.synergists.isNotEmpty ? exercise.synergists.first : null,
+              height: 300,
+              showMuscleLegend: false,
+            ),
+            Positioned(
+              left: 12,
+              bottom: 12,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onToggleMode,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xDD101B2D),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF1FAE87), width: 1.2),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.play_circle_fill_rounded, color: Color(0xFF1FAE87), size: 14),
+                      SizedBox(width: 5),
+                      Text(
+                        'Ver Técnica (GIF)',
+                        style: TextStyle(color: Color(0xFF1FAE87), fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final effectiveGifUrl = resolveGuaranteedGifUrl(
       name: exercise.name,
       agonist: exercise.agonist,
@@ -196,26 +308,31 @@ class _Viewer extends StatelessWidget {
           Positioned(
             left: 12,
             bottom: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'Guía Animada',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onToggleMode,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xDD101B2D),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF8BE0C0), width: 1.2),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.threed_rotation_rounded, color: Color(0xFF8BE0C0), size: 15),
+                    SizedBox(width: 5),
+                    Text(
+                      'Girar en 3D 360°',
+                      style: TextStyle(
+                        color: Color(0xFF8BE0C0),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

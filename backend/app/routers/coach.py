@@ -711,6 +711,178 @@ MOBILITY_CARDIO_POOLS = {
     ],
 }
 
+SEATED_ADAPTED_POOLS = {
+    "baja": [
+        {
+            "name": "Press de pecho sentado con banda elástica o peso ligero (Adaptado)",
+            "sets": 3,
+            "reps": "10-12",
+            "animation_key": "chest_press",
+            "primary_muscle": "Pectorales",
+            "secondary_muscle": "Tríceps, Deltoides Anterior",
+            "biomechanics": "Espalda firmemente apoyada contra el respaldo de la silla o banco. Empuje horizontal controlado sin despegar la espalda.",
+            "posture": "Tronco erguido y estable; no requiere apoyo ni uso de piernas.",
+        },
+        {
+            "name": "Remo sentado con soporte en pecho o tracción con banda (Adaptado)",
+            "sets": 3,
+            "reps": "12",
+            "animation_key": "cable_row",
+            "primary_muscle": "Espalda Media, Dorsales",
+            "secondary_muscle": "Bíceps, Romboides",
+            "biomechanics": "Tracción horizontal con codos pegados al cuerpo y retracción escapular al final del recorrido.",
+            "posture": "Pecho apoyado para anular el estrés lumbar y evitar balanceos.",
+        },
+        {
+            "name": "Press de hombros sentado con respaldo completo (Adaptado)",
+            "sets": 3,
+            "reps": "10-12",
+            "animation_key": "shoulder_press",
+            "primary_muscle": "Hombros (Deltoides)",
+            "secondary_muscle": "Tríceps",
+            "biomechanics": "Elevación vertical controlada manteniendo los codos a 45 grados respecto al torso.",
+            "posture": "Espalda apoyada por completo; cabeza neutra sin arquear el cuello.",
+        },
+        {
+            "name": "Elevaciones laterales de hombros sentado (Adaptado)",
+            "sets": 3,
+            "reps": "12-15",
+            "animation_key": "lateral_raises",
+            "primary_muscle": "Deltoides Lateral",
+            "secondary_muscle": "Trapecio",
+            "biomechanics": "Elevación hasta la altura de los hombros con una ligera inclinación hacia adelante.",
+            "posture": "Torso estable en la silla; movimiento estricto sin impulso.",
+        },
+        {
+            "name": "Curl de bíceps sentado controlado (Adaptado)",
+            "sets": 3,
+            "reps": "12",
+            "animation_key": "bicep_curl",
+            "primary_muscle": "Bíceps Braquial",
+            "secondary_muscle": "Antebrazo",
+            "biomechanics": "Flexión completa del codo manteniendo los brazos estables a los costados.",
+            "posture": "Respaldo vertical; sujeción firme sin balanceos del tronco.",
+        },
+    ],
+    "media": [
+        {
+            "name": "Press de pecho en banco sentado con mancuernas (Adaptado)",
+            "sets": 4,
+            "reps": "10-12",
+            "animation_key": "chest_press",
+            "primary_muscle": "Pectoral Mayor",
+            "secondary_muscle": "Tríceps, Hombros",
+            "biomechanics": "Empuje firme con rango completo y descenso controlado en 3 segundos.",
+            "posture": "Espalda pegada al banco; hombros retraídos para máxima seguridad articular.",
+        },
+        {
+            "name": "Remo en polea o tracción con mancuernas con soporte (Adaptado)",
+            "sets": 4,
+            "reps": "10-12",
+            "animation_key": "cable_row",
+            "primary_muscle": "Dorsal Ancho, Espalda Media",
+            "secondary_muscle": "Bíceps",
+            "biomechanics": "Tirón controlado apretando las escápulas durante 1 segundo en la contracción.",
+            "posture": "Torso bloqueado con soporte frontal para proteger la columna.",
+        },
+        {
+            "name": "Press militar con mancuernas sentado con soporte lumbar (Adaptado)",
+            "sets": 3,
+            "reps": "10",
+            "animation_key": "shoulder_press",
+            "primary_muscle": "Deltoides",
+            "secondary_muscle": "Tríceps",
+            "biomechanics": "Subida explosiva y bajada en 2 segundos hasta nivel de orejas.",
+            "posture": "Respaldo a 85-90 grados para protección total.",
+        },
+        {
+            "name": "Extensiones de tríceps en polea o sobre cabeza sentado (Adaptado)",
+            "sets": 3,
+            "reps": "12",
+            "animation_key": "tricep_extension",
+            "primary_muscle": "Tríceps Braquial",
+            "secondary_muscle": "Antebrazo",
+            "biomechanics": "Extensión completa del codo bloqueando los brazos cerca de la cabeza.",
+            "posture": "Abdomen activo y espalda apoyada.",
+        },
+        {
+            "name": "Estabilización isométrica de core y giros controlados sentado (Adaptado)",
+            "sets": 3,
+            "reps": "12 giros suaves",
+            "animation_key": "core_twist",
+            "primary_muscle": "Core, Oblicuos",
+            "secondary_muscle": "Transverso Abdominal",
+            "biomechanics": "Rotación suave de la caja torácica manteniendo la pelvis fija en la silla.",
+            "posture": "Columna elongada y respiración profunda.",
+        },
+    ],
+    "alta": [
+        {
+            "name": "Press de pecho pesado con mancuernas en banco inclinado con soporte (Adaptado)",
+            "sets": 4,
+            "reps": "8-10",
+            "animation_key": "chest_press",
+            "primary_muscle": "Pectoral Mayor, Deltoides Anterior",
+            "secondary_muscle": "Tríceps",
+            "biomechanics": "Control excéntrico de alta tensión mecánica con retracción escapular estricta.",
+            "posture": "Cuerpo completamente fijado al banco con respaldo seguro.",
+        },
+        {
+            "name": "Remo con mancuernas a dos manos con pecho apoyado en banco (Adaptado)",
+            "sets": 4,
+            "reps": "8-10",
+            "animation_key": "cable_row",
+            "primary_muscle": "Dorsales, Trapecio Medio",
+            "secondary_muscle": "Bíceps",
+            "biomechanics": "Máxima tracción con codos hacia las costillas y pausa isométrica arriba.",
+            "posture": "Soporte esternal para anular cualquier participación de piernas.",
+        },
+        {
+            "name": "Press de hombros Arnold sentado con respaldo (Adaptado)",
+            "sets": 4,
+            "reps": "10",
+            "animation_key": "shoulder_press",
+            "primary_muscle": "Deltoides Completo (Anterior, Lateral y Posterior)",
+            "secondary_muscle": "Tríceps",
+            "biomechanics": "Rotación de muñecas sincronizada con el empuje vertical sin bloquear bruscamente.",
+            "posture": "Soporte lumbar ergonómico.",
+        },
+        {
+            "name": "Super-serie de brazos sentado: Curl de bíceps + Fondos en banco/silla (Adaptado)",
+            "sets": 3,
+            "reps": "10 + 12",
+            "animation_key": "bicep_curl",
+            "primary_muscle": "Bíceps y Tríceps",
+            "secondary_muscle": "Antebrazos",
+            "biomechanics": "Tensión continua en flexión y extensión de brazos.",
+            "posture": "Base estable con sujeción segura.",
+        },
+    ],
+}
+
+
+def _detect_motor_disability_or_seated_need(payload: ChatMessage) -> tuple[bool, str]:
+    """Detecta si el usuario tiene dificultad o discapacidad motora en piernas o requiere entrenamiento adaptado sentado."""
+    combined_user_text = " ".join(
+        [t.content for t in payload.history if t.role == "user"]
+        + [payload.message or ""]
+        + [payload.motor_disability or ""]
+        + [payload.injuries or ""]
+        + [payload.areas_to_avoid or ""]
+    ).lower()
+
+    keywords = (
+        "discapacidad", "silla de ruedas", "movilidad reducida", "paraplejia",
+        "no puedo mover las piernas", "no puedo usar las piernas", "discapacidad motora",
+        "discapacidad en las piernas", "dificultad motora", "lesión en la rodilla que me impide",
+        "lesion en la rodilla que me impide", "amputación", "amputado", "amputada",
+        "no puedo pararme", "no puedo estar de pie", "entrenar sentado", "entrenar sentada",
+        "ejercicios sentados", "solo torso", "hacer la parte del torso", "torso sentado",
+        "ejercicios adaptados", "adaptado para piernas", "sin usar piernas", "sin usar las piernas",
+    )
+    is_adapted = any(k in combined_user_text for k in keywords)
+    return is_adapted, "movilidad reducida o discapacidad en miembros inferiores (entrenamiento adaptado sentado de torso)"
+
 
 def _is_leg_exercise(name: str, primary_muscle: str) -> bool:
     text = f"{name} {primary_muscle}".lower()
@@ -1340,12 +1512,32 @@ Devuelve SOLO JSON."""
     requested_focus = _detect_requested_focus(payload)
     is_complementary = _is_complementary_days_request(payload)
 
-    focus_instruction = {
-        "piernas": "PIERNAS Y GLÚTEOS (Cuádriceps, Isquiotibiales, Glúteos y Gemelos). PROHIBIDO incluir ejercicios de pecho, espalda, abdomen o brazos.",
-        "tren_superior": "TREN SUPERIOR COMPLEMENTARIO PARA MARTES Y JUEVES (Espalda, Pecho, Hombros y Brazos). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas, Elevación de Talones o cualquier ejercicio de piernas!",
-        "core": "CORE, ABDOMEN Y ESTABILIDAD LUMBAR PARA MARTES Y JUEVES (Dead Bug, Plancha, Crunch, Control Postural). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas o cualquier ejercicio de piernas!",
-        "movilidad_cardio": "MOVILIDAD ARTICULAR, ESTABILIDAD Y CARDIO SUAVE DE BAJO IMPACTO PARA MARTES Y JUEVES (Bicicleta/Marcha Zona 2, Movilidad Torácica/Escapular, Dead Bug respiratorio, Plancha suave). ¡ESTÁ ESTRICTAMENTE PROHIBIDO repetir Sentadillas, Puente de Glúteos, Zancadas o Elevación de Talones!",
-    }.get(requested_focus or "", "el grupo muscular solicitado por el usuario en su último mensaje.")
+    motor_disabled, motor_reason = _detect_motor_disability_or_seated_need(payload)
+
+    if motor_disabled:
+        focus_instruction = (
+            "TREN SUPERIOR Y TORSO SENTADO ADAPTADO (Pecho, Espalda, Hombros, Brazos y Core con soporte). "
+            "¡ESTÁ TERMINANTEMENTE PROHIBIDO incluir Sentadillas, Zancadas, Prensa de piernas, Peso Muerto o cualquier ejercicio de pie o de piernas! "
+            "Todos los ejercicios deben ser 100% realizados en posición sentada o con soporte de espalda estable y seguro."
+        )
+    else:
+        focus_instruction = {
+            "piernas": "PIERNAS Y GLÚTEOS (Cuádriceps, Isquiotibiales, Glúteos y Gemelos). PROHIBIDO incluir ejercicios de pecho, espalda, abdomen o brazos.",
+            "tren_superior": "TREN SUPERIOR COMPLEMENTARIO PARA MARTES Y JUEVES (Espalda, Pecho, Hombros y Brazos). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas, Elevación de Talones o cualquier ejercicio de piernas!",
+            "core": "CORE, ABDOMEN Y ESTABILIDAD LUMBAR PARA MARTES Y JUEVES (Dead Bug, Plancha, Crunch, Control Postural). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas o cualquier ejercicio de piernas!",
+            "movilidad_cardio": "MOVILIDAD ARTICULAR, ESTABILIDAD Y CARDIO SUAVE DE BAJO IMPACTO PARA MARTES Y JUEVES (Bicicleta/Marcha Zona 2, Movilidad Torácica/Escapular, Dead Bug respiratorio, Plancha suave). ¡ESTÁ ESTRICTAMENTE PROHIBIDO repetir Sentadillas, Puente de Glúteos, Zancadas o Elevación de Talones!",
+        }.get(requested_focus or "", "el grupo muscular solicitado por el usuario en su último mensaje.")
+
+    motor_instruction = ""
+    if motor_disabled:
+        motor_instruction = (
+            f"\n6. PROTOCOLO CLÍNICO DE ENTRENAMIENTO ADAPTADO POR DIFICULTAD O DISCAPACIDAD MOTORA EN PIERNAS:\n"
+            f"   - El usuario presenta discapacidad motora o movilidad reducida en miembros inferiores (silla de ruedas, paraplejia, lesión grave de rodilla/tobillo o imposibilidad de bipedestación).\n"
+            f"   - Valida su compromiso deportivo con empatía, respeto, dignidad y máximo rigor técnico de para-fitness.\n"
+            f"   - PROHIBICIÓN ABSOLUTA: Cero sentadillas, zancadas, peso muerto, prensa de piernas, saltos o ejercicios de pie.\n"
+            f"   - OBLIGATORIO: Todos los ejercicios deben ser de TREN SUPERIOR Y TORSO EN POSICIÓN SENTADA CON RESPALDO (press de pecho con mancuernas o bandas sentado con apoyo, remo con soporte esternal en pecho, press militar sentado, elevaciones laterales, curl de bíceps, extensiones de tríceps y estabilización de core sentado).\n"
+            f"   - En cada ejercicio generado, la biomecánica y postura debe aclarar explícitamente: 'Posición sentada con espalda apoyada firmemente contra el respaldo; no requiere uso ni apoyo de miembros inferiores'."
+        )
 
     fatigue_instruction = ""
     if fatigue_detected:
@@ -1503,7 +1695,7 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
      * Proteínas: huevos (pericos criollos con tomate y cebolla, o sancochados), pechuga o muslos de pollo, carne molida magra, atún, sardinas, queso blanco llanero o paisa.
      * Carbohidratos: arepa de maíz, avena en hojuelas, arroz blanco, caraotas negras, lentejas, frijoles, batata, yuca, plátano verde o maduro (asado o hervido).
      * Frutas y vegetales: cambur, lechosa, patilla, melón, guayaba, tomate, cebolla, pimentón, repollo, pepino, chayota, calabacín y aguacate criollo.
-   - PROHIBIDO TERMINANTEMENTE incluir salmón, quinoa, espárragos, semillas de chía, frutos rojos importados ni suplementos costosos.{fatigue_instruction}
+    - PROHIBIDO TERMINANTEMENTE incluir salmón, quinoa, espárragos, semillas de chía, frutos rojos importados ni suplementos costosos.{fatigue_instruction}{motor_instruction}
 
 Retorna EXCLUSIVAMENTE un objeto JSON válido con esta estructura exacta:
 {{
@@ -1570,7 +1762,10 @@ Devuelve SOLO JSON."""
         
         # Seleccionar pool de ejercicios según la zona solicitada e intensidad
         focus_key = requested_focus or "piernas"
-        if focus_key == "tren_superior":
+        if motor_disabled:
+            chosen_pool = SEATED_ADAPTED_POOLS.get(intensity_hint, SEATED_ADAPTED_POOLS["media"])
+            focus_name = "Tren Superior y Torso Sentado (Adaptado)"
+        elif focus_key == "tren_superior":
             chosen_pool = UPPER_BODY_POOLS.get(intensity_hint, UPPER_BODY_POOLS["media"])
             focus_name = "Tren Superior (Espalda, Pecho y Brazos)"
         elif focus_key == "core":
