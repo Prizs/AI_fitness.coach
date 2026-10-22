@@ -124,31 +124,54 @@ String resolveGuaranteedGifUrl({
                 : 'quads/dumbbell-goblet-squat.gif'));
   }
   if (text.contains('bicep') || text.contains('bícep') || text.contains('curl')) {
-    return _kGifBase + 'biceps/dumbbell-seated-biceps-curl.gif';
+    if (text.contains('martillo') || text.contains('hammer')) {
+      return _kGifBase + 'biceps/dumbbell-seated-hammer-curl.gif';
+    }
+    return _kGifBase + 'biceps/dumbbell-seated-bicep-curl.gif';
   }
-  if (text.contains('tricep') || text.contains('trícep') || text.contains('fondo') || text.contains('copa')) {
-    return _kGifBase + 'triceps/seated-dumbbell-triceps-extension.gif';
+  if (text.contains('tricep') || text.contains('trícep') || text.contains('fondo') || text.contains('copa') || text.contains('dip')) {
+    if (text.contains('fondo') || text.contains('dip') || text.contains('maquina') || text.contains('máquina')) {
+      return _kGifBase + 'triceps/lever-seated-dip.gif';
+    }
+    return _kGifBase + 'triceps/dumbbell-seated-triceps-extension.gif';
   }
-  if (text.contains('pecho') || text.contains('pectoral') || text.contains('banca') || text.contains('bench') || text.contains('apertura')) {
-    return _kGifBase +
-        (isLow ? 'pectorals/incline-push-up.gif' : 'pectorals/dumbbell-bench-press.gif');
+  if (text.contains('apertura') || text.contains('fly')) {
+    return _kGifBase + 'pectorals/lever-seated-fly.gif';
+  }
+  if (text.contains('pecho') || text.contains('pectoral') || text.contains('banca') || text.contains('bench')) {
+    if (text.contains('banda') || text.contains('silla') || text.contains('rueda') || text.contains('casa')) {
+      return _kGifBase + 'pectorals/resistance-band-seated-chest-press.gif';
+    }
+    if (text.contains('maquina') || text.contains('máquina') || text.contains('sentado')) {
+      return _kGifBase + 'pectorals/lever-chest-press.gif';
+    }
+    return _kGifBase + 'pectorals/dumbbell-bench-press.gif';
   }
   if (text.contains('espalda') || text.contains('dorsal') || text.contains('remo') || text.contains('jalon') || text.contains('jalón') || text.contains('dominada')) {
-    return _kGifBase +
-        (text.contains('remo')
-            ? 'upper-back/band-one-arm-twisting-seated-row.gif'
-            : 'lats/cable-pulldown.gif');
+    if (text.contains('jalon') || text.contains('jalón') || text.contains('polea alta') || text.contains('pulldown')) {
+      return _kGifBase + 'lats/cable-pulldown.gif';
+    }
+    if (text.contains('remo') && text.contains('polea')) {
+      return _kGifBase + 'lats/cable-seated-high-row-v-bar.gif';
+    }
+    return _kGifBase + 'upper-back/band-one-arm-twisting-seated-row.gif';
   }
   if (text.contains('hombro') || text.contains('deltoid') || text.contains('militar') || text.contains('lateral') || text.contains('pajaro') || text.contains('pájaro')) {
-    return _kGifBase +
-        (text.contains('lateral') || text.contains('pajaro') || text.contains('pájaro')
-            ? 'delts/dumbbell-lateral-raise.gif'
-            : (isLow ? 'delts/band-shoulder-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif'));
+    if (text.contains('pajaro') || text.contains('pájaro') || text.contains('posterior') || text.contains('reverse fly')) {
+      return _kGifBase + 'delts/lever-seated-reverse-fly.gif';
+    }
+    if (text.contains('lateral') || text.contains('elevacion') || text.contains('elevación')) {
+      return _kGifBase + 'delts/dumbbell-seated-lateral-raise.gif';
+    }
+    return _kGifBase + 'delts/dumbbell-seated-shoulder-press.gif';
   }
-  if (text.contains('core') || text.contains('abdom') || text.contains('plancha') || text.contains('giro') || text.contains('isometr') || text.contains('isométr') || text.contains('dead bug')) {
-    return _kGifBase + 'abs/dead-bug.gif';
+  if (text.contains('core') || text.contains('abdom') || text.contains('plancha') || text.contains('giro') || text.contains('twist') || text.contains('isometr') || text.contains('isométr')) {
+    if (text.contains('giro') || text.contains('twist') || text.contains('ruso')) {
+      return _kGifBase + 'abs/band-seated-twist.gif';
+    }
+    return _kGifBase + 'abs/cable-seated-crunch.gif';
   }
-  return _kGifBase + 'glutes/potty-squat-with-support.gif';
+  return _kGifBase + 'delts/dumbbell-seated-shoulder-press.gif';
 }
 
 /// Color del agonista: rojo brillante, como pide el diseno didactico.
@@ -163,9 +186,13 @@ const Color kAnatomyBackground = Color(0xFF121212);
 /// Fondo de las tarjetas y del panel inferior.
 const Color kAnatomySurface = Color(0xFF1E1E1E);
 
-/// Modelo humanoide real y con licencia, servido por modelviewer.dev.
+/// Modelo anatómico 3D de alta fidelidad con musculatura y esqueleto real (Z-Anatomy GLB).
+const String kMuscularAnatomyModelUrl =
+    'https://cdn.jsdelivr.net/gh/hpfrei/body-anatomy-3d-viewer@main/public/body.glb';
+
+/// Modelo humanoide alternativo de Khronos.
 const String kDefaultAnatomyModelUrl =
-    'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb';
+    'https://cdn.jsdelivr.net/gh/hpfrei/body-anatomy-3d-viewer@main/public/body.glb';
 
 /// Catálogo de los cuatro ejercicios de la demostracion.
 const List<AnatomyExercise> kAnatomyExercises = [

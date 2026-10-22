@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/widgets/exercise_3d_viewer.dart';
+import 'package:mobile_app/widgets/muscle_map_view.dart';
 
-
-/// Pantalla de demostracion didactica del modelo anatomico 3D.
+/// Pantalla de demostración didáctica del modelo anatómico y técnica.
 ///
-/// La mitad superior muestra el cuerpo en 3D: se rota con un dedo, se hace zoom
-/// con dos y la autorrotacion se alterna desde el boton de la AppBar. La mitad
-/// inferior es un panel deslizable con los datos del ejercicio: agonista,
-/// sinergistas, biomecanica, tempo, postura y advertencia de lesion.
-///
-/// La tira inferior cambia de ejercicio y actualiza el foco muscular y los
-/// textos biomecanicos, que es lo que demuestra como la IA orquestaria la
-/// visualizacion.
+/// Ofrece 4 modos de visualización avanzados:
+/// 0: Técnica Real (GIF) animado en bucle.
+/// 1: Modelo Anatómico 3D Muscular (360°) de alta fidelidad (Z-Anatomy GLB).
+/// 2: Atlas Anatómico de Músculos (resaltado interactivo de agonistas y sinergistas).
+/// 3: Biomecánica Vectorial 3D (ejes cinéticos y articulaciones).
 class AnatomyWorkoutScreen extends StatefulWidget {
-
   const AnatomyWorkoutScreen({
     super.key,
     this.initialExerciseId = 'squat',
@@ -24,11 +21,6 @@ class AnatomyWorkoutScreen extends StatefulWidget {
 
   final String initialExerciseId;
   final List<AnatomyExercise>? dynamicExercises;
-
-
-  /// Permite sustituir el visor 3D. En las pruebas se usa un marcador de
-  /// posicion, porque el WebView que necesita `ModelViewer` no existe en el
-  /// entorno de test. En la app real se deja en null y se dibuja el modelo.
   final Widget Function(BuildContext, AnatomyExercise, bool)? viewerBuilder;
 
   @override
@@ -38,10 +30,10 @@ class AnatomyWorkoutScreen extends StatefulWidget {
 class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
   late AnatomyExercise _exercise;
   bool _autoRotate = true;
-  bool _show3dModel = false;
+  int _viewMode = 0; // 0: GIF, 1: 3D Muscular, 2: Atlas Muscular, 3: Vectorial
 
-  /// Altura de la zona 3D: la mitad superior de la pantalla.
-  static const double _viewerHeight = 300;
+  /// Altura de la zona visual: la mitad superior de la pantalla.
+  static const double _viewerHeight = 310;
 
   @override
   void initState() {
@@ -62,6 +54,19 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
     setState(() => _exercise = exercise);
   }
 
+  String _appBarTitle() {
+    switch (_viewMode) {
+      case 1:
+        return 'Modelo 3D Muscular (360°)';
+      case 2:
+        return 'Atlas Anatómico de Músculos';
+      case 3:
+        return 'Biomecánica Vectorial 3D';
+      default:
+        return 'Guía de Ejecución y Técnica';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,78 +76,60 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          _show3dModel ? 'Anatomía 3D (360°)' : 'Guía de Ejecución y Técnica',
+          _appBarTitle(),
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5),
         ),
         actions: [
-          IconButton(
-            tooltip: _show3dModel
-                ? (_autoRotate ? 'Pausar autorrotación' : 'Activar giro 360°')
-                : 'Ver modelo anatómico 3D',
-            onPressed: () {
-              if (!_show3dModel) {
-                setState(() {
-                  _show3dModel = true;
-                  _autoRotate = true;
-                });
-              } else {
-                setState(() => _autoRotate = !_autoRotate);
-              }
-            },
-            icon: Icon(
-              _show3dModel
-                  ? (_autoRotate ? Icons.threesixty_rounded : Icons.rotate_right_rounded)
-                  : Icons.threed_rotation_rounded,
-              color: _show3dModel && _autoRotate ? kAgonistColor : Colors.white70,
+          if (_viewMode == 1)
+            IconButton(
+              tooltip: _autoRotate ? 'Pausar autorrotación' : 'Activar giro 360°',
+              onPressed: () => setState(() => _autoRotate = !_autoRotate),
+              icon: Icon(
+                _autoRotate ? Icons.threesixty_rounded : Icons.rotate_right_rounded,
+                color: _autoRotate ? const Color(0xFF8BE0C0) : Colors.white70,
+              ),
             ),
-          ),
         ],
       ),
       body: Column(
         children: [
-          // Selector dinámico entre Técnica GIF y Modelo 3D rotativo
+          // Selector dinámico con 4 modos de visualización
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             color: kAnatomySurface,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ChoiceChip(
-                  avatar: Icon(Icons.play_circle_fill_rounded,
-                      size: 15, color: !_show3dModel ? Colors.black : Colors.white70),
-                  label: const Text('Técnica Real (GIF)'),
-                  selected: !_show3dModel,
-                  selectedColor: const Color(0xFF1FAE87),
-                  backgroundColor: const Color(0xFF16253B),
-                  side: BorderSide.none,
-                  labelStyle: TextStyle(
-                    color: !_show3dModel ? Colors.black : Colors.white70,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11.5,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildModeChip(
+                    mode: 0,
+                    icon: Icons.play_circle_fill_rounded,
+                    label: 'Técnica Real (GIF)',
+                    color: const Color(0xFF1FAE87),
                   ),
-                  onSelected: (val) {
-                    if (val) setState(() => _show3dModel = false);
-                  },
-                ),
-                const SizedBox(width: 10),
-                ChoiceChip(
-                  avatar: Icon(Icons.threed_rotation_rounded,
-                      size: 15, color: _show3dModel ? const Color(0xFF0B1220) : const Color(0xFF8BE0C0)),
-                  label: const Text('Modelo 3D 360°'),
-                  selected: _show3dModel,
-                  selectedColor: const Color(0xFF8BE0C0),
-                  backgroundColor: const Color(0xFF16253B),
-                  side: BorderSide.none,
-                  labelStyle: TextStyle(
-                    color: _show3dModel ? const Color(0xFF0B1220) : const Color(0xFF8BE0C0),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11.5,
+                  const SizedBox(width: 8),
+                  _buildModeChip(
+                    mode: 1,
+                    icon: Icons.threed_rotation_rounded,
+                    label: 'Modelo 3D Muscular (360°)',
+                    color: const Color(0xFF8BE0C0),
                   ),
-                  onSelected: (val) {
-                    if (val) setState(() => _show3dModel = true);
-                  },
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  _buildModeChip(
+                    mode: 2,
+                    icon: Icons.accessibility_new_rounded,
+                    label: 'Atlas Muscular',
+                    color: const Color(0xFFFFB340),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildModeChip(
+                    mode: 3,
+                    icon: Icons.alt_route_rounded,
+                    label: 'Biomecánica 3D',
+                    color: const Color(0xFF64B5F6),
+                  ),
+                ],
+              ),
             ),
           ),
           SizedBox(
@@ -156,8 +143,8 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
                 _Viewer(
                   exercise: _exercise,
                   autoRotate: _autoRotate,
-                  show3dModel: _show3dModel,
-                  onToggleMode: () => setState(() => _show3dModel = !_show3dModel),
+                  viewMode: _viewMode,
+                  onSelectMode: (m) => setState(() => _viewMode = m),
                 ),
           ),
           Expanded(
@@ -171,25 +158,46 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
       ),
     );
   }
+
+  Widget _buildModeChip({
+    required int mode,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    final isSelected = _viewMode == mode;
+    return ChoiceChip(
+      avatar: Icon(icon, size: 15, color: isSelected ? const Color(0xFF0B1220) : color),
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: color,
+      backgroundColor: const Color(0xFF16253B),
+      side: BorderSide(color: isSelected ? color : Colors.white12),
+      labelStyle: TextStyle(
+        color: isSelected ? const Color(0xFF0B1220) : Colors.white,
+        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+        fontSize: 11.5,
+      ),
+      onSelected: (val) {
+        if (val) setState(() => _viewMode = mode);
+      },
+    );
+  }
 }
 
-/// Cuerpo 3D interactivo.
-///
-/// En Android `model_viewer_plus` renderiza dentro de un WebView, por eso
-/// necesita la permision de INTERNET para descargar el modelo. La aceleracion
-/// por hardware ya esta activa en el manifiesto de Android.
+/// Visor polivalente interactivo con 4 modos.
 class _Viewer extends StatelessWidget {
   const _Viewer({
     required this.exercise,
     required this.autoRotate,
-    required this.show3dModel,
-    required this.onToggleMode,
+    required this.viewMode,
+    required this.onSelectMode,
   });
 
   final AnatomyExercise exercise;
   final bool autoRotate;
-  final bool show3dModel;
-  final VoidCallback onToggleMode;
+  final int viewMode;
+  final ValueChanged<int> onSelectMode;
 
   Color _intensityColor(String level) {
     final l = level.toLowerCase();
@@ -204,43 +212,43 @@ class _Viewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (show3dModel) {
+    // Modo 1: Modelo 3D Muscular Real con model_viewer_plus
+    if (viewMode == 1) {
       return Container(
         color: const Color(0xFF070C16),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Exercise3DViewer(
-              animationKey: exercise.id,
-              primaryMuscle: exercise.agonist,
-              secondaryMuscle: exercise.synergists.isNotEmpty ? exercise.synergists.first : null,
-              height: 300,
-              showMuscleLegend: false,
+            ModelViewer(
+              key: ValueKey('mv_${exercise.id}_$autoRotate'),
+              src: kMuscularAnatomyModelUrl,
+              alt: 'Modelo Anatómico Muscular 3D (360°)',
+              ar: false,
+              autoRotate: autoRotate,
+              cameraControls: true,
+              backgroundColor: const Color(0xFF070C16),
+              shadowIntensity: 1.0,
             ),
             Positioned(
-              left: 12,
-              bottom: 12,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: onToggleMode,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xDD101B2D),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF1FAE87), width: 1.2),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.play_circle_fill_rounded, color: Color(0xFF1FAE87), size: 14),
-                      SizedBox(width: 5),
-                      Text(
-                        'Ver Técnica (GIF)',
-                        style: TextStyle(color: Color(0xFF1FAE87), fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
+              top: 10,
+              left: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xDD0B1220),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.4)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.touch_app_rounded, color: Color(0xFF8BE0C0), size: 13),
+                    SizedBox(width: 4),
+                    Text(
+                      'Rotación 360° táctil · Pellizca para zoom',
+                      style: TextStyle(color: Colors.white70, fontSize: 10.5),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -249,6 +257,34 @@ class _Viewer extends StatelessWidget {
       );
     }
 
+    // Modo 2: Atlas Anatómico de Músculos (flutter_body_atlas)
+    if (viewMode == 2) {
+      return Container(
+        color: const Color(0xFF070C16),
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: MuscleMapView(
+          primaryMuscle: exercise.agonist,
+          secondaryMuscle: exercise.synergists.isNotEmpty ? exercise.synergists.first : null,
+          height: 290,
+        ),
+      );
+    }
+
+    // Modo 3: Biomecánica Vectorial 3D (Esqueleto interactivo con articulaciones)
+    if (viewMode == 3) {
+      return Container(
+        color: const Color(0xFF070C16),
+        child: Exercise3DViewer(
+          animationKey: exercise.id,
+          primaryMuscle: exercise.agonist,
+          secondaryMuscle: exercise.synergists.isNotEmpty ? exercise.synergists.first : null,
+          height: 300,
+          showMuscleLegend: false,
+        ),
+      );
+    }
+
+    // Modo 0: Técnica Real (GIF garantizado y adaptado)
     final effectiveGifUrl = resolveGuaranteedGifUrl(
       name: exercise.name,
       agonist: exercise.agonist,
@@ -273,7 +309,7 @@ class _Viewer extends StatelessWidget {
             },
             errorBuilder: (context, error, stackTrace) {
               return Image.network(
-                'https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/glutes/potty-squat-with-support.gif',
+                'https://cdn.jsdelivr.net/gh/JahelCuadrado/ExerciseGymGifsDB@v1.1.0/pectorals/lever-seated-fly.gif',
                 fit: BoxFit.contain,
               );
             },
@@ -291,129 +327,19 @@ class _Viewer extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.speed_rounded, color: badgeColor, size: 15),
-                  const SizedBox(width: 6),
+                  Icon(Icons.bolt_rounded, size: 14, color: badgeColor),
+                  const SizedBox(width: 4),
                   Text(
                     exercise.intensityLevel,
                     style: TextStyle(
                       color: badgeColor,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          Positioned(
-            left: 12,
-            bottom: 12,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onToggleMode,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xDD101B2D),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF8BE0C0), width: 1.2),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.threed_rotation_rounded, color: Color(0xFF8BE0C0), size: 15),
-                    SizedBox(width: 5),
-                    Text(
-                      'Girar en 3D 360°',
-                      style: TextStyle(
-                        color: Color(0xFF8BE0C0),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Capa superpuesta que marca la zona estimulada.
-///
-/// El modelo 3D disponible no tiene mallas musculares separadas, asi que el
-/// resaltado se dibuja como una marca sobre el cuerpo, alineada con la zona que
-/// trabaja el ejercicio. Cuando exista un modelo anatomico real, esta capa se
-/// sustituye por el resaltado de material del propio archivo .glb.
-class _MuscleOverlay extends StatelessWidget {
-  const _MuscleOverlay({required this.exercise});
-
-  final AnatomyExercise exercise;
-
-  @override
-  Widget build(BuildContext context) {
-    final upper = _isUpperBody(exercise.agonist);
-    return Align(
-      alignment: upper
-          ? const Alignment(0.12, -0.22)
-          : const Alignment(0.12, 0.32),
-      child: Container(
-        width: 72,
-        height: 72,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: kAgonistColor.withValues(alpha: 0.32),
-          border: Border.all(color: kAgonistColor, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: kAgonistColor.withValues(alpha: 0.5),
-              blurRadius: 20,
-              spreadRadius: 3,
-            ),
-          ],
-        ),
-        child: const Center(
-          child: Icon(Icons.bolt_rounded, color: Colors.white, size: 26),
-        ),
-      ),
-    );
-  }
-
-  /// Decide si el musculo principal pertenece al tren superior.
-  bool _isUpperBody(String muscle) {
-    const lower = [
-      'cuadriceps', 'gluteos', 'isquiotibiales', 'gemelos', 'aductores',
-    ];
-    return !lower.contains(muscle.toLowerCase());
-  }
-}
-
-/// Aviso de gestos, para saber como interactuar con el modelo.
-class _Hint extends StatelessWidget {
-  const _Hint({required this.autoRotate});
-  final bool autoRotate;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black54,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.swipe_rounded, size: 14, color: Colors.white70),
-          const SizedBox(width: 6),
-          Text(
-            autoRotate
-                ? 'Un dedo rota · dos dedos acercan'
-                : 'Arrastra para rotar',
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
           ),
         ],
       ),
