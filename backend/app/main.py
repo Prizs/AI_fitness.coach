@@ -107,7 +107,7 @@ def admin_diagnostics(pin: str | None = None) -> dict:
         admin = get_supabase_admin_client()
         res = admin.table("usuarios").select("id", count="exact").execute()
         users_count = res.count if hasattr(res, "count") and res.count is not None else len(res.data or [])
-        res_t = admin.table("usuarios").select("id", count="exact").eq("rol", "trainer").execute()
+        res_t = admin.table("usuarios").select("id", count="exact").eq("role", "trainer").execute()
         trainers_count = res_t.count if hasattr(res_t, "count") and res_t.count is not None else len(res_t.data or [])
         supabase_ok = True
     except Exception as e:
