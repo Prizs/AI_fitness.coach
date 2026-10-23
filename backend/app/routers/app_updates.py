@@ -3,9 +3,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 router = APIRouter()
+
+GITHUB_RELEASE_APK_URL = "https://github.com/Prizs/AI_fitness.coach/releases/download/v1.0.60/AI_Fitness_Coach_v1.0.60.apk"
+GITHUB_LATEST_RELEASE_URL = "https://github.com/Prizs/AI_fitness.coach/releases/latest"
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -42,7 +45,7 @@ def latest_version() -> dict:
 
 @router.get("/download")
 def download_apk():
-    """Descarga directamente el APK oficial desde el servidor."""
+    """Descarga directamente el APK oficial desde el servidor o redirige a la release de GitHub."""
     apk = _find_apk_file()
     if apk and apk.exists():
         return FileResponse(
@@ -50,5 +53,5 @@ def download_apk():
             media_type="application/vnd.android.package-archive",
             filename="AI_Fitness_Coach_v1.0.60.apk",
         )
-    raise HTTPException(status_code=404, detail="Archivo APK no disponible en el servidor.")
+    return RedirectResponse(url=GITHUB_RELEASE_APK_URL, status_code=302)
 
