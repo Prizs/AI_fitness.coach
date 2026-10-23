@@ -1,3 +1,7 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mobile_app/models/user_profile.dart';
+import 'package:mobile_app/screens/auth/onboarding_quiz_screen.dart';
+import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/daily_notification_service.dart';
 import 'package:mobile_app/widgets/fatigue_checkin_dialog.dart';
 import 'package:flutter/material.dart';
@@ -10,8 +14,60 @@ import 'package:mobile_app/screens/notifications_screen.dart';
 import 'package:mobile_app/screens/nutrition_screen.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _storage = const FlutterSecureStorage();
+  String? _archetype;
+  bool _checkedArchetype = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadArchetype();
+  }
+
+  Future<void> _loadArchetype() async {
+    try {
+      final arch = await _storage.read(key: 'biopsycho_archetype');
+      if (mounted) {
+        setState(() {
+          _archetype = arch;
+          _checkedArchetype = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _checkedArchetype = true);
+    }
+  }
+
+  void _openQuiz() {
+    final user = AuthService.instance.loggedInUser ??
+        UserProfile(
+          cedula: '0000000',
+          name: 'Usuario',
+          lastName: '',
+          age: 25,
+          weight: 70,
+        );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OnboardingQuizScreen(
+          userProfile: user,
+          onComplete: () {
+            Navigator.pop(context);
+            _loadArchetype();
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -154,11 +210,78 @@ class HomeScreen extends StatelessWidget {
                           label: '🔥 Racha: $streak ${streak == 1 ? "sesión" : "sesiones"}',
                           color: const Color(0xFFFFB340),
                         ),
+                      if (_archetype != null)
+                        InkWell(
+                          onTap: _openQuiz,
+                          borderRadius: BorderRadius.circular(12),
+                          child: _StatusChip(
+                            label: '🧠 $_archetype',
+                            color: const Color(0xFF8BE0C0),
+                          ),
+                        ),
                     ],
                   );
                 },
               ),
               const SizedBox(height: 16),
+              if (_checkedArchetype && _archetype == null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF132B36), Color(0xFF0F1A2A)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.5)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8BE0C0).withOpacity(0.12),
+                        blurRadius: 12,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8BE0C0).withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.psychology_rounded, color: Color(0xFF8BE0C0), size: 26),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Test Biopsicosocial Pendiente',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Descubre tu arquetipo, vence la procrastinación y calibra la IA.',
+                              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _openQuiz,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8BE0C0),
+                          foregroundColor: const Color(0xFF0B1220),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Iniciar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
               FutureBuilder<bool>(
                 future: DailyNotificationService.instance.isFollowupCheckinDue(DateTime.now()),
                 builder: (context, snapshot) {

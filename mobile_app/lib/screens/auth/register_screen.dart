@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/screens/auth/onboarding_quiz_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({
@@ -30,7 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _lastName = TextEditingController();
   final _age = TextEditingController();
   final _weight = TextEditingController();
-  final _notes = TextEditingController();
+  final _pathologyInput = TextEditingController();
   final _securityAnswer = TextEditingController();
   String _securityQuestion = '¿Cuál es tu color favorito?';
   final List<String> _questions = [
@@ -44,6 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _injuryInput = TextEditingController();
   final _disabilityInput = TextEditingController();
   final _avoidInput = TextEditingController();
+  final _pathologies = <String>[];
   final _allergies = <String>[];
   final _injuries = <String>[];
   final _disabilities = <String>[];
@@ -129,6 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    _addTags(_pathologyInput, _pathologies);
     _addTags(_allergyInput, _allergies);
     _addTags(_injuryInput, _injuries);
     _addTags(_disabilityInput, _disabilities);
@@ -141,9 +144,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       lastName: _lastName.text.trim(),
       age: int.tryParse(_age.text.trim()) ?? 25,
       weight: double.tryParse(_weight.text.trim()) ?? 70.0,
-      pathologyOrAllergies: _notes.text.trim().isEmpty
+      pathologyOrAllergies: _pathologies.isEmpty
           ? null
-          : _notes.text.trim(),
+          : _join(_pathologies),
       foodAllergies: _join(_allergies),
       currentInjuries: _join(_injuries),
       motorDisability: _join(_disabilities),
@@ -164,7 +167,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return;
     }
-    widget.onRegisterSuccess();
+    
+    // Si es un Alumno, lanzar el Test Biopsicosocial y de Adherencia (estilo FitCraft)
+    if (!_isTrainer) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => OnboardingQuizScreen(
+            userProfile: profile,
+            onComplete: widget.onRegisterSuccess,
+          ),
+        ),
+      );
+    } else {
+      widget.onRegisterSuccess();
+    }
   }
 
   @override
@@ -176,7 +192,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _lastName,
       _age,
       _weight,
-      _notes,
+      _pathologyInput,
       _allergyInput,
       _injuryInput,
       _disabilityInput,
@@ -284,15 +300,85 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ]),
               const SizedBox(height: 14),
               if (!_isTrainer) _section('Salud y adaptación', Icons.accessibility_new_rounded, [
-                TextFormField(
-                  controller: _notes,
-                  maxLines: 2,
-                  decoration: _decoration(
-                    'Patología o alergias generales',
-                    Icons.health_and_safety_outlined,
+                _TagField(
+                  label: 'Patología o alergias generales',
+                  hint: 'Asma, Hipertensión, Polvo + Enter',
+                  icon: Icons.health_and_safety_outlined,
+                  controller: _pathologyInput,
+                  tags: _pathologies,
+                  onAdd: () => _addTags(_pathologyInput, _pathologies),
+                  onRemove: (tag) => setState(() => _pathologies.remove(tag)),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Text(
+                    'Sugerencias rápidas (toca para añadir):',
+                    style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.65)),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    'Asma',
+                    'Hipertensión',
+                    'Diabetes',
+                    'Alergia al polvo',
+                    'Rinitis alérgica',
+                    'Hipotiroidismo',
+                    'Ninguna',
+                  ].map((suggestion) {
+                    final isSelected = _pathologies.contains(suggestion);
+                    return ActionChip(
+                      backgroundColor: isSelected ? const Color(0xFF173B45) : const Color(0xFF101B2D),
+                      side: BorderSide(
+                        color: isSelected ? const Color(0xFF8BE0C0) : Colors.white24,
+                      ),
+                      avatar: Icon(
+                        isSelected ? Icons.check_rounded : Icons.add_rounded,
+                        size: 15,
+                        color: isSelected ? const Color(0xFF8BE0C0) : Colors.white70,
+                      ),
+                      label: Text(
+                        suggestion,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isSelected ? const Color(0xFF8BE0C0) : Colors.white70,
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          if (suggestion == 'Ninguna') {
+                            _pathologies.clear();
+                            _pathologies.add('Ninguna');
+                          } else {
+                            _pathologies.remove('Ninguna');
+                            if (_pathologies.contains(suggestion)) {
+                              _pathologies.remove(suggestion);
+                            } else {
+                              _pathologies.add(suggestion);
+                            }
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Text(
+                    'ℹ️ ¿Qué va aquí? Condiciones de salud o alergias ambientales (polvo, polen, picaduras). Sirve para que la IA calibre tu esfuerzo cardiovascular y no sature tus pulmones.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: const Color(0xFF8BE0C0).withOpacity(0.85),
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
                 _TagField(
                   label: 'Alergias alimentarias',
                   hint: 'camarones, nuezes + Enter',

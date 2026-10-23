@@ -8,6 +8,8 @@ import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/screens/body_metrics_screen.dart';
 import 'package:mobile_app/screens/admin_console_screen.dart';
 import 'package:mobile_app/screens/adaptive_workout_screen.dart';
+import 'package:mobile_app/screens/auth/onboarding_quiz_screen.dart';
+import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/main.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -364,6 +366,48 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ],
                 ),
                 onPressed: _downloadBitacoraPdf,
+              ),
+              const SizedBox(height: 10),
+
+              // Botón de Test Biopsicosocial & Adherencia (Estilo FitCraft)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF142436),
+                  foregroundColor: const Color(0xFF8BE0C0),
+                  side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.1),
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.psychology_rounded, size: 22, color: Color(0xFF8BE0C0)),
+                label: const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Test Biopsicosocial & Adherencia (FitCraft)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  ],
+                ),
+                onPressed: () {
+                  final u = AuthService.instance.loggedInUser ??
+                      UserProfile(
+                        cedula: '0000000',
+                        name: 'Usuario',
+                        lastName: '',
+                        age: 25,
+                        weight: 70,
+                      );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OnboardingQuizScreen(
+                        userProfile: u,
+                        onComplete: () {
+                          Navigator.pop(context);
+                          setState(() {});
+                        },
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 10),
 

@@ -1,5 +1,6 @@
 import 'dart:io';
-
+import 'package:url_launcher/url_launcher.dart';
+import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/app_update_service.dart';
 import 'package:flutter/material.dart';
 
@@ -163,6 +164,24 @@ class _AppUpdatePanelState extends State<AppUpdatePanel> {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF8BE0C0),
+              ),
+              onPressed: () async {
+                final url = Uri.parse('${AuthService.apiBaseUrl}/api/app/download');
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              },
+              icon: const Icon(Icons.download_for_offline_rounded, size: 18),
+              label: const Text(
+                'Descargar archivo APK directamente',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              ),
+            ),
           ),
         ],
       ),

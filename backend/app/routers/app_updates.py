@@ -25,16 +25,17 @@ def latest_version() -> dict:
     size = apk.stat().st_size if apk else 54792490
     return {
         "available": True,
-        "version_name": "1.0.40",
-        "version_code": 41,
+        "version_name": "1.0.60",
+        "version_code": 100,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.40:\n"
-            "1. Los 3 Modos Definitivos (Técnica Real, Atlas Muscular 2D y Modelo 3D Muscular 360).\n"
-            "2. Adaptación biomecánica completa para discapacidades motoras y lesiones.\n"
-            "3. Nutrición 100% mercado local venezolano.\n"
-            "4. Diagnóstico y asistente clínico para entrenadores personales."
+            "Actualización oficial de AI Fitness Coach v1.0.60:\n"
+            "1. Nuevo campo interactivo de Patologías y Alergias generales con sugerencias rápidas.\n"
+            "2. Test Biopsicosocial & Adherencia estilo FitCraft obligatorio al registrarse.\n"
+            "3. Detección de arquetipos bioconductuales y reglas anti-procrastinación personalizadas.\n"
+            "4. Calibración del Coach IA conectada a tu psicología y nivel de fatiga.\n"
+            "5. Los 3 Modos Definitivos (Técnica Real, Atlas Muscular 2D y Biomecánica 3D)."
         ),
         "download_url": "/api/app/download",
     }
@@ -47,7 +48,7 @@ def download_apk():
         return FileResponse(
             path=str(apk),
             media_type="application/vnd.android.package-archive",
-            filename="AI_Fitness_Coach_v1.0.40.apk",
+            filename="AI_Fitness_Coach_v1.0.60.apk",
         )
     raise HTTPException(status_code=404, detail="Archivo APK no disponible en el servidor.")
 

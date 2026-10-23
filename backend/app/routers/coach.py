@@ -34,6 +34,9 @@ class ChatMessage(BaseModel):
     user_level: str | None = Field(default=None, max_length=500)
     user_intensity: str | None = Field(default=None, max_length=500)
     allergies: str | None = Field(default=None, max_length=3000)
+    pathology_or_allergies: str | None = Field(default=None, max_length=3000)
+    archetype: str | None = Field(default=None, max_length=500)
+    behavioral_profile: str | None = Field(default=None, max_length=5000)
     injuries: str | None = Field(default=None, max_length=3000)
     motor_disability: str | None = Field(default=None, max_length=3000)
     areas_to_avoid: str | None = Field(default=None, max_length=3000)
@@ -1163,9 +1166,11 @@ def _profile_context(payload: ChatMessage, effective_level: str, effective_inten
         f"Meta: {payload.user_goal or 'Rendimiento general'}. "
         f"Nivel de experiencia: {effective_level}. "
         f"Intensidad solicitada: {effective_intensity}. "
-        f"Alergias: {payload.allergies or 'Ninguna'}. "
+        f"Patologías o afecciones generales: {payload.pathology_or_allergies or 'Ninguna'}. "
+        f"Alergias alimentarias: {payload.allergies or 'Ninguna'}. "
         f"Lesiones: {payload.injuries or 'Ninguna'}. "
         f"Discapacidad motora: {payload.motor_disability or 'Ninguna'}. "
+        f"Arquetipo Biopsicosocial: {payload.archetype or 'No evaluado'}. "
         f"RPE reportado: {payload.rpe_feedback if payload.rpe_feedback is not None else 'no indicado'}. "
         f"Racha actual de entrenamientos completados: {payload.user_streak or 0} sesiones consecutivas. "
         f"Total de sesiones completadas históricas: {payload.total_completed_sessions or 0}."

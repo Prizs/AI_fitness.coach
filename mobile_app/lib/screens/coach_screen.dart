@@ -680,6 +680,9 @@ class _CoachScreenState extends State<CoachScreen> {
             'is_training': (d['exercises'] as List?)?.isNotEmpty == true,
           }).toList();
 
+      final savedArchetype = await storage.read(key: 'biopsycho_archetype');
+      final savedBiopsychoJson = await storage.read(key: 'biopsycho_data');
+
       final response = await http
           .post(
             Uri.parse('$baseUrl/api/coach/chat'),
@@ -696,6 +699,9 @@ class _CoachScreenState extends State<CoachScreen> {
               'total_completed_sessions': WeeklyPlanService.instance.totalCompletedSessions,
               'rpe_feedback': WeeklyPlanService.instance.lastRpe,
               'allergies': profile?.foodAllergies,
+              'pathology_or_allergies': profile?.pathologyOrAllergies,
+              'archetype': savedArchetype,
+              'behavioral_profile': savedBiopsychoJson,
               'injuries': profile?.currentInjuries,
               'motor_disability': profile?.motorDisability,
               'areas_to_avoid': profile?.areasToAvoid,
