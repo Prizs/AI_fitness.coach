@@ -69,6 +69,82 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showChangeGoalDialog(BuildContext ctx, WeeklyPlanService planService) {
+    showModalBottomSheet<void>(
+      context: ctx,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (bCtx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '🎯 Selecciona tu Meta Mensual',
+              style: TextStyle(
+                color: Color(0xFF8BE0C0),
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Esta meta guía tu plan durante todo el mes. Puedes cambiarla cuando desees.',
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+            ...WeeklyPlanService.availableGoals.map((g) {
+              final isCurrent = g.toLowerCase() == planService.userGoal.toLowerCase();
+              return ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: isCurrent ? const Color(0xFF173B45) : null,
+                leading: Icon(
+                  isCurrent ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                  color: isCurrent ? const Color(0xFF8BE0C0) : Colors.white38,
+                ),
+                title: Text(
+                  g,
+                  style: TextStyle(
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                    color: isCurrent ? const Color(0xFF8BE0C0) : Colors.white,
+                    fontSize: 13.5,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(bCtx);
+                  await planService.updateUserPreferences(goal: g);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('🎯 Meta mensual fijada a: $g'),
+                        backgroundColor: const Color(0xFF16253B),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final planService = WeeklyPlanService.instance;
@@ -199,7 +275,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _StatusChip(label: 'Meta: $goalText'),
+                      InkWell(
+                        onTap: () => _showChangeGoalDialog(context, planService),
+                        borderRadius: BorderRadius.circular(999),
+                        child: _StatusChip(
+                          label: '🎯 Meta: $goalText ✏️',
+                          color: const Color(0xFF8BE0C0),
+                        ),
+                      ),
                       _StatusChip(label: 'Nivel: $levelText'),
                       _StatusChip(
                         label: 'Intensidad: $intensityText',

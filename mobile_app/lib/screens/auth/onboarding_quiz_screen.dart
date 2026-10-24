@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/services/weekly_plan_service.dart';
 
 class OnboardingQuizScreen extends StatefulWidget {
   const OnboardingQuizScreen({
@@ -24,6 +25,7 @@ class _OnboardingQuizScreenState extends State<OnboardingQuizScreen> {
   bool _showResults = false;
 
   // Respuestas del usuario
+  String? _selectedGoal;
   String? _activityLevel;
   String? _energyPattern;
   String? _mainObstacle;
@@ -41,6 +43,37 @@ class _OnboardingQuizScreenState extends State<OnboardingQuizScreen> {
   final _storage = const FlutterSecureStorage();
 
   final List<Map<String, dynamic>> _questions = [
+    {
+      'title': '¿Cuál es tu Objetivo Principal para este mes?',
+      'subtitle': 'Tu plan se estructurará con descansos y cargas basadas en este objetivo.',
+      'icon': Icons.track_changes_rounded,
+      'options': [
+        {
+          'title': 'Pérdida de grasa y definición',
+          'desc': 'Reducir porcentaje graso manteniendo masa muscular magra y activa.',
+          'val': 'Pérdida de grasa y definición',
+          'icon': Icons.local_fire_department_rounded,
+        },
+        {
+          'title': 'Aumentar masa muscular',
+          'desc': 'Estimular hipertrofia muscular progresiva y ganancia de masa magra.',
+          'val': 'Aumentar masa muscular',
+          'icon': Icons.fitness_center_rounded,
+        },
+        {
+          'title': 'Ganar fuerza funcional',
+          'desc': 'Incrementar potencia, reclutamiento neuromuscular y capacidad atlética.',
+          'val': 'Ganar fuerza funcional',
+          'icon': Icons.bolt_rounded,
+        },
+        {
+          'title': 'Salud integral y movilidad',
+          'desc': 'Aliviar tensiones, mejorar flexibilidad articular y bienestar postural.',
+          'val': 'Salud integral y movilidad',
+          'icon': Icons.self_improvement_rounded,
+        },
+      ],
+    },
     {
       'title': '¿Cómo es tu ritmo de vida y movimiento diario?',
       'subtitle': 'Evaluación de tu punto de partida biológico real.',
@@ -209,21 +242,25 @@ class _OnboardingQuizScreenState extends State<OnboardingQuizScreen> {
     setState(() {
       switch (_currentStep) {
         case 0:
-          _activityLevel = val;
+          _selectedGoal = val;
+          WeeklyPlanService.instance.updateUserPreferences(goal: val);
           break;
         case 1:
-          _energyPattern = val;
+          _activityLevel = val;
           break;
         case 2:
-          _mainObstacle = val;
+          _energyPattern = val;
           break;
         case 3:
-          _mindsetPattern = val;
+          _mainObstacle = val;
           break;
         case 4:
-          _preferredSessionTime = val;
+          _mindsetPattern = val;
           break;
         case 5:
+          _preferredSessionTime = val;
+          break;
+        case 6:
           _coachingStyle = val;
           break;
       }
@@ -323,6 +360,7 @@ class _OnboardingQuizScreenState extends State<OnboardingQuizScreen> {
     final quizData = {
       'completed': true,
       'date': DateTime.now().toIso8601String(),
+      'goal': _selectedGoal ?? WeeklyPlanService.instance.userGoal,
       'archetype': _archetypeTitle,
       'archetypeDesc': _archetypeDesc,
       'adherenceScore': _adherenceScore,

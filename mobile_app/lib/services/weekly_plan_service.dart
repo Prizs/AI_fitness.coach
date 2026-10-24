@@ -18,7 +18,15 @@ class WeeklyPlanService extends ChangeNotifier {
 
   Future<void>? _pending;
 
-  String _userGoal = 'Aumentar masa muscular';
+  static const List<String> availableGoals = [
+    'Pérdida de grasa y definición',
+    'Aumentar masa muscular',
+    'Ganar fuerza funcional',
+    'Salud integral y movilidad',
+    'Acondicionamiento físico general',
+  ];
+
+  String _userGoal = 'Acondicionamiento físico general';
   String _userLevel = 'Principiante';
   String _userIntensity = 'Baja';
   Set<int> _completedDaysSet = {};

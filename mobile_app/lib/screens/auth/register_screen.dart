@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/services/weekly_plan_service.dart';
 import 'package:mobile_app/screens/auth/onboarding_quiz_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -51,6 +52,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _disabilities = <String>[];
   final _avoidAreas = <String>[];
   String _gender = 'masculino';
+  String _selectedGoal = 'Pérdida de grasa y definición';
   bool _isLoading = false;
 
   static const _corrections = <String, String>{
@@ -187,6 +189,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
       
+      // Guardar meta mensual seleccionada
+      await WeeklyPlanService.instance.updateUserPreferences(goal: _selectedGoal);
+
       // Si es un Alumno, lanzar el Test Biopsicosocial y de Adherencia (estilo FitCraft)
       if (!_isTrainer) {
         await Navigator.of(context).push(
@@ -381,6 +386,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ],
                 ),
+                if (!_isTrainer) const SizedBox(height: 12),
+                if (!_isTrainer)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4.0, bottom: 6.0),
+                        child: Text(
+                          'Objetivo Principal (Fase mensual inicial)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                      DropdownButtonFormField<String>(
+                        value: _selectedGoal,
+                        dropdownColor: const Color(0xFF0F192B),
+                        style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFF101B2D),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          prefixIcon: const Icon(Icons.track_changes_rounded, color: Color(0xFF8BE0C0), size: 20),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Pérdida de grasa y definición',
+                            child: Text('🎯 Pérdida de grasa y definición'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Aumentar masa muscular',
+                            child: Text('💪 Aumentar masa muscular'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Ganar fuerza funcional',
+                            child: Text('⚡ Ganar fuerza y rendimiento'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Salud integral y movilidad',
+                            child: Text('🧘 Salud integral y movilidad'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Acondicionamiento físico general',
+                            child: Text('🏃 Acondicionamiento físico general'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setState(() => _selectedGoal = val);
+                        },
+                      ),
+                    ],
+                  ),
               ]),
               const SizedBox(height: 14),
               if (!_isTrainer) _section('Salud y adaptación', Icons.accessibility_new_rounded, [

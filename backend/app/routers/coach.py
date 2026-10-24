@@ -1113,6 +1113,32 @@ def _normalize_structured_plan(
         if requested_focus in focus_titles and ("pierna" in raw_title.lower() or is_complementary_days):
             raw_title = focus_titles[requested_focus]
 
+    # Construir days_schedule para los 7 días de la semana
+    week_order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    days_schedule = {}
+    for d in week_order:
+        is_training = d in recommended_days
+        if is_training:
+            days_schedule[d] = {
+                "day_name": d,
+                "is_rest": False,
+                "title": raw_title,
+                "exercises": exercises,
+            }
+        else:
+            comp_focus = complementary_days.get(d)
+            days_schedule[d] = {
+                "day_name": d,
+                "is_rest": True,
+                "title": f"Día de Descanso y Regeneración Muscular ({d})",
+                "complementary_suggestion": comp_focus,
+                "exercises": [],
+                "rest_advice": (
+                    f"Hoy {d} tus fibras musculares se reparan y sintetizan nuevas proteínas. "
+                    "El descanso neuromuscular de 48-72h es donde ocurre la adaptación y el progreso real."
+                ),
+            }
+
     return {
         "day": "Martes y Jueves (Complemento Intermedio)" if is_complementary_days else f"{' y '.join(recommended_days)} (Alternado 48-72h)",
         "title": raw_title,
@@ -1123,6 +1149,7 @@ def _normalize_structured_plan(
         "complementary_days": complementary_days,
         "recovery_rule": "Descanso obligatorio de 48 a 72 horas para este grupo muscular (nunca entrenar piernas en días seguidos).",
         "exercises": exercises,
+        "days_schedule": days_schedule,
         "nutrition": nutrition,
     }
 
@@ -1249,7 +1276,7 @@ El usuario {user_name} tiene programada para HOY ({today_day_name}) la sesión d
 - Rutina: **{today_title or 'Entrenamiento del Día'}**
 - Ejercicios previstos: {ex_str}
 - Modalidad: {'En Casa (peso corporal / calistenia)' if today_is_home else 'Gimnasio / Equipo'}
-- Nivel: {effective_level} | Intensidad: {effective_intensity} | Meta: {payload.user_goal or 'Hipertrofia y Rendimiento'}
+- Nivel: {effective_level} | Intensidad: {effective_intensity} | Meta Mensual: {payload.user_goal or 'Acondicionamiento físico general'}
 
 INSTRUCCIONES OBLIGATORIAS:
 1. Saluda a {user_name} por su nombre y preséntale con entusiasmo la sesión programada para hoy (**{today_title or 'Entrenamiento del Día'}** y sus ejercicios).
@@ -1331,7 +1358,7 @@ Retorna SOLO JSON."""
                 f"""Eres un Coach de Fitness y Fisiología Deportiva.
 El usuario {user_name} se encuentra en su día de descanso y recuperación neuromuscular programada.
 - Días de entreno de su semana: {training_days_str}
-- Meta: {payload.user_goal or 'Hipertrofia'}
+- Meta Mensual: {payload.user_goal or 'Acondicionamiento y recuperación'}
 
 INSTRUCCIONES:
 1. Saluda a {user_name} y explícale que hoy es su día de descanso muscular programado (48-72h de recuperación vital para asimilar las cargas).
@@ -1352,7 +1379,7 @@ Retorna SOLO JSON."""
             ]
             fallback_reply = (
                 f"¡Hola, {user_name}! 👋 Hoy es tu día de recuperación neuromuscular programado. "
-                f"El descanso de 48 a 72 horas entre sesiones del mismo grupo muscular es indispensable para crecer y evitar el sobreentrenamiento.\n\n"
+                f"El descanso de 48 a 72 horas entre sesiones del mismo grupo muscular es indispensable para la adaptación y evitar el sobreentrenamiento.\n\n"
                 f"¿Cómo sientes tu recuperación y energía corporal hoy?"
             )
 
@@ -1362,7 +1389,7 @@ Retorna SOLO JSON."""
                 f"""Eres un Coach de Fitness y Biomecánica.
 El usuario {user_name} ha ingresado a la app pero AÚN NO TIENE RUTINAS PROGRAMADAS para esta semana.
 - Logros anteriores: {completed_sessions} sesiones en {date_range} ({adherence_str} de cumplimiento).
-- Meta: {payload.user_goal or 'Hipertrofia y Rendimiento'}
+- Meta Mensual: {payload.user_goal or 'Acondicionamiento físico general'}
 
 INSTRUCCIONES:
 1. Saluda cálidamente a {user_name}, dale la bienvenida y menciónale que aún tiene el ciclo semanal disponible para planificar.
@@ -1430,6 +1457,44 @@ Retorna SOLO JSON."""
 
     if not configured_providers():
         raise AllProvidersFailed({})
+
+    user_msg_lower = (payload.message or "").lower()
+
+    # Detección y actualización de cambio de meta mensual en el chat
+    goal_change_keywords = {
+        "pérdida de grasa y definición": "Pérdida de grasa y definición",
+        "perdida de grasa y definicion": "Pérdida de grasa y definición",
+        "pérdida de grasa": "Pérdida de grasa y definición",
+        "perdida de grasa": "Pérdida de grasa y definición",
+        "perder grasa": "Pérdida de grasa y definición",
+        "definición muscular": "Pérdida de grasa y definición",
+        "definicion muscular": "Pérdida de grasa y definición",
+        "bajar de peso": "Pérdida de grasa y definición",
+        "quemar grasa": "Pérdida de grasa y definición",
+        "aumentar masa muscular": "Aumentar masa muscular",
+        "aumento de masa muscular": "Aumentar masa muscular",
+        "ganar masa muscular": "Aumentar masa muscular",
+        "ganar músculo": "Aumentar masa muscular",
+        "ganar musculo": "Aumentar masa muscular",
+        "hipertrofia": "Aumentar masa muscular",
+        "ganar fuerza funcional": "Ganar fuerza funcional",
+        "ganar fuerza": "Ganar fuerza funcional",
+        "fuerza y rendimiento": "Ganar fuerza funcional",
+        "fuerza funcional": "Ganar fuerza funcional",
+        "salud integral y movilidad": "Salud integral y movilidad",
+        "salud y movilidad": "Salud integral y movilidad",
+        "movilidad y salud": "Salud integral y movilidad",
+        "acondicionamiento físico general": "Acondicionamiento físico general",
+        "acondicionamiento fisico general": "Acondicionamiento físico general",
+        "acondicionamiento general": "Acondicionamiento físico general",
+    }
+    updated_user_goal = None
+    if any(k in user_msg_lower for k in ("cambiar meta", "cambiar mi meta", "cambia mi meta", "mi meta es", "mi objetivo es", "cambiar objetivo", "cambia mi objetivo")):
+        for kw, g_name in goal_change_keywords.items():
+            if kw in user_msg_lower:
+                updated_user_goal = g_name
+                payload.user_goal = g_name
+                break
 
     is_pure_greeting = _is_pure_greeting_or_conversation(payload.message)
     is_routine_request = _is_explicit_routine_request(payload.message)
@@ -1605,7 +1670,7 @@ El usuario te acaba de decir: "{payload.message}".
 CONTEXTO DEL ATLETA:
 - Nivel de Experiencia: {effective_level}
 - Intensidad de Trabajo: {effective_intensity}
-- Meta: {payload.user_goal or 'Mejorar condición física y salud'}
+- Meta Mensual del Atleta: {payload.user_goal or 'Acondicionamiento físico general'}
 
 REGLAS OBLIGATORIAS:
 1. DIÁLOGO, EMPATÍA Y ASESORÍA HUMANA:
@@ -1613,11 +1678,15 @@ REGLAS OBLIGATORIAS:
    - Explica con claridad y sustento científico práctico.
    - Si expresa alguna molestia física o lesión, dale recomendaciones de cuidado postural, descanso y prevención.
    - Si consulta de alimentación, recuerda las pautas accesibles de Venezuela (huevos, pollo, carne molida magra, atún, queso blanco llanero, arepa de maíz, arroz blanco, avena, batata, yuca, plátano, cambur criollo. Cero ingredientes importados inaccesibles).
-2. RECOMENDACIÓN PROACTIVA DE ENTRENAMIENTO SI NO HA DECIDIDO:
+2. META MENSUAL ESTRICTA (NO ASUMIR HIPERTROFIA):
+   - La meta mensual elegida por el usuario es: "{payload.user_goal or 'Acondicionamiento físico general'}".
+   - Adapta todo tu tono y asesoría a esta meta.
+   - NUNCA asumas aumento de masa muscular o hipertrofia a menos que esa sea exactamente su meta configurada. Si es "Pérdida de grasa y definición", habla de déficit, recomposición y gasto metabólico; si es "Salud y longevidad", habla de movilidad, capacidad cardiovascular y bienestar.
+3. RECOMENDACIÓN PROACTIVA DE ENTRENAMIENTO SI NO HA DECIDIDO:
    - Si el usuario aún no ha dicho qué quiere entrenar hoy o responde algo vago (ej: "hola", "??", "no sé", "qué hago", "qué entreno"), NO te limites a hacer preguntas abiertas o dejarlo en el aire.
    - En tu mensaje, explícale de forma motivadora y concisa qué opciones de entrenamiento tiene recomendadas para hoy (ej: Piernas/Glúteos, Tren Superior o Cardio/Core), o que si no tiene algo decidido, tú como Coach IA puedes armarle el **Plan Semanal Completo** directamente.
    - Pon obligatoriamente: "has_plan": false, "structured_plan": null.
-3. BOTONES DE RESPUESTA RÁPIDA (QUICK REPLIES ACCIONABLES):
+4. BOTONES DE RESPUESTA RÁPIDA (QUICK REPLIES ACCIONABLES):
    - Proporciona botones de acción directa con entrenamientos y recomendación por IA para que con 1 solo toque arranque:
      [
        "🤖 Plan Semanal Recomendado por IA",
@@ -1701,6 +1770,7 @@ Devuelve SOLO JSON."""
             "quick_replies": quick_replies,
             "recommended_intensity": recommended_intensity,
             "fatigue_detected": fatigue_detected,
+            "updated_user_goal": updated_user_goal,
         }
 
     prompt = (
@@ -2006,6 +2076,7 @@ Devuelve SOLO JSON."""
         "quick_replies": quick_replies or data.get("quick_replies"),
         "recommended_intensity": recommended_intensity,
         "fatigue_detected": fatigue_detected,
+        "updated_user_goal": updated_user_goal,
     }
 
 

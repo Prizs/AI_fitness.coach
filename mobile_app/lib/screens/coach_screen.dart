@@ -1,4 +1,5 @@
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/services/coach_chat_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -20,18 +21,12 @@ class CoachScreen extends StatefulWidget {
 }
 
 class _CoachScreenState extends State<CoachScreen> {
-  final List<Map<String, dynamic>> _messages = [
-    {
-      'isUser': false,
-      'text': '¡Hola! Soy tu Coach Inteligente. Puedo adaptar tus fases de entrenamiento, diseñar cronogramas para fuerza, resistencia o recomposición y modular tu nutrición. Para calibrar tu entrenamiento con máxima precisión, por favor completa tu estado actual.',
-      'isWelcome': true,
-      'plan': null,
-    }
-  ];
+  final List<Map<String, dynamic>> _messages = [];
 
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+  String _userGoal = 'Acondicionamiento físico general';
   String _userLevel = 'Principiante';
   String _userIntensity = 'Baja';
   bool _isListening = false;
@@ -47,21 +42,124 @@ class _CoachScreenState extends State<CoachScreen> {
       }
     });
   }
+
+  Widget _buildRestTip(IconData icon, String title, String subtitle) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFF8BE0C0), size: 15),
+        const SizedBox(width: 6),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
+              children: [
+                TextSpan(text: '$title: ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                TextSpan(text: subtitle),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showChangeGoalModal() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '🎯 Meta Mensual de Entrenamiento',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Esta meta guía tu plan semanal del mes. Puedes cambiarla cuando desees.',
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+            ...WeeklyPlanService.availableGoals.map((g) {
+              final isCurrent = g.toLowerCase() == _userGoal.toLowerCase();
+              return ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: isCurrent ? const Color(0xFF173B45) : null,
+                leading: Icon(
+                  isCurrent ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                  color: isCurrent ? const Color(0xFF8BE0C0) : Colors.white38,
+                ),
+                title: Text(
+                  g,
+                  style: TextStyle(
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                    color: isCurrent ? const Color(0xFF8BE0C0) : Colors.white,
+                    fontSize: 13.5,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  setState(() => _userGoal = g);
+                  await WeeklyPlanService.instance.updateUserPreferences(goal: g);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('🎯 Meta mensual fijada a: $g'),
+                        backgroundColor: const Color(0xFF16253B),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
   
   @override
   void initState() {
     super.initState();
+    final prefGoal = WeeklyPlanService.instance.userGoal;
+    if (prefGoal.isNotEmpty) _userGoal = prefGoal;
     final prefLvl = WeeklyPlanService.instance.userLevel;
     if (prefLvl.isNotEmpty) _userLevel = prefLvl;
     final prefInt = WeeklyPlanService.instance.userIntensity;
     if (prefInt.isNotEmpty) _userIntensity = prefInt;
     WeeklyPlanService.instance.addListener(_onWeeklyPlanUpdated);
+
+    // 1. Restauración instantánea desde memoria RAM (0ms de espera)
+    if (CoachChatService.instance.hasMessages) {
+      _messages.addAll(CoachChatService.instance.messages);
+      _scrollToBottom();
+    }
     _loadHistory();
   }
 
   void _onWeeklyPlanUpdated() {
     if (mounted) {
       setState(() {
+        _userGoal = WeeklyPlanService.instance.userGoal;
         _userLevel = WeeklyPlanService.instance.userLevel;
         _userIntensity = WeeklyPlanService.instance.userIntensity;
       });
@@ -71,35 +169,28 @@ class _CoachScreenState extends State<CoachScreen> {
   Future<void> _loadHistory() async {
     final profile = AuthService.instance.loggedInUser;
     final cedula = profile?.cedula ?? 'default';
-    const storage = FlutterSecureStorage();
-    final localKey = 'coach_chat_history_$cedula';
 
-    // 1. Restauración local instantánea (0ms de espera)
-    try {
-      final cachedStr = await storage.read(key: localKey);
-      if (cachedStr != null && cachedStr.trim().isNotEmpty) {
-        final decoded = jsonDecode(cachedStr);
-        if (decoded is List && decoded.isNotEmpty) {
-          if (mounted) {
-            setState(() {
-              _messages.clear();
-              for (final item in decoded) {
-                if (item is Map) {
-                  _messages.add(Map<String, dynamic>.from(item));
-                }
-              }
-            });
-            _scrollToBottom();
-          }
-        }
-      }
-    } catch (_) {}
+    // 1. Inicializar CoachChatService desde storage local
+    await CoachChatService.instance.init(cedula: cedula);
+    if (mounted && CoachChatService.instance.hasMessages) {
+      setState(() {
+        _messages.clear();
+        _messages.addAll(CoachChatService.instance.messages);
+      });
+      _scrollToBottom();
+    }
 
-    // 2. Sincronización en segundo plano con backend / Supabase
+    // 2. Si no hay mensajes en absoluto, solicitar saludo contextual
+    if (_messages.isEmpty) {
+      _requestInitialGreeting();
+      return;
+    }
+
+    // 3. Sincronización en segundo plano con backend sin sobreescribir si el servidor está vacío
     try {
       final baseUrl = AuthService.apiBaseUrl;
       final uri = Uri.parse('$baseUrl/api/coach/history?cedula=$cedula');
-      final res = await http.get(uri).timeout(const Duration(seconds: 6));
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
         final serverList = jsonDecode(res.body);
         if (serverList is List && serverList.isNotEmpty) {
@@ -123,21 +214,16 @@ class _CoachScreenState extends State<CoachScreen> {
             }
           }
           if (mounted && restored.isNotEmpty) {
+            CoachChatService.instance.setMessages(restored);
             setState(() {
               _messages.clear();
               _messages.addAll(restored);
             });
-            await storage.write(key: localKey, value: jsonEncode(_messages));
             _scrollToBottom();
           }
         }
       }
     } catch (_) {}
-
-    // 3. Si no hay mensajes o solo queda el mensaje default inicial, disparar Saludo Contextual Hiperpersonalizado
-    if (_messages.isEmpty || (_messages.length == 1 && _messages.first['isWelcome'] == true)) {
-      _requestInitialGreeting();
-    }
   }
 
   Future<void> _requestInitialGreeting() async {
@@ -287,28 +373,19 @@ class _CoachScreenState extends State<CoachScreen> {
   }
 
   Future<void> _saveHistoryLocally() async {
-    try {
-      final profile = AuthService.instance.loggedInUser;
-      final cedula = profile?.cedula ?? 'default';
-      const storage = FlutterSecureStorage();
-      final localKey = 'coach_chat_history_$cedula';
-      final toSave = _messages.length > 50 ? _messages.sublist(_messages.length - 50) : _messages;
-      await storage.write(key: localKey, value: jsonEncode(toSave));
-    } catch (_) {}
+    CoachChatService.instance.setMessages(_messages);
   }
 
   Future<void> _clearChatHistory() async {
     final profile = AuthService.instance.loggedInUser;
     final cedula = profile?.cedula ?? 'default';
-    const storage = FlutterSecureStorage();
-    final localKey = 'coach_chat_history_$cedula';
 
     setState(() {
       _messages.clear();
       _isLoading = true;
     });
 
-    await storage.delete(key: localKey);
+    await CoachChatService.instance.clearHistory();
 
     try {
       final baseUrl = AuthService.apiBaseUrl;
@@ -732,6 +809,13 @@ class _CoachScreenState extends State<CoachScreen> {
         final bool showStateBtn = !isSubmission && data['suggest_questionnaire'] == true;
         final qReplies = data['quick_replies'] is List ? List<String>.from(data['quick_replies']) : null;
         final recIntensity = data['recommended_intensity'] as String?;
+        final updatedGoal = data['updated_user_goal'] as String?;
+        if (updatedGoal != null && updatedGoal.isNotEmpty && updatedGoal != _userGoal) {
+          setState(() {
+            _userGoal = updatedGoal;
+          });
+          WeeklyPlanService.instance.updateUserPreferences(goal: updatedGoal);
+        }
 
         if (recIntensity != null &&
             recIntensity.isNotEmpty &&
@@ -740,18 +824,20 @@ class _CoachScreenState extends State<CoachScreen> {
             _userIntensity = recIntensity;
           });
           WeeklyPlanService.instance.updateUserPreferences(intensity: recIntensity);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                data['fatigue_detected'] == true
-                    ? '🛡️ Ajuste por fatiga: Intensidad adaptada a $recIntensity para facilitar recuperación activa (Nivel $_userLevel conservado).'
-                    : '⚡ Intensidad adaptada a $recIntensity según tu progreso (Nivel $_userLevel conservado).',
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  data['fatigue_detected'] == true
+                      ? '🛡️ Ajuste por fatiga: Intensidad adaptada a $recIntensity para facilitar recuperación activa (Nivel $_userLevel conservado).'
+                      : '⚡ Intensidad adaptada a $recIntensity según tu progreso (Nivel $_userLevel conservado).',
+                ),
+                backgroundColor: const Color(0xFF16253B),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
               ),
-              backgroundColor: const Color(0xFF16253B),
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 4),
-            ),
-          );
+            );
+          }
         }
 
         setState(() {
@@ -850,6 +936,35 @@ class _CoachScreenState extends State<CoachScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
+                    // Chip de Meta Mensual con opción de cambiar
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _showChangeGoalModal,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16253B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF8BE0C0), width: 1.1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.track_changes_rounded, size: 13, color: Color(0xFF8BE0C0)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Meta: $_userGoal',
+                              style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 10.5, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.edit_rounded, size: 11, color: Colors.white70),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(width: 1, height: 16, color: Colors.white12),
+                    const SizedBox(width: 6),
                     // Selector de Nivel de Experiencia (Desacoplado)
                     const Icon(Icons.fitness_center_rounded, size: 14, color: Color(0xFF8BE0C0)),
                     const SizedBox(width: 4),
@@ -1202,96 +1317,327 @@ class _CoachScreenState extends State<CoachScreen> {
                                 ),
                               ],
                               
-                              // Listado de Ejercicios
-                              if (plan['exercises'] is List && (plan['exercises'] as List).isNotEmpty) ...[
-                                const SizedBox(height: 14),
-                                const Text('🏋️ Ejercicios Recomendados (Categorizados por Intensidad):', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                const SizedBox(height: 8),
-                                ...(plan['exercises'] as List).take(5).map((ex) {
-                                  final String intLabel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
-                                  final String primaryM = (ex['primary_muscle'] ?? 'Piernas').toString();
-                                  final bool isLow = intLabel.toLowerCase().contains('baja') || intLabel.toLowerCase().contains('básico');
-                                  final bool isHigh = intLabel.toLowerCase().contains('alta') || intLabel.toLowerCase().contains('avanzado');
-                                  final Color badgeColor = isLow
-                                      ? const Color(0xFF8BE0C0)
-                                      : (isHigh ? const Color(0xFFFF6B6B) : const Color(0xFFFFB340));
-                                  final String exName = (ex['name'] ?? 'Ejercicio').toString();
-                                  return InkWell(
-                                    borderRadius: BorderRadius.circular(10),
-                                    onTap: () => _open3DViewer(plan, targetExerciseName: exName),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 6),
+                              // Selector interactivo de Días de la Semana (< LUNES >) y Ejercicios / Descanso
+                              () {
+                                const List<String> weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                                final List<String> recDays = (plan['recommended_days'] is List)
+                                    ? (plan['recommended_days'] as List).map((e) => e.toString()).toList()
+                                    : ['Lunes', 'Miércoles'];
+                                final String activeDay = (plan['_selected_day'] as String?) ?? (
+                                    recDays.isNotEmpty ? recDays.first : 'Lunes'
+                                );
+                                final Map? daysSched = plan['days_schedule'] as Map?;
+                                final Map? dayInfo = daysSched != null ? (daysSched[activeDay] as Map?) : null;
+                                final bool isTraining = dayInfo != null
+                                    ? (dayInfo['is_rest'] == false)
+                                    : recDays.any((d) => d.toLowerCase() == activeDay.toLowerCase());
+                                final List dayExercises = (dayInfo != null && dayInfo['exercises'] is List && (dayInfo['exercises'] as List).isNotEmpty)
+                                    ? (dayInfo['exercises'] as List)
+                                    : (isTraining && plan['exercises'] is List ? (plan['exercises'] as List) : []);
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 14),
+                                    // Selector con Flechas < DIA >
+                                    Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF16253B),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.white10),
+                                        color: const Color(0xFF0F1A2A),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.35)),
                                       ),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
                                               IconButton(
                                                 padding: EdgeInsets.zero,
                                                 constraints: const BoxConstraints(),
-                                                icon: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 22),
-                                                tooltip: 'Ver en 3D',
-                                                onPressed: () => _open3DViewer(plan, targetExerciseName: exName),
+                                                icon: const Icon(Icons.arrow_back_ios_rounded, color: Color(0xFF8BE0C0), size: 18),
+                                                tooltip: 'Día anterior',
+                                                onPressed: () {
+                                                  final idx = weekDays.indexOf(activeDay);
+                                                  final prevIdx = (idx - 1 + 7) % 7;
+                                                  setState(() {
+                                                    plan['_selected_day'] = weekDays[prevIdx];
+                                                  });
+                                                },
                                               ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Text(
-                                                  exName,
-                                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                              InkWell(
+                                                onTap: () {
+                                                  final idx = weekDays.indexOf(activeDay);
+                                                  final nextIdx = (idx + 1) % 7;
+                                                  setState(() {
+                                                    plan['_selected_day'] = weekDays[nextIdx];
+                                                  });
+                                                },
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      isTraining ? Icons.fitness_center_rounded : Icons.bedtime_outlined,
+                                                      color: isTraining ? const Color(0xFF8BE0C0) : const Color(0xFF60A5FA),
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      activeDay.toUpperCase(),
+                                                      style: TextStyle(
+                                                        color: isTraining ? const Color(0xFF8BE0C0) : const Color(0xFF60A5FA),
+                                                        fontSize: 14,
+                                                        fontWeight: FontWeight.w900,
+                                                        letterSpacing: 1.2,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: (isTraining ? const Color(0xFF8BE0C0) : const Color(0xFF60A5FA)).withValues(alpha: 0.18),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: Text(
+                                                        isTraining ? 'Entrenamiento' : 'Descanso',
+                                                        style: TextStyle(
+                                                          color: isTraining ? const Color(0xFF8BE0C0) : const Color(0xFF60A5FA),
+                                                          fontSize: 9.5,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF1F3A4B),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  '${ex['sets'] ?? 3} × ${ex['reps'] ?? '12'}',
-                                                  style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
-                                                ),
+                                              IconButton(
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(),
+                                                icon: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF8BE0C0), size: 18),
+                                                tooltip: 'Día siguiente',
+                                                onPressed: () {
+                                                  final idx = weekDays.indexOf(activeDay);
+                                                  final nextIdx = (idx + 1) % 7;
+                                                  setState(() {
+                                                    plan['_selected_day'] = weekDays[nextIdx];
+                                                  });
+                                                },
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 4),
-                                          Padding(
-                                            padding: const EdgeInsets.only(left: 30),
-                                            child: Wrap(
-                                              spacing: 8,
-                                              runSpacing: 4,
-                                              crossAxisAlignment: WrapCrossAlignment.center,
-                                              children: [
-                                                Text(
-                                                  '🎯 $primaryM',
-                                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                                                ),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                                  decoration: BoxDecoration(
-                                                    color: badgeColor.withValues(alpha: 0.18),
-                                                    borderRadius: BorderRadius.circular(5),
-                                                    border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                                          const SizedBox(height: 8),
+                                          SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            child: Row(
+                                              children: weekDays.map((d) {
+                                                final isSel = d.toLowerCase() == activeDay.toLowerCase();
+                                                final isTr = recDays.any((rd) => rd.toLowerCase() == d.toLowerCase());
+                                                return Padding(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                                                  child: InkWell(
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    onTap: () {
+                                                      setState(() {
+                                                        plan['_selected_day'] = d;
+                                                      });
+                                                    },
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: isSel
+                                                            ? (isTr ? const Color(0xFF8BE0C0) : const Color(0xFF60A5FA))
+                                                            : (isTr ? const Color(0xFF1E3A4B) : const Color(0xFF16253B)),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        border: Border.all(
+                                                          color: isSel
+                                                              ? Colors.white
+                                                              : (isTr ? const Color(0xFF8BE0C0).withValues(alpha: 0.4) : Colors.white12),
+                                                        ),
+                                                      ),
+                                                      child: Text(
+                                                        d.substring(0, 3),
+                                                        style: TextStyle(
+                                                          color: isSel ? Colors.black : (isTr ? const Color(0xFF8BE0C0) : Colors.white54),
+                                                          fontSize: 10.5,
+                                                          fontWeight: isSel ? FontWeight.w900 : FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ),
-                                                  child: Text(
-                                                    '⚡ $intLabel',
-                                                    style: TextStyle(color: badgeColor, fontSize: 10.5, fontWeight: FontWeight.w800),
-                                                  ),
-                                                ),
-                                              ],
+                                                );
+                                              }).toList(),
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                  );
-                                }),
-                              ],
+                                    const SizedBox(height: 10),
+
+                                    // CONTENIDO CONDICIONAL DEL DÍA (EJERCICIOS O DESCANSO)
+                                    if (isTraining && dayExercises.isNotEmpty) ...[
+                                      Text(
+                                        '🏋️ Ejercicios Recomendados para el $activeDay:',
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ...dayExercises.take(5).map((ex) {
+                                        final String intLabel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
+                                        final String primaryM = (ex['primary_muscle'] ?? 'Músculo principal').toString();
+                                        final bool isLow = intLabel.toLowerCase().contains('baja') || intLabel.toLowerCase().contains('básico');
+                                        final bool isHigh = intLabel.toLowerCase().contains('alta') || intLabel.toLowerCase().contains('avanzado');
+                                        final Color badgeColor = isLow
+                                            ? const Color(0xFF8BE0C0)
+                                            : (isHigh ? const Color(0xFFFF6B6B) : const Color(0xFFFFB340));
+                                        final String exName = (ex['name'] ?? 'Ejercicio').toString();
+                                        return InkWell(
+                                          borderRadius: BorderRadius.circular(10),
+                                          onTap: () => _open3DViewer(plan, targetExerciseName: exName),
+                                          child: Container(
+                                            margin: const EdgeInsets.only(bottom: 6),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF16253B),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(color: Colors.white10),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    IconButton(
+                                                      padding: EdgeInsets.zero,
+                                                      constraints: const BoxConstraints(),
+                                                      icon: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 22),
+                                                      tooltip: 'Ver en 3D',
+                                                      onPressed: () => _open3DViewer(plan, targetExerciseName: exName),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        exName,
+                                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFF1F3A4B),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: Text(
+                                                        '${ex['sets'] ?? 3} × ${ex['reps'] ?? '12'}',
+                                                        style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Padding(
+                                                  padding: const EdgeInsets.only(left: 30),
+                                                  child: Wrap(
+                                                    spacing: 8,
+                                                    runSpacing: 4,
+                                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                                    children: [
+                                                      Text(
+                                                        '🎯 $primaryM',
+                                                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                                      ),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                        decoration: BoxDecoration(
+                                                          color: badgeColor.withValues(alpha: 0.18),
+                                                          borderRadius: BorderRadius.circular(5),
+                                                          border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                                                        ),
+                                                        child: Text(
+                                                          '⚡ $intLabel',
+                                                          style: TextStyle(color: badgeColor, fontSize: 10.5, fontWeight: FontWeight.w800),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ] else ...[
+                                      // TARJETA DE DÍA DE DESCANSO CON MENSAJE INDICATIVO Y CONSEJOS
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF132238),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.35)),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF1E3A5F),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  child: const Icon(Icons.nightlife_rounded, color: Color(0xFF8BE0C0), size: 22),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        '🛋️ Día de Descanso y Recuperación ($activeDay)',
+                                                        style: const TextStyle(
+                                                          color: Color(0xFF8BE0C0),
+                                                          fontSize: 13.5,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      const Text(
+                                                        'Hoy no hay ejercicios de sobrecarga programados.',
+                                                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              dayInfo?['rest_advice']?.toString() ??
+                                                  'Tus músculos y sistema nervioso central requieren de 48 a 72 horas para sintetizar nuevas miofibrillas y reparar microdesgarros. El crecimiento muscular y la quema de grasa ocurren durante este descanso.',
+                                              style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.35),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            const Divider(color: Colors.white12, height: 1),
+                                            const SizedBox(height: 10),
+                                            const Text(
+                                              '💡 Consejos Clave para este día:',
+                                              style: TextStyle(color: Color(0xFFFFB340), fontWeight: FontWeight.bold, fontSize: 11.5),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            _buildRestTip(Icons.water_drop_rounded, 'Hidratación', 'Consume de 2.5 a 3 litros de agua fresca durante el día.'),
+                                            const SizedBox(height: 6),
+                                            _buildRestTip(Icons.restaurant_rounded, 'Nutrición Criolla', 'Prioriza proteínas (huevos, pollo o atún) y carbohidratos complejos (arepa, arroz, avena, batata).'),
+                                            const SizedBox(height: 6),
+                                            _buildRestTip(Icons.bedtime_rounded, 'Sueño Reparador', 'Duerme de 7 a 8 horas continuas (el pico de hormona de crecimiento ocurre en sueño profundo).'),
+                                            const SizedBox(height: 6),
+                                            _buildRestTip(Icons.directions_walk_rounded, 'Recuperación Activa', 'Una caminata suave de 15 a 20 min o estiramientos ligeros favorecen la circulación sin fatigar.'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                );
+                              }(),
 
                               // Plan Nutricional
                               if (plan['nutrition'] is Map && (plan['nutrition'] as Map).isNotEmpty) ...[
