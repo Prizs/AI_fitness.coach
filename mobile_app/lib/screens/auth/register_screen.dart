@@ -50,6 +50,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _injuries = <String>[];
   final _disabilities = <String>[];
   final _avoidAreas = <String>[];
+  String _gender = 'masculino';
   bool _isLoading = false;
 
   static const _corrections = <String, String>{
@@ -146,6 +147,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         lastName: _lastName.text.trim(),
         age: int.tryParse(_age.text.trim()) ?? 25,
         weight: double.tryParse(_weight.text.trim()) ?? 70.0,
+        gender: _gender,
         pathologyOrAllergies: _pathologies.isEmpty
             ? null
             : _join(_pathologies),
@@ -328,6 +330,53 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Icons.monitor_weight_outlined,
                         ),
                         validator: _weightValidator,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4.0, bottom: 6.0),
+                      child: Text(
+                        'Sexo biológico (calibración metabólica & BMR)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: 'masculino',
+                          label: Text('Masculino'),
+                          icon: Icon(Icons.male_rounded, size: 18),
+                        ),
+                        ButtonSegment(
+                          value: 'femenino',
+                          label: Text('Femenino'),
+                          icon: Icon(Icons.female_rounded, size: 18),
+                        ),
+                      ],
+                      selected: {_gender},
+                      onSelectionChanged: (set) => setState(() => _gender = set.first),
+                      style: ButtonStyle(
+                        backgroundColor: WidgetStateProperty.resolveWith((states) =>
+                            states.contains(WidgetState.selected)
+                                ? const Color(0xFF8BE0C0)
+                                : const Color(0xFF101B2D)),
+                        foregroundColor: WidgetStateProperty.resolveWith((states) =>
+                            states.contains(WidgetState.selected)
+                                ? const Color(0xFF0B1220)
+                                : Colors.white),
+                        side: WidgetStateProperty.all(BorderSide.none),
+                        shape: WidgetStateProperty.all(
+                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
                       ),
                     ),
                   ],

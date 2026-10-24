@@ -84,6 +84,7 @@ class AuthService {
       lastName: lastName,
       age: age,
       weight: weight,
+      gender: await _storage.read(key: 'gender') ?? 'masculino',
       pathologyOrAllergies: await _storage.read(key: 'health_notes'),
       foodAllergies: await _storage.read(key: 'food_allergies'),
       currentInjuries: await _storage.read(key: 'current_injuries'),
@@ -108,6 +109,7 @@ class AuthService {
           'apellido': profile.lastName,
           'edad': profile.age,
           'peso': profile.weight,
+          'genero': profile.gender,
           'patologia_o_alergias': profile.pathologyOrAllergies,
           'alergias_alimentarias': profile.foodAllergies,
           'lesiones_actuales': profile.currentInjuries,
@@ -207,6 +209,7 @@ class AuthService {
       lastName: user['apellido'] as String? ?? '',
       age: user['edad'] as int? ?? 0,
       weight: (user['peso'] as num?)?.toDouble() ?? 0,
+      gender: user['genero'] as String? ?? 'masculino',
       pathologyOrAllergies: user['patologia_o_alergias'] as String?,
       foodAllergies: user['alergias_alimentarias'] as String?,
       currentInjuries: user['lesiones_actuales'] as String?,
@@ -232,6 +235,7 @@ class AuthService {
         await _storage.write(key: 'last_name', value: profile.lastName);
         await _storage.write(key: 'age', value: profile.age.toString());
         await _storage.write(key: 'weight', value: profile.weight.toString());
+        await _storage.write(key: 'gender', value: profile.gender);
         await _storage.write(
           key: 'health_notes',
           value: profile.pathologyOrAllergies,

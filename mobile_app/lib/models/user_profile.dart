@@ -12,6 +12,7 @@ class UserProfile {
     this.motorDisability,
     this.areasToAvoid,
     this.role = 'client',
+    this.gender = 'masculino',
     this.specialty,
     this.experienceYears,
     this.certifications,
@@ -23,6 +24,7 @@ class UserProfile {
   final String lastName;
   final int age;
   final double weight;
+  final String gender;
   final String? pathologyOrAllergies;
   final String? foodAllergies;
   final String? currentInjuries;

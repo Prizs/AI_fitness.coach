@@ -707,6 +707,7 @@ class _CoachScreenState extends State<CoachScreen> {
               'areas_to_avoid': profile?.areasToAvoid,
               'age': profile?.age,
               'weight': profile?.weight,
+              'gender': profile?.gender,
               'active_plan_start': startStr,
               'active_plan_end': endStr,
               'next_cycle_start': nextStartStr,

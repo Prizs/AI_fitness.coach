@@ -307,7 +307,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Cédula: ${user?.cedula ?? 'V-Local'} · ${user?.age ?? 25} años · ${user?.weight ?? 70.0} kg',
+                            'Cédula: ${user?.cedula ?? 'V-Local'} · ${user?.age ?? 25} años · ${user?.weight ?? 70.0} kg · ${user?.gender == 'femenino' ? 'Femenino ♀' : 'Masculino ♂'}',
                             style: const TextStyle(color: Colors.white70, fontSize: 13),
                           ),
                         ],

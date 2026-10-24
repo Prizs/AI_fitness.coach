@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 router = APIRouter()
 
-GITHUB_RELEASE_APK_URL = "https://github.com/Prizs/AI_fitness.coach/releases/download/v1.0.60/AI_Fitness_Coach_v1.0.60.apk"
+GITHUB_RELEASE_APK_URL = "https://github.com/Prizs/AI_fitness.coach/releases/download/v1.0.61/app-release.apk"
 GITHUB_LATEST_RELEASE_URL = "https://github.com/Prizs/AI_fitness.coach/releases/latest"
 
 def _find_apk_file() -> Path | None:
@@ -25,19 +25,19 @@ def _find_apk_file() -> Path | None:
 @router.get("/latest")
 def latest_version() -> dict:
     apk = _find_apk_file()
-    size = apk.stat().st_size if apk else 63995089
+    size = apk.stat().st_size if apk else 63995129
     return {
         "available": True,
-        "version_name": "1.0.60",
-        "version_code": 100,
+        "version_name": "1.0.61",
+        "version_code": 101,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.60:\n"
-            "1. Nuevo campo interactivo de Patologías y Alergias generales con sugerencias rápidas.\n"
-            "2. Test Biopsicosocial & Adherencia estilo FitCraft obligatorio al registrarse.\n"
-            "3. Detección de arquetipos bioconductuales y reglas anti-procrastinación personalizadas.\n"
-            "4. Calibración del Coach IA conectada a tu psicología y nivel de fatiga.\n"
+            "Actualización oficial de AI Fitness Coach v1.0.61:\n"
+            "1. Nuevo selector de Sexo Biológico (Masculino / Femenino) en registro y perfil.\n"
+            "2. Calibración metabólica precisa (TMB / Harris-Benedict) y adaptación del Coach IA.\n"
+            "3. Test Biopsicosocial & Adherencia estilo FitCraft obligatorio al registrarse.\n"
+            "4. Registro 100% fluido con auto-login, prevención de duplicados y timeout extendido.\n"
             "5. Los 3 Modos Definitivos (Técnica Real, Atlas Muscular 2D y Biomecánica 3D)."
         ),
         "download_url": "/api/app/download",
@@ -51,7 +51,7 @@ def download_apk():
         return FileResponse(
             path=str(apk),
             media_type="application/vnd.android.package-archive",
-            filename="AI_Fitness_Coach_v1.0.60.apk",
+            filename="AI_Fitness_Coach_v1.0.61.apk",
         )
     return RedirectResponse(url=GITHUB_RELEASE_APK_URL, status_code=302)
 

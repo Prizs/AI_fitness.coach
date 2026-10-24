@@ -43,6 +43,7 @@ class ChatMessage(BaseModel):
     rpe_feedback: int | float | None = Field(default=None)
     age: int | float | None = Field(default=None)
     weight: float | int | None = Field(default=None)
+    gender: str | None = Field(default=None, max_length=50)
     active_plan_start: str | None = Field(default=None, max_length=200)
     active_plan_end: str | None = Field(default=None, max_length=200)
     next_cycle_start: str | None = Field(default=None, max_length=200)
@@ -1161,6 +1162,7 @@ def _profile_context(payload: ChatMessage, effective_level: str, effective_inten
 
     equip_info = f" Equipamiento reportado: {payload.equipment_details}." if payload.equipment_details else ""
     return (
+        f"Sexo biológico: {payload.gender if payload.gender else 'No indicado'}. "
         f"Edad: {payload.age if payload.age is not None else 'No indicada'}. "
         f"Peso: {payload.weight if payload.weight is not None else 'No indicado'} kg. "
         f"Meta: {payload.user_goal or 'Rendimiento general'}. "

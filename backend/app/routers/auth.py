@@ -19,6 +19,7 @@ class RegisterRequest(BaseModel):
     apellido: str = Field(..., min_length=2, max_length=100)
     edad: int = Field(..., ge=12, le=100)
     peso: float = Field(..., gt=0, le=300)
+    genero: str = Field(default="masculino", max_length=20)
     patologia_o_alergias: str | None = Field(default=None, max_length=1000)
     security_question: str = Field(default="¿Cuál es tu color favorito?", max_length=100)
     security_answer: str = Field(default="", max_length=100)
@@ -80,6 +81,7 @@ def register(payload: RegisterRequest):
                 "email_confirm": True,
                 "user_metadata": {
                     "cedula": payload.cedula,
+                    "genero": payload.genero.strip().lower(),
                     "security_question": payload.security_question,
                     "security_answer": payload.security_answer.strip().lower()
                 },
@@ -96,6 +98,7 @@ def register(payload: RegisterRequest):
             "apellido": payload.apellido,
             "edad": payload.edad,
             "peso": payload.peso,
+            "genero": payload.genero.strip().lower(),
             "patologia_o_alergias": payload.patologia_o_alergias,
             "alergias_alimentarias": payload.alergias_alimentarias,
             "lesiones_actuales": payload.lesiones_actuales,
@@ -170,7 +173,7 @@ def login(payload: LoginRequest):
         )
         profile_result = (
             admin_client.table("usuarios")
-            .select("id, cedula, nombre, apellido, edad, peso, patologia_o_alergias, alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar, role, specialty, experience_years, certifications")
+            .select("id, cedula, nombre, apellido, edad, peso, genero, patologia_o_alergias, alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar, role, specialty, experience_years, certifications")
             .eq("id", auth_response.user.id)
             .single()
             .execute()
