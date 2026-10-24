@@ -25,7 +25,7 @@ def _find_apk_file() -> Path | None:
 @router.get("/latest")
 def latest_version() -> dict:
     apk = _find_apk_file()
-    size = apk.stat().st_size if apk else 54792490
+    size = apk.stat().st_size if apk else 63995089
     return {
         "available": True,
         "version_name": "1.0.60",
