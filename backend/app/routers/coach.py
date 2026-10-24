@@ -129,31 +129,145 @@ def _detect_fatigue_and_intensity_calibration(message: str, current_intensity: s
     return False, None
 
 
+def _detect_requested_training_days(user_msg: str) -> list[str]:
+    """Detecta qué días específicos pidió el usuario para entrenar en la semana."""
+    msg = (user_msg or "").lower()
+    day_map = {
+        "lunes": "Lunes",
+        "martes": "Martes",
+        "miercoles": "Miércoles",
+        "miércoles": "Miércoles",
+        "jueves": "Jueves",
+        "viernes": "Viernes",
+        "sabado": "Sábado",
+        "sábado": "Sábado",
+        "domingo": "Domingo",
+    }
+    if "lunes a jueves" in msg:
+        return ["Lunes", "Martes", "Miércoles", "Jueves"]
+    if "lunes a viernes" in msg:
+        return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+    if "lunes a sabado" in msg or "lunes a sábado" in msg:
+        return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+
+    days = []
+    for k, d in day_map.items():
+        if re.search(r"\b" + k + r"\b", msg):
+            if d not in days:
+                days.append(d)
+
+    if len(days) >= 2:
+        week_order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+        return [d for d in week_order if d in days]
+
+    if any(k in msg for k in ("3 dias", "3 días", "tres dias", "tres días")):
+        return ["Lunes", "Miércoles", "Viernes"]
+    if any(k in msg for k in ("4 dias", "4 días", "cuatro dias", "cuatro días")):
+        return ["Lunes", "Martes", "Jueves", "Viernes"]
+
+    return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+
+
 def _detect_requested_focus(payload: ChatMessage) -> str | None:
-    """Detecta qué zona pidió el usuario dando prioridad al mensaje actual sobre el historial."""
+    """Detecta qué zona o combinación pidió el usuario dando prioridad al mensaje actual."""
     def _match_focus(txt: str) -> str | None:
-        # Detección de Plan Semanal Recomendado por IA
-        if any(w in txt for w in ("plan semanal", "plan de recomendacion", "plan de recomendación", "plan recomendado", "recomiendame un plan", "recomiéndame un plan", "recomienda tu", "recomiéndame tú", "semana completa", "haz mi plan", "hazme el plan", "arma mi semana")):
-            return "plan_semanal_ia"
-        if any(w in txt for w in ("piernas + tren superior", "piernas y tren superior", "piernas con tren superior")):
+        t = (txt or "").lower()
+
+        # 1. Combinaciones explícitas de múltiples áreas musculares
+        if any(w in t for w in (
+            "piernas + tren superior", "piernas y tren superior", "piernas con tren superior",
+            "combinar piernas con tren superior", "combinar piernas y tren superior",
+            "piernas y torso", "piernas con torso", "tren superior y piernas"
+        )):
             return "piernas_tren_superior"
-        if any(w in txt for w in ("piernas + core", "piernas y core", "piernas + abdomen", "piernas y abdomen")):
+        if any(w in t for w in (
+            "piernas + core", "piernas y core", "piernas + abdomen", "piernas y abdomen",
+            "combinar piernas con core", "combinar piernas y core", "piernas y abdominales",
+            "core y piernas", "abdomen y piernas"
+        )):
             return "piernas_core"
-        # Si el usuario está eligiendo el complemento para días intermedios, priorizar el complemento elegido
-        if any(w in txt for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda")):
-            return "tren_superior"
-        if any(w in txt for w in ("movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa")):
-            return "movilidad_cardio"
-        if any(w in txt for w in ("abdomen", "abdominal", "core", "estabilidad lumbar")):
-            return "core"
-        if any(w in txt for w in ("pecho", "pectoral", "empuje")):
-            return "pecho"
-        if any(w in txt for w in ("espalda", "dorsal", "traccion", "tracción")):
-            return "espalda"
-        if any(w in txt for w in ("brazo", "brazos", "biceps", "bíceps", "triceps", "tríceps", "hombro", "hombros")):
-            return "brazos_hombros"
-        if any(w in txt for w in ("pierna", "piernas", "tren inferior", "gluteo", "glúteo", "cuadriceps", "cuádriceps", "isquio", "femoral")):
+        if any(w in t for w in (
+            "tren superior + core", "tren superior y core", "pecho y core", "espalda y core",
+            "torso y abdomen", "torso y core", "core y tren superior"
+        )):
+            return "tren_superior_core"
+        if any(w in t for w in (
+            "piernas + cardio", "piernas y cardio", "cardio y piernas"
+        )):
+            return "piernas_cardio"
+
+        # 2. Solicitudes explícitas de SOLO una zona para toda la semana
+        if any(w in t for w in (
+            "solo piernas", "solo de piernas", "pura pierna", "puras piernas",
+            "toda la semana de piernas", "solo tren inferior", "semana solo de piernas",
+            "semana de piernas", "enfocarme solo en piernas", "rutina solo de piernas"
+        )):
+            return "solo_piernas"
+        if any(w in t for w in (
+            "solo tren superior", "solo torso", "toda la semana tren superior",
+            "semana de tren superior", "solo pecho", "solo espalda", "solo brazos"
+        )):
+            return "solo_tren_superior"
+        if any(w in t for w in (
+            "solo core", "solo abdomen", "toda la semana abdomen", "semana de abdomen"
+        )):
+            return "solo_core"
+        if any(w in t for w in (
+            "solo cardio", "toda la semana cardio", "solo movilidad"
+        )):
+            return "solo_cardio"
+
+        # 3. Zonas específicas estándar
+        has_legs = any(w in t for w in ("pierna", "piernas", "tren inferior", "gluteo", "glúteo", "cuadriceps", "cuádriceps", "isquio", "femoral"))
+        has_upper = any(w in t for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso"))
+        has_core = any(w in t for w in ("abdomen", "abdominal", "core", "estabilidad lumbar"))
+        has_cardio = any(w in t for w in ("movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa"))
+        has_pecho = any(w in t for w in ("pecho", "pectoral", "empuje"))
+        has_espalda = any(w in t for w in ("espalda", "dorsal", "traccion", "tracción"))
+        has_brazos = any(w in t for w in ("brazo", "brazos", "biceps", "bíceps", "triceps", "tríceps", "hombro", "hombros"))
+
+        if has_legs and has_upper:
+            return "piernas_tren_superior"
+        if has_legs and has_core:
+            return "piernas_core"
+        if has_upper and has_core:
+            return "tren_superior_core"
+        if has_legs and has_cardio:
+            return "piernas_cardio"
+
+        if has_legs:
+            if any(w in t for w in ("semana", "semanal", "lunes a viernes", "lunes a", "dias", "días")):
+                return "solo_piernas"
             return "piernas"
+
+        if has_upper:
+            if any(w in t for w in ("semana", "semanal", "lunes a viernes", "dias", "días")):
+                return "solo_tren_superior"
+            return "tren_superior"
+
+        if has_core:
+            if any(w in t for w in ("semana", "semanal", "lunes a viernes", "dias", "días")):
+                return "solo_core"
+            return "core"
+
+        if has_pecho:
+            return "pecho"
+        if has_espalda:
+            return "espalda"
+        if has_brazos:
+            return "brazos_hombros"
+        if has_cardio:
+            return "movilidad_cardio"
+
+        # 4. Plan Semanal General / Recomendado por IA (cuando no pide una zona específica)
+        if any(w in t for w in (
+            "plan semanal", "plan de recomendacion", "plan de recomendación",
+            "plan recomendado", "recomiendame un plan", "recomiéndame un plan",
+            "recomienda tu", "recomiéndame tú", "semana completa", "haz mi plan",
+            "hazme el plan", "arma mi semana"
+        )):
+            return "plan_semanal_ia"
+
         return None
 
     current_msg = (payload.message or "").lower()
@@ -1166,63 +1280,224 @@ def _normalize_structured_plan(
                     "rest_advice": f"Hoy {d} tus fibras musculares se reparan y sintetizan nuevas proteínas. El descanso de 48-72h optimiza el progreso.",
                 }
     else:
-        # PLAN SEMANAL COMPLETO (Lunes a Viernes) o MENSUAL:
-        recommended_days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
-        thursday_legs = list(reversed(leg_exs)) if leg_exs else leg_exs
-        friday_upper = list(reversed(upper_exs)) if upper_exs else upper_exs
+        # PLAN SEMANAL COMPLETO o MENSUAL ADAPTADO AL USUARIO:
+        target_days = _detect_requested_training_days(user_message)
+        recommended_days = target_days
 
-        days_schedule["Lunes"] = {
-            "day_name": "Lunes",
-            "is_rest": False,
-            "title": f"Piernas y Glúteos (Cuádriceps y Glúteos) · {badge_lbl}",
-            "exercises": exercises if (requested_focus == "piernas" and exercises) else leg_exs,
-        }
-        days_schedule["Martes"] = {
-            "day_name": "Martes",
-            "is_rest": False,
-            "title": f"Tren Superior (Pecho, Espalda y Brazos) · {badge_lbl}",
-            "exercises": exercises if (requested_focus == "tren_superior" and exercises) else upper_exs,
-        }
-        days_schedule["Miércoles"] = {
-            "day_name": "Miércoles",
-            "is_rest": False,
-            "title": f"Core, Abdomen y Cardio Funcional · {badge_lbl}",
-            "exercises": exercises if (requested_focus in ("core", "movilidad_cardio") and exercises) else core_exs,
-        }
-        days_schedule["Jueves"] = {
-            "day_name": "Jueves",
-            "is_rest": False,
-            "title": f"Piernas y Glúteos (Isquiotibiales y Femoral) · {badge_lbl}",
-            "exercises": thursday_legs,
-        }
-        days_schedule["Viernes"] = {
-            "day_name": "Viernes",
-            "is_rest": False,
-            "title": f"Tren Superior (Hombros, Brazos y Postura) · {badge_lbl}",
-            "exercises": friday_upper,
-        }
-        days_schedule["Sábado"] = {
-            "day_name": "Sábado",
-            "is_rest": True,
-            "title": "Día de Descanso y Supercompensación Muscular (Sábado)",
-            "exercises": [],
-            "rest_advice": "Hoy Sábado tus fibras musculares se reparan y sintetizan nuevas proteínas. El descanso neuromuscular de 48-72h es donde ocurre la adaptación y el progreso real.",
-        }
-        days_schedule["Domingo"] = {
-            "day_name": "Domingo",
-            "is_rest": True,
-            "title": "Día de Descanso y Regeneración Tisular (Domingo)",
-            "exercises": [],
-            "rest_advice": "Hoy Domingo recarga tus reservas de glucógeno y duerme profundamente para comenzar el lunes con máxima energía.",
-        }
+        # Sub-pools especializados para máxima variación sin repeticiones:
+        legs_quads = [
+            {"name": "Sentadilla profunda asistida" if int_hint == "baja" else ("Sentadilla Goblet con mancuerna" if int_hint == "media" else "Sentadilla profunda con barra libre"), "sets": 4, "reps": "10-12", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
+            {"name": "Extensión de cuádriceps isométrica" if int_hint == "baja" else "Prensa de piernas inclinada 45°", "sets": 3, "reps": "12", "animation_key": "leg-press", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
+            {"name": "Zancadas estáticas asistidas" if int_hint == "baja" else "Zancadas frontales alternas con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps", "secondary_muscle": "Isquiotibiales"},
+        ]
+        legs_hams = [
+            {"name": "Peso muerto rumano con mancuernas" if int_hint != "alta" else "Peso muerto rumano con barra", "sets": 4, "reps": "10-12", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Glúteos"},
+            {"name": "Curl femoral de pie sin peso" if int_hint == "baja" else "Curl de isquiotibiales en máquina", "sets": 3, "reps": "12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
+            {"name": "Buenos días con control motor", "sets": 3, "reps": "10", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Espalda baja"},
+        ]
+        legs_glutes = [
+            {"name": "Puente de glúteos en suelo" if int_hint == "baja" else "Hip Thrust con mancuerna en banco", "sets": 4, "reps": "12-15", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales"},
+            {"name": "Sentadilla sumo con peso corporal" if int_hint == "baja" else "Sentadilla sumo con mancuerna", "sets": 3, "reps": "12", "animation_key": "squat", "primary_muscle": "Glúteos, Aductores", "secondary_muscle": "Cuádriceps"},
+            {"name": "Patada de glúteos en cuadrupedia" if int_hint == "baja" else "Patada de glúteos en polea o con banda", "sets": 3, "reps": "12 por pierna", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Core"},
+        ]
+        legs_unipodal_calves = [
+            {"name": "Step-ups en escalón bajo" if int_hint == "baja" else "Sentadilla búlgara con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps, Glúteos", "secondary_muscle": "Estabilizadores"},
+            {"name": "Elevación de talones de pie con peso corporal" if int_hint == "baja" else "Elevación de talones de pie con carga", "sets": 4, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Gemelos", "secondary_muscle": "Tobillos"},
+            {"name": "Elevación de talones sentado en máquina (Sóleo)", "sets": 3, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Sóleo", "secondary_muscle": "Gemelos"},
+        ]
+        legs_power_mob = [
+            {"name": "Sentadilla pausada en el fondo (3s)" if int_hint == "baja" else "Sentadillas con salto controlado (Jump Squat)", "sets": 3, "reps": "10", "animation_key": "squat", "primary_muscle": "Cuádriceps, Potencia", "secondary_muscle": "Glúteos"},
+            {"name": "Estocadas dinámicas suaves" if int_hint == "baja" else "Zancadas dinámicas con salto alternado", "sets": 3, "reps": "8 por pierna", "animation_key": "lunge", "primary_muscle": "Piernas completas", "secondary_muscle": "Cardio"},
+            {"name": "Movilidad dinámica articular de cadera 90/90 y tobillos", "sets": 3, "reps": "10 por lado", "animation_key": "mobility", "primary_muscle": "Flexores de cadera", "secondary_muscle": "Articulaciones"},
+        ]
 
-    raw_title = str(raw_plan.get("title") or "Plan de Entrenamiento Semanal")
-    if plan_mode == "monthly":
-        raw_title = f"Plan Mensual (4 Semanas): {raw_title}"
-    elif plan_mode == "daily":
-        raw_title = f"Plan Diario: {raw_title}"
-    else:
-        raw_title = f"Plan Semanal (Lun - Vie): {raw_title}"
+        upper_chest_tri = [
+            {"name": "Flexiones inclinadas con apoyo en banco" if int_hint == "baja" else ("Press de pecho con mancuernas en banco" if int_hint == "media" else "Press de banca plano con barra"), "sets": 4, "reps": "10-12", "animation_key": "bench-press", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+            {"name": "Flexiones en suelo con control" if int_hint != "baja" else "Flexiones con apoyo en rodillas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Pectorales", "secondary_muscle": "Deltoides anterior"},
+            {"name": "Extensiones de tríceps sobre la cabeza con mancuerna", "sets": 3, "reps": "12", "animation_key": "tricep-extension", "primary_muscle": "Tríceps", "secondary_muscle": "Codo"},
+        ]
+        upper_back_bi = [
+            {"name": "Remo sentado con banda elástica" if int_hint == "baja" else "Remo en polea baja sentado", "sets": 4, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho, Espalda Media", "secondary_muscle": "Bíceps"},
+            {"name": "Jalón al pecho en polea o con banda", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides"},
+            {"name": "Curl de bíceps alterno con mancuernas", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
+        ]
+        upper_shoulders_post = [
+            {"name": "Press militar con mancuernas sentado", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps"},
+            {"name": "Elevaciones laterales de hombros con mancuernas", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
+            {"name": "Face pulls con cuerda o pájaros posteriores", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+        ]
+        upper_arms_torso = [
+            {"name": "Curl de bíceps tipo martillo", "sets": 3, "reps": "10-12", "animation_key": "bicep-curl", "primary_muscle": "Braquial, Bíceps", "secondary_muscle": "Antebrazo"},
+            {"name": "Fondos entre bancos o en paralelas asistidas", "sets": 3, "reps": "10", "animation_key": "pushup", "primary_muscle": "Tríceps, Pectoral", "secondary_muscle": "Hombros"},
+            {"name": "Remo invertido o tracción horizontal controlada", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Espalda media", "secondary_muscle": "Bíceps"},
+        ]
+
+        core_front = [
+            {"name": "Plancha frontal isométrica en antebrazos", "sets": 3, "reps": "30-45 seg", "animation_key": "plank", "primary_muscle": "Core, Recto Abdominal", "secondary_muscle": "Transverso"},
+            {"name": "Crunch abdominal clásico controlado", "sets": 3, "reps": "15", "animation_key": "crunch", "primary_muscle": "Recto Abdominal", "secondary_muscle": "Core"},
+        ]
+        core_obliques = [
+            {"name": "Plancha lateral isométrica", "sets": 3, "reps": "25-30 seg por lado", "animation_key": "plank", "primary_muscle": "Oblicuos", "secondary_muscle": "Estabilizadores"},
+            {"name": "Giros rusos (Russian twists) controlados", "sets": 3, "reps": "20 giros", "animation_key": "crunch", "primary_muscle": "Oblicuos", "secondary_muscle": "Core"},
+        ]
+        core_deep = [
+            {"name": "Elevación de piernas en suelo o banco", "sets": 3, "reps": "12", "animation_key": "crunch", "primary_muscle": "Abdomen Inferior", "secondary_muscle": "Flexores de cadera"},
+            {"name": "Dead Bug unilateral cruzado", "sets": 3, "reps": "10 por lado", "animation_key": "plank", "primary_muscle": "Core Profundo", "secondary_muscle": "Zona Lumbar"},
+        ]
+
+        def _get_day_content(day_idx: int) -> tuple[str, list]:
+            if requested_focus == "solo_piernas":
+                day_titles = [
+                    f"Piernas: Cuádriceps y Glúteos ({badge_lbl})",
+                    f"Piernas: Isquiotibiales y Cadena Posterior ({badge_lbl})",
+                    f"Piernas: Glúteos y Aductores ({badge_lbl})",
+                    f"Piernas: Fuerza Unipodal y Pantorrillas ({badge_lbl})",
+                    f"Piernas: Potencia y Movilidad Articular ({badge_lbl})",
+                ]
+                day_exs_map = [legs_quads, legs_hams, legs_glutes, legs_unipodal_calves, legs_power_mob]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas")
+
+            elif requested_focus == "solo_tren_superior":
+                day_titles = [
+                    f"Tren Superior: Pecho y Tríceps ({badge_lbl})",
+                    f"Tren Superior: Espalda y Bíceps ({badge_lbl})",
+                    f"Tren Superior: Hombros y Deltoides ({badge_lbl})",
+                    f"Tren Superior: Pecho y Espalda Antagonistas ({badge_lbl})",
+                    f"Tren Superior: Brazos y Postura Escapular ({badge_lbl})",
+                ]
+                day_exs_map = [upper_chest_tri, upper_back_bi, upper_shoulders_post, upper_chest_tri[:2] + upper_back_bi[:1], upper_arms_torso]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="tren_superior")
+
+            elif requested_focus == "solo_core":
+                day_titles = [
+                    f"Core: Recto Abdominal y Frontal ({badge_lbl})",
+                    f"Core: Oblicuos y Rotación ({badge_lbl})",
+                    f"Core: Abdomen Inferior y Cadena Lumbar ({badge_lbl})",
+                    f"Core: Anti-extensión y Planchas ({badge_lbl})",
+                    f"Core: Estabilidad Global y Vacío Abdominal ({badge_lbl})",
+                ]
+                day_exs_map = [core_front, core_obliques, core_deep, core_front + core_obliques[:1], core_obliques + core_deep[:1]]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="core")
+
+            elif requested_focus == "piernas_tren_superior":
+                day_titles = [
+                    f"Combinado: Piernas (Cuádriceps) + Pecho ({badge_lbl})",
+                    f"Combinado: Piernas (Femoral) + Espalda ({badge_lbl})",
+                    f"Combinado: Piernas (Glúteos) + Hombros ({badge_lbl})",
+                    f"Combinado: Piernas (Pantorrillas) + Brazos ({badge_lbl})",
+                    f"Combinado: Piernas (Funcional) + Torso Global ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    legs_quads[:2] + upper_chest_tri[:2],
+                    legs_hams[:2] + upper_back_bi[:2],
+                    legs_glutes[:2] + upper_shoulders_post[:2],
+                    legs_unipodal_calves[:2] + upper_arms_torso[:2],
+                    legs_power_mob[:2] + upper_chest_tri[:1] + upper_back_bi[:1],
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_tren_superior")
+
+            elif requested_focus == "piernas_core":
+                day_titles = [
+                    f"Combinado: Piernas (Cuádriceps) + Core Frontal ({badge_lbl})",
+                    f"Combinado: Piernas (Femoral) + Oblicuos ({badge_lbl})",
+                    f"Combinado: Piernas (Glúteos) + Core Inferior ({badge_lbl})",
+                    f"Combinado: Piernas (Unipodal) + Anti-extensión ({badge_lbl})",
+                    f"Combinado: Piernas (Funcional) + Estabilidad Lumbar ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    legs_quads[:2] + core_front,
+                    legs_hams[:2] + core_obliques,
+                    legs_glutes[:2] + core_deep,
+                    legs_unipodal_calves[:2] + core_front,
+                    legs_power_mob[:2] + core_deep,
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_core")
+
+            elif requested_focus == "tren_superior_core":
+                day_titles = [
+                    f"Combinado: Pecho + Core Frontal ({badge_lbl})",
+                    f"Combinado: Espalda + Oblicuos ({badge_lbl})",
+                    f"Combinado: Hombros + Core Inferior ({badge_lbl})",
+                    f"Combinado: Brazos + Anti-rotación ({badge_lbl})",
+                    f"Combinado: Torso Completo + Vacío Abdominal ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    upper_chest_tri[:2] + core_front,
+                    upper_back_bi[:2] + core_obliques,
+                    upper_shoulders_post[:2] + core_deep,
+                    upper_arms_torso[:2] + core_obliques,
+                    upper_chest_tri[:1] + upper_back_bi[:1] + core_front,
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="tren_superior_core")
+
+            else:
+                default_titles = [
+                    f"Piernas y Glúteos (Cuádriceps y Glúteos) · {badge_lbl}",
+                    f"Tren Superior (Pecho, Espalda y Brazos) · {badge_lbl}",
+                    f"Core, Abdomen y Cardio Funcional · {badge_lbl}",
+                    f"Piernas y Glúteos (Isquiotibiales y Femoral) · {badge_lbl}",
+                    f"Tren Superior (Hombros, Brazos y Postura) · {badge_lbl}",
+                ]
+                default_exs = [
+                    exercises if (requested_focus == "piernas" and exercises) else leg_exs,
+                    exercises if (requested_focus == "tren_superior" and exercises) else upper_exs,
+                    exercises if (requested_focus in ("core", "movilidad_cardio") and exercises) else core_exs,
+                    list(reversed(leg_exs)) if leg_exs else leg_exs,
+                    list(reversed(upper_exs)) if upper_exs else upper_exs,
+                ]
+                idx = day_idx % len(default_titles)
+                return default_titles[idx], default_exs[idx]
+
+        active_day_counter = 0
+        for d in week_order:
+            if d in target_days:
+                t_title, t_exs = _get_day_content(active_day_counter)
+                days_schedule[d] = {
+                    "day_name": d,
+                    "is_rest": False,
+                    "title": t_title,
+                    "exercises": t_exs,
+                }
+                active_day_counter += 1
+            else:
+                days_schedule[d] = {
+                    "day_name": d,
+                    "is_rest": True,
+                    "title": f"Día de Descanso y Supercompensación Muscular ({d})",
+                    "exercises": [],
+                    "rest_advice": f"Hoy {d} tus fibras musculares se reparan y sintetizan nuevas proteínas. El descanso neuromuscular de 48-72h optimiza la adaptación.",
+                }
+
+        if requested_focus == "solo_piernas":
+            raw_title = f"Especialización en Piernas y Glúteos ({badge_lbl})"
+        elif requested_focus == "solo_tren_superior":
+            raw_title = f"Especialización en Tren Superior ({badge_lbl})"
+        elif requested_focus == "solo_core":
+            raw_title = f"Especialización en Core y Abdomen ({badge_lbl})"
+        elif requested_focus == "piernas_tren_superior":
+            raw_title = f"Combinado Piernas + Tren Superior ({badge_lbl})"
+        elif requested_focus == "piernas_core":
+            raw_title = f"Combinado Piernas + Core ({badge_lbl})"
+        elif requested_focus == "tren_superior_core":
+            raw_title = f"Combinado Tren Superior + Core ({badge_lbl})"
+        else:
+            clean_t = str(raw_plan.get("title") or "Entrenamiento Completo")
+            for prefix in ("Plan Semanal (Lun - Vie):", "Plan Semanal:", "Plan Diario:", "Plan Mensual:"):
+                clean_t = clean_t.replace(prefix, "").strip()
+            raw_title = clean_t
+
+        if plan_mode == "monthly":
+            raw_title = f"Plan Mensual (4 Semanas): {raw_title}"
+        elif plan_mode == "daily":
+            raw_title = f"Plan Diario: {raw_title}"
+        else:
+            raw_title = f"Plan Semanal: {raw_title}"
 
     return {
         "day": "Lunes a Viernes (Semanal)" if plan_mode != "daily" else "Sesión Diaria",
@@ -1687,8 +1962,14 @@ Devuelve SOLO JSON."""
     else:
         focus_instruction = {
             "plan_semanal_ia": "PLAN COMPLETO SEMANAL RECOMENDADO POR IA: Estructura una distribución semanal periodizada con descansos de 48-72h. Diseña la rutina de hoy como sesión principal de arranque y detalla los días complementarios de la semana.",
+            "solo_piernas": "SEMANA ESPECIALIZADA DE PIERNAS Y GLÚTEOS: El usuario solicitó explícitamente entrenar solo piernas toda la semana. Diseña ejercicios exclusivos de miembros inferiores (Cuádriceps, Isquiotibiales, Glúteos y Pantorrillas) variando el estímulo para que cada día trabaje un vector o subgrupo diferente.",
+            "solo_tren_superior": "SEMANA ESPECIALIZADA DE TREN SUPERIOR: El usuario solicitó explícitamente entrenar solo tren superior. Diseña ejercicios de Pecho, Espalda, Hombros y Brazos sin incluir ejercicios de piernas.",
+            "solo_core": "SEMANA ESPECIALIZADA DE CORE Y ABDOMEN: Ejercicios de estabilidad lumbo-abdominal, recto abdominal, oblicuos y transverso.",
+            "solo_cardio": "SEMANA DE CARDIO Y RESISTENCIA: Ejercicios de cardio funcional, HIIT moderado y movilidad articular.",
             "piernas_tren_superior": "RUTINA COMBINADA FULL-BODY (PIERNAS + TREN SUPERIOR): Combina ejercicios multiarticulares de piernas y tren superior para un estímulo global armónico.",
             "piernas_core": "RUTINA COMBINADA (PIERNAS + CORE / ABDOMEN): Combina trabajo de piernas y glúteos con estabilización lumbo-abdominal (Plancha, Dead Bug).",
+            "tren_superior_core": "RUTINA COMBINADA (TREN SUPERIOR + CORE): Combina trabajo de torso superior (pecho, espalda, hombros) con core y abdomen.",
+            "piernas_cardio": "RUTINA COMBINADA (PIERNAS + CARDIO): Combina fuerza de piernas con acondicionamiento cardiovascular.",
             "piernas": "PIERNAS Y GLÚTEOS (Cuádriceps, Isquiotibiales, Glúteos y Gemelos). PROHIBIDO incluir ejercicios de pecho, espalda, abdomen o brazos.",
             "tren_superior": "TREN SUPERIOR (Espalda, Pecho, Hombros y Brazos). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas, Elevación de Talones o cualquier ejercicio de piernas!",
             "brazos_hombros": "BRAZOS Y HOMBROS (Bíceps, Tríceps, Deltoides).",
@@ -1866,9 +2147,10 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
    - **Nivel Avanzado (Intensidad Alta)**: Ejercicios compuestos pesados o alta exigencia neuromuscular.
    - REGLA DE DESACOPLAMIENTO: Nivel de experiencia ({effective_level}) e Intensidad ({effective_intensity}) son totalmente independientes.
 
-3. REGLA CIENTÍFICA DE DESCANSO MUSCULAR (48-72 HORAS) E INTERACCIÓN SEMANAL:
-   - Si el usuario pidió Piernas: pauta la sesión para **Lunes y Miércoles** (o Lunes, Miércoles y Viernes) explicando las 48-72h de recuperación muscular, y pregúntale con qué grupo complementario quiere combinar los días Martes y Jueves.
-   - Si el usuario ya eligió la rutina complementaria para **Martes y Jueves** ({requested_focus}): felicítalo por completar su estructura semanal alternada y entrega los ejercicios específicos de **{requested_focus}** para los días **Martes y Jueves**.
+3. REGLA DE ADAPTACIÓN TOTAL AL DESEO DEL ATLETA:
+   - Si el usuario solicita explícitamente entrenar solo piernas o una sola zona toda la semana (ej: 'solo de piernas', 'semana de piernas'): RESPETA TOTALMENTE SU SOLICITUD. Diseña ejercicios de esa zona para sus días de entrenamiento, variando los subgrupos (ej: cuádriceps, glúteos, isquiotibiales/femoral, pantorrillas y potencia/movilidad) para optimizar la recuperación entre patrones motores.
+   - Si el usuario solicita combinar múltiples zonas (ej: 'piernas + core', 'piernas + tren superior', 'pecho y core'): genera una rutina que combine exactamente esas áreas en cada sesión.
+   - Si el usuario no especificó una zona particular o pidió el plan general/semanal por defecto, distribuye armónicamente: Lunes Piernas, Martes Tren Superior, Miércoles Core/Cardio, Jueves Piernas (femoral), Viernes Tren Superior (hombros/brazos), y Fin de semana descanso.
 
 4. REGLA OBLIGATORIA DE NUTRICIÓN ADAPTADA A VENEZUELA (MERCADO LOCAL ACCESIBLE):
    - Todos los planes de alimentación DEBEN usar ingredientes económicos y fáciles de conseguir en Venezuela:
@@ -2015,19 +2297,40 @@ Devuelve SOLO JSON."""
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
     user_msg_lower = (payload.message or "").lower()
 
-    if has_plan and not is_complementary and requested_focus == "piernas":
+    if has_plan and not is_complementary:
         lower_reply = reply_str.lower()
-        if not any(w in lower_reply for w in ("martes", "combinar", "relacionar", "48", "72")):
-            rec_days_txt = " y ".join(structured_plan.get("recommended_days", ["Lunes", "Miércoles"]))
-            reply_str += (
-                f"\n\n💡 **Recomendación de Periodización Semanal:** Estás pidiendo ejercicios de piernas para la semana, "
-                f"pero fisiológicamente no es recomendable hacerlos todos los días seguidos porque el músculo requiere entre **48 y 72 horas de recuperación** "
-                f"para evitar fatiga neuromuscular. Lo más óptimo es realizar esta sesión los días **{rec_days_txt}**.\n"
-                f"Para los días intermedios (**Martes y Jueves**), podemos relacionarlo con otro grupo muscular complementario. ¿Cuál prefieres?\n"
-                f"1️⃣ **Tren Superior Suave (Espalda, Pecho y Brazos)**\n"
-                f"2️⃣ **Core, Abdomen y Postura**\n"
-                f"3️⃣ **Movilidad Articular y Cardio de Bajo Impacto**"
-            )
+        if requested_focus == "solo_piernas":
+            if "semana de especialización" not in lower_reply and "piernas" not in lower_reply:
+                reply_str += (
+                    f"\n\n🦵 **Especialización Semanal de Piernas:** He estructurado tu semana enfocada 100% en miembros inferiores "
+                    f"tal como lo pediste. Cada jornada trabaja un subgrupo distinto (Cuádriceps, Isquiotibiales, Glúteos, "
+                    f"Pantorrillas y Potencia Funcional) para evitar la sobrecarga y maximizar el desarrollo muscular."
+                )
+        elif requested_focus == "piernas_tren_superior":
+            if "combinando" not in lower_reply:
+                reply_str += (
+                    f"\n\n💪 **Plan Semanal Combinado:** Tu semana integra ejercicios multiarticulares de Piernas y Tren Superior "
+                    f"en cada sesión para un desarrollo muscular integral y balanceado."
+                )
+        elif requested_focus == "piernas_core":
+            if "combinando" not in lower_reply:
+                reply_str += (
+                    f"\n\n🔥 **Plan Semanal Combinado:** Tu semana integra fuerza de Piernas con estabilización de Core y Abdomen "
+                    f"en cada entrenamiento."
+                )
+        elif requested_focus == "tren_superior_core":
+            if "combinando" not in lower_reply:
+                reply_str += (
+                    f"\n\n⚡ **Plan Semanal Combinado:** Tu semana integra ejercicios de Tren Superior (Pecho, Espalda y Hombros) "
+                    f"con fortalecimiento profundo de Core."
+                )
+        elif requested_focus == "piernas":
+            if not any(w in lower_reply for w in ("martes", "combinar", "relacionar", "48", "72", "complementar")):
+                rec_days_txt = " y ".join(structured_plan.get("recommended_days", ["Lunes", "Miércoles"]))
+                reply_str += (
+                    f"\n\n💡 **Recomendación Fisiológica:** Para una sesión aislada de piernas, es ideal espaciar 48-72h ({rec_days_txt}). "
+                    f"Si deseas entrenar los días intermedios, podemos combinarlos con Tren Superior o Core."
+                )
 
 
 

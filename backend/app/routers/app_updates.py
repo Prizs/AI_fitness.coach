@@ -20,8 +20,8 @@ def _read_pubspec_version() -> tuple[str, int]:
                 if "+" in raw_ver:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
-                return raw_ver, 104
-    return "1.0.64", 104
+                return raw_ver, 105
+    return "1.0.65", 105
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -38,20 +38,20 @@ def _find_apk_file() -> Path | None:
 @router.get("/latest")
 def latest_version() -> dict:
     apk = _find_apk_file()
-    size = apk.stat().st_size if apk else 63995129
+    size = apk.stat().st_size if apk else 64077417
     return {
         "available": True,
-        "version_name": "1.0.64",
-        "version_code": 104,
+        "version_name": "1.0.65",
+        "version_code": 105,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.64:\n"
-            "1. Cronogramas completos y variados de Lunes a Viernes (sin restricciones de esperar a la siguiente semana ni falsos descansos en días de semana).\n"
-            "2. Soporte preciso al 100% para modalidades: Diario, Semanal (Lun - Vie) y Mensual (4 Semanas).\n"
-            "3. Fines de semana (Sábado y Domingo) dedicados a regeneración y descanso activo con tarjetas de consejos.\n"
-            "4. Coach IA interactivo con botones rápidos para seleccionar la modalidad de cronograma deseada.\n"
-            "5. Persistencia blindada de la conversación en RAM y local, sin pérdidas al cambiar de módulo."
+            "Actualización oficial de AI Fitness Coach v1.0.65:\n"
+            "1. Personalización total según el deseo exacto del usuario: especialización de solo piernas toda la semana o cualquier grupo muscular específico.\n"
+            "2. Rutinas combinadas multi-zona personalizadas (Piernas + Tren Superior, Piernas + Core, Torso + Core) en cada sesión.\n"
+            "3. Detección inteligente de días solicitados (ej: lunes, miércoles y viernes) manteniendo descanso en los demás días.\n"
+            "4. Variación profunda por sub-vectores musculares sin repeticiones de ejercicios.\n"
+            "5. Máxima precisión fisiológica y descanso en fin de semana."
         ),
         "download_url": "/api/app/download",
     }
@@ -64,7 +64,7 @@ def download_apk():
         return FileResponse(
             path=str(apk),
             media_type="application/vnd.android.package-archive",
-            filename="AI_Fitness_Coach_v1.0.64.apk",
+            filename="AI_Fitness_Coach_v1.0.65.apk",
         )
-    return RedirectResponse(url="https://github.com/miope-hub/AI_FITNESS_COACH_PROYECTO_COMPLETO/releases/download/v1.0.64/app-release.apk", status_code=302)
+    return RedirectResponse(url="https://github.com/miope-hub/AI_FITNESS_COACH_PROYECTO_COMPLETO/releases/download/v1.0.65/app-release.apk", status_code=302)
 
