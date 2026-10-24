@@ -60,6 +60,17 @@ def _session_response(auth_response, profile: dict | None = None) -> dict:
 def register(payload: RegisterRequest):
     client = get_supabase_client()
     admin_client = get_supabase_admin_client()
+    
+    # 1. Verificar si la cédula ya existe en la base de datos
+    try:
+        existing = admin_client.table("usuarios").select("id").eq("cedula", payload.cedula).execute()
+        if existing and existing.data and len(existing.data) > 0:
+            raise HTTPException(status_code=409, detail="Esta cédula ya está registrada. Por favor inicia sesión.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Warning checking existing cedula:", e)
+
     user_id = None
     try:
         auth_response = admin_client.auth.admin.create_user(
@@ -96,7 +107,16 @@ def register(payload: RegisterRequest):
             "certifications": payload.certifications,
         }
         admin_client.table("usuarios").insert(profile).execute()
-        return _session_response(auth_response, profile)
+
+        # Iniciar sesión inmediatamente para devolver token de acceso y refresco activos
+        try:
+            login_response = client.auth.sign_in_with_password(
+                {"email": _auth_email(payload.cedula), "password": payload.password}
+            )
+            return _session_response(login_response, profile)
+        except Exception:
+            return _session_response(auth_response, profile)
+
     except HTTPException:
         raise
     except Exception as error:
@@ -106,9 +126,9 @@ def register(payload: RegisterRequest):
                 admin_client.auth.admin.delete_user(user_id)
             except Exception:
                 pass
-        if "already registered" in error_text or "already exists" in error_text or "duplicate" in error_text:
-            raise HTTPException(status_code=409, detail="Esta cédula ya está registrada.") from error
-        raise HTTPException(status_code=500, detail="No se pudo guardar el perfil. Verifica el esquema de Supabase.") from error
+        if any(k in error_text for k in ["already", "registered", "duplicate", "unique", "exists", "422"]):
+            raise HTTPException(status_code=409, detail="Esta cédula ya está registrada. Por favor inicia sesión.") from error
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar el perfil: {error}") from error
 
 
 @router.post("/login")

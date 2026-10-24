@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -118,9 +118,9 @@ class AuthService {
           'experience_years': profile.experienceYears,
           'certifications': profile.certifications,
         }),
-      ).timeout(const Duration(seconds: 5));
-    } on Exception {
-      lastError = 'No se pudo conectar con el servidor.';
+      ).timeout(const Duration(seconds: 40));
+    } catch (e) {
+      lastError = 'No se pudo conectar con el servidor ($e). Verifica tu conexión o intenta nuevamente.';
       return false;
     }
 
@@ -129,16 +129,20 @@ class AuthService {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         lastError =
             data['detail'] as String? ?? 'No se pudo completar el registro.';
-      } on Exception {
-        lastError = 'No se pudo completar el registro.';
+      } catch (_) {
+        lastError = 'Error del servidor (${response.statusCode}).';
       }
       return false;
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    accessToken = data['access_token'] as String?;
-    loggedInUser = profile;
-    await _saveSession(profile.cedula, accessToken);
+    try {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      accessToken = data['access_token'] as String?;
+      loggedInUser = profile;
+      await _saveSession(profile.cedula, accessToken);
+    } catch (_) {
+      loggedInUser = profile;
+    }
     return true;
   }
 
@@ -219,29 +223,33 @@ class AuthService {
 
   Future<void> _saveSession(String cedula, String? token) async {
     if (token == null) return;
-    await _storage.write(key: 'cedula', value: cedula);
-    await _storage.write(key: 'access_token', value: token);
-    final profile = loggedInUser;
-    if (profile != null) {
-      await _storage.write(key: 'name', value: profile.name);
-      await _storage.write(key: 'last_name', value: profile.lastName);
-      await _storage.write(key: 'age', value: profile.age.toString());
-      await _storage.write(key: 'weight', value: profile.weight.toString());
-      await _storage.write(
-        key: 'health_notes',
-        value: profile.pathologyOrAllergies,
-      );
-      await _storage.write(key: 'food_allergies', value: profile.foodAllergies);
-      await _storage.write(
-        key: 'current_injuries',
-        value: profile.currentInjuries,
-      );
-      await _storage.write(
-        key: 'motor_disability',
-        value: profile.motorDisability,
-      );
-      await _storage.write(key: 'areas_to_avoid', value: profile.areasToAvoid);
-      await _storage.write(key: 'role', value: profile.role);
+    try {
+      await _storage.write(key: 'cedula', value: cedula);
+      await _storage.write(key: 'access_token', value: token);
+      final profile = loggedInUser;
+      if (profile != null) {
+        await _storage.write(key: 'name', value: profile.name);
+        await _storage.write(key: 'last_name', value: profile.lastName);
+        await _storage.write(key: 'age', value: profile.age.toString());
+        await _storage.write(key: 'weight', value: profile.weight.toString());
+        await _storage.write(
+          key: 'health_notes',
+          value: profile.pathologyOrAllergies,
+        );
+        await _storage.write(key: 'food_allergies', value: profile.foodAllergies);
+        await _storage.write(
+          key: 'current_injuries',
+          value: profile.currentInjuries,
+        );
+        await _storage.write(
+          key: 'motor_disability',
+          value: profile.motorDisability,
+        );
+        await _storage.write(key: 'areas_to_avoid', value: profile.areasToAvoid);
+        await _storage.write(key: 'role', value: profile.role);
+      }
+    } catch (_) {
+      // Si falla storage local, la sesion sigue en memoria
     }
   }
 

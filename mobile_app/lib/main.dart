@@ -81,7 +81,7 @@ class _AuthGateState extends State<AuthGate> {
 
   void _handleRegisterSuccess() {
     setState(() {
-      _showLogin = true;
+      _isAuthenticated = true;
     });
   }
 

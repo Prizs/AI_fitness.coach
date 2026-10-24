@@ -137,49 +137,84 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _addTags(_disabilityInput, _disabilities);
     _addTags(_avoidInput, _avoidAreas);
     setState(() => _isLoading = true);
-    final profile = UserProfile(
-      cedula: _cedula.text.trim(),
-      password: _password.text,
-      name: _name.text.trim(),
-      lastName: _lastName.text.trim(),
-      age: int.tryParse(_age.text.trim()) ?? 25,
-      weight: double.tryParse(_weight.text.trim()) ?? 70.0,
-      pathologyOrAllergies: _pathologies.isEmpty
-          ? null
-          : _join(_pathologies),
-      foodAllergies: _join(_allergies),
-      currentInjuries: _join(_injuries),
-      motorDisability: _join(_disabilities),
-      areasToAvoid: _join(_avoidAreas),
-      role: _isTrainer ? 'trainer' : 'client',
-      specialty: _isTrainer ? _specialtyController.text.trim() : null,
-      experienceYears: _isTrainer ? int.tryParse(_experienceController.text.trim()) : null,
-      certifications: _isTrainer ? _certificationsController.text.trim() : null,
-    );
-    final registered = await AuthService.instance.register(profile);
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    if (!registered) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AuthService.instance.lastError ?? 'Error de registro.'),
-        ),
+
+    try {
+      final profile = UserProfile(
+        cedula: _cedula.text.trim(),
+        password: _password.text,
+        name: _name.text.trim(),
+        lastName: _lastName.text.trim(),
+        age: int.tryParse(_age.text.trim()) ?? 25,
+        weight: double.tryParse(_weight.text.trim()) ?? 70.0,
+        pathologyOrAllergies: _pathologies.isEmpty
+            ? null
+            : _join(_pathologies),
+        foodAllergies: _join(_allergies),
+        currentInjuries: _join(_injuries),
+        motorDisability: _join(_disabilities),
+        areasToAvoid: _join(_avoidAreas),
+        role: _isTrainer ? 'trainer' : 'client',
+        specialty: _isTrainer ? _specialtyController.text.trim() : null,
+        experienceYears: _isTrainer ? int.tryParse(_experienceController.text.trim()) : null,
+        certifications: _isTrainer ? _certificationsController.text.trim() : null,
       );
-      return;
-    }
-    
-    // Si es un Alumno, lanzar el Test Biopsicosocial y de Adherencia (estilo FitCraft)
-    if (!_isTrainer) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => OnboardingQuizScreen(
-            userProfile: profile,
-            onComplete: widget.onRegisterSuccess,
+
+      final registered = await AuthService.instance.register(profile);
+      if (!mounted) return;
+
+      if (!registered) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.redAccent.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    AuthService.instance.lastError ?? 'Error de registro.',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    } else {
-      widget.onRegisterSuccess();
+        );
+        return;
+      }
+      
+      // Si es un Alumno, lanzar el Test Biopsicosocial y de Adherencia (estilo FitCraft)
+      if (!_isTrainer) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => OnboardingQuizScreen(
+              userProfile: profile,
+              onComplete: () {
+                Navigator.of(context).pop();
+                widget.onRegisterSuccess();
+              },
+            ),
+          ),
+        );
+      } else {
+        widget.onRegisterSuccess();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.redAccent.shade700,
+            behavior: SnackBarBehavior.floating,
+            content: Text('Error inesperado al registrar: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
