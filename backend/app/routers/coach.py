@@ -252,7 +252,10 @@ def _is_explicit_routine_request(message: str) -> bool:
         "plan de recomendación", "plan de recomendacion", "recomiéndame un plan", "recomiendame un plan",
         "recomienda un plan", "haz mi plan", "hazme el plan", "arma mi semana", "recomiéndame tú", "recomiendame tu",
         "piernas & glúteos", "pierna y glúteo", "pecho, espalda", "cardio & core", "cardio hiit",
-        "combinar con", "combinar piernas", "planificar mi semana"
+        "combinar con", "combinar piernas", "planificar mi semana", "nuevo inicio", "empezar de nuevo",
+        "nuevo plan", "plan de entrenamiento", "rutina diaria", "plan mensual", "cronograma",
+        "plan para la semana", "plan de la semana", "iniciar plan", "iniciar nuevo plan",
+        "planificar mi entrenamiento", "planificar de lunes a viernes", "lunes a viernes"
     )
     return any(p in msg for p in explicit_phrases)
 
@@ -1056,12 +1059,22 @@ def _normalize_exercises(
     return exercises
 
 
+def _detect_plan_mode(user_msg: str) -> str:
+    msg = (user_msg or "").lower()
+    if any(k in msg for k in ("diario", "diaria", "para hoy", "sesión de hoy", "sesion de hoy", "solo hoy", "entrenar hoy")):
+        return "daily"
+    if any(k in msg for k in ("mensual", "mes", "mesociclo", "4 semanas", "cuatro semanas")):
+        return "monthly"
+    return "weekly"
+
+
 def _normalize_structured_plan(
     raw_plan,
     intensity: str = "Media",
     level: str = "Intermedio",
     requested_focus: str | None = None,
     is_complementary_days: bool = False,
+    user_message: str = "",
 ) -> dict | None:
     if not isinstance(raw_plan, dict):
         return None
@@ -1079,75 +1092,151 @@ def _normalize_structured_plan(
     else:
         nutrition = {}
 
-    # Determinar días óptimos de entrenamiento respetando 48-72h de recuperación muscular
-    if is_complementary_days:
-        recommended_days = ["Martes", "Jueves"]
-        complementary_days = {
-            "Lunes y Miércoles": "Sesión Principal de Piernas (En recuperación muscular 48-72h)",
-            "Viernes": "Movilidad o Sesión Integrada Suave",
-        }
+    plan_mode = _detect_plan_mode(user_message)
+    int_lower = intensity.lower()
+    if "alta" in int_lower or "avanzado" in int_lower:
+        int_hint = "alta"
+        badge_lbl = "Avanzado (Intensidad Alta)"
+    elif "baja" in int_lower or "principiante" in int_lower:
+        int_hint = "baja"
+        badge_lbl = "Básico (Intensidad Baja)"
     else:
-        raw_days = raw_plan.get("recommended_days")
-        if isinstance(raw_days, list) and raw_days and len(raw_days) <= 3:
-            recommended_days = [str(d) for d in raw_days]
-        else:
-            if level.lower() == "principiante" or intensity.lower() == "baja":
-                recommended_days = ["Lunes", "Miércoles"]
-            else:
-                recommended_days = ["Lunes", "Miércoles", "Viernes"]
+        int_hint = "media"
+        badge_lbl = "Intermedio (Intensidad Media)"
 
-        complementary_days = raw_plan.get("complementary_days")
-        if not isinstance(complementary_days, dict) or not complementary_days:
-            complementary_days = {
-                "Martes": "Tren Superior Suave (Espalda/Pecho) o Core",
-                "Jueves": "Core, Postura o Movilidad Articular y Cardio Suave",
-            }
+    # Pools de ejercicios por zona
+    leg_pool_source = (
+        ADVANCED_HIGH_LEG_EXERCISES
+        if int_hint == "alta"
+        else (BEGINNER_LOW_LEG_EXERCISES if int_hint == "baja" else INTERMEDIATE_MID_LEG_EXERCISES)
+    )
+    leg_exs = _normalize_exercises(leg_pool_source, intensity=intensity, level=level, requested_focus="piernas")
+    upper_exs = _normalize_exercises(UPPER_BODY_POOLS.get(int_hint, UPPER_BODY_POOLS["media"]), intensity=intensity, level=level, requested_focus="tren_superior")
+    core_exs = _normalize_exercises(CORE_POOLS.get(int_hint, CORE_POOLS["media"]), intensity=intensity, level=level, requested_focus="core")
+    mobility_exs = _normalize_exercises(MOBILITY_CARDIO_POOLS.get(int_hint, MOBILITY_CARDIO_POOLS["media"]), intensity=intensity, level=level, requested_focus="movilidad_cardio")
 
-    raw_title = str(raw_plan.get("title") or "Sesión Personalizada")
-    if is_complementary_days or requested_focus in ("tren_superior", "core", "movilidad_cardio"):
-        focus_titles = {
-            "tren_superior": f"Rutina Complementaria: Tren Superior ({level} · Intensidad {intensity})",
-            "core": f"Rutina Complementaria: Core, Abdomen y Postura ({level} · Intensidad {intensity})",
-            "movilidad_cardio": f"Rutina Complementaria: Movilidad y Cardio Suave ({level} · Intensidad {intensity})",
-        }
-        if requested_focus in focus_titles and ("pierna" in raw_title.lower() or is_complementary_days):
-            raw_title = focus_titles[requested_focus]
-
-    # Construir days_schedule para los 7 días de la semana
     week_order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     days_schedule = {}
-    for d in week_order:
-        is_training = d in recommended_days
-        if is_training:
-            days_schedule[d] = {
-                "day_name": d,
-                "is_rest": False,
-                "title": raw_title,
-                "exercises": exercises,
-            }
-        else:
-            comp_focus = complementary_days.get(d)
-            days_schedule[d] = {
-                "day_name": d,
-                "is_rest": True,
-                "title": f"Día de Descanso y Regeneración Muscular ({d})",
-                "complementary_suggestion": comp_focus,
-                "exercises": [],
-                "rest_advice": (
-                    f"Hoy {d} tus fibras musculares se reparan y sintetizan nuevas proteínas. "
-                    "El descanso neuromuscular de 48-72h es donde ocurre la adaptación y el progreso real."
-                ),
-            }
+
+    if plan_mode == "daily":
+        target_day = "Lunes"
+        raw_days = raw_plan.get("recommended_days")
+        if isinstance(raw_days, list) and raw_days and str(raw_days[0]) in week_order:
+            target_day = str(raw_days[0])
+        recommended_days = [target_day]
+        for d in week_order:
+            if d == target_day:
+                days_schedule[d] = {
+                    "day_name": d,
+                    "is_rest": False,
+                    "title": f"Sesión Diaria Enfocada ({level} · {badge_lbl})",
+                    "exercises": exercises,
+                }
+            else:
+                days_schedule[d] = {
+                    "day_name": d,
+                    "is_rest": True,
+                    "title": f"Día de Descanso y Regeneración Muscular ({d})",
+                    "exercises": [],
+                    "rest_advice": f"Hoy {d} tus fibras musculares descansan para reparar el tejido muscular y supercompensar.",
+                }
+    elif is_complementary_days:
+        recommended_days = ["Lunes", "Martes", "Miércoles", "Jueves"]
+        for d in week_order:
+            if d in ("Martes", "Jueves"):
+                days_schedule[d] = {
+                    "day_name": d,
+                    "is_rest": False,
+                    "title": f"Rutina Complementaria: Tren Superior / Core ({level} · {badge_lbl})",
+                    "exercises": exercises if requested_focus in ("tren_superior", "core") else upper_exs,
+                }
+            elif d in ("Lunes", "Miércoles"):
+                days_schedule[d] = {
+                    "day_name": d,
+                    "is_rest": False,
+                    "title": f"Rutina Principal: Piernas y Glúteos ({level} · {badge_lbl})",
+                    "exercises": leg_exs,
+                }
+            else:
+                days_schedule[d] = {
+                    "day_name": d,
+                    "is_rest": True,
+                    "title": f"Día de Descanso y Supercompensación ({d})",
+                    "exercises": [],
+                    "rest_advice": f"Hoy {d} tus fibras musculares se reparan y sintetizan nuevas proteínas. El descanso de 48-72h optimiza el progreso.",
+                }
+    else:
+        # PLAN SEMANAL COMPLETO (Lunes a Viernes) o MENSUAL:
+        recommended_days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+        thursday_legs = list(reversed(leg_exs)) if leg_exs else leg_exs
+        friday_upper = list(reversed(upper_exs)) if upper_exs else upper_exs
+
+        days_schedule["Lunes"] = {
+            "day_name": "Lunes",
+            "is_rest": False,
+            "title": f"Piernas y Glúteos (Cuádriceps y Glúteos) · {badge_lbl}",
+            "exercises": exercises if (requested_focus == "piernas" and exercises) else leg_exs,
+        }
+        days_schedule["Martes"] = {
+            "day_name": "Martes",
+            "is_rest": False,
+            "title": f"Tren Superior (Pecho, Espalda y Brazos) · {badge_lbl}",
+            "exercises": exercises if (requested_focus == "tren_superior" and exercises) else upper_exs,
+        }
+        days_schedule["Miércoles"] = {
+            "day_name": "Miércoles",
+            "is_rest": False,
+            "title": f"Core, Abdomen y Cardio Funcional · {badge_lbl}",
+            "exercises": exercises if (requested_focus in ("core", "movilidad_cardio") and exercises) else core_exs,
+        }
+        days_schedule["Jueves"] = {
+            "day_name": "Jueves",
+            "is_rest": False,
+            "title": f"Piernas y Glúteos (Isquiotibiales y Femoral) · {badge_lbl}",
+            "exercises": thursday_legs,
+        }
+        days_schedule["Viernes"] = {
+            "day_name": "Viernes",
+            "is_rest": False,
+            "title": f"Tren Superior (Hombros, Brazos y Postura) · {badge_lbl}",
+            "exercises": friday_upper,
+        }
+        days_schedule["Sábado"] = {
+            "day_name": "Sábado",
+            "is_rest": True,
+            "title": "Día de Descanso y Supercompensación Muscular (Sábado)",
+            "exercises": [],
+            "rest_advice": "Hoy Sábado tus fibras musculares se reparan y sintetizan nuevas proteínas. El descanso neuromuscular de 48-72h es donde ocurre la adaptación y el progreso real.",
+        }
+        days_schedule["Domingo"] = {
+            "day_name": "Domingo",
+            "is_rest": True,
+            "title": "Día de Descanso y Regeneración Tisular (Domingo)",
+            "exercises": [],
+            "rest_advice": "Hoy Domingo recarga tus reservas de glucógeno y duerme profundamente para comenzar el lunes con máxima energía.",
+        }
+
+    raw_title = str(raw_plan.get("title") or "Plan de Entrenamiento Semanal")
+    if plan_mode == "monthly":
+        raw_title = f"Plan Mensual (4 Semanas): {raw_title}"
+    elif plan_mode == "daily":
+        raw_title = f"Plan Diario: {raw_title}"
+    else:
+        raw_title = f"Plan Semanal (Lun - Vie): {raw_title}"
 
     return {
-        "day": "Martes y Jueves (Complemento Intermedio)" if is_complementary_days else f"{' y '.join(recommended_days)} (Alternado 48-72h)",
+        "day": "Lunes a Viernes (Semanal)" if plan_mode != "daily" else "Sesión Diaria",
         "title": raw_title,
-        "focus_area": requested_focus or "general",
+        "focus_area": requested_focus or "semanal_completo",
+        "plan_mode": plan_mode,
         "is_complementary_days": is_complementary_days,
         "intensity_summary": f"Nivel {level} · Intensidad {intensity}",
         "recommended_days": recommended_days,
-        "complementary_days": complementary_days,
-        "recovery_rule": "Descanso obligatorio de 48 a 72 horas para este grupo muscular (nunca entrenar piernas en días seguidos).",
+        "complementary_days": {
+            "Martes y Jueves": "Tren Superior o Core",
+            "Sábado y Domingo": "Descanso y Recuperación",
+        },
+        "recovery_rule": "Descanso obligatorio el fin de semana y 48-72h entre sesiones del mismo grupo muscular.",
         "exercises": exercises,
         "days_schedule": days_schedule,
         "nutrition": nutrition,
@@ -1157,16 +1246,7 @@ def _normalize_structured_plan(
 def _profile_context(payload: ChatMessage, effective_level: str, effective_intensity: str) -> str:
     plan_info = ""
     if payload.active_plan_start and payload.active_plan_end:
-        active_days_str = ", ".join(payload.active_training_days) if payload.active_training_days else "Lunes, Miércoles y Viernes"
-        next_str = payload.next_cycle_start or "el próximo lunes"
-        plan_info = (
-            f" [CICLO SEMANAL ACTIVO: Vigente del {payload.active_plan_start} al {payload.active_plan_end}. "
-            f"Días de entrenamiento programados: {active_days_str}. "
-            f"Próxima planificación de ciclo completo: {next_str}. "
-            f"REGLA: Si pide generar una nueva rutina, recuérdale que su ciclo actual está activo hasta el {payload.active_plan_end} "
-            f"y que el nuevo ciclo completo se podrá planificar a partir de {next_str} para respetar 48-72h de descanso. "
-            f"Para esta semana, ofrécele rutinas complementarias para sus días libres (Martes/Jueves: Tren Superior, Core o Movilidad).] "
-        )
+        plan_info = f" [Ciclo de referencia: {payload.active_plan_start} al {payload.active_plan_end}. Si el usuario solicita un plan nuevo, semanal o reiniciar, atiende y genera el plan inmediatamente sin restricciones ni demoras.] "
 
     today_info = ""
     if payload.today_routine and isinstance(payload.today_routine, dict):
@@ -1395,18 +1475,18 @@ INSTRUCCIONES:
 1. Saluda cálidamente a {user_name}, dale la bienvenida y menciónale que aún tiene el ciclo semanal disponible para planificar.
 2. Pregúntale cómo estuvo su jornada o semana previa y qué días tiene disponibles para estructurar su nuevo cronograma personalizado con descansos óptimos de 48-72h.
 3. Quick Replies:
-   - "⚡ Planificar mi semana de entrenamiento"
-   - "📋 Completar mi estado actual"
-   - "🥗 Consultar pautas de nutrición"
-   - "💬 Tengo otra consulta"
+   - "🗓️ Plan Semanal (Lunes a Viernes)"
+   - "📅 Rutina Diaria (Solo por Hoy)"
+   - "📆 Plan Mensual (4 Semanas)"
+   - "🎯 Cambiar Meta Mensual"
 
 Retorna SOLO JSON."""
             )
             quick_replies = [
-                "⚡ Planificar mi semana de entrenamiento",
-                "📋 Completar mi estado actual",
-                "🥗 Consultar pautas de nutrición",
-                "💬 Tengo otra consulta",
+                "🗓️ Plan Semanal (Lunes a Viernes)",
+                "📅 Rutina Diaria (Solo por Hoy)",
+                "📆 Plan Mensual (4 Semanas)",
+                "🎯 Cambiar Meta Mensual",
             ]
             fallback_reply = (
                 f"¡Hola, {user_name}! 👋 ¡Bienvenido nuevamente!\n\n"
@@ -1517,21 +1597,21 @@ REGLAS OBLIGATORIAS:
 3. BOTONES DE RESPUESTA RÁPIDA (QUICK REPLIES):
    - Proporciona exactamente estos 4 botones de acción para guiar al usuario:
      [
-       "💪 Planificar mi sesión de hoy",
-       "📋 Completar mi estado actual",
-       "🏃 Consultar rutina de cardio/movilidad",
-       "🥗 Consultar plan de nutrición"
+       "🗓️ Plan Semanal (Lunes a Viernes)",
+       "📅 Rutina Diaria (Solo por Hoy)",
+       "📆 Plan Mensual (4 Semanas)",
+       "🎯 Cambiar Meta Mensual"
      ]
 
 Retorna EXCLUSIVAMENTE este JSON:
 {{
-  "reply": "Tu respuesta conversacional cálida, cordial y motivadora, respondiendo a su saludo y preguntándole qué desea trabajar o cómo se siente hoy.",
+  "reply": "Tu respuesta conversacional cálida, cordial y motivadora, respondiendo a su saludo y preguntándole qué desea trabajar o qué modalidad de plan prefiere.",
   "category": "Interacción Conversacional",
   "quick_replies": [
-    "💪 Planificar mi sesión de hoy",
-    "📋 Completar mi estado actual",
-    "🏃 Consultar rutina de cardio/movilidad",
-    "🥗 Consultar plan de nutrición"
+    "🗓️ Plan Semanal (Lunes a Viernes)",
+    "📅 Rutina Diaria (Solo por Hoy)",
+    "📆 Plan Mensual (4 Semanas)",
+    "🎯 Cambiar Meta Mensual"
   ],
   "suggest_questionnaire": false,
   "has_plan": false,
@@ -1543,10 +1623,10 @@ Devuelve SOLO JSON."""
         reply_str = None
         category = "Interacción Conversacional"
         quick_replies = [
-            "💪 Planificar mi sesión de hoy",
-            "📋 Completar mi estado actual",
-            "🏃 Consultar rutina de cardio/movilidad",
-            "🥗 Consultar plan de nutrición",
+            "🗓️ Plan Semanal (Lunes a Viernes)",
+            "📅 Rutina Diaria (Solo por Hoy)",
+            "📆 Plan Mensual (4 Semanas)",
+            "🎯 Cambiar Meta Mensual",
         ]
 
         try:
@@ -1929,6 +2009,7 @@ Devuelve SOLO JSON."""
         level=effective_level,
         requested_focus=requested_focus,
         is_complementary_days=is_complementary,
+        user_message=payload.message or "",
     )
     has_plan = bool(data.get("has_plan")) and structured_plan is not None and should_generate_plan
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
@@ -1948,22 +2029,7 @@ Devuelve SOLO JSON."""
                 f"3️⃣ **Movilidad Articular y Cardio de Bajo Impacto**"
             )
 
-    if payload.active_plan_start and payload.active_plan_end:
-        active_days_str = ", ".join(payload.active_training_days) if payload.active_training_days else "Lunes, Miércoles y Viernes"
-        next_cycle = payload.next_cycle_start or "el próximo lunes"
-        is_routine_request = any(k in user_msg_lower for k in ("nueva rutina", "otra rutina", "crear rutina", "planifica", "rutina nueva", "nuevo plan"))
-        if is_routine_request and not is_complementary:
-            lower_reply = reply_str.lower()
-            if not any(k in lower_reply for k in ("ciclo activo", "próximo lunes", "proximo lunes", "nuevo ciclo", "planificar un nuevo")):
-                reply_str = (
-                    f"🗓️ **Estado de tu Plan Semanal:** Tienes un ciclo de entrenamiento activo hasta el **domingo {payload.active_plan_end}**, "
-                    f"con sesiones programadas para los días **{active_days_str}**.\n\n"
-                    f"⏳ **¿Cuándo podrás planificar un nuevo ciclo general?** Podrás generar un ciclo completo totalmente nuevo a partir del **{next_cycle}**, "
-                    f"asegurando la adaptación neuromuscular y el descanso de 48 a 72 horas.\n\n"
-                    f"💡 **Para esta semana:** Puedes aprovechar tus días libres con una **rutina complementaria** "
-                    f"(Tren Superior, Core o Movilidad) o incorporar la propuesta ajustada a continuación:\n\n"
-                    + reply_str
-                )
+
 
     is_rest_request = (
         "me impide entrenar" in user_msg_lower

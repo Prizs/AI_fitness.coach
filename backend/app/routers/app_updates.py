@@ -20,8 +20,8 @@ def _read_pubspec_version() -> tuple[str, int]:
                 if "+" in raw_ver:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
-                return raw_ver, 103
-    return "1.0.63", 103
+                return raw_ver, 104
+    return "1.0.64", 104
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -41,17 +41,17 @@ def latest_version() -> dict:
     size = apk.stat().st_size if apk else 63995129
     return {
         "available": True,
-        "version_name": "1.0.63",
-        "version_code": 103,
+        "version_name": "1.0.64",
+        "version_code": 104,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.63:\n"
-            "1. Persistencia total de conversación en Coach IA: nunca se borran los mensajes al navegar entre módulos.\n"
-            "2. Selector interactivo de días (< LUNES >) con flechas y acceso rápido a toda la semana.\n"
-            "3. Visualización destacada de Días de Descanso con mensajes y 4 consejos clave (hidratación, nutrición criolla, sueño y recuperación activa).\n"
-            "4. Meta mensual editable en 1 toque en Inicio, Registro, Onboarding y Coach IA, sin asumir hipertrofia por defecto.\n"
-            "5. Eliminación de ejercicios repetidos y correcta combinación de zonas musculares sin duplicaciones."
+            "Actualización oficial de AI Fitness Coach v1.0.64:\n"
+            "1. Cronogramas completos y variados de Lunes a Viernes (sin restricciones de esperar a la siguiente semana ni falsos descansos en días de semana).\n"
+            "2. Soporte preciso al 100% para modalidades: Diario, Semanal (Lun - Vie) y Mensual (4 Semanas).\n"
+            "3. Fines de semana (Sábado y Domingo) dedicados a regeneración y descanso activo con tarjetas de consejos.\n"
+            "4. Coach IA interactivo con botones rápidos para seleccionar la modalidad de cronograma deseada.\n"
+            "5. Persistencia blindada de la conversación en RAM y local, sin pérdidas al cambiar de módulo."
         ),
         "download_url": "/api/app/download",
     }
@@ -64,7 +64,7 @@ def download_apk():
         return FileResponse(
             path=str(apk),
             media_type="application/vnd.android.package-archive",
-            filename="AI_Fitness_Coach_v1.0.63.apk",
+            filename="AI_Fitness_Coach_v1.0.64.apk",
         )
-    return RedirectResponse(url="https://github.com/miope-hub/AI_FITNESS_COACH_PROYECTO_COMPLETO/releases/download/v1.0.63/app-release.apk", status_code=302)
+    return RedirectResponse(url="https://github.com/miope-hub/AI_FITNESS_COACH_PROYECTO_COMPLETO/releases/download/v1.0.64/app-release.apk", status_code=302)
 
