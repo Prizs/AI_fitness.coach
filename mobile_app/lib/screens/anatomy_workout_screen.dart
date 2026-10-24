@@ -57,7 +57,7 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
       case 1:
         return 'Atlas Anatómico de Músculos';
       case 2:
-        return 'Modelo 3D Muscular (360° Marcadores)';
+        return 'Modelo 3D Muscular (Giro 360°)';
       default:
         return 'Guía de Ejecución y Técnica';
     }
@@ -114,7 +114,7 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
                   _buildModeChip(
                     mode: 2,
                     icon: Icons.threed_rotation_rounded,
-                    label: 'Modelo 3D (Marcadores)',
+                    label: 'Modelo 3D (360°)',
                     color: const Color(0xFF8BE0C0),
                   ),
                 ],
@@ -300,18 +300,13 @@ class _Muscular3DViewer extends StatefulWidget {
   State<_Muscular3DViewer> createState() => _Muscular3DViewerState();
 }
 
-class _Muscular3DViewerState extends State<_Muscular3DViewer> with SingleTickerProviderStateMixin {
-  late AnimationController _beaconAnim;
+class _Muscular3DViewerState extends State<_Muscular3DViewer> {
   String _currentOrbit = '0deg 75deg 105%';
   bool _isPosteriorTarget = false;
 
   @override
   void initState() {
     super.initState();
-    _beaconAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
     _resolveTargetOrientation();
   }
 
@@ -321,12 +316,6 @@ class _Muscular3DViewerState extends State<_Muscular3DViewer> with SingleTickerP
     if (oldWidget.exercise.id != widget.exercise.id) {
       _resolveTargetOrientation();
     }
-  }
-
-  @override
-  void dispose() {
-    _beaconAnim.dispose();
-    super.dispose();
   }
 
   void _resolveTargetOrientation() {
@@ -351,38 +340,8 @@ class _Muscular3DViewerState extends State<_Muscular3DViewer> with SingleTickerP
     _currentOrbit = _isPosteriorTarget ? '180deg 75deg 105%' : '0deg 75deg 105%';
   }
 
-  Alignment _getMuscleAlignment() {
-    final m = '${widget.exercise.agonist} ${widget.exercise.name}'.toLowerCase();
-    if (m.contains('pecho') || m.contains('pectoral') || m.contains('apertura')) {
-      return const Alignment(0.0, -0.32);
-    }
-    if (m.contains('dorsal') || m.contains('espalda') || m.contains('remo') || m.contains('jalon')) {
-      return const Alignment(0.0, -0.28);
-    }
-    if (m.contains('hombro') || m.contains('deltoid') || m.contains('militar') || m.contains('lateral')) {
-      return const Alignment(-0.38, -0.42);
-    }
-    if (m.contains('bicep') || m.contains('bícep') || m.contains('curl')) {
-      return const Alignment(-0.48, -0.15);
-    }
-    if (m.contains('tricep') || m.contains('trícep') || m.contains('fondo')) {
-      return const Alignment(-0.48, -0.18);
-    }
-    if (m.contains('core') || m.contains('abdom') || m.contains('twist')) {
-      return const Alignment(0.0, 0.0);
-    }
-    if (m.contains('isquio') || m.contains('femoral') || m.contains('glute')) {
-      return const Alignment(0.0, 0.28);
-    }
-    if (m.contains('sentadilla') || m.contains('cuadric') || m.contains('prensa')) {
-      return const Alignment(-0.20, 0.40);
-    }
-    return const Alignment(0.0, -0.20);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final beaconAlign = _getMuscleAlignment();
     final agonist = widget.exercise.agonist;
     final synergists = widget.exercise.synergists.isNotEmpty ? widget.exercise.synergists.join(', ') : 'Estabilizadores';
 
@@ -402,86 +361,6 @@ class _Muscular3DViewerState extends State<_Muscular3DViewer> with SingleTickerP
             cameraOrbit: _currentOrbit,
             backgroundColor: const Color(0xFF070C16),
             shadowIntensity: 1.0,
-          ),
-
-          // Baliza Holográfica de Activación Muscular (Crosshair / Target Beacon)
-          AnimatedBuilder(
-            animation: _beaconAnim,
-            builder: (context, child) {
-              final pulse = _beaconAnim.value;
-              return Align(
-                alignment: beaconAlign,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Tag flotante del músculo activo
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xEE1A0808),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFF3B30), width: 1.4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFFF3B30).withOpacity(0.4),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.my_location_rounded, size: 12, color: Color(0xFFFF5252)),
-                          const SizedBox(width: 4),
-                          Text(
-                            '🔥 AGONISTA: $agonist (100%)',
-                            style: const TextStyle(
-                              color: Color(0xFFFF8585),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Diana pulsante
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 22 + (pulse * 12),
-                          height: 22 + (pulse * 12),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFFFF3B30).withOpacity(1.0 - pulse),
-                              width: 1.8,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFFFF3B30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFFFF3B30),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
 
           // Selector de ángulo de cámara rápido en la parte superior

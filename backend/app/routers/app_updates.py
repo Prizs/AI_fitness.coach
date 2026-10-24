@@ -20,8 +20,8 @@ def _read_pubspec_version() -> tuple[str, int]:
                 if "+" in raw_ver:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
-                return raw_ver, 105
-    return "1.0.65", 105
+                return raw_ver, 106
+    return "1.0.66", 106
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -41,17 +41,16 @@ def latest_version() -> dict:
     size = apk.stat().st_size if apk else 64077417
     return {
         "available": True,
-        "version_name": "1.0.65",
-        "version_code": 105,
+        "version_name": "1.0.66",
+        "version_code": 106,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.65:\n"
-            "1. Personalización total según el deseo exacto del usuario: especialización de solo piernas toda la semana o cualquier grupo muscular específico.\n"
-            "2. Rutinas combinadas multi-zona personalizadas (Piernas + Tren Superior, Piernas + Core, Torso + Core) en cada sesión.\n"
-            "3. Detección inteligente de días solicitados (ej: lunes, miércoles y viernes) manteniendo descanso en los demás días.\n"
-            "4. Variación profunda por sub-vectores musculares sin repeticiones de ejercicios.\n"
-            "5. Máxima precisión fisiológica y descanso en fin de semana."
+            "Actualización oficial de AI Fitness Coach v1.0.66:\n"
+            "1. Eliminación definitiva del marcador/punto descalibrado en el Modelo 3D muscular.\n"
+            "2. Visualización 3D anatómica limpia, fluida y con giro 360° sin elementos flotantes desfasados.\n"
+            "3. Controles de cámara optimizados (Frente, Espalda y Perfil) con telemetría en HUD inferior.\n"
+            "4. Cronogramas adaptativos de máxima precisión (Semanal, Diario y Mensual)."
         ),
         "download_url": "/api/app/download",
     }
@@ -64,7 +63,7 @@ def download_apk():
         return FileResponse(
             path=str(apk),
             media_type="application/vnd.android.package-archive",
-            filename="AI_Fitness_Coach_v1.0.65.apk",
+            filename="AI_Fitness_Coach_v1.0.66.apk",
         )
-    return RedirectResponse(url="https://github.com/miope-hub/AI_FITNESS_COACH_PROYECTO_COMPLETO/releases/download/v1.0.65/app-release.apk", status_code=302)
+    return RedirectResponse(url="https://github.com/miope-hub/AI_FITNESS_COACH_PROYECTO_COMPLETO/releases/download/v1.0.66/app-release.apk", status_code=302)
 
