@@ -30,31 +30,22 @@ class _CoachScreenState extends State<CoachScreen> {
   ];
 
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
   String _userLevel = 'Principiante';
   String _userIntensity = 'Baja';
   bool _isListening = false;
-  bool _showPreviousConversations = false;
-  int? _initialSessionStartIndex;
 
-  int _computeLastConversationStartIndex() {
-    if (_messages.length <= 2) return 0;
-    int lastAiIdx = -1;
-    for (int i = _messages.length - 1; i >= 0; i--) {
-      if (_messages[i]['isUser'] != true) {
-        lastAiIdx = i;
-        break;
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
-    }
-    if (lastAiIdx != -1) {
-      for (int i = lastAiIdx - 1; i >= 0; i--) {
-        if (_messages[i]['isUser'] == true) {
-          return i;
-        }
-      }
-      return lastAiIdx;
-    }
-    return (_messages.length - 2).clamp(0, _messages.length - 1);
+    });
   }
   
   @override
@@ -97,8 +88,8 @@ class _CoachScreenState extends State<CoachScreen> {
                   _messages.add(Map<String, dynamic>.from(item));
                 }
               }
-              _initialSessionStartIndex = _computeLastConversationStartIndex();
             });
+            _scrollToBottom();
           }
         }
       }
@@ -135,9 +126,9 @@ class _CoachScreenState extends State<CoachScreen> {
             setState(() {
               _messages.clear();
               _messages.addAll(restored);
-              _initialSessionStartIndex = _computeLastConversationStartIndex();
             });
             await storage.write(key: localKey, value: jsonEncode(_messages));
+            _scrollToBottom();
           }
         }
       }
@@ -233,6 +224,7 @@ class _CoachScreenState extends State<CoachScreen> {
             });
           });
           _saveHistoryLocally();
+          _scrollToBottom();
         }
       }
     } catch (_) {
@@ -244,10 +236,10 @@ class _CoachScreenState extends State<CoachScreen> {
           final placeStr = todayIsHome ? 'en casa 🏠' : 'en el gimnasio 🏋️';
           fallbackText = '¡Hola, $userName! 👋 Para hoy $todayDayName tenemos programado: "${todayTitle ?? 'Entrenamiento'}"$exStr $placeStr.\n\n¿Cómo te sientes hoy para entrenar? Cuéntame si tienes alguna molestia física o si necesitas adaptar los ejercicios según tu estado actual y el lugar donde vas a entrenar.';
           fallbackQuickReplies = [
-            '📋 Completar mi estado de salud',
+            '🤖 Plan Semanal Recomendado por IA',
             '🏋️ Ver ejercicios de hoy',
+            '📋 Completar mi estado de salud',
             '🏠 ¿Dónde vas a entrenar? (Gimnasio o Casa)',
-            '💪 ¡Me siento al 100%, listo para entrenar!',
           ];
         } else if (todayIsCompleted) {
           fallbackText = '¡Hola, $userName! 🎉 ¡Excelente trabajo completando tu sesión de hoy $todayDayName! Recuerda hidratarte bien y permitir que tus fibras musculares descansen entre 48 y 72 horas para una supercompensación óptima. ¿Cómo terminaste?';
@@ -259,13 +251,15 @@ class _CoachScreenState extends State<CoachScreen> {
         } else if (!hasActivePlan) {
           fallbackText = '¡Hola, $userName! 👋 ¡Bienvenido nuevamente a tu centro de entrenamiento inteligente! No tienes un ciclo activo programado para esta semana. ¿Cómo estuvo tu jornada anterior? Vamos a planificar tus sesiones.';
           fallbackQuickReplies = [
-            '🚀 Planificar mi semana de entrenamiento',
+            '🤖 Plan Semanal Recomendado por IA',
+            '🏋️ Rutina de Piernas y Glúteos',
+            '💪 Rutina de Tren Superior',
             '📋 Completar mi estado actual',
-            '💡 ¿Qué rutina me recomiendas hoy?',
           ];
         } else {
           fallbackText = '¡Hola, $userName! 👋 Hoy $todayDayName es tu día de recuperación activa. El descanso neuromuscular es fundamental para consolidar el progreso y prevenir sobrecargas. ¿Cómo te sientes?';
           fallbackQuickReplies = [
+            '🤖 Plan Semanal Recomendado por IA',
             'Me siento recuperado y con energía',
             'Siento algo de tensión muscular',
             '📋 Completar mi estado actual',
@@ -282,10 +276,12 @@ class _CoachScreenState extends State<CoachScreen> {
             'quick_replies': fallbackQuickReplies,
           });
         });
+        _scrollToBottom();
       }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+        _scrollToBottom();
       }
     }
   }
@@ -363,6 +359,7 @@ class _CoachScreenState extends State<CoachScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     WeeklyPlanService.instance.removeListener(_onWeeklyPlanUpdated);
     _controller.dispose();
     super.dispose();
@@ -636,6 +633,7 @@ class _CoachScreenState extends State<CoachScreen> {
     });
     _controller.clear();
     _saveHistoryLocally();
+    _scrollToBottom();
 
     final history = _messages
         .where((m) => (m['text'] as String?)?.isNotEmpty ?? false)
@@ -796,22 +794,16 @@ class _CoachScreenState extends State<CoachScreen> {
       });
     } finally {
       setState(() => _isLoading = false);
+      _scrollToBottom();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final int hiddenCount = _initialSessionStartIndex ?? _computeLastConversationStartIndex();
-    final bool hasPrevious = hiddenCount > 0;
-    final int startIndex = _showPreviousConversations ? 0 : hiddenCount;
-    final List<Map<String, dynamic>> visibleMessages =
-        startIndex < _messages.length ? _messages.sublist(startIndex) : _messages;
-    final int totalCount = hasPrevious ? (visibleMessages.length + 1) : visibleMessages.length;
-
     return Scaffold(
       backgroundColor: const Color(0xFF0A0F1D),
       appBar: AppBar(
-        title: const Text('Coach IA & Adaptación', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Coach IA', style: TextStyle(fontWeight: FontWeight.w800)),
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
         actions: [
@@ -997,53 +989,15 @@ class _CoachScreenState extends State<CoachScreen> {
             // Lista de Mensajes y Tarjetas
             Expanded(
               child: ListView.builder(
+                controller: _scrollController,
                 padding: const EdgeInsets.all(16),
-                itemCount: totalCount,
+                itemCount: _messages.length,
                 itemBuilder: (context, index) {
-                  if (hasPrevious && index == 0) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 12),
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: const Color(0xFF142032),
-                            foregroundColor: const Color(0xFF8BE0C0),
-                            side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          ),
-                          icon: Icon(
-                            _showPreviousConversations
-                                ? Icons.unfold_less_rounded
-                                : Icons.history_rounded,
-                            size: 18,
-                            color: const Color(0xFF8BE0C0),
-                          ),
-                          label: Text(
-                            _showPreviousConversations
-                                ? 'Ocultar conversaciones anteriores'
-                                : 'Mostrar conversaciones anteriores',
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF8BE0C0),
-                            ),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _showPreviousConversations = !_showPreviousConversations;
-                            });
-                          },
-                        ),
-                      ),
-                    );
-                  }
-
-                  final msgIndex = hasPrevious ? (index - 1) : index;
-                  final msg = visibleMessages[msgIndex];
+                  final msg = _messages[index];
                   final isUser = msg['isUser'] as bool;
                   final text = msg['text'] as String;
                   final plan = msg['plan'] as Map<String, dynamic>?;
+                  final bool isLatestAiMessage = !isUser && index == _messages.length - 1;
 
                   return Column(
                     crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -1059,7 +1013,7 @@ class _CoachScreenState extends State<CoachScreen> {
                         ),
                         child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
                       ),
-                      if (msg['quick_replies'] is List && (msg['quick_replies'] as List).isNotEmpty) ...[
+                      if (isLatestAiMessage && msg['quick_replies'] is List && (msg['quick_replies'] as List).isNotEmpty) ...[
                         Padding(
                           padding: const EdgeInsets.only(top: 4, bottom: 8),
                           child: Wrap(
@@ -1125,8 +1079,8 @@ class _CoachScreenState extends State<CoachScreen> {
                           ),
                         ),
                       ],
-                      if (msg['suggest_questionnaire'] == true ||
-                          (msg['isWelcome'] == true && _messages.length == 1)) ...[
+                      if (isLatestAiMessage && (msg['suggest_questionnaire'] == true ||
+                          (msg['isWelcome'] == true && _messages.length == 1))) ...[
                         Padding(
                           padding: const EdgeInsets.only(top: 4, bottom: 8),
                           child: ElevatedButton.icon(
@@ -1532,7 +1486,6 @@ class _CoachScreenState extends State<CoachScreen> {
                 backgroundColor: Color(0xFF0F192B),
                 valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8BE0C0)),
               ),
-            _buildQuickRepliesBar(),
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
               decoration: const BoxDecoration(
@@ -1659,118 +1612,6 @@ class _CoachScreenState extends State<CoachScreen> {
       initialExerciseId: initialId,
       dynamicExercises: dyn.isNotEmpty ? dyn : null,
     )));
-  }
-
-  List<String>? _getActiveQuickReplies() {
-    if (_isLoading) return null;
-    List<String> list = [];
-    for (int i = _messages.length - 1; i >= 0; i--) {
-      final m = _messages[i];
-      if (m['isUser'] == false && m['quick_replies'] is List && (m['quick_replies'] as List).isNotEmpty) {
-        list = List<String>.from(m['quick_replies']);
-        break;
-      }
-    }
-    if (list.isEmpty) {
-      list = [
-        '📋 Completar mi estado de salud',
-        '🏋️ Ver ejercicios de hoy',
-        '♿ Test Torso Adaptado (Discapacidad)',
-        '💪 ¡Me siento al 100%, listo para entrenar!',
-      ];
-    }
-    if (!list.any((e) => e.contains('♿') || e.toLowerCase().contains('adaptad'))) {
-      list.add('♿ Test Torso Adaptado (Discapacidad)');
-    }
-    return list;
-  }
-
-  Widget _buildQuickRepliesBar() {
-    final replies = _getActiveQuickReplies();
-    if (replies == null || replies.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F192B),
-        border: Border(top: BorderSide(color: Colors.white10)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: replies.map((qrText) {
-            final lower = qrText.toLowerCase();
-            final isAdaptive = lower.contains('adaptad') || lower.contains('discapacidad') || lower.contains('♿');
-            final isStateBtn = lower.contains('completar') || lower.contains('estado actual') || lower.contains('estado de salud');
-            final isWhereTrain = lower.contains('dónde vas a entrenar') || lower.contains('donde vas a entrenar') || lower.contains('gimnasio o casa');
-            final isViewEx = lower.contains('ver ejercicios');
-            final isReady = lower.contains('100%') || lower.contains('listo para entrenar');
-            final isFatigue = lower.contains('cansado') || lower.contains('bajemos') || lower.contains('descarga');
-            final isNextLvl = lower.contains('siguiente nivel') || lower.contains('alta');
-
-            final Color color = isAdaptive
-                ? const Color(0xFF8BE0C0)
-                : (isStateBtn
-                    ? const Color(0xFF8BE0C0)
-                    : (isWhereTrain
-                        ? const Color(0xFF64B5F6)
-                        : (isViewEx
-                            ? const Color(0xFF8BE0C0)
-                            : (isReady
-                                ? const Color(0xFF81C784)
-                                : (isFatigue
-                                    ? const Color(0xFFFFB340)
-                                    : (isNextLvl
-                                        ? const Color(0xFFFF6B6B)
-                                        : const Color(0xFF8BE0C0)))))));
-
-            final IconData icon = isAdaptive
-                ? Icons.accessible_forward_rounded
-                : (isStateBtn
-                    ? Icons.assignment_turned_in_rounded
-                    : (isWhereTrain
-                        ? Icons.home_work_rounded
-                        : (isViewEx
-                            ? Icons.fitness_center_rounded
-                            : (isReady
-                                ? Icons.bolt_rounded
-                                : (isFatigue
-                                    ? Icons.battery_charging_full_rounded
-                                    : (isNextLvl
-                                        ? Icons.trending_up_rounded
-                                        : Icons.flash_on_rounded))))));
-
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ActionChip(
-                backgroundColor: const Color(0xFF16253B),
-                side: BorderSide(color: color.withValues(alpha: 0.8), width: 1.1),
-                avatar: Icon(icon, size: 15, color: color),
-                label: Text(
-                  qrText,
-                  style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w600),
-                ),
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        if (isAdaptive) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AdaptiveWorkoutScreen()),
-                          );
-                        } else if (isStateBtn || isWhereTrain) {
-                          _openStateSheet();
-                        } else {
-                          _sendMessage(qrText);
-                        }
-                      },
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
   }
 }
 

@@ -7,8 +7,21 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 router = APIRouter()
 
-GITHUB_RELEASE_APK_URL = "https://github.com/Prizs/AI_fitness.coach/releases/download/v1.0.61/app-release.apk"
-GITHUB_LATEST_RELEASE_URL = "https://github.com/Prizs/AI_fitness.coach/releases/latest"
+APK_PATH = Path(__file__).resolve().parents[3] / "releases" / "app-release.apk"
+
+def _read_pubspec_version() -> tuple[str, int]:
+    pubspec_path = Path(__file__).resolve().parents[3] / "mobile_app" / "pubspec.yaml"
+    if not pubspec_path.exists():
+        pubspec_path = Path("mobile_app/pubspec.yaml").resolve()
+    if pubspec_path.exists():
+        for line in pubspec_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("version:"):
+                raw_ver = line.split(":", 1)[1].strip()
+                if "+" in raw_ver:
+                    name, code = raw_ver.split("+", 1)
+                    return name.strip(), int(code.strip())
+                return raw_ver, 102
+    return "1.0.62", 102
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -28,17 +41,17 @@ def latest_version() -> dict:
     size = apk.stat().st_size if apk else 63995129
     return {
         "available": True,
-        "version_name": "1.0.61",
-        "version_code": 101,
+        "version_name": "1.0.62",
+        "version_code": 102,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.61:\n"
-            "1. Nuevo selector de Sexo Biológico (Masculino / Femenino) en registro y perfil.\n"
-            "2. Calibración metabólica precisa (TMB / Harris-Benedict) y adaptación del Coach IA.\n"
-            "3. Test Biopsicosocial & Adherencia estilo FitCraft obligatorio al registrarse.\n"
-            "4. Registro 100% fluido con auto-login, prevención de duplicados y timeout extendido.\n"
-            "5. Los 3 Modos Definitivos (Técnica Real, Atlas Muscular 2D y Biomecánica 3D)."
+            "Actualización oficial de AI Fitness Coach v1.0.62:\n"
+            "1. Historial de Chat móvil fluido: scroll continuo tipo mensajería, sin ocultar mensajes anteriores.\n"
+            "2. Botones rápidos de recomendación proactiva: 'Plan Semanal Recomendado por IA', Piernas, Tren Superior, Cardio & Core.\n"
+            "3. Opciones inmediatas para combinar entrenamientos ('Combinar con Core / Abdomen', 'Tren Superior', 'Cardio Suave').\n"
+            "4. Eliminada la duplicación visual de botones inferiores para máxima visibilidad con teclado abierto.\n"
+            "5. Plan de recomendación semanal instantáneo con sincronización al cronograma."
         ),
         "download_url": "/api/app/download",
     }
@@ -51,7 +64,7 @@ def download_apk():
         return FileResponse(
             path=str(apk),
             media_type="application/vnd.android.package-archive",
-            filename="AI_Fitness_Coach_v1.0.61.apk",
+            filename="AI_Fitness_Coach_v1.0.62.apk",
         )
     return RedirectResponse(url=GITHUB_RELEASE_APK_URL, status_code=302)
 

@@ -132,10 +132,17 @@ def _detect_fatigue_and_intensity_calibration(message: str, current_intensity: s
 def _detect_requested_focus(payload: ChatMessage) -> str | None:
     """Detecta qué zona pidió el usuario dando prioridad al mensaje actual sobre el historial."""
     def _match_focus(txt: str) -> str | None:
+        # Detección de Plan Semanal Recomendado por IA
+        if any(w in txt for w in ("plan semanal", "plan de recomendacion", "plan de recomendación", "plan recomendado", "recomiendame un plan", "recomiéndame un plan", "recomienda tu", "recomiéndame tú", "semana completa", "haz mi plan", "hazme el plan", "arma mi semana")):
+            return "plan_semanal_ia"
+        if any(w in txt for w in ("piernas + tren superior", "piernas y tren superior", "piernas con tren superior")):
+            return "piernas_tren_superior"
+        if any(w in txt for w in ("piernas + core", "piernas y core", "piernas + abdomen", "piernas y abdomen")):
+            return "piernas_core"
         # Si el usuario está eligiendo el complemento para días intermedios, priorizar el complemento elegido
-        if any(w in txt for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda")):
+        if any(w in txt for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda")):
             return "tren_superior"
-        if any(w in txt for w in ("movilidad", "cardio suave", "bajo impacto", "estiramiento")):
+        if any(w in txt for w in ("movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa")):
             return "movilidad_cardio"
         if any(w in txt for w in ("abdomen", "abdominal", "core", "estabilidad lumbar")):
             return "core"
@@ -143,7 +150,7 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
             return "pecho"
         if any(w in txt for w in ("espalda", "dorsal", "traccion", "tracción")):
             return "espalda"
-        if any(w in txt for w in ("brazo", "brazos", "biceps", "bíceps", "triceps", "tríceps", "hombro")):
+        if any(w in txt for w in ("brazo", "brazos", "biceps", "bíceps", "triceps", "tríceps", "hombro", "hombros")):
             return "brazos_hombros"
         if any(w in txt for w in ("pierna", "piernas", "tren inferior", "gluteo", "glúteo", "cuadriceps", "cuádriceps", "isquio", "femoral")):
             return "piernas"
@@ -240,7 +247,12 @@ def _is_explicit_routine_request(message: str) -> bool:
         "rutina de core", "rutina de tren superior", "rutina complementaria", "rutina de hoy",
         "ver rutina con intensidad ajustada", "ver rutina de alta intensidad", "ver mi rutina para hoy",
         "armar rutina", "armar mi plan", "hacer rutina", "generar mi plan", "planificar la rutina",
-        "puedes armarme la rutina", "diseña mi rutina", "diseñame una rutina"
+        "puedes armarme la rutina", "diseña mi rutina", "diseñame una rutina",
+        "plan semanal recomendado", "plan recomendado por ia", "plan recomendado", "plan semanal",
+        "plan de recomendación", "plan de recomendacion", "recomiéndame un plan", "recomiendame un plan",
+        "recomienda un plan", "haz mi plan", "hazme el plan", "arma mi semana", "recomiéndame tú", "recomiendame tu",
+        "piernas & glúteos", "pierna y glúteo", "pecho, espalda", "cardio & core", "cardio hiit",
+        "combinar con", "combinar piernas", "planificar mi semana"
     )
     return any(p in msg for p in explicit_phrases)
 
@@ -1529,10 +1541,14 @@ Devuelve SOLO JSON."""
         )
     else:
         focus_instruction = {
+            "plan_semanal_ia": "PLAN COMPLETO SEMANAL RECOMENDADO POR IA: Estructura una distribución semanal periodizada con descansos de 48-72h. Diseña la rutina de hoy como sesión principal de arranque y detalla los días complementarios de la semana.",
+            "piernas_tren_superior": "RUTINA COMBINADA FULL-BODY (PIERNAS + TREN SUPERIOR): Combina ejercicios multiarticulares de piernas y tren superior para un estímulo global armónico.",
+            "piernas_core": "RUTINA COMBINADA (PIERNAS + CORE / ABDOMEN): Combina trabajo de piernas y glúteos con estabilización lumbo-abdominal (Plancha, Dead Bug).",
             "piernas": "PIERNAS Y GLÚTEOS (Cuádriceps, Isquiotibiales, Glúteos y Gemelos). PROHIBIDO incluir ejercicios de pecho, espalda, abdomen o brazos.",
-            "tren_superior": "TREN SUPERIOR COMPLEMENTARIO PARA MARTES Y JUEVES (Espalda, Pecho, Hombros y Brazos). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas, Elevación de Talones o cualquier ejercicio de piernas!",
-            "core": "CORE, ABDOMEN Y ESTABILIDAD LUMBAR PARA MARTES Y JUEVES (Dead Bug, Plancha, Crunch, Control Postural). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas o cualquier ejercicio de piernas!",
-            "movilidad_cardio": "MOVILIDAD ARTICULAR, ESTABILIDAD Y CARDIO SUAVE DE BAJO IMPACTO PARA MARTES Y JUEVES (Bicicleta/Marcha Zona 2, Movilidad Torácica/Escapular, Dead Bug respiratorio, Plancha suave). ¡ESTÁ ESTRICTAMENTE PROHIBIDO repetir Sentadillas, Puente de Glúteos, Zancadas o Elevación de Talones!",
+            "tren_superior": "TREN SUPERIOR (Espalda, Pecho, Hombros y Brazos). ¡ESTÁ ESTRICTAMENTE PROHIBIDO incluir Sentadillas, Puente de Glúteos, Zancadas, Elevación de Talones o cualquier ejercicio de piernas!",
+            "brazos_hombros": "BRAZOS Y HOMBROS (Bíceps, Tríceps, Deltoides).",
+            "core": "CORE, ABDOMEN Y ESTABILIDAD LUMBAR (Dead Bug, Plancha, Crunch, Control Postural).",
+            "movilidad_cardio": "MOVILIDAD ARTICULAR, ESTABILIDAD Y CARDIO DE BAJO IMPACTO / HIIT MODERADO.",
         }.get(requested_focus or "", "el grupo muscular solicitado por el usuario en su último mensaje.")
 
     motor_instruction = ""
@@ -1597,31 +1613,38 @@ REGLAS OBLIGATORIAS:
    - Explica con claridad y sustento científico práctico.
    - Si expresa alguna molestia física o lesión, dale recomendaciones de cuidado postural, descanso y prevención.
    - Si consulta de alimentación, recuerda las pautas accesibles de Venezuela (huevos, pollo, carne molida magra, atún, queso blanco llanero, arepa de maíz, arroz blanco, avena, batata, yuca, plátano, cambur criollo. Cero ingredientes importados inaccesibles).
-2. ESTRICTAMENTE PROHIBIDO GENERAR UNA RUTINA O LISTA DE EJERCICIOS EN ESTE TURNO:
-   - El usuario NO ha solicitado explícitamente armar o ver su rutina hoy. No le tires un plan de entrenamiento de golpe.
-   - Resuelve sus dudas, conversa con él y dile amablemente que cuando desee entrenar o planificar su sesión, con mucho gusto la estructurarán.
+2. RECOMENDACIÓN PROACTIVA DE ENTRENAMIENTO SI NO HA DECIDIDO:
+   - Si el usuario aún no ha dicho qué quiere entrenar hoy o responde algo vago (ej: "hola", "??", "no sé", "qué hago", "qué entreno"), NO te limites a hacer preguntas abiertas o dejarlo en el aire.
+   - En tu mensaje, explícale de forma motivadora y concisa qué opciones de entrenamiento tiene recomendadas para hoy (ej: Piernas/Glúteos, Tren Superior o Cardio/Core), o que si no tiene algo decidido, tú como Coach IA puedes armarle el **Plan Semanal Completo** directamente.
    - Pon obligatoriamente: "has_plan": false, "structured_plan": null.
-3. BOTONES DE RESPUESTA RÁPIDA (QUICK REPLIES):
-   - Proporciona entre 3 y 4 botones interactivos útiles acordes al tema para que el usuario continúe la interacción con un toque:
+3. BOTONES DE RESPUESTA RÁPIDA (QUICK REPLIES ACCIONABLES):
+   - Proporciona botones de acción directa con entrenamientos y recomendación por IA para que con 1 solo toque arranque:
      [
-       "💪 Planificar mi sesión de hoy",
-       "📋 Completar mi estado actual",
-       "🥗 Consultar pautas de nutrición",
-       "💬 Tengo otra duda"
+       "🤖 Plan Semanal Recomendado por IA",
+       "🏋️ Rutina de Piernas y Glúteos",
+       "💪 Rutina de Tren Superior",
+       "🔥 Rutina Cardio HIIT & Core"
+     ]
+   - Si el usuario preguntó por un músculo específico (ej: Piernas), ofrece opciones de combinación:
+     [
+       "🏋️ Rutina de Piernas y Glúteos",
+       "🤝 Combinar Piernas + Core / Abdomen",
+       "🤝 Combinar Piernas + Tren Superior",
+       "🤖 Plan Semanal Recomendado por IA"
      ]
 
 Retorna EXCLUSIVAMENTE este JSON:
 {{
-  "reply": "Tu respuesta conversacional cálida, profesional y empática.",
+  "reply": "Tu respuesta conversacional cálida, motivadora y proactiva recomendando opciones de entrenamiento claras.",
   "category": "Asesoría y Diálogo de Coach",
   "suggest_questionnaire": false,
   "has_plan": false,
   "structured_plan": null,
   "quick_replies": [
-    "💪 Planificar mi sesión de hoy",
-    "📋 Completar mi estado actual",
-    "🥗 Consultar pautas de nutrición",
-    "💬 Tengo otra duda"
+    "🤖 Plan Semanal Recomendado por IA",
+    "🏋️ Rutina de Piernas y Glúteos",
+    "💪 Rutina de Tren Superior",
+    "🔥 Rutina Cardio HIIT & Core"
   ]
 }}
 Devuelve SOLO JSON."""
@@ -1630,10 +1653,10 @@ Devuelve SOLO JSON."""
         reply_str = None
         category = "Asesoría y Diálogo de Coach"
         quick_replies = [
-            "💪 Planificar mi sesión de hoy",
-            "📋 Completar mi estado actual",
-            "🥗 Consultar pautas de nutrición",
-            "💬 Tengo otra duda",
+            "🤖 Plan Semanal Recomendado por IA",
+            "🏋️ Rutina de Piernas y Glúteos",
+            "💪 Rutina de Tren Superior",
+            "🔥 Rutina Cardio HIIT & Core",
         ]
         if fatigue_detected:
             quick_replies = [
@@ -1919,8 +1942,18 @@ Devuelve SOLO JSON."""
     else:
         suggest_q = bool(data.get("suggest_questionnaire")) or force_suggest
 
-    quick_replies = None
-    if fatigue_detected:
+    llm_quick_replies = data.get("quick_replies")
+    if not isinstance(llm_quick_replies, list):
+        llm_quick_replies = None
+
+    if has_plan:
+        quick_replies = [
+            "🤝 Combinar con Core / Abdomen",
+            "🤝 Combinar con Tren Superior",
+            "🤝 Combinar con Cardio Suave",
+            "📅 Añadir al Cronograma",
+        ]
+    elif fatigue_detected:
         quick_replies = [
             "Ver rutina con intensidad ajustada",
             "Consultar rutina de movilidad/descarga",
@@ -1928,20 +1961,32 @@ Devuelve SOLO JSON."""
         ]
     elif calibrated_intensity == "Alta":
         quick_replies = [
+            "🤖 Plan Semanal Recomendado por IA",
+            "💪 Rutina de Tren Superior",
+            "🏋️ Rutina de Piernas y Glúteos",
             "Ver rutina de alta intensidad",
-            "Completar mi estado actual",
-            "Consultar plan nutricional",
         ]
     elif any(k in user_msg_lower for k in ("fue genial", "repetir intensidad", "misma intensidad")):
         quick_replies = [
-            "Ver mi rutina para hoy",
-            "Completar mi estado actual",
-            "Consultar plan nutricional",
+            "🤖 Plan Semanal Recomendado por IA",
+            "🏋️ Rutina de Piernas y Glúteos",
+            "💪 Rutina de Tren Superior",
         ]
     elif suggest_q:
         quick_replies = [
             "Completar mi estado actual",
-            "Solicitar rutina de hoy",
+            "🤖 Plan Semanal Recomendado por IA",
+            "🏋️ Rutina de Piernas y Glúteos",
+            "💪 Rutina de Tren Superior",
+        ]
+    elif llm_quick_replies and len(llm_quick_replies) > 0:
+        quick_replies = [str(x) for x in llm_quick_replies if isinstance(x, (str, int))]
+    else:
+        quick_replies = [
+            "🤖 Plan Semanal Recomendado por IA",
+            "🏋️ Rutina de Piernas y Glúteos",
+            "💪 Rutina de Tren Superior",
+            "🔥 Rutina Cardio HIIT & Core",
         ]
 
     return {
