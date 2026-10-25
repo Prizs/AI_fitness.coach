@@ -21,7 +21,7 @@ def _read_pubspec_version() -> tuple[str, int]:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
                 return raw_ver, 106
-    return "1.0.67", 107
+    return "1.0.68", 108
 
 def _find_apk_file() -> Path | None:
     candidates = [

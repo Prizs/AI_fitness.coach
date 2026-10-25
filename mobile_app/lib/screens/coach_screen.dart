@@ -1491,7 +1491,7 @@ class _CoachScreenState extends State<CoachScreen> {
                                         final String exName = (ex['name'] ?? 'Ejercicio').toString();
                                         return InkWell(
                                           borderRadius: BorderRadius.circular(10),
-                                          onTap: () => _open3DViewer(plan, targetExerciseName: exName),
+                                          onTap: () => _open3DViewer(plan, targetExerciseName: exName, activeExercises: dayExercises),
                                           child: Container(
                                             margin: const EdgeInsets.only(bottom: 6),
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1510,7 +1510,7 @@ class _CoachScreenState extends State<CoachScreen> {
                                                       constraints: const BoxConstraints(),
                                                       icon: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 22),
                                                       tooltip: 'Ver en 3D',
-                                                      onPressed: () => _open3DViewer(plan, targetExerciseName: exName),
+                                                      onPressed: () => _open3DViewer(plan, targetExerciseName: exName, activeExercises: dayExercises),
                                                     ),
                                                     const SizedBox(width: 8),
                                                     Expanded(
@@ -1903,10 +1903,24 @@ class _CoachScreenState extends State<CoachScreen> {
     );
   }
 
-  Future<void> _open3DViewer(Map<String, dynamic> plan, {String? targetExerciseName}) async {
+  Future<void> _open3DViewer(
+    Map<String, dynamic> plan, {
+    String? targetExerciseName,
+    List? activeExercises,
+  }) async {
     List<AnatomyExercise> dyn = [];
-    if (plan['exercises'] != null) {
-      for (var ex in plan['exercises']) {
+    final String activeDay = (plan['_selected_day'] as String?) ?? 'Lunes';
+    final Map? daysSched = plan['days_schedule'] as Map?;
+    final Map? dayInfo = daysSched != null ? (daysSched[activeDay] as Map?) : null;
+
+    final List rawList = (activeExercises != null && activeExercises.isNotEmpty)
+        ? activeExercises
+        : ((dayInfo != null && dayInfo['exercises'] is List && (dayInfo['exercises'] as List).isNotEmpty)
+            ? (dayInfo['exercises'] as List)
+            : (plan['exercises'] is List ? (plan['exercises'] as List) : []));
+
+    for (var ex in rawList) {
+      if (ex is! Map) continue;
         final String exName = (ex['name'] ?? 'Ejercicio').toString();
         final String primaryM = (ex['primary_muscle'] ?? 'Piernas').toString();
         final String secondaryM = (ex['secondary_muscle'] ?? '').toString();
@@ -1935,17 +1949,42 @@ class _CoachScreenState extends State<CoachScreen> {
           posture: postureStr,
           warning: warnStr,
         ));
-      }
     }
 
     String initialId = 'squat';
     if (targetExerciseName != null && dyn.isNotEmpty) {
-      final tLower = targetExerciseName.toLowerCase().trim();
+      final tLower = targetExerciseName
+          .toLowerCase()
+          .replaceAll('á', 'a')
+          .replaceAll('é', 'e')
+          .replaceAll('í', 'i')
+          .replaceAll('ó', 'o')
+          .replaceAll('ú', 'u')
+          .trim();
       final match = dyn.firstWhere(
-        (e) => e.name.toLowerCase().trim() == tLower ||
-               e.name.toLowerCase().contains(tLower) ||
-               tLower.contains(e.name.toLowerCase().trim()) ||
-               e.id.toLowerCase() == tLower,
+        (e) {
+          final eLower = e.name
+              .toLowerCase()
+              .replaceAll('á', 'a')
+              .replaceAll('é', 'e')
+              .replaceAll('í', 'i')
+              .replaceAll('ó', 'o')
+              .replaceAll('ú', 'u')
+              .trim();
+          final idLower = e.id
+              .toLowerCase()
+              .replaceAll('á', 'a')
+              .replaceAll('é', 'e')
+              .replaceAll('í', 'i')
+              .replaceAll('ó', 'o')
+              .replaceAll('ú', 'u')
+              .trim();
+          return eLower == tLower ||
+                 eLower.contains(tLower) ||
+                 tLower.contains(eLower) ||
+                 idLower == tLower ||
+                 idLower.contains(tLower);
+        },
         orElse: () => dyn.first,
       );
       initialId = match.id;

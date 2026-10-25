@@ -173,12 +173,26 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
     def _match_focus(txt: str) -> str | None:
         t = (txt or "").lower()
 
+        # 0. Verificación explícita de solicitud COMPLETA de Pierna o Tren Inferior
+        # Previene que 'piernas' active por error sub-áreas como pantorrillas/pie
+        is_full_leg_request = any(w in t for w in (
+            "completo de pierna", "completo de piernas", "entrenamiento completo de piernas",
+            "completa de pierna", "completa de piernas", "piernas completas", "pierna completa",
+            "piernas completa", "pierna completo", "rutina completa de pierna", "rutina completa de piernas",
+            "toda la pierna", "todas las piernas", "toda el area de la pierna", "toda el área de la pierna",
+            "todo lo que corresponde al area de las piernas", "todo lo que corresponde al área de las piernas",
+            "composicion de la pierna", "composición de la pierna", "todas las areas de la pierna",
+            "todas las áreas de la pierna", "todo el tren inferior", "tren inferior completo",
+        ))
+
         # 1. Combinaciones explícitas de múltiples áreas musculares o sub-zonas anatómicas
         has_triceps_word = any(w in t for w in ("triceps", "tríceps"))
+        # Usar regex para 'pie' y 'pies' para que NUNCA coincidan con 'pierna', 'piernas', etc.
         has_calves_word = any(w in t for w in (
             "batata", "batatas", "pantorrilla", "pantorrillas", "triceps sural", "tríceps sural",
-            "gemelo", "gemelos", "soleo", "sóleo", "gastrocnemio", "pie", "pies", "tobillo", "tobillos"
-        ))
+            "gemelo", "gemelos", "soleo", "sóleo", "gastrocnemio"
+        )) or bool(re.search(r"\b(pie|pies|tobillo|tobillos)\b", t))
+
         has_quads_word = any(w in t for w in ("cuadriceps", "cuádriceps", "vasto"))
         has_hams_word = any(w in t for w in ("isquiotibial", "isquiotibiales", "isquio", "isquios", "femoral", "femorales"))
         has_glutes_word = any(w in t for w in ("gluteo", "glúteo", "gluteos", "glúteos", "cadera", "hip thrust"))
@@ -187,16 +201,23 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         if has_triceps_word and any(w in t for w in ("pierna", "piernas", "tren inferior", "composición de la pierna", "composicion de la pierna")):
             return "triceps_piernas"
 
-        # Sub-área anatómica de Pierna: Pantorrillas, Batatas, Sóleo, Pies y Tobillos
-        if has_calves_word and not any(w in t for w in ("pecho", "espalda", "core", "abdomen")):
+        # Si el usuario solicitó entrenamiento COMPLETO de pierna:
+        if is_full_leg_request:
+            if any(w in t for w in ("semana", "semanal", "lunes a viernes", "lunes a", "dias", "días", "dias de la semana")):
+                return "solo_piernas"
+            return "piernas"
+
+        # Sub-área anatómica AISLADA de Pierna: Pantorrillas, Batatas, Sóleo, Pies y Tobillos
+        # SOLO si NO pidió piernas en general ni otros músculos mayores
+        if has_calves_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen")):
             return "pantorrillas_pies"
 
         # Sub-áreas aisladas de pierna si se piden de forma específica
-        if has_quads_word and not any(w in t for w in ("pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
+        if has_quads_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
             return "cuadriceps"
-        if has_hams_word and not any(w in t for w in ("pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
+        if has_hams_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
             return "femorales_isquios"
-        if has_glutes_word and not any(w in t for w in ("pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
+        if has_glutes_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
             return "gluteos"
 
         if any(w in t for w in (
@@ -418,6 +439,14 @@ BEGINNER_LOW_LEG_EXERCISES = [
         "secondary_muscle": "Isquiotibiales, Core",
     },
     {
+        "name": "Curl femoral de pie sin peso o con banda (Básico)",
+        "sets": 3,
+        "reps": "12 por pierna",
+        "animation_key": "leg-curl",
+        "primary_muscle": "Isquiotibiales",
+        "secondary_muscle": "Gemelos",
+    },
+    {
         "name": "Zancada estática asistida con peso corporal (Básico)",
         "sets": 3,
         "reps": "8-10 por pierna",
@@ -426,19 +455,11 @@ BEGINNER_LOW_LEG_EXERCISES = [
         "secondary_muscle": "Isquiotibiales",
     },
     {
-        "name": "Curl femoral de pie sin peso (Isquiotibiales - Básico)",
-        "sets": 3,
-        "reps": "12 por pierna",
-        "animation_key": "leg-curl",
-        "primary_muscle": "Isquiotibiales",
-        "secondary_muscle": "Gemelos",
-    },
-    {
-        "name": "Elevación de talones de pie con peso corporal (Básico)",
+        "name": "Elevación de talones de pie con apoyo en pared (Básico)",
         "sets": 3,
         "reps": "15",
         "animation_key": "calf-raise",
-        "primary_muscle": "Gemelos",
+        "primary_muscle": "Gemelos (Tríceps Sural)",
         "secondary_muscle": "Sóleo, Tobillo",
     },
 ]
@@ -461,28 +482,28 @@ INTERMEDIATE_MID_LEG_EXERCISES = [
         "secondary_muscle": "Isquiotibiales",
     },
     {
-        "name": "Zancadas alternas con mancuernas (Intermedio)",
-        "sets": 3,
-        "reps": "10 por pierna",
-        "animation_key": "lunge",
-        "primary_muscle": "Cuádriceps, Glúteos",
+        "name": "Peso muerto rumano con mancuernas (Intermedio)",
+        "sets": 4,
+        "reps": "10-12",
+        "animation_key": "deadlift",
+        "primary_muscle": "Isquiotibiales",
+        "secondary_muscle": "Glúteos, Cadena posterior",
+    },
+    {
+        "name": "Elevación de cadera (Hip Thrust) con mancuerna (Intermedio)",
+        "sets": 4,
+        "reps": "12",
+        "animation_key": "hip-thrust",
+        "primary_muscle": "Glúteo Mayor",
         "secondary_muscle": "Isquiotibiales",
     },
     {
-        "name": "Curl de isquiotibiales sentado en máquina (Intermedio)",
-        "sets": 3,
-        "reps": "12",
-        "animation_key": "leg-curl",
-        "primary_muscle": "Isquiotibiales",
-        "secondary_muscle": "Gemelos",
-    },
-    {
-        "name": "Peso muerto rumano con mancuernas (Intermedio)",
-        "sets": 3,
-        "reps": "10-12",
-        "animation_key": "deadlift",
-        "primary_muscle": "Isquiotibiales, Glúteos",
-        "secondary_muscle": "Espalda baja",
+        "name": "Elevación de talones en máquina sentado (Sóleo / Batatas) (Intermedio)",
+        "sets": 4,
+        "reps": "12-15",
+        "animation_key": "calf-raise",
+        "primary_muscle": "Sóleo (Batatas)",
+        "secondary_muscle": "Tríceps Sural, Tobillos",
     },
 ]
 
@@ -496,7 +517,15 @@ ADVANCED_HIGH_LEG_EXERCISES = [
         "secondary_muscle": "Core, Erectores espinales",
     },
     {
-        "name": "Peso muerto rumano con barra (Avanzado)",
+        "name": "Prensa 45° pesada pies anchos (Avanzado)",
+        "sets": 4,
+        "reps": "8-10",
+        "animation_key": "leg-press",
+        "primary_muscle": "Cuádriceps, Glúteos, Aductores",
+        "secondary_muscle": "Isquiotibiales",
+    },
+    {
+        "name": "Peso muerto rumano pesado con barra (Avanzado)",
         "sets": 4,
         "reps": "8-10",
         "animation_key": "deadlift",
@@ -504,28 +533,20 @@ ADVANCED_HIGH_LEG_EXERCISES = [
         "secondary_muscle": "Cadena posterior",
     },
     {
-        "name": "Sentadilla búlgara con carga (Avanzado)",
-        "sets": 4,
-        "reps": "8-10 por pierna",
-        "animation_key": "split-squat",
-        "primary_muscle": "Cuádriceps, Glúteo mayor",
-        "secondary_muscle": "Estabilizadores de cadera",
-    },
-    {
-        "name": "Curl femoral tumbado en máquina (Avanzado)",
+        "name": "Hip Thrust con barra olímpica pesada (Avanzado)",
         "sets": 4,
         "reps": "10-12",
-        "animation_key": "leg-curl",
-        "primary_muscle": "Isquiotibiales",
-        "secondary_muscle": "Gemelos",
+        "animation_key": "hip-thrust",
+        "primary_muscle": "Glúteo Mayor",
+        "secondary_muscle": "Isquiotibiales",
     },
     {
-        "name": "Prensa 45° pesada pies anchos (Avanzado)",
+        "name": "Elevación de talones pesada en prensa 45° o de pie (Avanzado)",
         "sets": 4,
-        "reps": "8-10",
-        "animation_key": "leg-press",
-        "primary_muscle": "Cuádriceps, Glúteos, Aductores",
-        "secondary_muscle": "Isquiotibiales",
+        "reps": "12-15",
+        "animation_key": "calf-raise",
+        "primary_muscle": "Tríceps Sural (Batatas)",
+        "secondary_muscle": "Sóleo, Tobillos",
     },
 ]
 
@@ -1300,7 +1321,11 @@ def _normalize_exercises(
 
 def _detect_plan_mode(user_msg: str) -> str:
     msg = (user_msg or "").lower()
-    if any(k in msg for k in ("diario", "diaria", "para hoy", "sesión de hoy", "sesion de hoy", "solo hoy", "entrenar hoy")):
+    if any(k in msg for k in (
+        "diario", "diaria", "para hoy", "sesión de hoy", "sesion de hoy", "solo hoy", "entrenar hoy",
+        "un día", "un dia", "un solo día", "un solo dia", "un día específico", "un dia especifico",
+        "solo por hoy", "de un día", "de un dia", "rutina de hoy", "entrenamiento de hoy"
+    )):
         return "daily"
     if any(k in msg for k in ("mensual", "mes", "mesociclo", "4 semanas", "cuatro semanas")):
         return "monthly"
@@ -1500,13 +1525,19 @@ def _normalize_structured_plan(
         def _get_day_content(day_idx: int) -> tuple[str, list]:
             if requested_focus == "solo_piernas":
                 day_titles = [
-                    f"Piernas: Cuádriceps y Glúteos ({badge_lbl})",
-                    f"Piernas: Isquiotibiales y Cadena Posterior ({badge_lbl})",
-                    f"Piernas: Glúteos y Aductores ({badge_lbl})",
-                    f"Piernas: Fuerza Unipodal y Pantorrillas ({badge_lbl})",
-                    f"Piernas: Potencia y Movilidad Articular ({badge_lbl})",
+                    f"Piernas: Cuádriceps, Glúteos y Batatas ({badge_lbl})",
+                    f"Piernas: Isquiotibiales, Femoral y Sóleo ({badge_lbl})",
+                    f"Piernas: Glúteos, Cadena Posterior y Cuádriceps ({badge_lbl})",
+                    f"Piernas: Fuerza Unipodal, Estabilidad y Pantorrillas ({badge_lbl})",
+                    f"Piernas: Potencia Funcional, Bombeo y Movilidad ({badge_lbl})",
                 ]
-                day_exs_map = [legs_quads, legs_hams, legs_glutes, legs_unipodal_calves, legs_power_mob]
+                day_exs_map = [
+                    [legs_quads[0], legs_quads[1], legs_glutes[0], legs_unipodal_calves[1]],
+                    [legs_hams[0], legs_hams[1], legs_unipodal_calves[0], legs_unipodal_calves[2]],
+                    [legs_glutes[1], legs_glutes[2], legs_quads[2], legs_hams[2]],
+                    [legs_unipodal_calves[0], legs_hams[0], legs_glutes[0], legs_unipodal_calves[1]],
+                    [legs_power_mob[0], legs_hams[1], legs_quads[0], legs_unipodal_calves[2]],
+                ]
                 idx = day_idx % len(day_titles)
                 return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas")
 
