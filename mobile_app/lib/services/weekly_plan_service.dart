@@ -730,6 +730,74 @@ class WeeklyPlanService extends ChangeNotifier {
     bool scheduledInNextCycle = false;
     int preservedRoutinesCount = 0;
 
+    final rawDaysSchedule = structuredPlan['days_schedule'];
+    if (rawDaysSchedule is Map && rawDaysSchedule.isNotEmpty) {
+      final daysMap = Map<String, dynamic>.from(rawDaysSchedule);
+      final List<Map<String, dynamic>> newDays = [];
+      const weekNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+      for (int i = 0; i < 7; i++) {
+        final dName = weekNames[i];
+        final dayData = daysMap[dName] ??
+            daysMap[dName.toLowerCase()] ??
+            daysMap[dName.replaceAll('é', 'e')];
+        if (dayData is Map) {
+          final isRest = dayData['is_rest'] == true;
+          final dTitle = dayData['title']?.toString() ??
+              (isRest ? 'Día de Descanso y Supercompensación' : title);
+          final dExercises = (dayData['exercises'] as List?) ?? [];
+          final bool isTraining = !isRest && dExercises.isNotEmpty;
+          if (isTraining && !assignedDayNames.contains(_weekdayNames[i])) {
+            assignedDayNames.add(_weekdayNames[i]);
+          }
+          newDays.add({
+            'weekday': i,
+            'weekday_name': _weekdayNames[i],
+            'title': dTitle,
+            'is_training': isTraining,
+            'exercises': dExercises,
+            'nutrition': isTraining ? nutrition : defaultNutrition,
+            'synergy': isRest
+                ? (dayData['rest_advice']?.toString() ??
+                    'Día de supercompensación y descanso neuromuscular.')
+                : recoveryRule,
+          });
+        } else {
+          newDays.add({
+            'weekday': i,
+            'weekday_name': _weekdayNames[i],
+            'title': (i == 5 || i == 6)
+                ? 'Descanso y Supercompensación Muscular'
+                : 'Sesión de Acondicionamiento',
+            'is_training': false,
+            'exercises': [],
+            'nutrition': defaultNutrition,
+            'synergy': 'Día de regeneración muscular.',
+          });
+        }
+      }
+
+      week = {
+        'id': 'coach_plan_${DateTime.now().millisecondsSinceEpoch}',
+        'goal': title,
+        'days': newDays,
+      };
+
+      isLoading = false;
+      _pending = null;
+      lastError = null;
+      notifyListeners();
+      try {
+        await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
+      } catch (_) {}
+
+      return {
+        'assigned_days': assignedDayNames,
+        'scheduled_in_next_cycle': false,
+        'preserved_routines_count': 0,
+      };
+    }
+
     if (week == null) {
       // Si no hay plan previo, se inicializa la semana normalmente
       final targetSet = requestedIndices.toSet();

@@ -151,7 +151,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
-  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+  Future<void> _pickAndUploadPhoto(ImageSource source, {String photoType = 'body'}) async {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
@@ -170,16 +170,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
         Uri.parse('${AuthService.apiBaseUrl}/api/progress/upload'),
       );
       request.fields['user_id'] = uid;
+      request.fields['photo_type'] = photoType;
 
       final bytes = await image.readAsBytes();
       final ext = image.name.split('.').last.toLowerCase();
       final mimeSubtype = (ext == 'png') ? 'png' : (ext == 'webp' ? 'webp' : 'jpeg');
 
+      final fieldName = (photoType == 'scale') ? 'scale_file' : 'file';
+      final defaultFileName = (photoType == 'scale') ? 'scale.jpg' : 'progress.jpg';
+
       request.files.add(
         http.MultipartFile.fromBytes(
-          'file',
+          fieldName,
           bytes,
-          filename: image.name.isNotEmpty ? image.name : 'progress.jpg',
+          filename: image.name.isNotEmpty ? image.name : defaultFileName,
           contentType: MediaType('image', mimeSubtype),
         ),
       );
@@ -188,17 +192,27 @@ class _ProgressScreenState extends State<ProgressScreen> {
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
+        dynamic decoded;
+        try {
+          decoded = jsonDecode(response.body);
+        } catch (_) {}
+        final detectedW = decoded is Map ? decoded['detected_weight_kg'] : null;
+
         if (mounted) {
+          final isScale = photoType == 'scale' || detectedW != null;
+          final msg = isScale
+              ? '⚖️ ¡Peso de $detectedW kg identificado en balanza y registrado con éxito!'
+              : '¡Foto analizada con éxito por IA Vision!';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Color(0xFF1FAE87)),
-                  SizedBox(width: 10),
-                  Expanded(child: Text('¡Foto analizada con éxito por IA Vision!')),
+                  Icon(isScale ? Icons.scale_rounded : Icons.check_circle, color: const Color(0xFF1FAE87)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(msg)),
                 ],
               ),
-              backgroundColor: Color(0xFF0F192B),
+              backgroundColor: const Color(0xFF0F192B),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -241,6 +255,135 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
+  Future<void> _pickAndUploadDualPhotos() async {
+    try {
+      // 1. Elegir Foto Corporal
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Paso 1: Selecciona tu Foto Corporal (Frontal/Torso)'),
+            backgroundColor: Color(0xFF173B45),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      final XFile? bodyImage = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+      if (bodyImage == null) return;
+
+      // 2. Elegir Foto de Balanza
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Paso 2: Selecciona la foto de tu Balanza / Báscula'),
+            backgroundColor: Color(0xFF173B45),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      final XFile? scaleImage = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+      if (scaleImage == null) return;
+
+      setState(() => _isUploading = true);
+
+      final user = AuthService.instance.loggedInUser;
+      final uid = user?.cedula ?? '';
+
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${AuthService.apiBaseUrl}/api/progress/upload'),
+      );
+      request.fields['user_id'] = uid;
+      request.fields['photo_type'] = 'both';
+
+      final bodyBytes = await bodyImage.readAsBytes();
+      final bodyExt = bodyImage.name.split('.').last.toLowerCase();
+      final bodyMime = (bodyExt == 'png') ? 'png' : (bodyExt == 'webp' ? 'webp' : 'jpeg');
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bodyBytes,
+          filename: bodyImage.name.isNotEmpty ? bodyImage.name : 'body.jpg',
+          contentType: MediaType('image', bodyMime),
+        ),
+      );
+
+      final scaleBytes = await scaleImage.readAsBytes();
+      final scaleExt = scaleImage.name.split('.').last.toLowerCase();
+      final scaleMime = (scaleExt == 'png') ? 'png' : (scaleExt == 'webp' ? 'webp' : 'jpeg');
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'scale_file',
+          scaleBytes,
+          filename: scaleImage.name.isNotEmpty ? scaleImage.name : 'scale.jpg',
+          contentType: MediaType('image', scaleMime),
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        dynamic decoded;
+        try {
+          decoded = jsonDecode(response.body);
+        } catch (_) {}
+        final detectedW = decoded is Map ? decoded['detected_weight_kg'] : null;
+
+        if (mounted) {
+          final msg = (detectedW != null)
+              ? '⚖️ ¡Peso de $detectedW kg detectado en balanza y cuerpo analizado con éxito!'
+              : '¡Progreso y balanza sincronizados con éxito!';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.verified, color: Color(0xFF1FAE87)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(msg)),
+                ],
+              ),
+              backgroundColor: const Color(0xFF0F192B),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        await _fetchPhotos();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al procesar: ${response.body}'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al subir: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
   void _showUploadSourceSheet() {
     showModalBottomSheet(
       context: context,
@@ -250,76 +393,166 @@ class _ProgressScreenState extends State<ProgressScreen> {
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1FAE87).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.camera_enhance_rounded, color: Color(0xFF8BE0C0), size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Nueva Foto de Progreso',
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1FAE87).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      Text(
-                        'Análisis Fisiológico con IA Vision',
-                        style: TextStyle(color: Colors.white60, fontSize: 12),
+                      child: const Icon(Icons.camera_enhance_rounded, color: Color(0xFF8BE0C0), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Registrar Progreso con IA',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'Sube foto corporal o báscula para identificar tu peso',
+                            style: TextStyle(color: Colors.white60, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // OPCIÓN 1: Foto Corporal
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF162338),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.person_outline_rounded, color: Color(0xFF8BE0C0), size: 20),
+                        ),
+                        title: const Text('Foto Corporal (Cámara o Galería)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                        subtitle: const Text('Analiza grasa, simetría y definición muscular', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.camera_alt_rounded, color: Color(0xFF8BE0C0), size: 20),
+                              tooltip: 'Cámara',
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _pickAndUploadPhoto(ImageSource.camera, photoType: 'body');
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.photo_library_rounded, color: Color(0xFF38BDF8), size: 20),
+                              tooltip: 'Galería',
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _pickAndUploadPhoto(ImageSource.gallery, photoType: 'body');
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF8BE0C0)),
                 ),
-                title: const Text('Tomar Foto con Cámara', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Captura tu compostura frontal con buena luz', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndUploadPhoto(ImageSource.camera);
-                },
-              ),
-              const Divider(color: Colors.white10),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
+                const SizedBox(height: 10),
+
+                // OPCIÓN 2: Foto de Balanza / Báscula
+                Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFF162338),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
                   ),
-                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF38BDF8)),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.scale_rounded, color: Color(0xFF38BDF8), size: 20),
+                    ),
+                    title: const Row(
+                      children: [
+                        Text('Foto de Balanza / Báscula', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                        SizedBox(width: 6),
+                        Text('IA OCR', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    subtitle: const Text('Identifica automáticamente tu peso en kg', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.camera_alt_rounded, color: Color(0xFF38BDF8), size: 20),
+                          tooltip: 'Cámara Balanza',
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _pickAndUploadPhoto(ImageSource.camera, photoType: 'scale');
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.photo_library_rounded, color: Color(0xFF8BE0C0), size: 20),
+                          tooltip: 'Galería Balanza',
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _pickAndUploadPhoto(ImageSource.gallery, photoType: 'scale');
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                title: const Text('Elegir de Galería', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Selecciona una imagen de cuerpo completo', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                trailing: const Icon(Icons.chevron_right, color: Colors.white38),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndUploadPhoto(ImageSource.gallery);
-                },
-              ),
-            ],
+                const SizedBox(height: 10),
+
+                // OPCIÓN 3: Subir Ambas (Corporal + Balanza)
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF162338),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.collections_rounded, color: Color(0xFFF59E0B), size: 20),
+                    ),
+                    title: const Text('Subir Ambas (Cuerpo + Balanza)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                    subtitle: const Text('1 foto de tu cuerpo + 1 foto de tu báscula a la vez', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _pickAndUploadDualPhotos();
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -615,6 +848,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     // Calcular deltas si hay al menos 2 puntos
     double defDelta = 0.0;
     double fatDelta = 0.0;
+    double weightDelta = 0.0;
     if (hasData) {
       final firstP = _evolutionChart.first;
       final lastP = _evolutionChart.last;
@@ -625,6 +859,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
       final firstFat = _safeDouble(firstP['body_fat'], 22.0);
       final lastFat = _safeDouble(lastP['body_fat'], 22.0);
       fatDelta = lastFat - firstFat;
+
+      final firstW = _safeDouble(firstP['weight'], 70.0);
+      final lastW = _safeDouble(lastP['weight'], 70.0);
+      weightDelta = lastW - firstW;
     }
 
     return Container(
@@ -664,7 +902,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ),
                 ],
               ),
-              // Selector de métrica para el mini-gráfico
+              // Selector de 3 métricas para el mini-gráfico
               Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E293B),
@@ -675,6 +913,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   children: [
                     _buildChartMetricToggle(0, '⚡ Definición'),
                     _buildChartMetricToggle(1, '📉 % Grasa'),
+                    _buildChartMetricToggle(2, '⚖️ Peso'),
                   ],
                 ),
               ),
@@ -696,8 +935,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   Expanded(
                     child: Text(
                       totalPoints == 1
-                          ? 'Tienes 1 foto de punto de partida (Día 1). Al subir tu próxima foto en unos días, verás la curva de tu progreso aquí.'
-                          : 'Sube tu foto de inicio del Día 1 para activar el trazado inteligente de definición muscular y grasa corporal.',
+                          ? 'Tienes 1 foto de punto de partida (Día 1). Al subir tu próxima foto o foto de balanza, verás la curva de tu progreso aquí.'
+                          : 'Sube tu foto corporal o foto de balanza para activar el trazado inteligente de peso, definición muscular y grasa corporal.',
                       style: const TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.3),
                     ),
                   ),
@@ -705,31 +944,31 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
             )
           ] else ...[
-            // KPI resumen rápido de cambio
+            // KPI resumen rápido de cambio (3 columnas: Definición, Grasa, Peso)
             Row(
               children: [
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFF162338),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.bolt, color: Color(0xFF8BE0C0), size: 16),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.bolt, color: Color(0xFF8BE0C0), size: 15),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Definición Muscular', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                              const Text('Definición', style: TextStyle(color: Colors.white54, fontSize: 9.5)),
                               Text(
                                 '${defDelta >= 0 ? "+" : ""}${defDelta.toStringAsFixed(1)} pts',
                                 style: TextStyle(
                                   color: defDelta >= 0 ? const Color(0xFF8BE0C0) : Colors.orangeAccent,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                 ),
                               ),
                             ],
@@ -739,29 +978,61 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFF162338),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.trending_down, color: Color(0xFFF59E0B), size: 16),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.trending_down, color: Color(0xFFF59E0B), size: 15),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Grasa Estimada', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                              const Text('Grasa', style: TextStyle(color: Colors.white54, fontSize: 9.5)),
                               Text(
                                 '${fatDelta <= 0 ? "" : "+"}${fatDelta.toStringAsFixed(1)} %',
                                 style: TextStyle(
                                   color: fatDelta <= 0 ? const Color(0xFF8BE0C0) : Colors.orangeAccent,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF162338),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.scale_rounded, color: Color(0xFF38BDF8), size: 15),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Peso', style: TextStyle(color: Colors.white54, fontSize: 9.5)),
+                              Text(
+                                '${weightDelta <= 0 ? "" : "+"}${weightDelta.toStringAsFixed(1)} kg',
+                                style: TextStyle(
+                                  color: weightDelta <= 0 ? const Color(0xFF38BDF8) : Colors.amberAccent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11.5,
                                 ),
                               ),
                             ],
@@ -1815,13 +2086,20 @@ class _MiniProgressChartPainter extends CustomPainter {
     if (data.isEmpty) return;
 
     final isDef = metricIndex == 0;
-    final primaryColor = isDef ? const Color(0xFF8BE0C0) : const Color(0xFFF59E0B);
+    final isFat = metricIndex == 1;
+    final isWeight = metricIndex == 2;
+
+    final primaryColor = isDef
+        ? const Color(0xFF8BE0C0)
+        : (isFat ? const Color(0xFFF59E0B) : (isWeight ? const Color(0xFF38BDF8) : const Color(0xFF8BE0C0)));
 
     final values = data.map((d) {
       if (isDef) {
         return _safeDouble(d['definition_score'], 6.0);
-      } else {
+      } else if (isFat) {
         return _safeDouble(d['body_fat'], 20.0);
+      } else {
+        return _safeDouble(d['weight'], 70.0);
       }
     }).toList();
 
@@ -1921,7 +2199,9 @@ class _MiniProgressChartPainter extends CustomPainter {
 
       // Texto de valor encima del punto
       final textSpan = TextSpan(
-        text: isDef ? val.toStringAsFixed(1) : '${val.toStringAsFixed(1)}%',
+        text: isDef
+            ? val.toStringAsFixed(1)
+            : (isFat ? '${val.toStringAsFixed(1)}%' : '${val.toStringAsFixed(1)} kg'),
         style: TextStyle(
           color: primaryColor,
           fontSize: 9.5,

@@ -66,28 +66,184 @@ def resolve_user_context(user_id: str, admin):
     return u_id, u_cedula, u_name, u_weight, u_goal
 
 
+def extract_scale_weight_from_image(img_bytes: bytes, mime_type: str = "image/jpeg", model_instance=None) -> tuple[float | None, str]:
+    """
+    Usa IA Vision para leer la pantalla digital o el dial de una balanza/báscula y extraer el peso numérico en kg.
+    """
+    if not img_bytes:
+        return None, "Imagen vacía"
+    prompt = """
+    Actúa como un sistema OCR y de visión artificial de alta precisión médica especializado en balanzas digitales y básculas mecánicas de pesaje corporal.
+    Observa detalladamente la imagen de la balanza / báscula.
+    1. Localiza el display digital (LED/LCD) o la aguja indicadora que muestra el peso corporal de la persona.
+    2. Extrae el número del peso.
+    3. Si la unidad visible está en libras (lb o lbs), conviértela a kilogramos (kg) dividiendo entre 2.20462. Si está en kg, usa el número directamente.
+    4. Devuelve ÚNICAMENTE un objeto JSON válido con este formato exacto:
+    {
+      "detected_weight_kg": 76.5,
+      "confidence": 0.95,
+      "raw_reading": "76.5 kg",
+      "notes": "Lectura clara de display digital"
+    }
+    Si la imagen no contiene una balanza o no se distingue ningún número, devuelve:
+    {
+      "detected_weight_kg": null,
+      "confidence": 0.0,
+      "raw_reading": null,
+      "notes": "No se detectó lectura numérica clara de balanza"
+    }
+    Devuelve SOLO JSON.
+    """
+    try:
+        if model_instance is None:
+            vision_model_name = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+            model_instance = genai.GenerativeModel(vision_model_name)
+        resp = model_instance.generate_content([
+            prompt,
+            {"mime_type": mime_type, "data": img_bytes}
+        ])
+        txt = (resp.text or "").strip()
+        cleaned = txt
+        if "```json" in cleaned:
+            cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+        elif "```" in cleaned:
+            cleaned = cleaned.split("```")[1].split("```")[0].strip()
+        parsed = json.loads(cleaned)
+        w_val = parsed.get("detected_weight_kg")
+        if w_val is not None:
+            w_float = parse_numeric(w_val, 0.0)
+            if 25.0 <= w_float <= 300.0:
+                return round(w_float, 2), parsed.get("notes", "Detectado por IA")
+        return None, parsed.get("notes", "Lectura no concluyente")
+    except Exception as e:
+        print("Aviso extrayendo peso de balanza con IA:", e)
+        return None, str(e)
+
+
 @router.post("/upload")
-async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = File(...)):
+async def upload_progress_photo(
+    user_id: str = Form(...),
+    file: Optional[UploadFile] = File(None),
+    scale_file: Optional[UploadFile] = File(None),
+    photo_type: Optional[str] = Form("body"),  # 'body', 'scale', 'both'
+):
     admin = get_supabase_admin_client()
     try:
-        file_bytes = await file.read()
-
-        # 1. Resolver información del usuario con UUID válido
+        # Resolver contexto de usuario
         u_id, u_cedula, u_name, u_weight, u_goal = resolve_user_context(user_id, admin)
 
-        # 2. Historial de fotos para contextualizar si es foto inicial o avance comparativo
+        # Si no vino file pero sí scale_file, o si el tipo es 'scale'
+        if file is None and scale_file is None:
+            raise HTTPException(status_code=400, detail="Debe subir al menos una imagen (corporal o de balanza).")
+
+        # Configurar IA Vision
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+        vision_model_name = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+        try:
+            model = genai.GenerativeModel(vision_model_name)
+        except Exception:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+
+        detected_weight: Optional[float] = None
+        scale_notes: str = ""
+
+        # 1. Procesar foto de Balanza / Báscula si se adjuntó
+        target_scale_upload = scale_file if scale_file is not None else (file if photo_type == "scale" else None)
+        if target_scale_upload is not None:
+            scale_bytes = await target_scale_upload.read()
+            s_mime = target_scale_upload.content_type or "image/jpeg"
+            if s_mime not in ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]:
+                s_mime = "image/jpeg"
+            detected_weight, scale_notes = extract_scale_weight_from_image(scale_bytes, s_mime, model)
+            if detected_weight:
+                u_weight = detected_weight
+                # Actualizar peso oficial en usuarios
+                try:
+                    admin.table("usuarios").update({"peso": detected_weight}).eq("id", u_id).execute()
+                except Exception as e_wup:
+                    print("Aviso actualizando peso en usuarios:", e_wup)
+                # Registrar métrica en coach_mensajes
+                try:
+                    admin.table("coach_mensajes").insert({
+                        "user_id": u_id,
+                        "cedula": u_cedula,
+                        "role": "system",
+                        "category": "body_metric",
+                        "content": f"Balanza IA: {detected_weight} kg registrados ({scale_notes})",
+                        "plan": {
+                            "weight": detected_weight,
+                            "notes": f"Identificado por IA Vision en balanza: {scale_notes}",
+                            "source": "scale_photo",
+                            "measured_at": date.today().isoformat()
+                        },
+                        "created_at": datetime.utcnow().isoformat()
+                    }).execute()
+                except Exception as e_ms:
+                    print("Aviso insertando métrica de balanza:", e_ms)
+
+        # Si el usuario SOLO subió la foto de la balanza
+        if photo_type == "scale" or (file is None and scale_file is not None):
+            sanitized_name = f"scale_{int(time.time())}.jpg"
+            file_path = f"{u_id}/{sanitized_name}"
+            public_url = ""
+            try:
+                scale_bytes = scale_bytes if 'scale_bytes' in locals() else await target_scale_upload.read()
+                admin.storage.from_("progress").upload(file_path, scale_bytes, {"content-type": "image/jpeg"})
+                public_url = admin.storage.from_("progress").get_public_url(file_path)
+            except Exception as e_st:
+                public_url = f"https://placehold.co/600x400/1E293B/38BDF8.png?text=Balanza+{detected_weight or u_weight}+kg"
+
+            analysis_dict = {
+                "headline": f"⚖️ Peso de {detected_weight or u_weight} kg identificado y registrado exitosamente en balanza.",
+                "photo_stage": "Registro en Balanza",
+                "photo_number": 1,
+                "detected_weight_kg": detected_weight or u_weight,
+                "estimated_body_fat": 22.0,
+                "muscle_definition_score": 6.0,
+                "posture_score": 7.5,
+                "biotype": "Evaluación por Báscula Digital",
+                "scale_notes": scale_notes or "Lectura registrada",
+                "positive_changes": [f"Peso corporal actualizado a {detected_weight or u_weight} kg", "Historial biométrico sincronizado"],
+                "areas_to_improve": ["Monitorear el pesaje en ayunas para consistencia", "Acompañar con foto de postura corporal"],
+                "physiological_composition": f"Registro de peso corporal oficial capturado por IA: {detected_weight or u_weight} kg.",
+                "training_plan_feedback": "El Coach IA ajustará la intensidad según tu nuevo registro de peso.",
+                "motivational_quote": "Cada pesaje consciente te acerca a tu meta.",
+            }
+
+            admin.table("progress_photos").insert({
+                "user_id": u_id,
+                "photo_url": public_url,
+                "ai_analysis": json.dumps(analysis_dict, ensure_ascii=False)
+            }).execute()
+
+            return {
+                "status": "ok",
+                "detected_weight_kg": detected_weight or u_weight,
+                "weight_updated": bool(detected_weight),
+                "analysis": analysis_dict["headline"],
+                "structured_analysis": analysis_dict,
+                "photo_url": public_url
+            }
+
+        # 2. Si hay foto corporal, procesar con Cineantropometría
+        file_bytes = await file.read()
+        mime = file.content_type or "image/jpeg"
+        if mime not in ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]:
+            mime = "image/jpeg"
+
+        # Historial de fotos para contextualizar
         photo_number = 1
         prev_photos = []
         try:
             prev_photos_res = admin.table("progress_photos").select("id, created_at, photo_url, ai_analysis").eq("user_id", u_id).order("created_at", desc=False).execute()
             prev_photos = prev_photos_res.data or []
             photo_number = len(prev_photos) + 1
-        except Exception as e_hist:
-            print("Aviso consultando historial de fotos:", e_hist)
+        except Exception:
             photo_number = 1
 
         is_first = photo_number == 1
-
         prev_analysis = None
         prev_fat = 26.0
         prev_def = 4.0
@@ -116,22 +272,6 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                         prev_img_bytes = r_prev.content
                 except Exception as e_dl:
                     print("Aviso descargando foto previa para comparativa:", e_dl)
-
-        # 3. Analizar con Gemini Vision
-        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if api_key:
-            genai.configure(api_key=api_key)
-
-        vision_model_name = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
-        try:
-            model = genai.GenerativeModel(vision_model_name)
-        except Exception:
-            model = genai.GenerativeModel("gemini-2.5-flash")
-
-        # Normalizar tipo MIME de imagen para Gemini
-        mime = file.content_type or "image/jpeg"
-        if mime not in ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]:
-            mime = "image/jpeg"
 
         content_parts = []
         if prev_img_bytes:
@@ -188,9 +328,11 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                 ]
             }},'''
 
+        scale_context_str = f" [Peso en Balanza Oficial: {u_weight} kg ({scale_notes})]" if detected_weight else f" [Peso registrado: {u_weight} kg]"
+
         prompt = f"""
         Actúa como un Especialista en Cineantropometría, Biomecánica y Recomposición Corporal.
-        Estás evaluando la fotografía de progreso físico de {u_name} (Peso: {u_weight} kg, Objetivo: {u_goal}).
+        Estás evaluando la fotografía de progreso físico de {u_name} (Peso actual: {u_weight} kg, Objetivo: {u_goal}){scale_context_str}.
         Contexto del momento: {stage_desc}.
         {compare_instructions}
 
@@ -208,6 +350,7 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
             "headline": "Frase resumen de impacto clínico y motivacional",
             "photo_stage": "{default_stage}",
             "photo_number": {photo_number},
+            "detected_weight_kg": {u_weight},
             "estimated_body_fat": 24.0,
             "muscle_definition_score": 5.5,
             "posture_score": 7.5,
@@ -240,12 +383,11 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
 
             parsed = json.loads(cleaned)
             if isinstance(parsed, dict):
-                # Sanitizar números a tipos estrictamente flotantes
+                parsed["detected_weight_kg"] = round(float(u_weight), 2)
                 parsed["estimated_body_fat"] = parse_numeric(parsed.get("estimated_body_fat"), 22.0)
                 parsed["muscle_definition_score"] = min(10.0, max(1.0, parse_numeric(parsed.get("muscle_definition_score"), 6.0)))
                 parsed["posture_score"] = min(10.0, max(1.0, parse_numeric(parsed.get("posture_score"), 7.5)))
 
-                # Sanitizar comparison_with_previous si existe
                 if parsed.get("comparison_with_previous") and isinstance(parsed["comparison_with_previous"], dict):
                     comp = parsed["comparison_with_previous"]
                     comp["body_fat_delta"] = round(parse_numeric(comp.get("body_fat_delta"), parsed["estimated_body_fat"] - prev_fat), 1)
@@ -254,7 +396,6 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                     if not isinstance(comp.get("specific_anatomical_changes"), list):
                         comp["specific_anatomical_changes"] = [str(comp.get("specific_anatomical_changes") or "Evolución anatómica positiva")]
 
-                # Asegurar listas en fortalezas y áreas a mejorar
                 if isinstance(parsed.get("positive_changes"), str):
                     parsed["positive_changes"] = [parsed["positive_changes"]]
                 elif not isinstance(parsed.get("positive_changes"), list):
@@ -277,6 +418,7 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                 "headline": f"Jornada #{photo_number}: Progreso y Recomposición Corporal Activa",
                 "photo_stage": default_stage,
                 "photo_number": photo_number,
+                "detected_weight_kg": round(float(u_weight), 2),
                 "estimated_body_fat": cur_fat,
                 "muscle_definition_score": cur_def,
                 "posture_score": 7.0,
@@ -289,7 +431,7 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                     "Mantener tempo controlado en cada repetición",
                     "Controlar ingesta calórica para reducir grasa abdominal"
                 ],
-                "physiological_composition": "Compostura física con sólida base estructural. Al cumplir el plan, el déficit y la sobrecarga progresiva revelarán masa muscular magra.",
+                "physiological_composition": f"Compostura física en progreso activo con peso registrado de {u_weight} kg.",
                 "training_plan_feedback": "Ejecuta los planes asignados respetando los descansos y la técnica recomendada.",
                 "motivational_quote": "Cada jornada suma hacia la mejor versión de tu físico."
             }
@@ -307,7 +449,7 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
                 }
             analysis_raw = json.dumps(structured_analysis, ensure_ascii=False)
 
-        # 4. Upload to Supabase Storage
+        # Subir a Supabase Storage
         sanitized_filename = f"{int(time.time())}_{file.filename or 'photo.jpg'}"
         file_path = f"{u_id}/{sanitized_filename}"
         public_url = ""
@@ -318,14 +460,14 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
             print("Aviso storage Supabase:", storage_err)
             public_url = f"https://placehold.co/600x400/1E293B/1FAE87.png?text=Foto+Progreso+{int(time.time())}"
 
-        # 5. Guardar en Base de Datos (USANDO SIEMPRE u_id que es UUID válido)
+        # Guardar en Base de Datos
         admin.table("progress_photos").insert({
             "user_id": u_id,
             "photo_url": public_url,
             "ai_analysis": analysis_raw
         }).execute()
 
-        # 6. Sincronizar automáticamente la estimación de grasa en body_metrics si existe
+        # Sincronizar automáticamente en coach_mensajes
         try:
             est_fat = structured_analysis.get("estimated_body_fat")
             if est_fat:
@@ -348,6 +490,8 @@ async def upload_progress_photo(user_id: str = Form(...), file: UploadFile = Fil
 
         return {
             "status": "ok",
+            "detected_weight_kg": detected_weight,
+            "weight_updated": bool(detected_weight),
             "analysis": structured_analysis.get("headline", "Análisis completado"),
             "structured_analysis": structured_analysis,
             "photo_url": public_url
@@ -412,12 +556,14 @@ def get_progress_photos(user_id: str):
             processed_photos.append(p)
 
             date_str = str(p.get("created_at", ""))[:10]
+            w_val = parsed_dict.get("detected_weight_kg") or parsed_dict.get("weight") or u_weight
             evolution_chart.append({
                 "date": date_str,
                 "photo_number": idx,
                 "body_fat": parsed_dict.get("estimated_body_fat", 22.0),
                 "definition_score": parsed_dict.get("muscle_definition_score", 6.0),
-                "posture_score": parsed_dict.get("posture_score", 7.5)
+                "posture_score": parsed_dict.get("posture_score", 7.5),
+                "weight": round(float(w_val), 1),
             })
 
         # Resumen comparativo global si hay 2 o más fotos
@@ -437,6 +583,9 @@ def get_progress_photos(user_id: str):
             base_posture = base_ana.get("posture_score", 6.5)
             cur_posture = latest_ana.get("posture_score", 7.0)
 
+            base_w = base_ana.get("detected_weight_kg") or base_ana.get("weight") or u_weight
+            cur_w = latest_ana.get("detected_weight_kg") or latest_ana.get("weight") or u_weight
+
             comparative_summary = {
                 "has_comparison": True,
                 "baseline_date": str(baseline.get("created_at") or "")[:10],
@@ -450,6 +599,9 @@ def get_progress_photos(user_id: str):
                 "baseline_posture": base_posture,
                 "latest_posture": cur_posture,
                 "posture_delta": round(cur_posture - base_posture, 1),
+                "baseline_weight": round(float(base_w), 1),
+                "latest_weight": round(float(cur_w), 1),
+                "weight_delta": round(float(cur_w) - float(base_w), 1),
                 "clinical_notes": (latest_ana.get("comparison_with_previous") or {}).get("clinical_comparison", "")
             }
 

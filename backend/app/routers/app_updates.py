@@ -21,7 +21,7 @@ def _read_pubspec_version() -> tuple[str, int]:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
                 return raw_ver, 106
-    return "1.0.66", 106
+    return "1.0.67", 107
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -41,16 +41,16 @@ def latest_version() -> dict:
     size = apk.stat().st_size if apk else 64077417
     return {
         "available": True,
-        "version_name": "1.0.66",
-        "version_code": 106,
+        "version_name": "1.0.67",
+        "version_code": 107,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.66:\n"
-            "1. Eliminación definitiva del marcador/punto descalibrado en el Modelo 3D muscular.\n"
-            "2. Visualización 3D anatómica limpia, fluida y con giro 360° sin elementos flotantes desfasados.\n"
-            "3. Controles de cámara optimizados (Frente, Espalda y Perfil) con telemetría en HUD inferior.\n"
-            "4. Cronogramas adaptativos de máxima precisión (Semanal, Diario y Mensual)."
+            "Actualización oficial de AI Fitness Coach v1.0.67:\n"
+            "1. Especificación anatómica precisa en Coach IA: selección de sub-áreas musculares (pantorrillas/batatas/sóleo, pies, tríceps + pierna completa, cuádriceps, femorales, glúteos).\n"
+            "2. Cero duplicados en cronogramas: sesiones variadas y equilibradas de Lunes a Viernes con más de 1300 ejercicios sin repetición.\n"
+            "3. Módulo de Progreso Inteligente: carga de 1 o 2 fotos (corporal y/o balanza digital/mecánica) con lectura por IA OCR del peso corporal.\n"
+            "4. Gráfica de evolución multidimensional: seguimiento de Definición Muscular (pts), Grasa Corporal (%) y Peso en Balanza (kg)."
         ),
         "download_url": "/api/app/download",
     }
