@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/widgets/muscle_map_view.dart';
 
 /// Pantalla de demostración didáctica del modelo anatómico y técnica.
 ///
 /// Ofrece 3 modos de visualización avanzados y certificados:
-/// 0: Técnica Real (GIF) animado en bucle adaptado.
-/// 1: Atlas Anatómico de Músculos (resaltado interactivo frontal/dorsal de agonistas y sinergistas).
-/// 2: Modelo Anatómico 3D Muscular (360°) con Balizas Holográficas de Activación y Presets de Cámara.
+/// 0: Atlas Anatómico de Músculos (resaltado interactivo frontal/dorsal de agonistas y sinergistas).
+/// 1: Técnica Real (GIF) animado en bucle adaptado.
+/// 2: Reclutamiento Muscular y Biomecánica (telemetría porcentual de activación).
 class AnatomyWorkoutScreen extends StatefulWidget {
   const AnatomyWorkoutScreen({
     super.key,
@@ -54,12 +53,14 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
 
   String _appBarTitle() {
     switch (_viewMode) {
-      case 1:
+      case 0:
         return 'Atlas Anatómico de Músculos';
-      case 2:
-        return 'Modelo 3D Muscular (Giro 360°)';
-      default:
+      case 1:
         return 'Guía de Ejecución y Técnica';
+      case 2:
+        return 'Reclutamiento y Biomecánica';
+      default:
+        return 'Anatomía y Técnica';
     }
   }
 
@@ -76,15 +77,19 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5),
         ),
         actions: [
-          if (_viewMode == 2)
-            IconButton(
-              tooltip: _autoRotate ? 'Pausar autorrotación' : 'Activar giro 360°',
-              onPressed: () => setState(() => _autoRotate = !_autoRotate),
-              icon: Icon(
-                _autoRotate ? Icons.threesixty_rounded : Icons.rotate_right_rounded,
-                color: _autoRotate ? const Color(0xFF8BE0C0) : Colors.white70,
-              ),
-            ),
+          IconButton(
+            tooltip: 'Info Anatómica',
+            icon: const Icon(Icons.info_outline_rounded, color: Colors.white70),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('🔴 Rojo: Músculo Agonista (100%) · 🟡 Ámbar: Sinergista (70%)'),
+                  duration: Duration(seconds: 3),
+                  backgroundColor: Color(0xFF16253B),
+                ),
+              );
+            },
+          ),
         ],
       ),
       body: Column(
@@ -99,22 +104,22 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
                 children: [
                   _buildModeChip(
                     mode: 0,
-                    icon: Icons.play_circle_fill_rounded,
-                    label: 'Técnica Real (GIF)',
-                    color: const Color(0xFF1FAE87),
-                  ),
-                  const SizedBox(width: 10),
-                  _buildModeChip(
-                    mode: 1,
                     icon: Icons.accessibility_new_rounded,
                     label: 'Atlas Muscular',
                     color: const Color(0xFFFFB340),
                   ),
                   const SizedBox(width: 10),
                   _buildModeChip(
+                    mode: 1,
+                    icon: Icons.play_circle_fill_rounded,
+                    label: 'Técnica Real (GIF)',
+                    color: const Color(0xFF1FAE87),
+                  ),
+                  const SizedBox(width: 10),
+                  _buildModeChip(
                     mode: 2,
-                    icon: Icons.threed_rotation_rounded,
-                    label: 'Modelo 3D (360°)',
+                    icon: Icons.analytics_rounded,
+                    label: 'Reclutamiento Muscular',
                     color: const Color(0xFF8BE0C0),
                   ),
                 ],
@@ -201,8 +206,8 @@ class _Viewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Modo 1: Atlas Anatómico de Músculos (flutter_body_atlas con auto-orientación frontal/posterior)
-    if (viewMode == 1) {
+    // Modo 0: Atlas Anatómico de Músculos (resaltado con precisión en rojo y ámbar)
+    if (viewMode == 0) {
       return Container(
         color: const Color(0xFF070C16),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -214,15 +219,14 @@ class _Viewer extends StatelessWidget {
       );
     }
 
-    // Modo 2: Modelo 3D Muscular Real con Balizas Holográficas de Activación y Presets de Cámara
+    // Modo 2: Reclutamiento Muscular y Telemetría Biomecánica
     if (viewMode == 2) {
-      return _Muscular3DViewer(
+      return _MuscleRecruitmentView(
         exercise: exercise,
-        autoRotate: autoRotate,
       );
     }
 
-    // Modo 0: Técnica Real (GIF garantizado y adaptado)
+    // Modo 1: Técnica Real (GIF garantizado y adaptado)
     final effectiveGifUrl = resolveGuaranteedGifUrl(
       name: exercise.name,
       agonist: exercise.agonist,
@@ -285,236 +289,88 @@ class _Viewer extends StatelessWidget {
   }
 }
 
-/// Visor 3D Muscular interactivo con balizas holográficas de activación sobre el músculo agonista
-/// y selector rápido de ángulo de cámara (Frente / Espalda / Perfil).
-class _Muscular3DViewer extends StatefulWidget {
+/// Visor de Reclutamiento Muscular y Telemetría Biomecánica.
+/// Muestra desglosado con exactitud porcentual la activación de agonista,
+/// sinergistas, estabilizadores, articulaciones y tempo seguro.
+class _MuscleRecruitmentView extends StatelessWidget {
   final AnatomyExercise exercise;
-  final bool autoRotate;
 
-  const _Muscular3DViewer({
-    required this.exercise,
-    required this.autoRotate,
-  });
-
-  @override
-  State<_Muscular3DViewer> createState() => _Muscular3DViewerState();
-}
-
-class _Muscular3DViewerState extends State<_Muscular3DViewer> {
-  String _currentOrbit = '0deg 75deg 105%';
-  bool _isPosteriorTarget = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolveTargetOrientation();
-  }
-
-  @override
-  void didUpdateWidget(covariant _Muscular3DViewer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.exercise.id != widget.exercise.id) {
-      _resolveTargetOrientation();
-    }
-  }
-
-  void _resolveTargetOrientation() {
-    final m = '${widget.exercise.agonist} ${widget.exercise.name}'.toLowerCase();
-    _isPosteriorTarget = m.contains('dorsal') ||
-        m.contains('espalda') ||
-        m.contains('glute') ||
-        m.contains('glúte') ||
-        m.contains('isquio') ||
-        m.contains('femoral') ||
-        m.contains('hamstring') ||
-        m.contains('tricep') ||
-        m.contains('trícep') ||
-        m.contains('lumbar') ||
-        m.contains('pantorrilla') ||
-        m.contains('gemelo') ||
-        m.contains('posterior') ||
-        m.contains('trapecio') ||
-        m.contains('pajaro') ||
-        m.contains('pájaro');
-
-    _currentOrbit = _isPosteriorTarget ? '180deg 75deg 105%' : '0deg 75deg 105%';
-  }
+  const _MuscleRecruitmentView({required this.exercise});
 
   @override
   Widget build(BuildContext context) {
-    final agonist = widget.exercise.agonist;
-    final synergists = widget.exercise.synergists.isNotEmpty ? widget.exercise.synergists.join(', ') : 'Estabilizadores';
+    final agonist = exercise.agonist;
+    final synergists = exercise.synergists.isNotEmpty ? exercise.synergists.join(', ') : 'Estabilizadores generales';
+    final intensity = exercise.intensityLevel;
 
     return Container(
       color: const Color(0xFF070C16),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Modelo 3D con model_viewer_plus y cámara inteligente
-          ModelViewer(
-            key: ValueKey('mv_${widget.exercise.id}_${widget.autoRotate}_$_currentOrbit'),
-            src: kMuscularAnatomyModelUrl,
-            alt: 'Modelo Anatómico Muscular 3D (360°)',
-            ar: false,
-            autoRotate: widget.autoRotate,
-            cameraControls: true,
-            cameraOrbit: _currentOrbit,
-            backgroundColor: const Color(0xFF070C16),
-            shadowIntensity: 1.0,
-          ),
-
-          // Selector de ángulo de cámara rápido en la parte superior
-          Positioned(
-            top: 10,
-            left: 10,
-            right: 10,
-            child: Row(
-              children: [
-                _buildCameraAngleButton(
-                  label: 'Frente',
-                  icon: Icons.accessibility_new_rounded,
-                  orbit: '0deg 75deg 105%',
-                  isActive: _currentOrbit.startsWith('0deg'),
-                ),
-                const SizedBox(width: 6),
-                _buildCameraAngleButton(
-                  label: 'Espalda',
-                  icon: Icons.back_hand_outlined,
-                  orbit: '180deg 75deg 105%',
-                  isActive: _currentOrbit.startsWith('180deg'),
-                ),
-                const SizedBox(width: 6),
-                _buildCameraAngleButton(
-                  label: 'Perfil',
-                  icon: Icons.crop_portrait_rounded,
-                  orbit: '90deg 75deg 105%',
-                  isActive: _currentOrbit.startsWith('90deg'),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xDD0B1220),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.4)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.touch_app_rounded, color: Color(0xFF8BE0C0), size: 12),
-                      SizedBox(width: 3),
-                      Text(
-                        'Giro 360°',
-                        style: TextStyle(color: Colors.white70, fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Agonista Primario (100% Reclutamiento)
+            _buildCard(
+              title: 'Músculo Motor Primario (Agonista)',
+              muscle: agonist,
+              percentage: 100,
+              color: const Color(0xFFFF3B30),
+              icon: Icons.flash_on_rounded,
+              description: 'Genera la fuerza principal y máxima tensión durante la fase concéntrica.',
             ),
-          ),
+            const SizedBox(height: 8),
 
-          // HUD inferior de telemetría de reclutamiento muscular
-          Positioned(
-            bottom: 8,
-            left: 10,
-            right: 10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            // Sinergistas (70% Reclutamiento)
+            _buildCard(
+              title: 'Músculos Asistentes (Sinergistas)',
+              muscle: synergists,
+              percentage: 70,
+              color: const Color(0xFFFFC24B),
+              icon: Icons.group_work_rounded,
+              description: 'Colaboran en la trayectoria motora y estabilizan la articulación clave.',
+            ),
+            const SizedBox(height: 8),
+
+            // Estabilizadores (45% Reclutamiento)
+            _buildCard(
+              title: 'Estabilizadores Articulares & Core',
+              muscle: 'Core, Erectores y Fijadores articulares',
+              percentage: 45,
+              color: const Color(0xFF8BE0C0),
+              icon: Icons.shield_rounded,
+              description: 'Mantienen la columna neutra y absorben fuerzas disipativas para prevenir lesiones.',
+            ),
+            const SizedBox(height: 8),
+
+            // Fila de Métricas Biomecánicas
+            Container(
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xDD0C1322),
-                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFF0F192B),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF1E2D42)),
               ),
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFFFF3B30), shape: BoxShape.circle)),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                'Agonista: $agonist (100%)',
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFFFFB340), shape: BoxShape.circle)),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                'Sinergistas: $synergists',
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white70, fontSize: 10),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    child: _buildMetricItem(
+                      label: 'Tempo de Ejecución',
+                      value: exercise.tempo.isNotEmpty ? exercise.tempo : '3-1-1',
+                      icon: Icons.timer_outlined,
+                      color: const Color(0xFF8BE0C0),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _isPosteriorTarget ? const Color(0xFF261D10) : const Color(0xFF10261E),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: _isPosteriorTarget ? const Color(0xFFFFB340) : const Color(0xFF8BE0C0)),
-                    ),
-                    child: Text(
-                      _isPosteriorTarget ? 'Plano Posterior' : 'Plano Anterior',
-                      style: TextStyle(
-                        color: _isPosteriorTarget ? const Color(0xFFFFB340) : const Color(0xFF8BE0C0),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  Container(width: 1, height: 32, color: Colors.white12),
+                  Expanded(
+                    child: _buildMetricItem(
+                      label: 'Nivel / Carga',
+                      value: intensity,
+                      icon: Icons.speed_rounded,
+                      color: const Color(0xFFFFB340),
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCameraAngleButton({
-    required String label,
-    required IconData icon,
-    required String orbit,
-    required bool isActive,
-  }) {
-    return InkWell(
-      onTap: () => setState(() => _currentOrbit = orbit),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF1F3854) : const Color(0xCC0E1828),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isActive ? const Color(0xFF64B5F6) : Colors.white12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: isActive ? const Color(0xFF64B5F6) : Colors.white70),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? const Color(0xFF64B5F6) : Colors.white70,
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
               ),
             ),
           ],
@@ -522,8 +378,99 @@ class _Muscular3DViewerState extends State<_Muscular3DViewer> {
       ),
     );
   }
-}
 
+  Widget _buildCard({
+    required String title,
+    required String muscle,
+    required int percentage,
+    required Color color,
+    required IconData icon,
+    required String description,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F192B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w700),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '$percentage%',
+                  style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            muscle,
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: percentage / 100.0,
+              backgroundColor: const Color(0xFF16253B),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            description,
+            style: const TextStyle(color: Colors.white60, fontSize: 9.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricItem({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.white60, fontSize: 9.5)),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w800),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
 
 /// Panel inferior deslizable con los datos del ejercicio.
 ///

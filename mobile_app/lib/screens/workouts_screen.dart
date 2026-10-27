@@ -1263,7 +1263,7 @@ class _DayCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: const Text('Ver 3D'),
+                  label: const Text('Ver Atlas'),
                   onPressed: () => onExerciseTap(item, exercises),
                 ),
               );

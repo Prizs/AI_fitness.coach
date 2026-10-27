@@ -714,7 +714,7 @@ class WeeklyPlanService extends ChangeNotifier {
       }
     }
     if (requestedIndices.isEmpty) {
-      requestedIndices.addAll([todayIndex, (todayIndex + 2) % 7]);
+      requestedIndices.addAll([0, 1, 2, 3, 4]); // Lunes a Viernes por defecto
     }
 
     final defaultNutrition = {
@@ -812,9 +812,9 @@ class WeeklyPlanService extends ChangeNotifier {
             'weekday_name': _weekdayNames[i],
             'title': isTarget
                 ? title
-                : (i == 1 || i == 3)
-                    ? 'Recuperación Muscular 48-72h / Tren Superior o Core'
-                    : 'Descanso Activo / Regeneración Muscular',
+                : (i == 5 || i == 6)
+                    ? 'Descanso y Supercompensación Muscular'
+                    : 'Acondicionamiento y Recuperación Activa',
             'is_training': isTarget && (exercises as List).isNotEmpty,
             'exercises': isTarget ? exercises : [],
             'nutrition': isTarget ? nutrition : defaultNutrition,

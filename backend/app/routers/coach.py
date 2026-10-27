@@ -150,13 +150,24 @@ def _detect_requested_training_days(user_msg: str) -> list[str]:
     if "lunes a sabado" in msg or "lunes a sábado" in msg:
         return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
 
+    # Si menciona días intermedios (Martes y Jueves) para complementar o relacionar,
+    # debe conservarse la semana completa (Lunes a Viernes) para que no se vacíen los demás días!
+    if any(k in msg for k in ("intermedio", "intermedios", "complement", "relacionar", "mientras descansan")):
+        return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+
+    # Solamente si el usuario pide explícitamente restringir su entrenamiento a esos días exclusivos:
+    is_exclusive_request = any(k in msg for k in (
+        "solo", "únicamente", "unicamente", "solamente", "únicos días", "unicos dias",
+        "solo entreno", "solo puedo", "solo los", "únicamente los"
+    ))
+
     days = []
     for k, d in day_map.items():
         if re.search(r"\b" + k + r"\b", msg):
             if d not in days:
                 days.append(d)
 
-    if len(days) >= 2:
+    if is_exclusive_request and len(days) >= 2:
         week_order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
         return [d for d in week_order if d in days]
 
@@ -1465,7 +1476,7 @@ def _normalize_structured_plan(
                     "rest_advice": f"Hoy {d} tus fibras musculares descansan para reparar el tejido muscular y supercompensar.",
                 }
     elif is_complementary_days:
-        recommended_days = ["Lunes", "Martes", "Miércoles", "Jueves"]
+        recommended_days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
         for d in week_order:
             if d == "Martes":
                 days_schedule[d] = {
@@ -1507,6 +1518,16 @@ def _normalize_structured_plan(
                     "exercises": _normalize_exercises(
                         legs_hams + legs_unipodal_calves[:2],
                         intensity=intensity, level=level, requested_focus="piernas"
+                    ),
+                }
+            elif d == "Viernes":
+                days_schedule[d] = {
+                    "day_name": d,
+                    "is_rest": False,
+                    "title": f"Rutina: Full Body Funcional, Core y Brazos ({level} · {badge_lbl})",
+                    "exercises": _normalize_exercises(
+                        upper_arms_torso + core_obliques + legs_power_mob[:1],
+                        intensity=intensity, level=level, requested_focus="tren_superior_core"
                     ),
                 }
             else:
@@ -2378,13 +2399,26 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
    - **Nivel Avanzado (Intensidad Alta)**: Ejercicios compuestos pesados o alta exigencia neuromuscular.
    - REGLA DE DESACOPLAMIENTO: Nivel de experiencia ({effective_level}) e Intensidad ({effective_intensity}) son totalmente independientes.
 
-3. REGLA DE ADAPTACIÓN TOTAL AL DESEO DEL ATLETA:
+3. REGLA DE ADAPTACIÓN TOTAL AL DESEO DEL ATLETA Y PERIODIZACIÓN SEMANAL (LUNES A VIERNES):
+   - El descanso neuromuscular de 48-72h aplica **AL MISMO GRUPO MUSCULAR**, NO implica que el usuario deba cesar el entrenamiento durante la semana:
+     * Si el Lunes entrena Piernas (Cuádriceps/Glúteos), el Martes puede entrenar libremente Tren Superior o Zona Dorsal!
+     * El Miércoles entrena Core, Abdomen y Cardio Funcional!
+     * El Jueves retoma Piernas con diferente subgrupo (Isquios/Femorales y Batatas/Sóleo)!
+     * El Viernes entrena Tren Superior (Pecho, Hombros y Brazos)!
+     * Los fines de semana son de recuperación activa y supercompensación.
    - Si el usuario solicita explícitamente entrenar solo piernas o una sola zona toda la semana (ej: 'solo de piernas', 'semana de piernas'): RESPETA TOTALMENTE SU SOLICITUD. Diseña ejercicios de esa zona para sus días de entrenamiento, variando los subgrupos (ej: cuádriceps, glúteos, isquiotibiales/femoral, pantorrillas y potencia/movilidad) para optimizar la recuperación entre patrones motores.
    - Si el usuario solicita sub-áreas anatómicas específicas de piernas (ej: batatas, pantorrillas, tríceps sural, sóleo, pies, tobillos, cuádriceps, femorales o glúteos, o combinaciones como tríceps y toda la pierna):
      RESPETA 100% SU ESPECIFICACIÓN. Genera ejercicios dedicados exclusivamente a esas áreas anatómicas biomecánicas.
-   - REGLA DE VARIEDAD ABSOLUTA (CERO EJERCICIOS REPETIDOS): Si el plan incluye múltiples días (ej. Martes y Jueves, o Lunes a Viernes), ESTÁ TERMINANTEMENTE PROHIBIDO colocar los mismos ejercicios en dos días de la misma semana. Diseña ejercicios completamente distintos en cada día (Día A: Cuádriceps y Glúteos; Día B: Isquiotibiales, Femoral y Batatas/Sóleo).
-   - Si el usuario solicita combinar múltiples zonas (ej: 'piernas + core', 'piernas + tren superior', 'pecho y core', 'tríceps y piernas'): genera una rutina que combine exactamente esas áreas en cada sesión.
-   - Si el usuario no especificó una zona particular o pidió el plan general/semanal por defecto, distribuye armónicamente: Lunes Piernas (Cuádriceps), Martes Tren Superior, Miércoles Core/Cardio, Jueves Piernas (Femoral y Batatas), Viernes Tren Superior (Hombros/Brazos), y Fin de semana descanso.
+   - REGLA DE VARIEDAD ABSOLUTA (CERO EJERCICIOS REPETIDOS): En cualquier plan semanal, ESTÁ TERMINANTEMENTE PROHIBIDO colocar los mismos ejercicios en dos días de la misma semana. Diseña ejercicios completamente distintos en cada día.
+
+5. REGLA OBLIGATORIA DE ENTRENAMIENTO COMBINADO EN EL MISMO DÍA (BLOQUES DE 2 / SUPERSERIES ANTAGONISTAS):
+   - Si el usuario solicita combinar múltiples ejercicios o áreas musculares en un mismo día (ej: 'piernas y dorsal', 'tren superior y core', 'tríceps y piernas', o múltiples áreas):
+   - DEBES organizar los ejercicios en **Bloques de 2 alternados (superseries agonista-antagonista o tren inferior + tren superior)**:
+     * Bloque 1: Ejercicio Zona A (ej. Sentadilla o Prensa) + Ejercicio Zona B (ej. Jalón dorsal o Remo con mancuerna).
+     * Bloque 2: Ejercicio Zona A (ej. Peso muerto rumano o Hip Thrust) + Ejercicio Zona B (ej. Press militar o Extensiones de tríceps).
+     * Bloque 3: Ejercicio de Estabilidad / Accesorio (ej. Plancha frontal isométrica o Elevación de talones / sóleo).
+   - En tu respuesta explicativa, aclara explícitamente la ventaja biomecánica:
+     'He organizado tus ejercicios en **Bloques de 2 (estímulo alternado agonista-antagonista)**, que es la forma fisiológicamente más óptima: mientras un grupo muscular descansa y recupera sus depósitos de fosfocreatina (ATP-PC), trabajas el grupo no competidor. Esto ahorra tiempo, eleva la densidad del entrenamiento y evita la fatiga neural prematura.'
 
 4. REGLA OBLIGATORIA DE NUTRICIÓN ADAPTADA A VENEZUELA (MERCADO LOCAL ACCESIBLE):
    - Todos los planes de alimentación DEBEN usar ingredientes económicos y fáciles de conseguir en Venezuela:
@@ -2404,9 +2438,9 @@ Retorna EXCLUSIVAMENTE un objeto JSON válido con esta estructura exacta:
   "suggest_questionnaire": false,
   "has_plan": true,
   "structured_plan": {{
-    "day": "{'Martes y Jueves' if is_complementary else 'Lunes y Miércoles'}",
+    "day": "Lunes a Viernes (Semanal)",
     "title": "Rutina personalizada ({effective_level} - Intensidad {effective_intensity})",
-    "recommended_days": {json.dumps(['Martes', 'Jueves'] if is_complementary else ['Lunes', 'Miércoles'])},
+    "recommended_days": ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"],
     "complementary_days": {{
       "Martes": "Tren Superior Suave o Core",
       "Jueves": "Movilidad Articular o Tren Superior"
