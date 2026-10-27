@@ -5,8 +5,8 @@ import 'package:mobile_app/widgets/muscle_map_view.dart';
 /// Pantalla de demostración didáctica del modelo anatómico y técnica.
 ///
 /// Ofrece 3 modos de visualización avanzados y certificados:
-/// 0: Atlas Anatómico de Músculos (resaltado interactivo frontal/dorsal de agonistas y sinergistas).
-/// 1: Técnica Real (GIF) animado en bucle adaptado.
+/// 0: Técnica Real (GIF) animado en bucle adaptado.
+/// 1: Atlas Anatómico de Músculos (resaltado interactivo frontal/dorsal de agonistas y sinergistas).
 /// 2: Reclutamiento Muscular y Biomecánica (telemetría porcentual de activación).
 class AnatomyWorkoutScreen extends StatefulWidget {
   const AnatomyWorkoutScreen({
@@ -26,8 +26,8 @@ class AnatomyWorkoutScreen extends StatefulWidget {
 
 class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
   late AnatomyExercise _exercise;
-  bool _autoRotate = true;
-  int _viewMode = 0; // 0: GIF, 1: Atlas Muscular, 2: 3D Muscular con Marcadores
+  final bool _autoRotate = true;
+  int _viewMode = 0; // 0: Técnica Real (GIF), 1: Atlas Muscular, 2: Reclutamiento Muscular
 
   /// Altura de la zona visual: la mitad superior de la pantalla.
   static const double _viewerHeight = 330;
@@ -54,13 +54,13 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
   String _appBarTitle() {
     switch (_viewMode) {
       case 0:
-        return 'Atlas Anatómico de Músculos';
+        return 'Guía de Ejecución y Técnica Real';
       case 1:
-        return 'Guía de Ejecución y Técnica';
+        return 'Atlas Anatómico de Músculos';
       case 2:
         return 'Reclutamiento y Biomecánica';
       default:
-        return 'Anatomía y Técnica';
+        return 'Técnica y Anatomía';
     }
   }
 
@@ -104,16 +104,16 @@ class _AnatomyWorkoutScreenState extends State<AnatomyWorkoutScreen> {
                 children: [
                   _buildModeChip(
                     mode: 0,
-                    icon: Icons.accessibility_new_rounded,
-                    label: 'Atlas Muscular',
-                    color: const Color(0xFFFFB340),
+                    icon: Icons.play_circle_fill_rounded,
+                    label: 'Técnica Real (GIF)',
+                    color: const Color(0xFF1FAE87),
                   ),
                   const SizedBox(width: 10),
                   _buildModeChip(
                     mode: 1,
-                    icon: Icons.play_circle_fill_rounded,
-                    label: 'Técnica Real (GIF)',
-                    color: const Color(0xFF1FAE87),
+                    icon: Icons.accessibility_new_rounded,
+                    label: 'Atlas Muscular',
+                    color: const Color(0xFFFFB340),
                   ),
                   const SizedBox(width: 10),
                   _buildModeChip(
@@ -206,8 +206,8 @@ class _Viewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Modo 0: Atlas Anatómico de Músculos (resaltado con precisión en rojo y ámbar)
-    if (viewMode == 0) {
+    // Modo 1: Atlas Anatómico de Músculos (resaltado con precisión en rojo y ámbar)
+    if (viewMode == 1) {
       return Container(
         color: const Color(0xFF070C16),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -226,7 +226,7 @@ class _Viewer extends StatelessWidget {
       );
     }
 
-    // Modo 1: Técnica Real (GIF garantizado y adaptado)
+    // Modo 0: Técnica Real (GIF garantizado y adaptado)
     final effectiveGifUrl = resolveGuaranteedGifUrl(
       name: exercise.name,
       agonist: exercise.agonist,
@@ -392,7 +392,7 @@ class _MuscleRecruitmentView extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF0F192B),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,7 +410,7 @@ class _MuscleRecruitmentView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.18),
+                  color: color.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
