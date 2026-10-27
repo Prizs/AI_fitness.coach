@@ -18,6 +18,19 @@ class CoachChatService extends ChangeNotifier {
   bool get hasMessages => _messages.isNotEmpty;
   int get count => _messages.length;
 
+  /// Obtiene el plan estructurado más reciente generado por el Coach IA en la conversación.
+  Map<String, dynamic>? get latestRecommendedPlan {
+    for (final m in _messages.reversed) {
+      if (m['isUser'] == false && m['plan'] is Map) {
+        final p = Map<String, dynamic>.from(m['plan'] as Map);
+        if (p['days_schedule'] is Map || (p['exercises'] is List && (p['exercises'] as List).isNotEmpty)) {
+          return p;
+        }
+      }
+    }
+    return null;
+  }
+
   /// Inicializa o carga el historial existente desde memoria o almacenamiento local.
   Future<void> init({String? cedula}) async {
     final targetCedula = (cedula != null && cedula.isNotEmpty)

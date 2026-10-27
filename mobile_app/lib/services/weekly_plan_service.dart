@@ -186,12 +186,37 @@ class WeeklyPlanService extends ChangeNotifier {
     return list;
   }
 
+  bool get isPlanExpired {
+    if (week == null) return false;
+    if (week?['is_expired'] == true) return true;
+    final mondayStr = week?['week_monday'] as String?;
+    if (mondayStr != null) {
+      final planMonday = DateTime.tryParse(mondayStr);
+      if (planMonday != null && currentWeekMonday.isAfter(planMonday)) {
+        return true;
+      }
+    }
+    final createdAtStr = week?['created_at'] as String?;
+    if (createdAtStr != null) {
+      final created = DateTime.tryParse(createdAtStr);
+      if (created != null) {
+        final createdMonday = DateTime(created.year, created.month, created.day)
+            .subtract(Duration(days: created.weekday - 1));
+        if (currentWeekMonday.isAfter(createdMonday)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   bool get hasActivePlan {
+    if (isPlanExpired) return false;
     return week != null && days.any((d) => (d['exercises'] as List?)?.isNotEmpty == true);
   }
 
   Future<void> ensureLoaded(UserProfile? profile) {
-    if (week != null) {
+    if (week != null && !isPlanExpired) {
       isLoading = false;
       return Future<void>.value();
     }
@@ -210,6 +235,25 @@ class WeeklyPlanService extends ChangeNotifier {
         try {
           final decoded = jsonDecode(cachedJson);
           if (decoded is Map<String, dynamic>) {
+            final mondayStr = decoded['week_monday'] as String?;
+            if (mondayStr != null) {
+              final planMonday = DateTime.tryParse(mondayStr);
+              if (planMonday != null && currentWeekMonday.isAfter(planMonday)) {
+                decoded['is_expired'] = true;
+              }
+            } else {
+              final createdAtStr = decoded['created_at'] as String?;
+              if (createdAtStr != null) {
+                final created = DateTime.tryParse(createdAtStr);
+                if (created != null) {
+                  final createdMonday = DateTime(created.year, created.month, created.day)
+                      .subtract(Duration(days: created.weekday - 1));
+                  if (currentWeekMonday.isAfter(createdMonday)) {
+                    decoded['is_expired'] = true;
+                  }
+                }
+              }
+            }
             week = decoded;
             loadedFromCache = true;
           }
@@ -780,6 +824,8 @@ class WeeklyPlanService extends ChangeNotifier {
       week = {
         'id': 'coach_plan_${DateTime.now().millisecondsSinceEpoch}',
         'goal': title,
+        'week_monday': currentWeekMonday.toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
         'days': newDays,
       };
 
@@ -804,6 +850,8 @@ class WeeklyPlanService extends ChangeNotifier {
       week = {
         'id': 'coach_plan_${DateTime.now().millisecondsSinceEpoch}',
         'goal': title,
+        'week_monday': currentWeekMonday.toIso8601String(),
+        'created_at': DateTime.now().toIso8601String(),
         'days': List.generate(7, (i) {
           final isTarget = targetSet.contains(i);
           if (isTarget) assignedDayNames.add(_weekdayNames[i]);

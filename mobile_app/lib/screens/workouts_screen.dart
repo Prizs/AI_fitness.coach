@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/services/coach_chat_service.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/database/db_helper.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
@@ -24,8 +25,27 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   @override
   void initState() {
     super.initState();
-    _service.ensureLoaded(AuthService.instance.loggedInUser);
-    _loadCompletedDays();
+    _initSchedule();
+  }
+
+  Future<void> _initSchedule() async {
+    await CoachChatService.instance.init();
+    await _service.ensureLoaded(AuthService.instance.loggedInUser);
+
+    // Sincronización automática de concordancia: Si el Coach IA recomendó un plan para esta semana
+    // y Rutinas aún tiene un plan con menos días o desactualizado, sincronizarlo inmediatamente:
+    final latestCoachPlan = CoachChatService.instance.latestRecommendedPlan;
+    if (latestCoachPlan != null) {
+      final currentTrainingDays = _service.activeTrainingDayNames.length;
+      final coachDaysSched = latestCoachPlan['days_schedule'] as Map?;
+      final int coachTrainingCount = coachDaysSched != null
+          ? coachDaysSched.values.where((d) => d is Map && d['is_rest'] == false && (d['exercises'] as List?)?.isNotEmpty == true).length
+          : 0;
+      if (_service.week == null || _service.isPlanExpired || (coachTrainingCount > currentTrainingDays && coachTrainingCount >= 3)) {
+        await _service.injectCustomPlanForToday(latestCoachPlan);
+      }
+    }
+    await _loadCompletedDays();
   }
 
   Future<void> _loadCompletedDays() async {
@@ -617,6 +637,21 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   }
 
   Widget _buildBody() {
+    if (_service.isPlanExpired) {
+      return _EmptyState(
+        icon: Icons.event_repeat_rounded,
+        title: '¡Ciclo Semanal Culminado! 🏁',
+        message:
+            'Tu semana de entrenamiento anterior ha finalizado con éxito.\n\nEs momento de diseñar tu nuevo plan de entrenamiento con el Coach IA para la semana en curso, adaptado a tu progreso y estado actual.',
+        buttonLabel: 'Crear Nuevo Plan en Coach IA',
+        onRetry: () async {
+          await _service.clearWeeklyPlan();
+          _openCoach();
+        },
+        isError: false,
+      );
+    }
+
     if (_service.week == null) {
       if (_service.isLoading) {
         return const Center(
@@ -1005,11 +1040,20 @@ class _ActiveCycleCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState(
-      {required this.message, required this.onRetry, this.isError = true});
+  const _EmptyState({
+    required this.message,
+    required this.onRetry,
+    this.title = 'Rutinas Programadas',
+    this.icon = Icons.smart_toy_rounded,
+    this.buttonLabel = 'Crear mi rutina en Coach IA',
+    this.isError = true,
+  });
 
   final String message;
   final VoidCallback onRetry;
+  final String title;
+  final IconData icon;
+  final String buttonLabel;
   final bool isError;
 
   @override
@@ -1020,15 +1064,15 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.smart_toy_rounded,
+            Icon(
+              icon,
               size: 58,
-              color: Color(0xFF2DD4BF),
+              color: const Color(0xFF2DD4BF),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Rutinas Programadas',
-              style: TextStyle(
+            Text(
+              title,
+              style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.bold),
@@ -1046,10 +1090,10 @@ class _EmptyState extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               ),
               onPressed: onRetry,
-              icon: const Icon(Icons.smart_toy_rounded),
-              label: const Text(
-                'Crear mi rutina en Coach IA',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              icon: Icon(icon),
+              label: Text(
+                buttonLabel,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ],

@@ -177,6 +177,7 @@ class _CoachScreenState extends State<CoachScreen> {
         _messages.clear();
         _messages.addAll(CoachChatService.instance.messages);
       });
+      _syncLatestPlanWithSchedule();
       _scrollToBottom();
     }
 
@@ -219,11 +220,28 @@ class _CoachScreenState extends State<CoachScreen> {
               _messages.clear();
               _messages.addAll(restored);
             });
+            _syncLatestPlanWithSchedule();
             _scrollToBottom();
           }
         }
       }
     } catch (_) {}
+  }
+
+  void _syncLatestPlanWithSchedule() {
+    final latestPlan = CoachChatService.instance.latestRecommendedPlan;
+    if (latestPlan != null) {
+      final currentTrainingDays = WeeklyPlanService.instance.activeTrainingDayNames.length;
+      final coachDaysSched = latestPlan['days_schedule'] as Map?;
+      final int coachTrainingCount = coachDaysSched != null
+          ? coachDaysSched.values.where((d) => d is Map && d['is_rest'] == false && (d['exercises'] as List?)?.isNotEmpty == true).length
+          : 0;
+      if (WeeklyPlanService.instance.week == null ||
+          WeeklyPlanService.instance.isPlanExpired ||
+          (coachTrainingCount > currentTrainingDays && coachTrainingCount >= 3)) {
+        WeeklyPlanService.instance.injectCustomPlanForToday(latestPlan);
+      }
+    }
   }
 
   Future<void> _requestInitialGreeting() async {
@@ -577,6 +595,12 @@ class _CoachScreenState extends State<CoachScreen> {
   Map<String, dynamic>? _sanitizeClientPlan(dynamic rawPlan, String userMsg) {
     if (rawPlan is! Map) return null;
     final plan = Map<String, dynamic>.from(rawPlan);
+
+    // Si el backend ya estructuró days_schedule con días completos de la semana, respetarlo íntegramente
+    if (plan.containsKey('days_schedule') && plan['days_schedule'] is Map && (plan['days_schedule'] as Map).isNotEmpty) {
+      return plan;
+    }
+
     final msgLower = userMsg.toLowerCase();
     final isCompRequest = msgLower.contains('martes y jueves') ||
         msgLower.contains('días intermedios') ||
@@ -840,11 +864,18 @@ class _CoachScreenState extends State<CoachScreen> {
           }
         }
 
+        final structuredPlan = data['has_plan'] == true ? _sanitizeClientPlan(data['structured_plan'], text) : null;
+        if (structuredPlan != null) {
+          structuredPlan['is_added_to_schedule'] = true;
+          // Sincronización automática de concordancia con el cronograma y Rutinas
+          WeeklyPlanService.instance.injectCustomPlanForToday(structuredPlan);
+        }
+
         setState(() {
           _messages.add({
             'isUser': false,
             'text': replyText,
-            'plan': data['has_plan'] == true ? _sanitizeClientPlan(data['structured_plan'], text) : null,
+            'plan': structuredPlan,
             'category': data['category'],
             'rule': data['progression_rule'],
             'suggest_questionnaire': showStateBtn,
