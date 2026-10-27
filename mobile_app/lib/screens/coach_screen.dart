@@ -230,7 +230,7 @@ class _CoachScreenState extends State<CoachScreen> {
 
   void _syncLatestPlanWithSchedule() {
     final latestPlan = CoachChatService.instance.latestRecommendedPlan;
-    if (latestPlan != null) {
+    if (latestPlan != null && latestPlan['is_added_to_schedule'] == true) {
       final currentTrainingDays = WeeklyPlanService.instance.activeTrainingDayNames.length;
       final coachDaysSched = latestPlan['days_schedule'] as Map?;
       final int coachTrainingCount = coachDaysSched != null
@@ -866,9 +866,7 @@ class _CoachScreenState extends State<CoachScreen> {
 
         final structuredPlan = data['has_plan'] == true ? _sanitizeClientPlan(data['structured_plan'], text) : null;
         if (structuredPlan != null) {
-          structuredPlan['is_added_to_schedule'] = true;
-          // Sincronización automática de concordancia con el cronograma y Rutinas
-          WeeklyPlanService.instance.injectCustomPlanForToday(structuredPlan);
+          structuredPlan['is_added_to_schedule'] = false;
         }
 
         setState(() {
@@ -1745,15 +1743,16 @@ class _CoachScreenState extends State<CoachScreen> {
                                               return;
                                             }
                                             final scheduleResult = await WeeklyPlanService.instance.injectCustomPlanForToday(plan);
-                                            if (!context.mounted) return;
                                             setState(() {
                                               plan['is_added_to_schedule'] = true;
                                             });
+                                            await _saveHistoryLocally();
+                                            if (!context.mounted) return;
                                             final assignedDays = (scheduleResult['assigned_days'] as List?)?.join(', ') ?? 'fechas disponibles';
                                             final bool preserved = (scheduleResult['preserved_routines_count'] as int? ?? 0) > 0;
                                             final String message = preserved
-                                                ? '✅ ¡Rutinas y nutrición vigentes conservadas! Lo nuevo se programó en fechas disponibles: ' + assignedDays
-                                                : '✅ ¡Añadido al cronograma en: ' + assignedDays + '!';
+                                                ? '✅ ¡Rutinas y nutrición vigentes conservadas! Lo nuevo se programó en: $assignedDays. Ve a la pestaña Rutinas para verlo.'
+                                                : '✅ ¡Añadido al cronograma semanal en: $assignedDays! Ve a la pestaña Rutinas para verlo.';
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
                                                 content: Text(message),

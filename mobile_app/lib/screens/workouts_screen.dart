@@ -32,10 +32,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     await CoachChatService.instance.init();
     await _service.ensureLoaded(AuthService.instance.loggedInUser);
 
-    // Sincronización automática de concordancia: Si el Coach IA recomendó un plan para esta semana
-    // y Rutinas aún tiene un plan con menos días o desactualizado, sincronizarlo inmediatamente:
+    // Sincronización de concordancia: Si el Coach IA recomendó un plan y el usuario pulsó 'Agregar a Cronograma',
+    // sincronizarlo para asegurar que Rutinas refleje los 5 días completos sin desajustes:
     final latestCoachPlan = CoachChatService.instance.latestRecommendedPlan;
-    if (latestCoachPlan != null) {
+    if (latestCoachPlan != null && latestCoachPlan['is_added_to_schedule'] == true) {
       final currentTrainingDays = _service.activeTrainingDayNames.length;
       final coachDaysSched = latestCoachPlan['days_schedule'] as Map?;
       final int coachTrainingCount = coachDaysSched != null

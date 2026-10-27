@@ -21,7 +21,7 @@ def _read_pubspec_version() -> tuple[str, int]:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
                 return raw_ver, 106
-    return "1.0.71", 111
+    return "1.0.72", 112
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -41,16 +41,16 @@ def latest_version() -> dict:
     size = apk.stat().st_size if apk else 64077417
     return {
         "available": True,
-        "version_name": "1.0.67",
-        "version_code": 107,
+        "version_name": "1.0.72",
+        "version_code": 112,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.67:\n"
-            "1. Especificación anatómica precisa en Coach IA: selección de sub-áreas musculares (pantorrillas/batatas/sóleo, pies, tríceps + pierna completa, cuádriceps, femorales, glúteos).\n"
-            "2. Cero duplicados en cronogramas: sesiones variadas y equilibradas de Lunes a Viernes con más de 1300 ejercicios sin repetición.\n"
-            "3. Módulo de Progreso Inteligente: carga de 1 o 2 fotos (corporal y/o balanza digital/mecánica) con lectura por IA OCR del peso corporal.\n"
-            "4. Gráfica de evolución multidimensional: seguimiento de Definición Muscular (pts), Grasa Corporal (%) y Peso en Balanza (kg)."
+            "Actualización oficial de AI Fitness Coach v1.0.72:\n"
+            "1. Confirmación de cronograma semanal: el usuario decide cuándo sincronizar el plan generado pulsando 'Agregar a Cronograma y Nutrición'.\n"
+            "2. Concordancia semanal total: persistencia de los 5 días de entrenamiento (L-V) con ejercicios variados y sin duplicaciones.\n"
+            "3. Detección de ciclo culminado: Rutinas notifica cuando termina la semana para planificar el siguiente ciclo con el Coach IA.\n"
+            "4. Vista anatómica optimizada: Técnica Real GIF como pestaña principal por defecto junto con el Atlas Muscular interactivo."
         ),
         "download_url": "/api/app/download",
     }
