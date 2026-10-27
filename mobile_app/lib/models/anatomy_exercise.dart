@@ -62,7 +62,15 @@ String resolveGuaranteedGifUrl({
   String? existingUrl,
 }) {
   if (existingUrl != null && existingUrl.trim().isNotEmpty) {
-    return existingUrl.trim();
+    final cleanExisting = existingUrl.trim();
+    final nameLower = name.toLowerCase();
+    // Si la URL existente es un fallback genérico de talones de pie pero el ejercicio es sentado o unipodal, corregir al GIF exacto:
+    final bool isGenericStanding = cleanExisting.contains('standing-calf-raise');
+    final bool isActuallySeated = nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated');
+    final bool isActuallyUnipodal = nameLower.contains('unipodal') || nameLower.contains('una pierna') || nameLower.contains('single leg');
+    if (!isGenericStanding || (!isActuallySeated && !isActuallyUnipodal)) {
+      return cleanExisting;
+    }
   }
   final text = '${name.toLowerCase()} ${agonist.toLowerCase()}';
   final intLower = intensityLevel.toLowerCase();
@@ -78,6 +86,9 @@ String resolveGuaranteedGifUrl({
                 : 'hamstrings/lever-seated-leg-curl.gif'));
   }
   if (text.contains('prensa') || text.contains('leg press')) {
+    if (text.contains('gemelo') || text.contains('pantorrilla') || text.contains('talon') || text.contains('calf')) {
+      return _kGifBase + 'calves/sled-calf-press-on-leg-press.gif';
+    }
     return _kGifBase +
         (isLow
             ? 'quads/lever-alternate-leg-press.gif'
@@ -97,11 +108,32 @@ String resolveGuaranteedGifUrl({
                 ? 'glutes/barbell-glute-bridge.gif'
                 : 'glutes/glute-bridge-two-legs-on-bench-male.gif'));
   }
-  if (text.contains('gemelo') || text.contains('pantorrilla') || text.contains('talon') || text.contains('talón') || text.contains('calf')) {
+  if (text.contains('gemelo') || text.contains('pantorrilla') || text.contains('talon') || text.contains('talón') || text.contains('calf') || text.contains('soleo') || text.contains('sóleo') || text.contains('batata') || text.contains('tibial')) {
+    if (text.contains('sentado') || text.contains('silla') || text.contains('seated')) {
+      return _kGifBase +
+          (isLow
+              ? 'calves/seated-calf-stretch-male.gif'
+              : (isHigh ? 'calves/barbell-seated-calf-raise.gif' : 'calves/lever-seated-calf-raise.gif'));
+    }
+    if (text.contains('unipodal') || text.contains('una pierna') || text.contains('single leg') || text.contains('unilateral')) {
+      return _kGifBase +
+          (isLow
+              ? 'calves/band-single-leg-calf-raise.gif'
+              : (isHigh ? 'calves/single-leg-calf-raise-on-a-dumbbell.gif' : 'calves/dumbbell-single-leg-calf-raise.gif'));
+    }
+    if (text.contains('prensa') || text.contains('sled')) {
+      return _kGifBase + (isHigh ? 'calves/sled-45-calf-press.gif' : 'calves/sled-calf-press-on-leg-press.gif');
+    }
+    if (text.contains('donkey') || text.contains('burro')) {
+      return _kGifBase + (isHigh ? 'calves/weighted-donkey-calf-raise.gif' : 'calves/donkey-calf-raise.gif');
+    }
+    if (text.contains('tibial') || text.contains('dorsiflex') || text.contains('tobillo') || text.contains('pie')) {
+      return _kGifBase + (isHigh ? 'calves/box-jump-down-with-one-leg-stabilization.gif' : 'calves/posterior-tibialis-stretch.gif');
+    }
     return _kGifBase +
         (isLow
             ? 'calves/bodyweight-standing-calf-raise.gif'
-            : 'calves/dumbbell-standing-calf-raise.gif');
+            : (isHigh ? 'calves/lever-standing-calf-raise.gif' : 'calves/dumbbell-standing-calf-raise.gif'));
   }
   if (text.contains('abduc')) {
     return _kGifBase +

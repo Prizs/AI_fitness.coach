@@ -291,10 +291,76 @@ CURATED_BY_INTENSITY = [
         "posture": "Escápulas retraídas, abdomen firme y carga pegada a los muslos durante todo el recorrido.",
         "warning": "Jamás redondees la zona lumbar; desciende solo hasta donde tu flexibilidad de isquiotibiales lo permita.",
     },
-    # 10. Elevación de Talones / Gemelos (Calf Raise)
+    # 10. Elevación de Talones / Gemelos y Pantorrillas (Variaciones Anatómicas Precisas)
+    # 10a. Elevación de Talones Sentado en Máquina o con Mancuerna / Sóleo
     {
-        "match_any": ("gemelo", "pantorrilla", "talon", "calf", "calves", "soleo"),
+        "match_any": ("talones en maquina sentado", "talon sentado", "talones sentado", "seated calf", "soleo sentado", "batata sentado", "batatas sentado", "pantorrilla sentado"),
         "exclude_any": (),
+        "gifs": {
+            "baja": "calves/seated-calf-stretch-male.gif",
+            "media": "calves/lever-seated-calf-raise.gif",
+            "alta": "calves/barbell-seated-calf-raise.gif",
+        },
+        "biomechanics": "Flexión plantar con rodillas flexionadas a 90° para aislar selectivamente el músculo sóleo eliminando la acción del gastrocnemio.",
+        "posture": "Espalda recta, almohadillas firmemente fijadas sobre los muslos y pausa de 1 segundo en la contracción alta.",
+        "warning": "No permitas que las almohadillas reboten contra los muslos en la parte baja para proteger el tendón.",
+    },
+    # 10b. Elevación de Talones Unipodal / a Una Pierna en Escalón
+    {
+        "match_any": ("unipodal", "a una pierna", "unilateral", "single leg calf", "unipodal en escalon", "talones a una pierna"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "calves/band-single-leg-calf-raise.gif",
+            "media": "calves/dumbbell-single-leg-calf-raise.gif",
+            "alta": "calves/single-leg-calf-raise-on-a-dumbbell.gif",
+        },
+        "biomechanics": "Trabajo unilateral de fuerza y propiocepción estimulando el tríceps sural y los estabilizadores del pie y tobillo.",
+        "posture": "Apoyo metatarsiano en el borde del escalón con talón suspendido; desciende lentamente sintiendo el estiramiento profundo.",
+        "warning": "Mantén el equilibrio sujetándote con una mano si es necesario; no aceleres la fase de bajada.",
+    },
+    # 10c. Elevación de Talones en Prensa de Piernas
+    {
+        "match_any": ("talones en prensa", "pantorrilla en prensa", "sled calf", "calf press"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "calves/lever-seated-calf-press.gif",
+            "media": "calves/sled-calf-press-on-leg-press.gif",
+            "alta": "calves/sled-45-calf-press.gif",
+        },
+        "biomechanics": "Empuje de flexión plantar en prensa con rodillas casi extendidas reclutando la cabeza medial y lateral del gastrocnemio.",
+        "posture": "Solo las puntas de los pies apoyadas en la parte inferior de la plataforma; bloquea la seguridad de la prensa.",
+        "warning": "NUNCA flexiones las rodillas bruscamente durante el ejercicio para evitar atrapamiento articular.",
+    },
+    # 10d. Donkey Calf Raise / Tipo Burro
+    {
+        "match_any": ("donkey", "burro"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "calves/one-leg-donkey-calf-raise.gif",
+            "media": "calves/donkey-calf-raise.gif",
+            "alta": "calves/weighted-donkey-calf-raise.gif",
+        },
+        "biomechanics": "Flexión plantar con torso flexionado a 90°, maximizando el pre-estiramiento del gastrocnemio por la posición de cadera.",
+        "posture": "Espalda plana apoyada y rodillas extendidas sin bloqueo rígido.",
+        "warning": "Evita redondear la zona lumbar.",
+    },
+    # 10e. Tibial Anterior, Dorsiflexión y Movilidad de Pies
+    {
+        "match_any": ("dorsiflexion", "tibial anterior", "dorsiflexion tibial", "tobillo", "arco plantar", "pies"),
+        "exclude_any": ("sentadilla", "squat", "prensa", "lunge"),
+        "gifs": {
+            "baja": "calves/ankle-circles.gif",
+            "media": "calves/posterior-tibialis-stretch.gif",
+            "alta": "calves/box-jump-down-with-one-leg-stabilization.gif",
+        },
+        "biomechanics": "Dorsiflexión activa del tobillo para equilibrar el compartimento anterior de la pierna y prevenir periostitis tibial.",
+        "posture": "Sentado con pierna extendida o de pie con talones firmes, eleva las puntas de los pies hacia las espinillas.",
+        "warning": "Realiza movimientos controlados sin tirones bruscos.",
+    },
+    # 10f. Elevación de Talones de Pie (General / Con Mancuernas / Con Barra)
+    {
+        "match_any": ("gemelo", "pantorrilla", "talon", "calf", "calves", "soleo", "batata", "triceps sural"),
+        "exclude_any": ("sentado", "unipodal", "a una pierna", "prensa", "donkey", "tibial"),
         "gifs": {
             "baja": "calves/bodyweight-standing-calf-raise.gif",
             "media": "calves/dumbbell-standing-calf-raise.gif",

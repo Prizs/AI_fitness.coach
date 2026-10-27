@@ -242,6 +242,7 @@ class _Viewer extends StatelessWidget {
         children: [
           Image.network(
             effectiveGifUrl,
+            key: ValueKey('${exercise.id}_${exercise.name}_$effectiveGifUrl'),
             fit: BoxFit.contain,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;

@@ -21,7 +21,7 @@ def _read_pubspec_version() -> tuple[str, int]:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
                 return raw_ver, 106
-    return "1.0.72", 112
+    return "1.0.73", 113
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -41,16 +41,16 @@ def latest_version() -> dict:
     size = apk.stat().st_size if apk else 64077417
     return {
         "available": True,
-        "version_name": "1.0.72",
-        "version_code": 112,
+        "version_name": "1.0.73",
+        "version_code": 113,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.72:\n"
-            "1. Confirmación de cronograma semanal: el usuario decide cuándo sincronizar el plan generado pulsando 'Agregar a Cronograma y Nutrición'.\n"
-            "2. Concordancia semanal total: persistencia de los 5 días de entrenamiento (L-V) con ejercicios variados y sin duplicaciones.\n"
-            "3. Detección de ciclo culminado: Rutinas notifica cuando termina la semana para planificar el siguiente ciclo con el Coach IA.\n"
-            "4. Vista anatómica optimizada: Técnica Real GIF como pestaña principal por defecto junto con el Atlas Muscular interactivo."
+            "Actualización oficial de AI Fitness Coach v1.0.73:\n"
+            "1. GIFs anatómicos únicos por ejercicio: diferenciación biomecánica precisa entre elevación de talones sentado en máquina, unipodal en escalón y de pie.\n"
+            "2. Actualización instantánea en visor anatómico: refresco inmediato del GIF animado al alternar ejercicios desde la barra inferior.\n"
+            "3. Rutina completa de piernas sin repeticiones: distribución anatómica integral cubriendo Cuádriceps, Femorales, Glúteos y Sóleo/Batatas.\n"
+            "4. Alternancia muscular semanal: respeto de las 48-72h de recuperación alternando piernas con dorsal/tren superior y core."
         ),
         "download_url": "/api/app/download",
     }

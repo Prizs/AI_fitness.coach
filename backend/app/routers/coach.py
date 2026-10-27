@@ -191,16 +191,29 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
             "completa de pierna", "completa de piernas", "piernas completas", "pierna completa",
             "piernas completa", "pierna completo", "rutina completa de pierna", "rutina completa de piernas",
             "toda la pierna", "todas las piernas", "toda el area de la pierna", "toda el área de la pierna",
+            "todo el area del a pierna", "todo el area de la pierna", "todo el área de la pierna",
+            "todo el área de las piernas", "todo el area de las piernas",
+            "todo lo que viene siendo las especificaciones de las áreas de mi pierna",
+            "todo lo que viene siendo las especificaciones de las areas de mi pierna",
+            "todo lo que viene siendo el área de las piernas", "todo lo que viene siendo el area de las piernas",
             "todo lo que corresponde al area de las piernas", "todo lo que corresponde al área de las piernas",
+            "especificaciones de las áreas de mi pierna", "especificaciones de las areas de mi pierna",
+            "especificaciones de las áreas", "especificaciones de las areas",
+            "areas de mi pierna", "áreas de mi pierna", "area de mi pierna", "área de mi pierna",
             "composicion de la pierna", "composición de la pierna", "todas las areas de la pierna",
             "todas las áreas de la pierna", "todo el tren inferior", "tren inferior completo",
+            "entrenamiento de piernas", "entrenamiento de pierna", "rutina de piernas", "rutina de pierna",
+            "ejercicios de piernas", "ejercicios de pierna", "entrenamiento para piernas", "ejercicios para pierna",
         ))
 
         # 1. Combinaciones explícitas de múltiples áreas musculares o sub-zonas anatómicas
-        has_triceps_word = any(w in t for w in ("triceps", "tríceps"))
+        # Tríceps braquial (brazo) vs Tríceps sural (pantorrilla/batata):
+        is_triceps_sural = ("triceps sural" in t or "tríceps sural" in t)
+        has_arm_triceps_word = (("triceps" in t or "tríceps" in t) and not is_triceps_sural)
+
         # Usar regex para 'pie' y 'pies' para que NUNCA coincidan con 'pierna', 'piernas', etc.
-        has_calves_word = any(w in t for w in (
-            "batata", "batatas", "pantorrilla", "pantorrillas", "triceps sural", "tríceps sural",
+        has_calves_word = is_triceps_sural or any(w in t for w in (
+            "batata", "batatas", "pantorrilla", "pantorrillas",
             "gemelo", "gemelos", "soleo", "sóleo", "gastrocnemio"
         )) or bool(re.search(r"\b(pie|pies|tobillo|tobillos)\b", t))
 
@@ -208,15 +221,15 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         has_hams_word = any(w in t for w in ("isquiotibial", "isquiotibiales", "isquio", "isquios", "femoral", "femorales"))
         has_glutes_word = any(w in t for w in ("gluteo", "glúteo", "gluteos", "glúteos", "cadera", "hip thrust"))
 
-        # Combinación explícita de Tríceps con Piernas / Toda la Pierna
-        if has_triceps_word and any(w in t for w in ("pierna", "piernas", "tren inferior", "composición de la pierna", "composicion de la pierna")):
-            return "triceps_piernas"
-
-        # Si el usuario solicitó entrenamiento COMPLETO de pierna:
+        # Si el usuario solicitó entrenamiento COMPLETO de pierna / especificaciones de las áreas:
         if is_full_leg_request:
             if any(w in t for w in ("semana", "semanal", "lunes a viernes", "lunes a", "dias", "días", "dias de la semana")):
                 return "solo_piernas"
             return "piernas"
+
+        # Combinación explícita de Tríceps Braquial con Piernas / Toda la Pierna
+        if has_arm_triceps_word and any(w in t for w in ("pierna", "piernas", "tren inferior", "composición de la pierna", "composicion de la pierna")):
+            return "triceps_piernas"
 
         # Sub-área anatómica AISLADA de Pierna: Pantorrillas, Batatas, Sóleo, Pies y Tobillos
         # SOLO si NO pidió piernas en general ni otros músculos mayores
@@ -1548,16 +1561,17 @@ def _normalize_structured_plan(
                 day_titles = [
                     f"Piernas: Cuádriceps, Glúteos y Batatas ({badge_lbl})",
                     f"Piernas: Isquiotibiales, Femoral y Sóleo ({badge_lbl})",
-                    f"Piernas: Glúteos, Cadena Posterior y Cuádriceps ({badge_lbl})",
+                    f"Piernas: Glúteos, Cadena Posterior y Aductores ({badge_lbl})",
                     f"Piernas: Fuerza Unipodal, Estabilidad y Pantorrillas ({badge_lbl})",
                     f"Piernas: Potencia Funcional, Bombeo y Movilidad ({badge_lbl})",
                 ]
+                calves_pool = CALVES_FEET_POOLS.get(int_hint, CALVES_FEET_POOLS["media"])
                 day_exs_map = [
-                    [legs_quads[0], legs_quads[1], legs_glutes[0], legs_unipodal_calves[1]],
-                    [legs_hams[0], legs_hams[1], legs_unipodal_calves[0], legs_unipodal_calves[2]],
-                    [legs_glutes[1], legs_glutes[2], legs_quads[2], legs_hams[2]],
-                    [legs_unipodal_calves[0], legs_hams[0], legs_glutes[0], legs_unipodal_calves[1]],
-                    [legs_power_mob[0], legs_hams[1], legs_quads[0], legs_unipodal_calves[2]],
+                    [legs_quads[0], legs_quads[1], legs_glutes[0], calves_pool[0]],
+                    [legs_hams[0], legs_hams[1], calves_pool[1], legs_glutes[1]],
+                    [legs_glutes[2], legs_quads[2], legs_hams[2], legs_power_mob[0]],
+                    [legs_unipodal_calves[0], calves_pool[2] if len(calves_pool) > 2 else calves_pool[0], calves_pool[3] if len(calves_pool) > 3 else calves_pool[1], legs_power_mob[1]],
+                    [legs_power_mob[0], legs_power_mob[2], calves_pool[4] if len(calves_pool) > 4 else calves_pool[1], legs_quads[1]],
                 ]
                 idx = day_idx % len(day_titles)
                 return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas")
@@ -1642,22 +1656,22 @@ def _normalize_structured_plan(
 
             elif requested_focus == "pantorrillas_pies":
                 day_titles = [
-                    f"Pantorrillas y Pies: Gastrocnemio y Gemelos ({badge_lbl})",
-                    f"Pantorrillas y Pies: Sóleo y Batatas en Máquina ({badge_lbl})",
-                    f"Pantorrillas y Pies: Dorsiflexión y Tibial Anterior ({badge_lbl})",
-                    f"Pantorrillas y Pies: Fuerza Unipodal y Arco Plantar ({badge_lbl})",
-                    f"Pantorrillas y Pies: Estabilidad de Tobillo y Saltos ({badge_lbl})",
+                    f"Piernas: Pantorrillas, Batatas y Cuádriceps ({badge_lbl})",
+                    f"Tren Superior: Espalda Dorsal, Pecho y Brazos ({badge_lbl})",
+                    f"Piernas: Sóleo en Máquina, Isquiotibiales y Femoral ({badge_lbl})",
+                    f"Tren Superior: Hombros, Deltoides y Core ({badge_lbl})",
+                    f"Piernas: Fuerza Unipodal de Tobillo, Pies y Glúteos ({badge_lbl})",
                 ]
                 calves_pool = CALVES_FEET_POOLS.get(int_hint, CALVES_FEET_POOLS["media"])
                 day_exs_map = [
-                    calves_pool[:3],
-                    calves_pool[1:4] if len(calves_pool) >= 4 else calves_pool,
-                    [calves_pool[2], calves_pool[0]] + calves_pool[3:],
-                    calves_pool[:2] + calves_pool[2:],
-                    calves_pool,
+                    [calves_pool[0]] + legs_quads[:2],
+                    upper_back_bi + upper_chest_tri[:1],
+                    [calves_pool[1]] + legs_hams[:2],
+                    upper_shoulders_post + core_front[:1],
+                    [calves_pool[2] if len(calves_pool) > 2 else calves_pool[0]] + legs_glutes[:2],
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="pantorrillas_pies")
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_tren_superior")
 
             elif requested_focus == "triceps_piernas":
                 day_titles = [
