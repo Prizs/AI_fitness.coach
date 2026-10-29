@@ -2077,7 +2077,7 @@ def _normalize_exercises(
                     break
         seen_names.add(base_norm)
 
-        gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint)
+        gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint, is_no_equipment=is_no_equipment)
 
         exercises.append(
             {

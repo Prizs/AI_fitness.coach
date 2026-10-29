@@ -760,15 +760,32 @@ def _translate_tokens(query: str) -> list[str]:
     return tokens
 
 
+GYM_EQUIPMENT_KEYWORDS = {"dumbbell", "barbell", "cable", "lever", "smith", "machine", "sled", "kettlebell"}
+
+
+def _is_gym_gif(path: str) -> bool:
+    slug = path.split("/")[1].lower() if "/" in path else path.lower()
+    return any(w in slug for w in GYM_EQUIPMENT_KEYWORDS)
+
+
 @router.get("/gif")
 def get_exercise_gif(
     query: str,
     muscle: Optional[str] = None,
     intensity: Optional[str] = None,
+    equipment: Optional[str] = None,
+    is_no_equipment: Optional[bool] = None,
 ):
     norm_q = _normalize(query)
     norm_m = _normalize(muscle or "")
     combined = f"{norm_q} {norm_m}".strip()
+
+    # Detectar automáticamente si se solicita sin herramientas
+    if is_no_equipment is None:
+        is_no_equipment = any(w in norm_q for w in (
+            "sin equipo", "sin herramientas", "peso corporal", "en casa", "calistenia",
+            "en suelo", "con toalla", "en pared", "en silla", "deslizador", "toalla", "suelo"
+        )) or (equipment in ("sin_equipo", "casa", "bodyweight", "calistenia"))
 
     intensity_info = classify_intensity(query, intensity)
     level_code = intensity_info["code"]  # "baja" | "media" | "alta"
@@ -778,6 +795,10 @@ def get_exercise_gif(
         if any(m in norm_q for m in entry["match_any"]):
             if not any(ex in norm_q for ex in entry["exclude_any"]):
                 chosen_gif = entry["gifs"].get(level_code) or entry["gifs"]["media"]
+                if is_no_equipment and _is_gym_gif(chosen_gif):
+                    baja_gif = entry["gifs"].get("baja")
+                    if baja_gif and not _is_gym_gif(baja_gif):
+                        chosen_gif = baja_gif
                 gif_url = f"{BASE_GIF_URL}{chosen_gif}"
                 return {
                     "url": gif_url,
@@ -796,6 +817,10 @@ def get_exercise_gif(
         if any(m in combined for m in entry["match_any"]):
             if not any(ex in combined for ex in entry["exclude_any"]):
                 chosen_gif = entry["gifs"].get(level_code) or entry["gifs"]["media"]
+                if is_no_equipment and _is_gym_gif(chosen_gif):
+                    baja_gif = entry["gifs"].get("baja")
+                    if baja_gif and not _is_gym_gif(baja_gif):
+                        chosen_gif = baja_gif
                 gif_url = f"{BASE_GIF_URL}{chosen_gif}"
                 return {
                     "url": gif_url,
@@ -819,6 +844,12 @@ def get_exercise_gif(
     ]
     if not candidates:
         candidates = gif_paths
+
+    # HARD FILTER: Si es sin equipo, excluir rotundamente máquinas, barras y mancuernas
+    if is_no_equipment:
+        candidates_no_eq = [p for p in candidates if not _is_gym_gif(p)]
+        if candidates_no_eq:
+            candidates = candidates_no_eq
 
     best_match = None
     best_score = -999
@@ -861,6 +892,12 @@ def get_exercise_gif(
         primary_folder = allowed_folders[0] if allowed_folders else "quads"
         folder_map = FOLDER_DEFAULT_GIFS.get(primary_folder, FOLDER_DEFAULT_GIFS["quads"])
         best_match = folder_map.get(level_code, folder_map["media"])
+        if is_no_equipment and _is_gym_gif(best_match):
+            best_match = folder_map.get("baja", best_match)
+            if _is_gym_gif(best_match):
+                bw_in_folder = [p for p in gif_paths if p.startswith(f"{primary_folder}/") and not _is_gym_gif(p)]
+                if bw_in_folder:
+                    best_match = bw_in_folder[0]
 
     gif_url = f"{BASE_GIF_URL}{best_match}"
     return {
