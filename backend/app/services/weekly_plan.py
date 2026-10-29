@@ -38,25 +38,28 @@ def _fallback_synergy(index: int, title: str) -> str:
 
 def _enrich_exercise(ex: dict, intensity_hint: str = "Media") -> dict:
     name = str(ex.get("name") or "Ejercicio")
+    primary_m = str(ex.get("primary_muscle") or "General")
     info = classify_intensity(name, intensity_hint)
-    gif_data = get_exercise_gif(name, intensity_hint)
+    gif_data = get_exercise_gif(name, muscle=primary_m, intensity=intensity_hint)
     return {
         "name": name,
         "sets": ex.get("sets") or 3,
         "reps": str(ex.get("reps") or "10-12"),
         "animation_key": str(ex.get("animation_key") or "generic-exercise"),
-        "primary_muscle": str(ex.get("primary_muscle") or "General"),
+        "primary_muscle": primary_m,
         "secondary_muscle": str(ex.get("secondary_muscle") or "Secundario"),
         "intensity_level": str(ex.get("intensity_level") or info["label"]),
         "biomechanics": str(
             ex.get("biomechanics")
+            or gif_data.get("biomechanics")
             or "Movimiento controlado respetando el rango articular y la respiración."
         ),
         "posture": str(
             ex.get("posture")
+            or gif_data.get("posture")
             or "Columna neutra, abdomen activado y estabilidad escapular."
         ),
-        "gif_url": ex.get("gif_url") or gif_data.get("gif_url"),
+        "gif_url": ex.get("gif_url") or gif_data.get("url") or gif_data.get("gif_url") or "",
     }
 
 

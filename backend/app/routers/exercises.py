@@ -129,9 +129,19 @@ def classify_intensity(query: str, intensity_hint: Optional[str] = None) -> dict
 
 def _detect_target_folders(query: str, muscle: Optional[str] = None) -> list[str]:
     """Determina estrictamente las carpetas anatómicas permitidas para evitar mezclar piernas con tórax/brazos."""
-    combined = f"{_normalize(query)} {_normalize(muscle or '')}"
+    norm_q = _normalize(query)
+    norm_m = _normalize(muscle or "")
+    combined = f"{norm_q} {norm_m}".strip()
 
-    # 1. Reglas específicas de Tren Inferior (Piernas y Glúteos)
+    # 1. Reglas prioritarias de Brazos (Tríceps y Bíceps) para evitar colisión con 'flexión'
+    if any(w in combined for w in ("triceps", "tricep", "fondo", "dips", "dip", "copa", "press frances", "rompecraneos", "skull", "pushdown", "patada de triceps")):
+        return ["triceps"]
+    if any(w in combined for w in ("biceps", "bicep", "martillo", "hammer curl", "predicador", "preacher", "curl con barra")):
+        return ["biceps", "forearms"]
+    if any(w in combined for w in ("antebrazo", "muneca", "forearm", "wrist")):
+        return ["forearms"]
+
+    # 2. Reglas específicas de Tren Inferior (Piernas y Glúteos)
     if any(w in combined for w in ("isquio", "femoral", "hamstring", "curl de pierna", "leg curl", "buenos dias", "good morning")):
         return ["hamstrings", "glutes"]
     if any(w in combined for w in ("gemelo", "pantorrilla", "talon", "calf", "calves", "soleo", "tibial")):
@@ -151,20 +161,14 @@ def _detect_target_folders(query: str, muscle: Optional[str] = None) -> list[str
     )):
         return ["quads", "glutes", "hamstrings", "calves", "abductors", "adductors"]
 
-    # 2. Reglas de Tren Superior y Core
-    if any(w in combined for w in ("pectoral", "pecho", "bench press", "press de banca", "flexion", "push up", "pushup", "aperturas", "fly")):
+    # 3. Reglas de Tren Superior y Core
+    if any(w in combined for w in ("pectoral", "pecho", "bench press", "press de banca", "flexion de pecho", "flexiones de pecho", "flexiones", "push up", "pushup", "aperturas", "fly")):
         return ["pectorals", "serratus-anterior"]
     if any(w in combined for w in ("dorsal", "dominada", "pull up", "pullup", "jalon", "pulldown", "remo", "row", "espalda", "back")):
         return ["lats", "upper-back", "traps", "spine"]
     if any(w in combined for w in ("deltoides", "hombro", "shoulder", "press militar", "military press", "elevacion lateral", "lateral raise", "elevacion frontal", "pajaro", "arnold")):
         return ["delts", "traps"]
-    if any(w in combined for w in ("biceps", "bicep", "martillo", "hammer curl", "predicador", "preacher")):
-        return ["biceps", "forearms"]
-    if any(w in combined for w in ("triceps", "tricep", "rompecraneos", "skull", "extension de codo", "patada de triceps", "pushdown")):
-        return ["triceps"]
-    if any(w in combined for w in ("antebrazo", "muneca", "forearm", "wrist")):
-        return ["forearms"]
-    if any(w in combined for w in ("abdomen", "abdominal", "core", "plancha", "plank", "crunch", "oblicuo", "russian twist", "dead bug", "lumbar")):
+    if any(w in combined for w in ("abdomen", "abdominal", "core", "plancha", "plank", "crunch", "oblicuo", "russian twist", "dead bug", "lumbar", "superman")):
         return ["abs", "spine"]
     if any(w in combined for w in ("cardio", "burpee", "jumping jack", "trote", "correr", "bicicleta", "caminata", "marcha", "mountain climber", "escalador")):
         return ["cardio", "quads", "glutes"]
@@ -174,20 +178,72 @@ def _detect_target_folders(query: str, muscle: Optional[str] = None) -> list[str
 
 # Mapeo curado de ejercicios arquetípicos por patrón de movimiento e intensidad (baja, media, alta)
 CURATED_BY_INTENSITY = [
-    # 1. Sentadillas (Squats)
+    # 1. Puentes de Glúteo e Isquios / Hip Thrust
     {
-        "match_any": ("sentadilla", "squat"),
-        "exclude_any": ("bulgara", "split", "salto", "jump", "pistol", "hack", "sissy"),
+        "match_any": ("puente de gluteo", "puente de gluteos", "puente de cadera", "puente de isquio", "glute bridge", "hip thrust", "elevacion pelvica"),
+        "exclude_any": (),
         "gifs": {
-            "baja": "glutes/potty-squat-with-support.gif",
-            "media": "quads/dumbbell-goblet-squat.gif",
-            "alta": "glutes/barbell-full-squat.gif",
+            "baja": "glutes/low-glute-bridge-on-floor.gif",
+            "media": "glutes/glute-bridge-two-legs-on-bench-male.gif",
+            "alta": "glutes/barbell-glute-bridge.gif",
         },
-        "biomechanics": "Flexión controlada de rodillas y cadera manteniendo la columna neutra y el peso distribuido en toda la planta del pie.",
-        "posture": "Pecho erguido, mirada al frente y rodillas alineadas con la punta de los pies sin colapsar hacia adentro.",
-        "warning": "Detén el descenso si sientes pellizco en la cadera o dolor rotuliano; prioriza el control antes que la profundidad.",
+        "biomechanics": "Extensión de cadera activando glúteo mayor e isquiotibiales en rango horizontal seguro.",
+        "posture": "Empuje desde los talones, costillas bajas y pausa de 2 segundos en contracción máxima.",
+        "warning": "No hiperextiendas la columna lumbar arriba; el movimiento debe nacer de la cadera.",
     },
-    # 2. Sentadilla Búlgara / Split Squat
+    # 2. Buenos Días (Good Morning / Hip Hinge)
+    {
+        "match_any": ("buenos dias", "good morning", "buenos d"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "glutes/band-straight-back-stiff-leg-deadlift.gif",
+            "media": "hamstrings/barbell-good-morning.gif",
+            "alta": "hamstrings/barbell-good-morning.gif",
+        },
+        "biomechanics": "Bisagra de cadera flexionando el torso hacia adelante con columna neutra y manos tras nuca o carga dorsal.",
+        "posture": "Espalda recta, flexión mínima de rodillas y desplazamiento de cadera hacia atrás.",
+        "warning": "Detén el descenso si se redondea la zona lumbar.",
+    },
+    # 3. Fondos de Tríceps (Chair Dips / Bench Dips)
+    {
+        "match_any": ("fondo de triceps", "fondos de triceps", "fondos en silla", "fondo en silla", "fondos entre bancos", "bench dip", "chair dip", "triceps dip", "fondos de pecho y triceps"),
+        "exclude_any": ("paralelas con lastre",),
+        "gifs": {
+            "baja": "triceps/bench-dip-knees-bent.gif",
+            "media": "triceps/bench-dip-on-floor.gif",
+            "alta": "triceps/triceps-dip.gif",
+        },
+        "biomechanics": "Flexión y extensión de codos con apoyo posterior en silla o banco activando las tres cabezas del tríceps.",
+        "posture": "Hombros deprimidos hacia abajo y lejos de las orejas; espalda pegada al borde de apoyo.",
+        "warning": "No desciendas más allá de 90° de flexión en el codo para no sobrecargar el hombro anterior.",
+    },
+    # 4. Curl Femoral / Isquiotibiales (Hamstring Curls)
+    {
+        "match_any": ("curl femoral", "curl de isquiotibial", "curl de isquiotibiales", "curl de pierna", "leg curl", "curl nordico", "nordic curl"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "hamstrings/standing-single-leg-curl.gif",
+            "media": "hamstrings/lever-seated-leg-curl.gif",
+            "alta": "hamstrings/lever-lying-leg-curl.gif",
+        },
+        "biomechanics": "Flexión aislada de la rodilla reclutando bíceps femoral, semitendinoso y semimembranoso.",
+        "posture": "Pelvis fija contra el suelo o asiento sin arquear la zona lumbar.",
+        "warning": "Controla la fase excéntrica con bajada lenta de 3 segundos.",
+    },
+    # 5. Peso Muerto (Deadlift / RDL)
+    {
+        "match_any": ("peso muerto", "deadlift", "romanian deadlift", "rdl"),
+        "exclude_any": ("buenos dias",),
+        "gifs": {
+            "baja": "glutes/band-stiff-leg-deadlift.gif",
+            "media": "glutes/dumbbell-romanian-deadlift.gif",
+            "alta": "glutes/barbell-deadlift.gif",
+        },
+        "biomechanics": "Patrón de bisagra de cadera con activación de la cadena posterior completa.",
+        "posture": "Escápulas retraídas, abdomen firme y columna completamente neutra.",
+        "warning": "Jamás redondees la zona lumbar al descender.",
+    },
+    # 6. Sentadilla Búlgara / Split Squat
     {
         "match_any": ("bulgara", "split squat", "sentadilla dividida"),
         "exclude_any": (),
@@ -196,317 +252,308 @@ CURATED_BY_INTENSITY = [
             "media": "quads/dumbbell-single-leg-split-squat.gif",
             "alta": "quads/barbell-single-leg-split-squat.gif",
         },
-        "biomechanics": "Trabajo unilateral enfocado en el cuádriceps y glúteo de la pierna adelantada con descenso vertical controlado.",
-        "posture": "Torso ligeramente inclinado hacia adelante (~15°) para alinear la cadera y proteger la zona lumbar.",
+        "biomechanics": "Trabajo unilateral enfocado en cuádriceps y glúteo con pie trasero elevado en silla o banco.",
+        "posture": "Torso ligeramente inclinado hacia adelante (~15°) para alinear la cadera.",
         "warning": "Mantén la rodilla delantera estable sin oscilar lateralmente.",
     },
-    # 3. Sentadilla con salto / Pliométrica
+    # 7. Sentadillas con salto / Pliométrico
     {
-        "match_any": ("sentadilla con salto", "jump squat", "pliometric"),
+        "match_any": ("sentadilla con salto", "jump squat", "salto controlado", "sentadillas con salto"),
         "exclude_any": (),
         "gifs": {
             "baja": "quads/split-squats.gif",
             "media": "glutes/jump-squat.gif",
             "alta": "glutes/bodyweight-drop-jump-squat.gif",
         },
-        "biomechanics": "Triple extensión explosiva de tobillo, rodilla y cadera seguida de recepción amortiguada.",
-        "posture": "Aterriza suavemente apoyando primero metatarso y flexionando las rodillas para absorber el impacto.",
-        "warning": "Evitar en caso de molestia articular en rodillas, tobillos o columna lumbar.",
+        "biomechanics": "Triple extensión explosiva de tobillos, rodillas y cadera con aterrizaje suave.",
+        "posture": "Aterriza primero sobre metatarsos amortiguando con flexión fluida.",
+        "warning": "Evitar en caso de dolor articular en rodillas o tobillos.",
     },
-    # 4. Zancadas / Desplantes (Lunges)
+    # 8. Sentadillas Libres / Goblet / Profundas (Squats)
     {
-        "match_any": ("zancada", "desplante", "lunge"),
+        "match_any": ("sentadilla", "squat"),
+        "exclude_any": ("bulgara", "split", "salto", "jump", "hack", "sissy"),
+        "gifs": {
+            "baja": "glutes/potty-squat-with-support.gif",
+            "media": "quads/dumbbell-goblet-squat.gif",
+            "alta": "glutes/barbell-full-squat.gif",
+        },
+        "biomechanics": "Flexión controlada de rodillas y cadera manteniendo columna neutra.",
+        "posture": "Pecho erguido, mirada al frente y rodillas alineadas con las puntas de los pies.",
+        "warning": "Prioriza el control y la alineación antes que la profundidad.",
+    },
+    # 9. Zancadas / Lunges
+    {
+        "match_any": ("zancada", "desplante", "lunge", "estocada"),
         "exclude_any": (),
         "gifs": {
             "baja": "glutes/forward-lunge-male.gif",
             "media": "glutes/dumbbell-lunge.gif",
             "alta": "glutes/barbell-lunge.gif",
         },
-        "biomechanics": "Paso controlado formando ángulos cercanos a 90° en ambas rodillas, activando cuádriceps y glúteo mayor.",
-        "posture": "Tronco recto, pelvis neutra y empuje firme con el talón del pie delantero al regresar.",
-        "warning": "No golpees la rodilla trasera contra el suelo; frena el movimiento a 2-3 cm del piso.",
+        "biomechanics": "Paso controlado formando ángulos de 90° en ambas rodillas.",
+        "posture": "Tronco recto, pelvis neutra y empuje con el talón delantero.",
+        "warning": "Frena la rodilla trasera a 2-3 cm del suelo sin golpearla.",
     },
-    # 5. Prensa de Piernas (Leg Press)
+    # 10. Prensa de Piernas (Leg Press)
     {
         "match_any": ("prensa", "leg press"),
-        "exclude_any": ("gemelo", "pantorrilla", "calf"),
+        "exclude_any": ("gemelo", "pantorrilla", "talon", "calf"),
         "gifs": {
             "baja": "quads/lever-alternate-leg-press.gif",
             "media": "glutes/sled-45-leg-press.gif",
             "alta": "glutes/sled-45-leg-wide-press.gif",
         },
-        "biomechanics": "Empuje de cadena cerrada con espalda soportada, reduciendo la carga axial sobre la columna vertebral.",
-        "posture": "Mantén el sacro y la espalda baja pegados al respaldo en todo momento; pies al ancho de los hombros.",
-        "warning": "NUNCA bloquees las rodillas por completo al extender las piernas.",
+        "biomechanics": "Empuje de cadena cerrada con espalda soportada reduciendo carga axial.",
+        "posture": "Sacro pegado al respaldo; pies al ancho de hombros.",
+        "warning": "NUNCA bloquees las rodillas por completo en la extensión.",
     },
-    # 6. Curl de Isquiotibiales / Femoral (Hamstring Curl)
+    # 11. Extensión de Cuádriceps (Leg Extension)
     {
-        "match_any": ("isquiotibial", "femoral", "hamstring", "leg curl", "curl de pierna"),
-        "exclude_any": ("estiramiento", "stretch"),
-        "gifs": {
-            "baja": "hamstrings/standing-single-leg-curl.gif",
-            "media": "hamstrings/lever-seated-leg-curl.gif",
-            "alta": "hamstrings/lever-lying-leg-curl.gif",
-        },
-        "biomechanics": "Flexión aislada de la articulación de la rodilla reclutando el bíceps femoral, semitendinoso y semimembranoso.",
-        "posture": "Alinea el eje de la rodilla con el pivote de soporte y mantén la pelvis fija sin arquear la espalda baja.",
-        "warning": "Controla la fase excéntrica (bajada lenta de 3 segundos) para prevenir tirones en el tendón distal.",
-    },
-    # 7. Extensión de Cuádriceps (Leg Extension)
-    {
-        "match_any": ("extension de cuadriceps", "extension de pierna", "leg extension", "cuadriceps en maquina"),
+        "match_any": ("extension de cuadriceps", "extension de pierna", "leg extension", "cuadriceps en maquina", "extension de rodilla"),
         "exclude_any": (),
         "gifs": {
             "baja": "quads/resistance-band-leg-extension.gif",
             "media": "quads/lever-leg-extension.gif",
             "alta": "quads/lever-leg-extension.gif",
         },
-        "biomechanics": "Extensión de cadena cinética abierta enfocada en las cuatro cabezas del cuádriceps (recto femoral y vastos).",
-        "posture": "Espalda totalmente apoyada en el respaldo y rodillas alineadas con el eje de giro.",
-        "warning": "Evita usar impulso brusco; haz una pausa de 1 segundo arriba para máxima activación muscular con menor peso.",
+        "biomechanics": "Extensión de rodilla en cadena abierta estimulando el recto femoral y vastos.",
+        "posture": "Espalda firme contra el respaldo y rodillas alineadas con el eje de rotación.",
+        "warning": "Evita movimientos bruscos; haz pausa arriba de 1 segundo.",
     },
-    # 8. Puente de Glúteos / Hip Thrust
+    # 12. Elevación de Talones Unipodal (Single Leg Calf Raise)
     {
-        "match_any": ("puente de gluteo", "puente de cadera", "glute bridge", "hip thrust", "elevacion de cadera", "elevacion pelvica"),
-        "exclude_any": (),
-        "gifs": {
-            "baja": "glutes/low-glute-bridge-on-floor.gif",
-            "media": "glutes/glute-bridge-two-legs-on-bench-male.gif",
-            "alta": "glutes/barbell-glute-bridge.gif",
-        },
-        "biomechanics": "Extensión de cadera en rango horizontal con máxima contracción del glúteo mayor en el punto superior.",
-        "posture": "Empuja desde los talones, mantén las costillas bajas y el mentón ligeramente recogido.",
-        "warning": "No hiperextiendas la columna lumbar arriba; el movimiento debe nacer de la cadera y los glúteos.",
-    },
-    # 9. Peso Muerto / Bisagra de Cadera (Deadlift / RDL)
-    {
-        "match_any": ("peso muerto", "deadlift", "bisagra de cadera", "buenos dias", "good morning"),
-        "exclude_any": (),
-        "gifs": {
-            "baja": "glutes/band-stiff-leg-deadlift.gif",
-            "media": "glutes/dumbbell-romanian-deadlift.gif",
-            "alta": "glutes/barbell-romanian-deadlift.gif",
-        },
-        "biomechanics": "Patrón de bisagra de cadera llevando los glúteos hacia atrás mientras el torso desciende con espalda neutra.",
-        "posture": "Escápulas retraídas, abdomen firme y carga pegada a los muslos durante todo el recorrido.",
-        "warning": "Jamás redondees la zona lumbar; desciende solo hasta donde tu flexibilidad de isquiotibiales lo permita.",
-    },
-    # 10. Elevación de Talones / Gemelos y Pantorrillas (Variaciones Anatómicas Precisas)
-    # 10a. Elevación de Talones Sentado en Máquina o con Mancuerna / Sóleo
-    {
-        "match_any": ("talones en maquina sentado", "talon sentado", "talones sentado", "seated calf", "soleo sentado", "batata sentado", "batatas sentado", "pantorrilla sentado"),
-        "exclude_any": (),
-        "gifs": {
-            "baja": "calves/seated-calf-stretch-male.gif",
-            "media": "calves/lever-seated-calf-raise.gif",
-            "alta": "calves/barbell-seated-calf-raise.gif",
-        },
-        "biomechanics": "Flexión plantar con rodillas flexionadas a 90° para aislar selectivamente el músculo sóleo eliminando la acción del gastrocnemio.",
-        "posture": "Espalda recta, almohadillas firmemente fijadas sobre los muslos y pausa de 1 segundo en la contracción alta.",
-        "warning": "No permitas que las almohadillas reboten contra los muslos en la parte baja para proteger el tendón.",
-    },
-    # 10b. Elevación de Talones Unipodal / a Una Pierna en Escalón
-    {
-        "match_any": ("unipodal", "a una pierna", "unilateral", "single leg calf", "unipodal en escalon", "talones a una pierna"),
+        "match_any": ("talon unipodal", "talones unipodal", "pantorrilla unipodal", "gemelo unipodal", "unipodal en escalon", "talones a una pierna", "talon a una pierna", "unipodales lentas"),
         "exclude_any": (),
         "gifs": {
             "baja": "calves/band-single-leg-calf-raise.gif",
             "media": "calves/dumbbell-single-leg-calf-raise.gif",
             "alta": "calves/single-leg-calf-raise-on-a-dumbbell.gif",
         },
-        "biomechanics": "Trabajo unilateral de fuerza y propiocepción estimulando el tríceps sural y los estabilizadores del pie y tobillo.",
-        "posture": "Apoyo metatarsiano en el borde del escalón con talón suspendido; desciende lentamente sintiendo el estiramiento profundo.",
-        "warning": "Mantén el equilibrio sujetándote con una mano si es necesario; no aceleres la fase de bajada.",
+        "biomechanics": "Flexión plantar unilateral estimulando gastrocnemio y estabilizadores del tobillo.",
+        "posture": "Apoyo metatarsiano en el borde del escalón y descenso lento sintiendo estiramiento.",
+        "warning": "No aceleres la bajada excéntrica.",
     },
-    # 10c. Elevación de Talones en Prensa de Piernas
+    # 13. Elevación de Talones Sentado / Sóleo (Seated Calf / Soleus)
     {
-        "match_any": ("talones en prensa", "pantorrilla en prensa", "sled calf", "calf press"),
+        "match_any": ("talon sentado", "talones sentado", "soleo sentado", "soleo en silla", "talones en silla", "seated calf", "batatas sentado", "batata sentado", "en cuclillas asistido"),
         "exclude_any": (),
         "gifs": {
-            "baja": "calves/lever-seated-calf-press.gif",
-            "media": "calves/sled-calf-press-on-leg-press.gif",
-            "alta": "calves/sled-45-calf-press.gif",
+            "baja": "calves/seated-calf-stretch-male.gif",
+            "media": "calves/lever-seated-calf-raise.gif",
+            "alta": "calves/barbell-seated-calf-raise.gif",
         },
-        "biomechanics": "Empuje de flexión plantar en prensa con rodillas casi extendidas reclutando la cabeza medial y lateral del gastrocnemio.",
-        "posture": "Solo las puntas de los pies apoyadas en la parte inferior de la plataforma; bloquea la seguridad de la prensa.",
-        "warning": "NUNCA flexiones las rodillas bruscamente durante el ejercicio para evitar atrapamiento articular.",
+        "biomechanics": "Flexión plantar con rodillas flexionadas aislando el músculo sóleo profundo.",
+        "posture": "Pausa de 1 segundo arriba y bajada controlada sin rebotar.",
+        "warning": "Evita el rebote elástico; controla el movimiento muscularmente.",
     },
-    # 10d. Donkey Calf Raise / Tipo Burro
+    # 14. Elevación de Talones de Pie / Gemelos General
     {
-        "match_any": ("donkey", "burro"),
-        "exclude_any": (),
-        "gifs": {
-            "baja": "calves/one-leg-donkey-calf-raise.gif",
-            "media": "calves/donkey-calf-raise.gif",
-            "alta": "calves/weighted-donkey-calf-raise.gif",
-        },
-        "biomechanics": "Flexión plantar con torso flexionado a 90°, maximizando el pre-estiramiento del gastrocnemio por la posición de cadera.",
-        "posture": "Espalda plana apoyada y rodillas extendidas sin bloqueo rígido.",
-        "warning": "Evita redondear la zona lumbar.",
-    },
-    # 10e. Tibial Anterior, Dorsiflexión y Movilidad de Pies
-    {
-        "match_any": ("dorsiflexion", "tibial anterior", "dorsiflexion tibial", "tobillo", "arco plantar", "pies"),
+        "match_any": ("talon", "talones", "gemelo", "gemelos", "pantorrilla", "pantorrillas", "calf raise", "batata", "soleo"),
         "exclude_any": ("sentadilla", "squat", "prensa", "lunge"),
-        "gifs": {
-            "baja": "calves/ankle-circles.gif",
-            "media": "calves/posterior-tibialis-stretch.gif",
-            "alta": "calves/box-jump-down-with-one-leg-stabilization.gif",
-        },
-        "biomechanics": "Dorsiflexión activa del tobillo para equilibrar el compartimento anterior de la pierna y prevenir periostitis tibial.",
-        "posture": "Sentado con pierna extendida o de pie con talones firmes, eleva las puntas de los pies hacia las espinillas.",
-        "warning": "Realiza movimientos controlados sin tirones bruscos.",
-    },
-    # 10f. Elevación de Talones de Pie (General / Con Mancuernas / Con Barra)
-    {
-        "match_any": ("gemelo", "pantorrilla", "talon", "calf", "calves", "soleo", "batata", "triceps sural"),
-        "exclude_any": ("sentado", "unipodal", "a una pierna", "prensa", "donkey", "tibial"),
         "gifs": {
             "baja": "calves/bodyweight-standing-calf-raise.gif",
             "media": "calves/dumbbell-standing-calf-raise.gif",
             "alta": "calves/lever-standing-calf-raise.gif",
         },
-        "biomechanics": "Flexión plantar completa del tobillo estimulando el gastrocnemio y el sóleo.",
-        "posture": "Rodillas extendidas pero sin bloqueo rígido; pausa de 1 segundo en la máxima contracción superior.",
-        "warning": "Evita rebotar en la parte baja para no sobrecargar el tendón de Aquiles.",
+        "biomechanics": "Flexión plantar de pie reclutando ambas cabezas del gastrocnemio.",
+        "posture": "Cuerpo alineado, empuje sobre el primer y segundo metatarso.",
+        "warning": "Rango de recorrido completo sin balanceo de cadera.",
     },
-    # 11. Abducción / Aducción de Cadera
+    # 15. Flexiones en Pica (Pike Push-ups)
     {
-        "match_any": ("abduccion", "abductor", "apertura de cadera"),
-        "exclude_any": (),
-        "gifs": {
-            "baja": "abductors/side-hip-abduction.gif",
-            "media": "abductors/resistance-band-seated-hip-abduction.gif",
-            "alta": "abductors/lever-seated-hip-abduction.gif",
-        },
-        "biomechanics": "Separación lateral del fémur enfocada en el glúteo medio y glúteo menor para estabilizar la pelvis.",
-        "posture": "Pelvis alineada sin rotar hacia atrás durante la elevación o apertura.",
-        "warning": "Controla el retorno sin dejar caer las piernas de golpe.",
-    },
-    {
-        "match_any": ("aduccion", "aductor"),
-        "exclude_any": (),
-        "gifs": {
-            "baja": "adductors/side-lying-hip-adduction-male.gif",
-            "media": "adductors/cable-hip-adduction.gif",
-            "alta": "adductors/lever-seated-hip-adduction.gif",
-        },
-        "biomechanics": "Aproximación medial del muslo activando la musculatura aductora interna.",
-        "posture": "Mantén el tronco estable y evita abrir en exceso más allá de tu rango cómodo.",
-        "warning": "Realiza movimientos fluidos para proteger la inserción inguinal.",
-    },
-    # 12. Subida al cajón / Step-up
-    {
-        "match_any": ("step up", "subida al cajon", "escalon", "banco"),
-        "exclude_any": ("pecho", "banca", "bench press", "triceps", "biceps"),
-        "gifs": {
-            "baja": "glutes/band-step-up.gif",
-            "media": "glutes/dumbbell-step-up.gif",
-            "alta": "glutes/barbell-step-up.gif",
-        },
-        "biomechanics": "Ascenso unilateral impulsando con toda la planta del pie apoyado en la plataforma.",
-        "posture": "Evita impulsarte con el pie de abajo; el trabajo debe hacerlo la pierna elevada.",
-        "warning": "Usa una altura de escalón que permita mantener la cadera nivelada.",
-    },
-    # 13. Pecho / Empuje
-    {
-        "match_any": ("flexion", "push up", "pushup", "lagartija", "press de pecho en pared"),
-        "exclude_any": (),
-        "gifs": {
-            "baja": "pectorals/incline-push-up.gif",
-            "media": "pectorals/push-up.gif",
-            "alta": "pectorals/decline-push-up.gif",
-        },
-        "biomechanics": "Empuje horizontal en cadena cerrada activando pectoral mayor, deltoides anterior y tríceps.",
-        "posture": "Cuerpo alineado en plancha desde los tobillos hasta la cabeza y codos a 45° del torso.",
-        "warning": "No dejes caer la cadera hacia el suelo para proteger la columna lumbar.",
-    },
-    {
-        "match_any": ("press de banca", "bench press", "press de pecho"),
-        "exclude_any": ("pared",),
-        "gifs": {
-            "baja": "pectorals/resistance-band-seated-chest-press.gif",
-            "media": "pectorals/dumbbell-bench-press.gif",
-            "alta": "pectorals/barbell-bench-press.gif",
-        },
-        "biomechanics": "Empuje horizontal con retracción escapular para maximizar el reclutamiento pectoral.",
-        "posture": "Escápulas juntas contra el banco, pies firmes en el suelo y muñecas rectas.",
-        "warning": "No bajes con los codos abiertos a 90°; mantenlos a unos 45-60° para cuidar el manguito rotador.",
-    },
-    # 14. Espalda / Tracción
-    {
-        "match_any": ("remo", "row"),
-        "exclude_any": ("al menton", "upright"),
-        "gifs": {
-            "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
-            "media": "upper-back/cable-low-seated-row.gif",
-            "alta": "upper-back/barbell-bent-over-row.gif",
-        },
-        "biomechanics": "Tracción horizontal iniciando con retracción escapular y llevando los codos hacia la cadera.",
-        "posture": "Pecho proyectado al frente, espalda neutra y hombros lejos de las orejas.",
-        "warning": "Evita balancear el torso para mover el peso.",
-    },
-    {
-        "match_any": ("dominada", "pull up", "pullup", "jalon", "pulldown"),
-        "exclude_any": (),
-        "gifs": {
-            "baja": "lats/band-close-grip-pulldown.gif",
-            "media": "lats/cable-pulldown.gif",
-            "alta": "lats/pull-up.gif",
-        },
-        "biomechanics": "Tracción vertical enfocada en el dorsal ancho y redondo mayor.",
-        "posture": "Deprime los hombros antes de flexionar los codos y lleva la barra hacia la parte alta del pecho.",
-        "warning": "Nunca tires por detrás de la nuca para evitar pinzamiento subacromial.",
-    },
-    # 15. Hombros
-    {
-        "match_any": ("press militar", "press de hombro", "shoulder press", "military press"),
+        "match_any": ("flexiones en pica", "flexion en pica", "pike push", "pike-push", "pino asistidas", "handstand"),
         "exclude_any": (),
         "gifs": {
             "baja": "delts/band-shoulder-press.gif",
             "media": "delts/dumbbell-seated-shoulder-press.gif",
-            "alta": "delts/barbell-seated-overhead-press.gif",
+            "alta": "delts/dumbbell-seated-shoulder-press.gif",
         },
-        "biomechanics": "Empuje vertical sobre la cabeza en el plano escapular trabajando el deltoides anterior y lateral.",
-        "posture": "Glúteos y abdomen contraídos para estabilizar el tronco sin arquear la espalda baja.",
-        "warning": "Baja de forma controlada hasta la altura del mentón.",
+        "biomechanics": "Empuje vertical en inversión estimulando deltoides anterior, lateral y tríceps.",
+        "posture": "Cadera elevada formando una V invertida; cabeza desciende hacia adelante de las manos.",
+        "warning": "Mantén los codos en ángulo de 45° sin abrirlos excesivamente hacia afuera.",
     },
+    # 16. Flexiones Diamante (Diamond Push-ups)
+    {
+        "match_any": ("flexiones diamante", "flexion diamante", "diamond push"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "triceps/bench-dip-knees-bent.gif",
+            "media": "pectorals/push-up.gif",
+            "alta": "pectorals/decline-push-up.gif",
+        },
+        "biomechanics": "Flexión de pecho con manos juntas enfocando la carga sobre las cabezas del tríceps.",
+        "posture": "Manos juntas formando un triángulo o diamante bajo el esternón.",
+        "warning": "Si sientes molestia en muñecas, separa ligeramente los dedos o apóyate en rodillas.",
+    },
+    # 17. Flexiones de Pecho Estándar (Push-ups)
+    {
+        "match_any": ("flexiones de pecho", "flexion de pecho", "push up", "push-up", "pushup", "lagartija", "flexiones en suelo", "flexiones inclinadas", "flexiones declinadas"),
+        "exclude_any": ("pica", "pike", "diamante"),
+        "gifs": {
+            "baja": "pectorals/incline-push-up.gif",
+            "media": "pectorals/push-up.gif",
+            "alta": "pectorals/barbell-bench-press.gif",
+        },
+        "biomechanics": "Empuje horizontal de cadena cerrada activando pectoral mayor, deltoides anterior y tríceps.",
+        "posture": "Cuerpo en línea recta desde los talones hasta la coronilla, abdomen y glúteos activos.",
+        "warning": "No dejes caer la pelvis ni arquees la columna lumbar.",
+    },
+    # 18. Press de Banca / Pecho con Mancuernas o Barra
+    {
+        "match_any": ("press de banca", "bench press", "press de pecho", "press plano", "press inclinado", "press declinado"),
+        "exclude_any": ("flexion", "push up"),
+        "gifs": {
+            "baja": "pectorals/incline-push-up.gif",
+            "media": "pectorals/dumbbell-bench-press.gif",
+            "alta": "pectorals/barbell-bench-press.gif",
+        },
+        "biomechanics": "Empuje horizontal reclutando pectoral mayor y tríceps con soporte dorsal.",
+        "posture": "Retracción escapular activa y pies firmes contra el suelo.",
+        "warning": "No rebotes la barra contra el pecho ni hiperextiendas muñecas.",
+    },
+    # 19. Extensiones de Tríceps (Tricep Extensions / Pushdown / Press Francés)
+    {
+        "match_any": ("extension de triceps", "extensiones de triceps", "press frances", "patada de triceps", "triceps tras nuca", "tricep extension"),
+        "exclude_any": ("fondo", "dip"),
+        "gifs": {
+            "baja": "triceps/bench-dip-knees-bent.gif",
+            "media": "triceps/cable-alternate-triceps-extension.gif",
+            "alta": "triceps/barbell-lying-triceps-extension.gif",
+        },
+        "biomechanics": "Extensión aislada del codo reclutando la cabeza larga, lateral y medial del tríceps.",
+        "posture": "Codos fijos a los lados del torso sin balanceo de hombros.",
+        "warning": "Controla el retorno excéntrico sin abrir los codos hacia afuera.",
+    },
+    # 20. Curl de Bíceps (Biceps Curl / Martillo / Barra)
+    {
+        "match_any": ("curl de biceps", "curl de bicep", "curl alterno", "curl martillo", "curl concentrado", "bicep curl", "biceps curl", "curl con barra"),
+        "exclude_any": ("femoral", "isquio", "pierna", "nordic"),
+        "gifs": {
+            "baja": "biceps/band-alternating-biceps-curl.gif",
+            "media": "biceps/dumbbell-biceps-curl.gif",
+            "alta": "biceps/barbell-curl.gif",
+        },
+        "biomechanics": "Flexión de codo en supinación o agarre neutro estimulando bíceps braquial y braquiorradial.",
+        "posture": "Codos pegados a los costados del torso, sin balancear la espalda.",
+        "warning": "Evita impulsarte con la cadera; mantén el torso vertical.",
+    },
+    # 21. Elevaciones Laterales (Lateral Raises)
     {
         "match_any": ("elevacion lateral", "elevaciones laterales", "lateral raise"),
         "exclude_any": (),
         "gifs": {
             "baja": "delts/band-front-lateral-raise.gif",
             "media": "delts/dumbbell-lateral-raise.gif",
-            "alta": "delts/cable-lateral-raise.gif",
+            "alta": "delts/dumbbell-lateral-raise.gif",
         },
-        "biomechanics": "Abducción de hombro hasta los 90° aislando la porción lateral del deltoides.",
-        "posture": "Codos ligeramente flexionados y subida guiada por los codos, no por las muñecas.",
-        "warning": "Usa pesos moderados para no compensar con el trapecio superior.",
+        "biomechanics": "Abducción de hombros en el plano escapular enfocada en el deltoides lateral.",
+        "posture": "Codos ligeramente flexionados, elevación hasta la altura de los hombros.",
+        "warning": "No encojas los hombros hacia las orejas durante la subida.",
     },
-    # 16. Core / Abdomen
+    # 22. Press Militar / Hombros (Shoulder Press)
     {
-        "match_any": ("plancha", "plank"),
+        "match_any": ("press militar", "press de hombro", "shoulder press", "press arnold"),
         "exclude_any": (),
         "gifs": {
-            "baja": "abs/kneeling-plank-tap-shoulder-male.gif",
-            "media": "abs/front-plank-with-twist.gif",
-            "alta": "abs/weighted-front-plank.gif",
+            "baja": "delts/band-shoulder-press.gif",
+            "media": "delts/dumbbell-seated-shoulder-press.gif",
+            "alta": "delts/barbell-seated-overhead-press.gif",
         },
-        "biomechanics": "Contracción isométrica anti-extensión del transverso abdominal, recto abdominal y glúteos.",
-        "posture": "Codos bajo los hombros, pelvis en ligera retroversión y respiración fluida.",
-        "warning": "Si sientes tensión en la espalda baja, detén la serie o apoya las rodillas.",
+        "biomechanics": "Empuje vertical por encima de la cabeza reclutando deltoides y tríceps.",
+        "posture": "Core comprimido y glúteos firmes para evitar arquear la columna lumbar.",
+        "warning": "Evita hiperextender el cuello o arquear excesivamente la espalda.",
     },
+    # 23. Retracción Escapular / Y-T-W / Pájaros / Face Pulls
     {
-        "match_any": ("dead bug", "bicho muerto"),
+        "match_any": ("retraccion escapular", "prone y-t-w", "y-t-w", "pajaro", "pajaros", "face pull", "face pulls"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/band-shoulder-press.gif",
+            "media": "delts/dumbbell-seated-shoulder-press.gif",
+            "alta": "delts/lever-lateral-raise.gif",
+        },
+        "biomechanics": "Aducción y rotación externa escapular estimulando deltoides posterior y romboides.",
+        "posture": "Junta las escápulas atrás y mantén el mentón hacia adentro.",
+        "warning": "No tenses el cuello excesivamente.",
+    },
+    # 24. Remos / Jalón Dorsal (Rows / Pulls)
+    {
+        "match_any": ("remo", "row", "jalon", "jalón", "pulldown", "dominada", "pull up", "pull-up", "traccion dorsal"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
+            "media": "upper-back/cable-low-seated-row.gif",
+            "alta": "upper-back/barbell-bent-over-row.gif",
+        },
+        "biomechanics": "Tracción horizontal o vertical activando dorsal ancho, romboides y bíceps.",
+        "posture": "Tracción liderada por los codos, pecho abierto y escápulas conectadas.",
+        "warning": "No impulses el torso hacia atrás para mover la carga.",
+    },
+    # 25. Dead Bug (Bicho Muerto)
+    {
+        "match_any": ("dead bug", "dead-bug", "bicho muerto"),
         "exclude_any": (),
         "gifs": {
             "baja": "abs/dead-bug.gif",
             "media": "abs/dead-bug.gif",
             "alta": "abs/dead-bug.gif",
         },
-        "biomechanics": "Estabilización lumbopélvica dinámica extendiendo brazo y pierna contraria sin despegar la zona lumbar.",
-        "posture": "Zona lumbar completamente sellada contra el suelo en todo momento.",
-        "warning": "Exhala lentamente al extender las extremidades.",
+        "biomechanics": "Anti-extensión del core extendiendo brazo y pierna contraria con control lumbopélvico.",
+        "posture": "Zona lumbar 100% pegada contra el suelo en todo momento.",
+        "warning": "Si la espalda baja se despega del suelo, reduce el rango de extensión.",
+    },
+    # 26. Plancha Lateral (Side Plank)
+    {
+        "match_any": ("plancha lateral", "side plank"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "abs/side-bridge-v-2.gif",
+            "media": "abs/side-bridge-v-2.gif",
+            "alta": "abs/side-bridge-v-2.gif",
+        },
+        "biomechanics": "Anti-flexión lateral estabilizando oblicuos, cuadrado lumbar y glúteo medio.",
+        "posture": "Hombro alineado sobre el codo, cuerpo recto desde pies hasta la cabeza.",
+        "warning": "No permitas que la cadera caiga hacia el suelo.",
+    },
+    # 27. Plancha Frontal (Front Plank)
+    {
+        "match_any": ("plancha", "plank"),
+        "exclude_any": ("lateral", "side"),
+        "gifs": {
+            "baja": "abs/kneeling-plank-tap-shoulder-male.gif",
+            "media": "abs/front-plank-with-twist.gif",
+            "alta": "abs/front-plank-with-twist.gif",
+        },
+        "biomechanics": "Contracción isométrica anti-extensión de toda la pared abdominal y transverso.",
+        "posture": "Codos bajo hombros, pelvis retrovertida y glúteos apretados.",
+        "warning": "Evita hundir la cadera para no comprimir las vértebras lumbares.",
+    },
+    # 28. Crunches / Abdomen Clásico / Bicicleta
+    {
+        "match_any": ("crunch", "crunches", "abdominal clasico", "bicicleta abdominal", "giros rusos", "russian twist"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "abs/oblique-crunches-floor.gif",
+            "media": "abs/crunch-floor.gif",
+            "alta": "abs/hanging-leg-raise.gif",
+        },
+        "biomechanics": "Flexión toracolumbar acortando la distancia entre esternón y pubis.",
+        "posture": "Cuello relajado con mentón despegado del pecho; exhalar arriba.",
+        "warning": "No jales de la cabeza con las manos.",
+    },
+    # 29. Superman / Extensiones Lumbares
+    {
+        "match_any": ("superman", "extensiones lumbares", "lumbares en suelo"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "glutes/band-straight-back-stiff-leg-deadlift.gif",
+            "media": "glutes/band-straight-back-stiff-leg-deadlift.gif",
+            "alta": "glutes/barbell-deadlift.gif",
+        },
+        "biomechanics": "Extensión de columna activando erectores espinales, glúteos y cadena posterior.",
+        "posture": "Elevación sutil y controlada de pecho y muslos sin hiperextensión forzada.",
+        "warning": "Mantén la mirada al suelo para alinear las vértebras cervicales.",
     },
 ]
 
@@ -687,13 +734,33 @@ def get_exercise_gif(
     intensity_info = classify_intensity(query, intensity)
     level_code = intensity_info["code"]  # "baja" | "media" | "alta"
 
-    # 1. Revisar catálogo curado por patrón biomecánico e intensidad
+    # 1A. Revisar catálogo curado por patrón exacto del nombre del ejercicio (norm_q)
+    for entry in CURATED_BY_INTENSITY:
+        if any(m in norm_q for m in entry["match_any"]):
+            if not any(ex in norm_q for ex in entry["exclude_any"]):
+                chosen_gif = entry["gifs"].get(level_code) or entry["gifs"]["media"]
+                gif_url = f"{BASE_GIF_URL}{chosen_gif}"
+                return {
+                    "url": gif_url,
+                    "gif_url": gif_url,
+                    "query": query,
+                    "intensity_level": intensity_info["label"],
+                    "intensity_code": level_code,
+                    "tempo": intensity_info["tempo"],
+                    "biomechanics": entry["biomechanics"],
+                    "posture": entry["posture"],
+                    "warning": entry["warning"],
+                }
+
+    # 1B. Si no coincidió en norm_q, intentar con la combinación (norm_q + norm_m)
     for entry in CURATED_BY_INTENSITY:
         if any(m in combined for m in entry["match_any"]):
             if not any(ex in combined for ex in entry["exclude_any"]):
                 chosen_gif = entry["gifs"].get(level_code) or entry["gifs"]["media"]
+                gif_url = f"{BASE_GIF_URL}{chosen_gif}"
                 return {
-                    "url": f"{BASE_GIF_URL}{chosen_gif}",
+                    "url": gif_url,
+                    "gif_url": gif_url,
                     "query": query,
                     "intensity_level": intensity_info["label"],
                     "intensity_code": level_code,
@@ -756,8 +823,10 @@ def get_exercise_gif(
         folder_map = FOLDER_DEFAULT_GIFS.get(primary_folder, FOLDER_DEFAULT_GIFS["quads"])
         best_match = folder_map.get(level_code, folder_map["media"])
 
+    gif_url = f"{BASE_GIF_URL}{best_match}"
     return {
-        "url": f"{BASE_GIF_URL}{best_match}",
+        "url": gif_url,
+        "gif_url": gif_url,
         "query": query,
         "intensity_level": intensity_info["label"],
         "intensity_code": level_code,

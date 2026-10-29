@@ -53,156 +53,242 @@ class AnatomyExercise {
 const String _kGifBase =
     'https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/';
 
-/// Garantiza que SIEMPRE exista un GIF anatomico acorde al musculo y a la intensidad,
-/// evitando cualquier recuadro textual.
+/// Garantiza que SIEMPRE exista un GIF anatómico exacto acorde al movimiento e intensidad.
 String resolveGuaranteedGifUrl({
   required String name,
   required String agonist,
   required String intensityLevel,
   String? existingUrl,
 }) {
-  if (existingUrl != null && existingUrl.trim().isNotEmpty) {
-    final cleanExisting = existingUrl.trim();
-    final nameLower = name.toLowerCase();
-    // Si la URL existente es un fallback genérico de talones de pie pero el ejercicio es sentado o unipodal, corregir al GIF exacto:
-    final bool isGenericStanding = cleanExisting.contains('standing-calf-raise');
-    final bool isActuallySeated = nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated');
-    final bool isActuallyUnipodal = nameLower.contains('unipodal') || nameLower.contains('una pierna') || nameLower.contains('single leg');
-    if (!isGenericStanding || (!isActuallySeated && !isActuallyUnipodal)) {
-      return cleanExisting;
-    }
-  }
-  final text = '${name.toLowerCase()} ${agonist.toLowerCase()}';
+  final nameLower = name.toLowerCase();
   final intLower = intensityLevel.toLowerCase();
   final isLow = intLower.contains('baja') || intLower.contains('basico') || intLower.contains('básico');
   final isHigh = intLower.contains('alta') || intLower.contains('avanzado');
 
-  if (text.contains('isquio') || text.contains('femoral') || text.contains('hamstring')) {
-    return _kGifBase +
-        (isLow
-            ? 'hamstrings/standing-single-leg-curl.gif'
-            : (isHigh
-                ? 'hamstrings/lever-lying-leg-curl.gif'
-                : 'hamstrings/lever-seated-leg-curl.gif'));
+  if (existingUrl != null && existingUrl.trim().isNotEmpty) {
+    final cleanExisting = existingUrl.trim();
+    // Validar si existe incongruencia biomecánica conocida
+    final bool hasMismatch =
+        // 1. Puentes, Buenos Días o Peso Muerto mostrando Curl de Pierna
+        ((nameLower.contains('puente') || nameLower.contains('bridge') || nameLower.contains('hip thrust') || nameLower.contains('buenos d') || nameLower.contains('deadlift') || nameLower.contains('peso muerto')) && cleanExisting.contains('curl')) ||
+        // 2. Fondos o Tríceps mostrando Flexiones de Pecho (Push-up)
+        ((nameLower.contains('fondo') || nameLower.contains('dip') || nameLower.contains('tricep') || nameLower.contains('trícep')) && cleanExisting.contains('push-up')) ||
+        // 3. Dead Bug, Plancha, Remos o Flexiones mostrando Gemelos
+        ((nameLower.contains('dead bug') || nameLower.contains('plank') || nameLower.contains('plancha') || nameLower.contains('remo') || nameLower.contains('flexion') || nameLower.contains('flexión')) && cleanExisting.contains('calf')) ||
+        // 4. Talones sentado / en silla mostrando elevación de pie
+        ((nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated')) && cleanExisting.contains('standing-calf-raise')) ||
+        // 5. Talones unipodal mostrando elevación bilateral de pie
+        ((nameLower.contains('unipodal') || nameLower.contains('una pierna') || nameLower.contains('single leg')) && cleanExisting.contains('standing-calf-raise'));
+
+    if (!hasMismatch) {
+      return cleanExisting;
+    }
   }
-  if (text.contains('prensa') || text.contains('leg press')) {
-    if (text.contains('gemelo') || text.contains('pantorrilla') || text.contains('talon') || text.contains('calf')) {
+
+  // 1. Puentes de Glúteo / Hip Thrust / Elevación Pélvica
+  if (nameLower.contains('puente') || nameLower.contains('bridge') || nameLower.contains('hip thrust') || nameLower.contains('elevacion pelvica') || nameLower.contains('elevación pélvica')) {
+    return _kGifBase + (isLow
+        ? 'glutes/low-glute-bridge-on-floor.gif'
+        : (isHigh ? 'glutes/barbell-glute-bridge.gif' : 'glutes/glute-bridge-two-legs-on-bench-male.gif'));
+  }
+
+  // 2. Buenos Días (Good Morning)
+  if (nameLower.contains('buenos dias') || nameLower.contains('buenos días') || nameLower.contains('good morning') || nameLower.contains('buenos d')) {
+    return _kGifBase + (isLow
+        ? 'glutes/band-straight-back-stiff-leg-deadlift.gif'
+        : 'hamstrings/barbell-good-morning.gif');
+  }
+
+  // 3. Fondos de Tríceps (Chair Dips / Bench Dips)
+  if (nameLower.contains('fondo') || nameLower.contains('fondos') || nameLower.contains('dip') || nameLower.contains('chair dip') || nameLower.contains('bench dip')) {
+    return _kGifBase + (isLow
+        ? 'triceps/bench-dip-knees-bent.gif'
+        : (isHigh ? 'triceps/triceps-dip.gif' : 'triceps/bench-dip-on-floor.gif'));
+  }
+
+  // 4. Dead Bug (Bicho Muerto)
+  if (nameLower.contains('dead bug') || nameLower.contains('dead-bug') || nameLower.contains('bicho muerto')) {
+    return _kGifBase + 'abs/dead-bug.gif';
+  }
+
+  // 5. Plancha Lateral (Side Plank)
+  if (nameLower.contains('plancha lateral') || nameLower.contains('side plank')) {
+    return _kGifBase + 'abs/side-bridge-v-2.gif';
+  }
+
+  // 6. Plancha Frontal (Plank)
+  if (nameLower.contains('plancha') || nameLower.contains('plank')) {
+    return _kGifBase + (isLow
+        ? 'abs/kneeling-plank-tap-shoulder-male.gif'
+        : 'abs/front-plank-with-twist.gif');
+  }
+
+  // 7. Crunches / Abdomen
+  if (nameLower.contains('crunch') || nameLower.contains('abdominal') || nameLower.contains('abdomen') || nameLower.contains('twist')) {
+    return _kGifBase + (isLow
+        ? 'abs/oblique-crunches-floor.gif'
+        : (isHigh ? 'abs/hanging-leg-raise.gif' : 'abs/crunch-floor.gif'));
+  }
+
+  // 8. Superman / Lumbares
+  if (nameLower.contains('superman') || nameLower.contains('lumbar') || nameLower.contains('lumbares')) {
+    return _kGifBase + 'glutes/band-straight-back-stiff-leg-deadlift.gif';
+  }
+
+  // 9. Curl Femoral / Isquiotibiales (Hamstring Curls)
+  if (nameLower.contains('curl femoral') || nameLower.contains('curl de isquio') || nameLower.contains('curl de pierna') || nameLower.contains('leg curl') || nameLower.contains('nordico') || nameLower.contains('nórdico')) {
+    return _kGifBase + (isLow
+        ? 'hamstrings/standing-single-leg-curl.gif'
+        : (isHigh ? 'hamstrings/lever-lying-leg-curl.gif' : 'hamstrings/lever-seated-leg-curl.gif'));
+  }
+
+  // 10. Peso Muerto (Deadlift / RDL)
+  if (nameLower.contains('peso muerto') || nameLower.contains('deadlift') || nameLower.contains('rdl')) {
+    return _kGifBase + (isLow
+        ? 'glutes/band-stiff-leg-deadlift.gif'
+        : (isHigh ? 'glutes/barbell-deadlift.gif' : 'glutes/dumbbell-romanian-deadlift.gif'));
+  }
+
+  // 11. Sentadilla Búlgara / Split Squat
+  if (nameLower.contains('bulgara') || nameLower.contains('búlgara') || nameLower.contains('split squat')) {
+    return _kGifBase + (isLow
+        ? 'quads/split-squats.gif'
+        : (isHigh ? 'quads/barbell-single-leg-split-squat.gif' : 'quads/dumbbell-single-leg-split-squat.gif'));
+  }
+
+  // 12. Sentadillas con Salto / Jump Squats
+  if (nameLower.contains('salto') || nameLower.contains('jump')) {
+    return _kGifBase + (isLow
+        ? 'quads/split-squats.gif'
+        : (isHigh ? 'glutes/bodyweight-drop-jump-squat.gif' : 'glutes/jump-squat.gif'));
+  }
+
+  // 13. Sentadillas (Squats)
+  if (nameLower.contains('sentadilla') || nameLower.contains('squat')) {
+    return _kGifBase + (isLow
+        ? 'glutes/potty-squat-with-support.gif'
+        : (isHigh ? 'glutes/barbell-full-squat.gif' : 'quads/dumbbell-goblet-squat.gif'));
+  }
+
+  // 14. Zancadas / Lunges
+  if (nameLower.contains('zancada') || nameLower.contains('desplante') || nameLower.contains('lunge')) {
+    return _kGifBase + (isLow
+        ? 'glutes/forward-lunge-male.gif'
+        : (isHigh ? 'glutes/barbell-lunge.gif' : 'glutes/dumbbell-lunge.gif'));
+  }
+
+  // 15. Prensa de Piernas
+  if (nameLower.contains('prensa') || nameLower.contains('leg press')) {
+    if (nameLower.contains('gemelo') || nameLower.contains('talon') || nameLower.contains('pantorrilla')) {
       return _kGifBase + 'calves/sled-calf-press-on-leg-press.gif';
     }
-    return _kGifBase +
-        (isLow
-            ? 'quads/lever-alternate-leg-press.gif'
-            : 'glutes/sled-45-leg-press.gif');
+    return _kGifBase + (isLow ? 'quads/lever-alternate-leg-press.gif' : 'glutes/sled-45-leg-press.gif');
   }
-  if (text.contains('zancada') || text.contains('desplante') || text.contains('lunge')) {
-    return _kGifBase +
-        (isLow
-            ? 'glutes/forward-lunge-male.gif'
-            : (isHigh ? 'glutes/barbell-lunge.gif' : 'glutes/dumbbell-lunge.gif'));
+
+  // 16. Extensión de Cuádriceps
+  if (nameLower.contains('extension de cuadriceps') || nameLower.contains('extensión de cuádriceps') || nameLower.contains('extension de pierna') || nameLower.contains('leg extension')) {
+    return _kGifBase + (isLow ? 'quads/resistance-band-leg-extension.gif' : 'quads/lever-leg-extension.gif');
   }
-  if (text.contains('puente') || text.contains('bridge') || text.contains('hip thrust')) {
-    return _kGifBase +
-        (isLow
-            ? 'glutes/low-glute-bridge-on-floor.gif'
-            : (isHigh
-                ? 'glutes/barbell-glute-bridge.gif'
-                : 'glutes/glute-bridge-two-legs-on-bench-male.gif'));
-  }
-  if (text.contains('gemelo') || text.contains('pantorrilla') || text.contains('talon') || text.contains('talón') || text.contains('calf') || text.contains('soleo') || text.contains('sóleo') || text.contains('batata') || text.contains('tibial')) {
-    if (text.contains('sentado') || text.contains('silla') || text.contains('seated')) {
-      return _kGifBase +
-          (isLow
-              ? 'calves/seated-calf-stretch-male.gif'
-              : (isHigh ? 'calves/barbell-seated-calf-raise.gif' : 'calves/lever-seated-calf-raise.gif'));
+
+  // 17. Elevación de Talones / Sóleo / Pantorrilla / Gemelos
+  if (nameLower.contains('talon') || nameLower.contains('talón') || nameLower.contains('gemelo') || nameLower.contains('pantorrilla') || nameLower.contains('calf') || nameLower.contains('soleo') || nameLower.contains('sóleo')) {
+    if (nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated')) {
+      return _kGifBase + (isLow
+          ? 'calves/seated-calf-stretch-male.gif'
+          : (isHigh ? 'calves/barbell-seated-calf-raise.gif' : 'calves/lever-seated-calf-raise.gif'));
     }
-    if (text.contains('unipodal') || text.contains('una pierna') || text.contains('single leg') || text.contains('unilateral')) {
-      return _kGifBase +
-          (isLow
-              ? 'calves/band-single-leg-calf-raise.gif'
-              : (isHigh ? 'calves/single-leg-calf-raise-on-a-dumbbell.gif' : 'calves/dumbbell-single-leg-calf-raise.gif'));
+    if (nameLower.contains('unipodal') || nameLower.contains('una pierna') || nameLower.contains('single leg')) {
+      return _kGifBase + (isLow
+          ? 'calves/band-single-leg-calf-raise.gif'
+          : (isHigh ? 'calves/single-leg-calf-raise-on-a-dumbbell.gif' : 'calves/dumbbell-single-leg-calf-raise.gif'));
     }
-    if (text.contains('prensa') || text.contains('sled')) {
-      return _kGifBase + (isHigh ? 'calves/sled-45-calf-press.gif' : 'calves/sled-calf-press-on-leg-press.gif');
-    }
-    if (text.contains('donkey') || text.contains('burro')) {
-      return _kGifBase + (isHigh ? 'calves/weighted-donkey-calf-raise.gif' : 'calves/donkey-calf-raise.gif');
-    }
-    if (text.contains('tibial') || text.contains('dorsiflex') || text.contains('tobillo') || text.contains('pie')) {
-      return _kGifBase + (isHigh ? 'calves/box-jump-down-with-one-leg-stabilization.gif' : 'calves/posterior-tibialis-stretch.gif');
-    }
-    return _kGifBase +
-        (isLow
-            ? 'calves/bodyweight-standing-calf-raise.gif'
-            : (isHigh ? 'calves/lever-standing-calf-raise.gif' : 'calves/dumbbell-standing-calf-raise.gif'));
+    return _kGifBase + (isLow
+        ? 'calves/bodyweight-standing-calf-raise.gif'
+        : (isHigh ? 'calves/lever-standing-calf-raise.gif' : 'calves/dumbbell-standing-calf-raise.gif'));
   }
-  if (text.contains('abduc')) {
-    return _kGifBase +
-        (isLow
-            ? 'abductors/side-hip-abduction.gif'
-            : 'abductors/lever-seated-hip-abduction.gif');
+
+  // 18. Flexiones en Pica / Pike Push-ups
+  if (nameLower.contains('pica') || nameLower.contains('pike')) {
+    return _kGifBase + (isLow ? 'delts/band-shoulder-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif');
   }
-  if (text.contains('aduc')) {
-    return _kGifBase +
-        (isLow
-            ? 'adductors/side-lying-hip-adduction-male.gif'
-            : 'adductors/lever-seated-hip-adduction.gif');
+
+  // 19. Flexiones Diamante
+  if (nameLower.contains('diamante') || nameLower.contains('diamond')) {
+    return _kGifBase + (isLow ? 'triceps/bench-dip-knees-bent.gif' : 'pectorals/push-up.gif');
   }
-  if (text.contains('sentadilla') || text.contains('squat') || text.contains('cuadriceps') || text.contains('cuádriceps') || text.contains('glute') || text.contains('glúte') || text.contains('pierna')) {
-    return _kGifBase +
-        (isLow
-            ? 'glutes/potty-squat-with-support.gif'
-            : (isHigh
-                ? 'glutes/barbell-full-squat.gif'
-                : 'quads/dumbbell-goblet-squat.gif'));
+
+  // 20. Flexiones de Pecho (Push-ups)
+  if (nameLower.contains('flexion de pecho') || nameLower.contains('flexión de pecho') || nameLower.contains('flexiones') || nameLower.contains('push up') || nameLower.contains('pushup') || nameLower.contains('lagartija')) {
+    return _kGifBase + (isLow
+        ? 'pectorals/incline-push-up.gif'
+        : (isHigh ? 'pectorals/barbell-bench-press.gif' : 'pectorals/push-up.gif'));
   }
-  if (text.contains('bicep') || text.contains('bícep') || text.contains('curl')) {
-    if (text.contains('martillo') || text.contains('hammer')) {
+
+  // 21. Press de Banca / Pecho
+  if (nameLower.contains('press de banca') || nameLower.contains('bench press') || nameLower.contains('press de pecho') || nameLower.contains('pecho') || nameLower.contains('pectoral')) {
+    return _kGifBase + (isLow
+        ? 'pectorals/incline-push-up.gif'
+        : (isHigh ? 'pectorals/barbell-bench-press.gif' : 'pectorals/dumbbell-bench-press.gif'));
+  }
+
+  // 22. Extensiones de Tríceps / Francés / Copa
+  if (nameLower.contains('tricep') || nameLower.contains('trícep') || nameLower.contains('press frances') || nameLower.contains('copa')) {
+    return _kGifBase + (isLow
+        ? 'triceps/bench-dip-knees-bent.gif'
+        : (isHigh ? 'triceps/barbell-lying-triceps-extension.gif' : 'triceps/cable-alternate-triceps-extension.gif'));
+  }
+
+  // 23. Curl de Bíceps
+  if (nameLower.contains('bicep') || nameLower.contains('bícep') || nameLower.contains('martillo') || nameLower.contains('curl')) {
+    if (nameLower.contains('martillo') || nameLower.contains('hammer')) {
       return _kGifBase + 'biceps/dumbbell-seated-hammer-curl.gif';
     }
-    return _kGifBase + 'biceps/dumbbell-seated-bicep-curl.gif';
+    return _kGifBase + (isLow
+        ? 'biceps/band-alternating-biceps-curl.gif'
+        : (isHigh ? 'biceps/barbell-curl.gif' : 'biceps/dumbbell-biceps-curl.gif'));
   }
-  if (text.contains('tricep') || text.contains('trícep') || text.contains('fondo') || text.contains('copa') || text.contains('dip')) {
-    if (text.contains('fondo') || text.contains('dip') || text.contains('maquina') || text.contains('máquina')) {
-      return _kGifBase + 'triceps/lever-seated-dip.gif';
-    }
-    return _kGifBase + 'triceps/dumbbell-seated-triceps-extension.gif';
+
+  // 24. Elevaciones Laterales
+  if (nameLower.contains('lateral raise') || nameLower.contains('elevacion lateral') || nameLower.contains('elevaciones laterales') || nameLower.contains('elevación lateral')) {
+    return _kGifBase + (isLow ? 'delts/band-front-lateral-raise.gif' : 'delts/dumbbell-lateral-raise.gif');
   }
-  if (text.contains('apertura') || text.contains('fly')) {
-    return _kGifBase + 'pectorals/lever-seated-fly.gif';
+
+  // 25. Press Militar / Hombros
+  if (nameLower.contains('militar') || nameLower.contains('shoulder press') || nameLower.contains('hombro') || nameLower.contains('deltoid')) {
+    return _kGifBase + (isLow
+        ? 'delts/band-shoulder-press.gif'
+        : (isHigh ? 'delts/barbell-seated-overhead-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif'));
   }
-  if (text.contains('pecho') || text.contains('pectoral') || text.contains('banca') || text.contains('bench')) {
-    if (text.contains('banda') || text.contains('silla') || text.contains('rueda') || text.contains('casa')) {
-      return _kGifBase + 'pectorals/resistance-band-seated-chest-press.gif';
-    }
-    if (text.contains('maquina') || text.contains('máquina') || text.contains('sentado')) {
-      return _kGifBase + 'pectorals/lever-chest-press.gif';
-    }
-    return _kGifBase + 'pectorals/dumbbell-bench-press.gif';
+
+  // 26. Remos / Jalones / Dominadas
+  if (nameLower.contains('remo') || nameLower.contains('row') || nameLower.contains('jalon') || nameLower.contains('jalón') || nameLower.contains('dominada') || nameLower.contains('pulldown') || nameLower.contains('espalda') || nameLower.contains('dorsal')) {
+    return _kGifBase + (isLow
+        ? 'upper-back/band-one-arm-twisting-seated-row.gif'
+        : (isHigh ? 'upper-back/barbell-bent-over-row.gif' : 'upper-back/cable-low-seated-row.gif'));
   }
-  if (text.contains('espalda') || text.contains('dorsal') || text.contains('remo') || text.contains('jalon') || text.contains('jalón') || text.contains('dominada')) {
-    if (text.contains('jalon') || text.contains('jalón') || text.contains('polea alta') || text.contains('pulldown')) {
-      return _kGifBase + 'lats/cable-pulldown.gif';
-    }
-    if (text.contains('remo') && text.contains('polea')) {
-      return _kGifBase + 'lats/cable-seated-high-row-v-bar.gif';
-    }
-    return _kGifBase + 'upper-back/band-one-arm-twisting-seated-row.gif';
+
+  // 27. Abducción de Cadera
+  if (nameLower.contains('abduc')) {
+    return _kGifBase + (isLow ? 'abductors/side-hip-abduction.gif' : 'abductors/lever-seated-hip-abduction.gif');
   }
-  if (text.contains('hombro') || text.contains('deltoid') || text.contains('militar') || text.contains('lateral') || text.contains('pajaro') || text.contains('pájaro')) {
-    if (text.contains('pajaro') || text.contains('pájaro') || text.contains('posterior') || text.contains('reverse fly')) {
-      return _kGifBase + 'delts/lever-seated-reverse-fly.gif';
-    }
-    if (text.contains('lateral') || text.contains('elevacion') || text.contains('elevación')) {
-      return _kGifBase + 'delts/dumbbell-seated-lateral-raise.gif';
-    }
-    return _kGifBase + 'delts/dumbbell-seated-shoulder-press.gif';
+
+  // 28. Aducción de Cadera
+  if (nameLower.contains('aduc')) {
+    return _kGifBase + (isLow ? 'adductors/side-lying-hip-adduction-male.gif' : 'adductors/lever-seated-hip-adduction.gif');
   }
-  if (text.contains('core') || text.contains('abdom') || text.contains('plancha') || text.contains('giro') || text.contains('twist') || text.contains('isometr') || text.contains('isométr')) {
-    if (text.contains('giro') || text.contains('twist') || text.contains('ruso')) {
-      return _kGifBase + 'abs/band-seated-twist.gif';
-    }
-    return _kGifBase + 'abs/cable-seated-crunch.gif';
+
+  // 29. Fallback general por agonista
+  final text = '${nameLower} ${agonist.toLowerCase()}';
+  if (text.contains('isquio') || text.contains('femoral')) {
+    return _kGifBase + (isLow ? 'hamstrings/standing-single-leg-curl.gif' : 'hamstrings/lever-seated-leg-curl.gif');
   }
+  if (text.contains('glute') || text.contains('glúte')) {
+    return _kGifBase + (isLow ? 'glutes/low-glute-bridge-on-floor.gif' : 'glutes/glute-bridge-two-legs-on-bench-male.gif');
+  }
+  if (text.contains('cuadricep') || text.contains('cuádricep') || text.contains('pierna')) {
+    return _kGifBase + (isLow ? 'glutes/potty-squat-with-support.gif' : 'quads/dumbbell-goblet-squat.gif');
+  }
+
   return _kGifBase + 'delts/dumbbell-seated-shoulder-press.gif';
 }
 
