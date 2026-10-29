@@ -17,7 +17,7 @@ from app.services.ai_providers import (
 router = APIRouter()
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-AI_TIMEOUT_SEC = 60.0
+AI_TIMEOUT_SEC = 14.0
 MAX_HISTORY_TURNS = 20
 
 
@@ -413,13 +413,23 @@ def _is_pure_greeting_or_conversation(message: str) -> bool:
     return False
 
 
-def _is_explicit_routine_request(message: str) -> bool:
+def _is_explicit_routine_request(message: str, history: list = None) -> bool:
     """Detecta si el usuario está pidiendo explícitamente generar o ver un plan o rutina."""
     msg = (message or "").lower()
 
     # Si expresa dolor o molestia, es una consulta de salud/rehabilitación, no una orden de rutina
     if any(k in msg for k in ("me duele", "molestia", "dolor", "lesión", "lesion", "tengo dudas", "tengo una duda", "pregunta")):
         return False
+
+    # 1. Botones de acción rápida directos
+    if any(k in msg for k in ("plan semanal recomendado", "plan recomendado por ia", "plan recomendado", "🤖")):
+        return True
+
+    # 2. Expresiones con tolerancia a tipeos (ej. "recomeidnes ejercicos", "recomiendame ejercicios")
+    if re.search(r"(recom|dame|arma|dise|haz|crea|prepar|gener).*(ejerci|rutin|plan)", msg):
+        return True
+    if re.search(r"(ejerci|rutin|plan).*(semana|hoy|casa|gimnasio|dias|días|arriba|pierna|descarga)", msg):
+        return True
 
     explicit_phrases = (
         "dame la rutina", "dame una rutina", "dame mi rutina", "dame el plan", "dame un plan",
@@ -440,9 +450,26 @@ def _is_explicit_routine_request(message: str) -> bool:
         "combinar con", "combinar piernas", "planificar mi semana", "nuevo inicio", "empezar de nuevo",
         "nuevo plan", "plan de entrenamiento", "rutina diaria", "plan mensual", "cronograma",
         "plan para la semana", "plan de la semana", "iniciar plan", "iniciar nuevo plan",
-        "planificar mi entrenamiento", "planificar de lunes a viernes", "lunes a viernes"
+        "planificar mi entrenamiento", "planificar de lunes a viernes", "lunes a viernes",
+        "recomiéndame ejercicios", "recomiendame ejercicios", "recomienda ejercicios",
+        "ejercicios en casa", "ejercicios para toda la semana", "para toda la siguiente semana"
     )
-    return any(p in msg for p in explicit_phrases)
+    if any(p in msg for p in explicit_phrases):
+        return True
+
+    # 3. Si en el historial reciente el usuario pidió una rutina y ahora está respondiendo
+    if history:
+        for turn in reversed(history[-2:]):
+            content = ""
+            if isinstance(turn, dict):
+                content = str(turn.get("content", "")).lower()
+            elif hasattr(turn, "content"):
+                content = str(turn.content or "").lower()
+            if any(k in content for k in ("sin herramientas", "en casa", "recomiend", "rutina", "plan")):
+                if any(k in msg for k in ("si", "sí", "dale", "ok", "hazlo", "arma", "plan", "semana")):
+                    return True
+
+    return False
 
 
 
@@ -1305,8 +1332,14 @@ def _build_safe_nutrition(allergies: str | None = None, pathologies: str | None 
     }
 
 
-def _is_no_equipment(equipment_details: str | None, user_message: str, is_home: bool = False) -> bool:
+def _is_no_equipment(equipment_details: str | None, user_message: str, is_home: bool = False, history: list = None) -> bool:
     text = f"{equipment_details or ''} {user_message or ''}".lower()
+    if history:
+        for turn in history[-6:]:
+            if isinstance(turn, dict):
+                text += " " + str(turn.get("content", "")).lower()
+            elif hasattr(turn, "content"):
+                text += " " + str(turn.content or "").lower()
     no_equip_keywords = (
         "sin herramientas", "sin herramienta", "sin equipo", "sin maquinas", "sin máquinas",
         "sin pesas", "sin mancuernas", "peso corporal", "calistenia", "en casa", "solo casa",
@@ -1935,11 +1968,11 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
         g_list = glutes_dict[int_k]
         uni_a = [
             ("Zancada estática asistida con apoyo en pared (Básico)", "Cuádriceps", "Isquiotibiales", "lunge") if int_k == "baja" else (
-                ("Sentadilla búlgara con mancuernas (Intermedio)", "Cuádriceps", "Glúteos", "split-squat") if int_k == "media" else
-                ("Zancadas búlgaras profundas con mancuernas pesadas (Avanzado)", "Glúteos, Cuádriceps", "split-squat")
+                ("Sentadilla búlgara con pie en silla o cama (Intermedio)" if is_no_equipment else "Sentadilla búlgara con mancuernas (Intermedio)", "Cuádriceps", "Glúteos", "split-squat") if int_k == "media" else
+                ("Sentadilla búlgara con salto controlado (Avanzado)" if is_no_equipment else "Zancadas búlgaras profundas con mancuernas pesadas (Avanzado)", "Glúteos, Cuádriceps", "split-squat")
             ),
             ("Step-ups en banco o silla firme (Intermedio)", "Glúteos, Cuádriceps", "Estabilidad", "lunge"),
-            ("Zancadas frontales alternas (Intermedio)", "Cuádriceps", "Isquiotibiales", "lunge"),
+            ("Zancadas frontales alternas con peso corporal (Intermedio)" if is_no_equipment else "Zancadas frontales alternas (Intermedio)", "Cuádriceps", "Isquiotibiales", "lunge"),
         ]
         calf_choice_a = soleo_dict[int_k][(seed) % len(soleo_dict[int_k])] if (seed % 2 == 0) else calves_pies_dict[int_k][(seed) % len(calves_pies_dict[int_k])]
         selected_tuples = [
@@ -2937,7 +2970,7 @@ Retorna SOLO JSON."""
                 break
 
     is_pure_greeting = _is_pure_greeting_or_conversation(payload.message)
-    is_routine_request = _is_explicit_routine_request(payload.message)
+    is_routine_request = _is_explicit_routine_request(payload.message, payload.history)
 
     # Si es solo un saludo o cortesía (ej: "Hola buen día, ¿qué tal estás?"), responder conversacionalmente SIN tirar plan
     if is_pure_greeting and not is_routine_request:
@@ -3083,7 +3116,7 @@ Devuelve SOLO JSON."""
             f"   - Todos los ejercicios recomendados deben coincidir rigurosamente con la intensidad **{effective_intensity}**."
         )
 
-    is_no_equipment = _is_no_equipment(payload.equipment_details, payload.message, payload.today_is_home)
+    is_no_equipment = _is_no_equipment(payload.equipment_details, payload.message, payload.today_is_home, payload.history)
     equip_instruction = ""
     if is_no_equipment:
         equip_instruction = (
@@ -3348,28 +3381,33 @@ Devuelve SOLO JSON."""
     if not isinstance(data, dict):
         reply_clean = re.sub(r"```(?:json)?", "", raw).replace("```", "").strip()
         
-        # Seleccionar pool de ejercicios según la zona solicitada e intensidad
-        focus_key = requested_focus or "piernas"
+        int_low = effective_intensity.lower()
+        if "alta" in int_low or "avanzado" in int_low:
+            intensity_hint = "alta"
+            forced_label = "Avanzado (Intensidad Alta)"
+        elif "baja" in int_low or "principiante" in int_low:
+            intensity_hint = "baja"
+            forced_label = "Básico (Intensidad Baja)"
+        else:
+            intensity_hint = "media"
+            forced_label = "Intermedio (Intensidad Media)"
+
+        focus_key = requested_focus or "semanal_completo"
         if motor_disabled:
-            chosen_pool = SEATED_ADAPTED_POOLS.get(intensity_hint, SEATED_ADAPTED_POOLS["media"])
             focus_name = "Tren Superior y Torso Sentado (Adaptado)"
         elif focus_key == "pantorrillas_pies":
-            chosen_pool = CALVES_FEET_POOLS.get(intensity_hint, CALVES_FEET_POOLS["media"])
             focus_name = "Pantorrillas (Batatas / Tríceps Sural) y Pies"
         elif focus_key == "triceps_piernas":
-            chosen_pool = TRICEPS_LEGS_POOLS.get(intensity_hint, TRICEPS_LEGS_POOLS["media"])
             focus_name = "Tríceps y Composición Completa de Piernas"
-        elif focus_key == "tren_superior":
-            chosen_pool = UPPER_BODY_POOLS.get(intensity_hint, UPPER_BODY_POOLS["media"])
+        elif focus_key in ("tren_superior", "solo_tren_superior"):
             focus_name = "Tren Superior (Espalda, Pecho y Brazos)"
-        elif focus_key == "core":
-            chosen_pool = CORE_POOLS.get(intensity_hint, CORE_POOLS["media"])
+        elif focus_key in ("core", "solo_core"):
             focus_name = "Core y Estabilidad Lumbar"
-        elif focus_key == "movilidad_cardio":
-            chosen_pool = MOBILITY_CARDIO_POOLS.get(intensity_hint, MOBILITY_CARDIO_POOLS["media"])
+        elif focus_key in ("movilidad_cardio", "solo_cardio"):
             focus_name = "Movilidad Articular y Cardio Suave"
+        elif focus_key in ("plan_semanal_ia", "semanal_completo"):
+            focus_name = "Plan Semanal Integral Personalizado"
         else:
-            chosen_pool = leg_pool
             focus_name = "Piernas y Glúteos"
 
         dynamic_seed = abs(hash((payload.message or "") + str(int(time.time() / 5)))) % 1000
@@ -3388,12 +3426,13 @@ Devuelve SOLO JSON."""
                 "posture": "Core activo y columna neutra durante todo el recorrido.",
             })
 
+        eq_note = " (100% en casa sin herramientas)" if is_no_equipment else ""
         data = {
             "reply": reply_clean or (
-                f"¡Excelente decisión! He preparado tu plan de sesión enfocado en **{focus_name}**, "
+                f"¡Excelente decisión! He preparado tu plan de sesión enfocado en **{focus_name}**{eq_note}, "
                 f"calibrado para tu nivel de experiencia **{effective_level}** a una intensidad **{effective_intensity}**.\n\n"
-                f"Recuerda que para optimizar la hipertrofia y adaptación neuromuscular, este grupo muscular requiere entre "
-                f"**48 y 72 horas de recuperación** antes de volver a trabajarse."
+                f"Recuerda que para optimizar la adaptación neuromuscular y evitar sobrecargas, este programa periodiza "
+                f"descansos adecuados de **48 y 72 horas** entre estímulos del mismo grupo muscular."
             ),
             "category": f"Entrenamiento ({effective_level} · Intensidad {effective_intensity})",
             "duration_weeks": 4,
@@ -3403,9 +3442,9 @@ Devuelve SOLO JSON."""
             "suggest_questionnaire": False,
             "has_plan": True,
             "structured_plan": {
-                "day": "Martes y Jueves" if is_complementary else "Lunes y Miércoles",
+                "day": "Martes y Jueves" if is_complementary else "Lunes a Viernes (Semanal)",
                 "title": f"Rutina personalizada: {focus_name} ({effective_level} · Intensidad {effective_intensity})",
-                "recommended_days": ["Martes", "Jueves"] if is_complementary else ["Lunes", "Miércoles"],
+                "recommended_days": ["Martes", "Jueves"] if is_complementary else ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"],
                 "complementary_days": {
                     "Martes": "Tren Superior Suave o Core",
                     "Jueves": "Movilidad Articular o Tren Superior"
@@ -3656,37 +3695,89 @@ def chat_with_coach(payload: ChatMessage):
                 recommended_intensity=result.get("recommended_intensity"),
             )
         return result
-    except AllProvidersFailed as error:
-        print("Coach IA: todos los proveedores fallaron:", error)
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Ningun proveedor de IA pudo responder. Revisa las claves de IA "
-                "en el servidor o intenta de nuevo en unos segundos."
-            ),
-        )
-    except Exception as error:  # noqa: BLE001 - se reporta al cliente
-        print("Coach IA error:", error.__class__.__name__, error)
-        if error.__class__.__name__ in RATE_LIMIT_ERRORS:
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    "El Coach IA alcanzo el limite de uso temporal del proveedor. "
-                    "Espera unos segundos y vuelve a intentarlo."
-                ),
-            )
-        if error.__class__.__name__ in TIMEOUT_ERRORS:
-            raise HTTPException(
-                status_code=504,
-                detail="El Coach IA tardo demasiado en responder. Intenta de nuevo.",
-            )
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "El Coach IA no esta disponible en este momento. "
-                "Intenta de nuevo en unos segundos."
-            ),
-        )
+    except Exception as error:
+        print("Coach IA chat_with_coach exception handler (activando rescate local):", error.__class__.__name__, error)
+        try:
+            eff_lvl = payload.user_level or "Intermedio"
+            eff_int = payload.user_intensity or "Media"
+            is_no_eq = _is_no_equipment(payload.equipment_details, payload.message, payload.today_is_home, payload.history)
+            focus_req = _detect_requested_focus(payload)
+            int_hint = "alta" if ("alta" in eff_int.lower() or "avanzado" in eff_int.lower()) else ("baja" if ("baja" in eff_int.lower() or "principiante" in eff_int.lower()) else "media")
+            
+            is_routine = _is_explicit_routine_request(payload.message, payload.history) or (payload.message or "").startswith("🤖") or "plan" in (payload.message or "").lower()
+
+            if is_routine:
+                diverse_exs = _generate_diverse_session(focus_req or "piernas", int_hint, seed=int(time.time()) % 1000, is_no_equipment=is_no_eq)
+                raw_struct = {
+                    "day": "Lunes a Viernes (Semanal)",
+                    "title": f"Plan Semanal Calibrado por Coach IA ({eff_lvl} · Intensidad {eff_int})",
+                    "recommended_days": ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"],
+                    "exercises": diverse_exs,
+                    "nutrition": _build_safe_nutrition(payload.allergies, payload.pathology_or_allergies, payload.user_goal)
+                }
+                norm_plan = _normalize_structured_plan(
+                    raw_struct,
+                    intensity=eff_int,
+                    level=eff_lvl,
+                    requested_focus=focus_req,
+                    user_message=payload.message or "",
+                    is_no_equipment=is_no_eq,
+                )
+                eq_text = " (100% en casa sin herramientas)" if is_no_eq else ""
+                return {
+                    "provider": "local_resilience",
+                    "reply": (
+                        f"¡Listo! He calibrado tu plan semanal de entrenamiento{eq_text} adaptado a tu nivel **{eff_lvl}** "
+                        f"con intensidad **{eff_int}**. He programado tus sesiones con periodización estratégica de 48 a 72 horas "
+                        f"de descanso entre estímulos musculares para asegurar una supercompensación óptima."
+                    ),
+                    "category": f"Entrenamiento ({eff_lvl} · Intensidad {eff_int})",
+                    "duration_weeks": 4,
+                    "rest_between_sets_sec": 60,
+                    "progression_rule": "Respeta 48-72h de recuperación entre sesiones del mismo grupo muscular.",
+                    "extracted_equipment": None,
+                    "suggest_questionnaire": False,
+                    "has_plan": True,
+                    "structured_plan": norm_plan,
+                    "quick_replies": [
+                        "📅 Añadir al Cronograma",
+                        "🤝 Combinar con Core / Abdomen",
+                        "🤝 Combinar con Tren Superior",
+                        "🔥 Rutina Cardio HIIT & Core",
+                    ],
+                    "recommended_intensity": eff_int,
+                    "fatigue_detected": False,
+                    "updated_user_goal": payload.user_goal,
+                }
+            else:
+                return {
+                    "provider": "local_resilience",
+                    "reply": (
+                        f"¡Hola! Me encuentro excelente y listo para orientarte. Como tu Coach de Fitness, "
+                        f"puedo diseñar tu plan de entrenamiento semanal o diario para tu nivel {eff_lvl}, "
+                        f"ajustar tu intensidad o resolver cualquier duda biomecánica o nutricional. ¿Cómo deseas avanzar hoy?"
+                    ),
+                    "category": "Asesoría y Diálogo de Coach",
+                    "duration_weeks": 4,
+                    "rest_between_sets_sec": 60,
+                    "progression_rule": "Monitorea tu técnica y respeta 48-72h de recuperación.",
+                    "extracted_equipment": None,
+                    "suggest_questionnaire": False,
+                    "has_plan": False,
+                    "structured_plan": None,
+                    "quick_replies": [
+                        "🤖 Plan Semanal Recomendado por IA",
+                        "🏋️ Rutina de Piernas y Glúteos",
+                        "💪 Rutina de Tren Superior",
+                        "🔥 Rutina Cardio HIIT & Core",
+                    ],
+                    "recommended_intensity": eff_int,
+                    "fatigue_detected": False,
+                    "updated_user_goal": payload.user_goal,
+                }
+        except Exception as rescue_err:
+            print("Fallo crítico en rescate local:", rescue_err)
+            raise HTTPException(status_code=503, detail="El Coach IA se encuentra en calibración. Intenta en un momento.")
 
 
 @router.get("/history")
