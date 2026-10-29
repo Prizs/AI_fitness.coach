@@ -926,11 +926,17 @@ class _CoachScreenState extends State<CoachScreen> {
         });
       }
     } catch (error) {
+      final errStr = error.toString().toLowerCase();
+      final bool isTimeout = errStr.contains('timeout') || errStr.contains('tiempo');
+      final friendlyMsg = isTimeout
+          ? 'El servidor tardó un momento más de lo esperado en calibrar la rutina. Por favor, pulsa el botón para reintentar.'
+          : 'El servidor se encontraba actualizando o reconectando. Ya está operativo, por favor pulsa el botón abajo para generar tu plan.';
       setState(() {
         _messages.add({
           'isUser': false,
-          'text': 'No se pudo comunicar con el servidor backend (${error.runtimeType}).',
+          'text': friendlyMsg,
           'plan': null,
+          'quick_replies': ['🔄 Reintentar generar plan'],
         });
       });
     } finally {
