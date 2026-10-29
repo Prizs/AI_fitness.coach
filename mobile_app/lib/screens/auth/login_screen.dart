@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_app/services/app_update_service.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/widgets/app_update.dart';
@@ -330,6 +331,10 @@ class _LoginScreenState extends State<LoginScreen> {
           TextFormField(
             controller: _cedulaController,
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(9),
+            ],
             decoration:
                 _inputStyle('Cédula venezolana', Icons.badge_outlined),
             validator: _validateCedula,

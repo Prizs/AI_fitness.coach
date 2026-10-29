@@ -21,11 +21,13 @@ def _read_pubspec_version() -> tuple[str, int]:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
                 return raw_ver, 106
-    return "1.0.74", 114
+    return "1.0.76", 116
 
 def _find_apk_file() -> Path | None:
     candidates = [
         Path(__file__).resolve().parents[3] / "releases" / "app-release.apk",
+        Path(__file__).resolve().parents[3] / "releases" / "app-release-v1076.apk",
+        Path(__file__).resolve().parents[3] / "mobile_app" / "build" / "app" / "outputs" / "flutter-apk" / "app-release.apk",
         Path(__file__).resolve().parents[2] / "releases" / "app-release.apk",
         Path(__file__).resolve().parent.parent / "web_dist" / "AI_Fitness_Coach.apk",
         Path("releases/app-release.apk").resolve(),
@@ -38,19 +40,19 @@ def _find_apk_file() -> Path | None:
 @router.get("/latest")
 def latest_version() -> dict:
     apk = _find_apk_file()
-    size = apk.stat().st_size if apk else 64077417
+    size = apk.stat().st_size if apk else 63225169
+    ver_name, ver_code = _read_pubspec_version()
     return {
         "available": True,
-        "version_name": "1.0.73",
-        "version_code": 113,
+        "version_name": ver_name,
+        "version_code": ver_code,
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            "Actualización oficial de AI Fitness Coach v1.0.73:\n"
-            "1. GIFs anatómicos únicos por ejercicio: diferenciación biomecánica precisa entre elevación de talones sentado en máquina, unipodal en escalón y de pie.\n"
-            "2. Actualización instantánea en visor anatómico: refresco inmediato del GIF animado al alternar ejercicios desde la barra inferior.\n"
-            "3. Rutina completa de piernas sin repeticiones: distribución anatómica integral cubriendo Cuádriceps, Femorales, Glúteos y Sóleo/Batatas.\n"
-            "4. Alternancia muscular semanal: respeto de las 48-72h de recuperación alternando piernas con dorsal/tren superior y core."
+            f"Actualización oficial de AI Fitness Coach v{ver_name}:\n"
+            "1. Corrección visual en respuestas rápidas del Coach IA: eliminación del formato de diccionario crudo {content_type: text, title: ...}.\n"
+            "2. Validación estricta en registro: cédula y edad numéricas, nombres y apellidos solo alfabéticos, contraseñas con caracteres especiales.\n"
+            "3. Filtro Clínico & Seguridad en segundo plano: personalización automática de planes de nutrición y ejercicio según patologías (asma, hipertensión, diabetes) y alergias alimentarias."
         ),
         "download_url": "/api/app/download",
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
@@ -90,35 +91,87 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _join(List<String> values) => values.join(', ');
 
-  String? _required(String? value) => value == null || value.trim().isEmpty
-      ? 'Este campo es obligatorio'
-      : null;
-
-  String? _nameValidator(String? value) {
-    if (_required(value) != null) return _required(value);
-    return RegExp(r'^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$').hasMatch(value!.trim())
-        ? null
-        : 'Solo se permiten letras y espacios';
+  String? _nameValidator(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName es obligatorio';
+    }
+    final trimmed = value.trim();
+    if (trimmed.length < 2) {
+      return '$fieldName debe tener al menos 2 letras';
+    }
+    if (!RegExp(r'^[A-Za-zÁÉÍÓÚáéíóúÑñÄËÏÖÜäëïöü\s]+$').hasMatch(trimmed)) {
+      return 'Solo se permiten letras en $fieldName';
+    }
+    return null;
   }
 
-  String? _cedulaValidator(String? value) =>
-      value != null && RegExp(r'^\d{6,9}$').hasMatch(value.trim())
-      ? null
-      : 'Cédula de 6 a 9 dígitos';
-  String? _passwordValidator(String? value) =>
-      value != null && value.length >= 8 ? null : 'Mínimo 8 caracteres';
+  String? _cedulaValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'La cédula es obligatoria';
+    }
+    final clean = value.trim();
+    if (!RegExp(r'^\d+$').hasMatch(clean)) {
+      return 'Solo se permiten números';
+    }
+    if (clean.length < 6 || clean.length > 9) {
+      return 'Cédula debe tener entre 6 y 9 dígitos';
+    }
+    return null;
+  }
+
+  String? _passwordValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'La contraseña es obligatoria';
+    }
+    if (value.length < 8) {
+      return 'Mínimo 8 caracteres (letras, números o símbolos)';
+    }
+    if (RegExp(r'[\u{1F300}-\u{1FAFF}]', unicode: true).hasMatch(value)) {
+      return 'No se permiten emojis en la contraseña';
+    }
+    return null;
+  }
+
   String? _ageValidator(String? value) {
-    final parsed = int.tryParse(value?.trim() ?? '');
-    return parsed != null && parsed >= 12 && parsed <= 100
-        ? null
-        : 'Edad entre 12 y 100 años';
+    if (value == null || value.trim().isEmpty) {
+      return 'La edad es obligatoria';
+    }
+    final clean = value.trim();
+    if (!RegExp(r'^\d+$').hasMatch(clean)) {
+      return 'Solo se permiten números';
+    }
+    final parsed = int.tryParse(clean);
+    if (parsed == null || parsed < 12 || parsed > 100) {
+      return 'Edad válida entre 12 y 100 años';
+    }
+    return null;
   }
 
   String? _weightValidator(String? value) {
-    final parsed = double.tryParse(value?.trim() ?? '');
-    return parsed != null && parsed > 0 && parsed <= 300
-        ? null
-        : 'Ingrese un peso válido';
+    if (_isTrainer) return null;
+    if (value == null || value.trim().isEmpty) {
+      return 'El peso es obligatorio';
+    }
+    final clean = value.trim().replaceAll(',', '.');
+    final parsed = double.tryParse(clean);
+    if (parsed == null || parsed < 30 || parsed > 300) {
+      return 'Peso válido entre 30 y 300 kg';
+    }
+    return null;
+  }
+
+  String? _experienceValidator(String? value) {
+    if (!_isTrainer) return null;
+    if (value == null || value.trim().isEmpty) return null;
+    final clean = value.trim();
+    if (!RegExp(r'^\d+$').hasMatch(clean)) {
+      return 'Solo se permiten números';
+    }
+    final parsed = int.tryParse(clean);
+    if (parsed == null || parsed < 0 || parsed > 60) {
+      return 'Años válidos entre 0 y 60';
+    }
+    return null;
   }
 
   InputDecoration _decoration(String label, IconData icon) => InputDecoration(
@@ -273,6 +326,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _cedula,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
                   decoration: _decoration(
                     'Cédula venezolana',
                     Icons.badge_outlined,
@@ -283,6 +340,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _password,
                   obscureText: true,
+                  keyboardType: TextInputType.visiblePassword,
+                  // Permite letras, números y caracteres especiales
                   decoration: _decoration(
                     'Contraseña',
                     Icons.lock_outline_rounded,
@@ -295,19 +354,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _name,
+                        keyboardType: TextInputType.name,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑäëïöüÄËÏÖÜ\s]'),
+                          ),
+                          LengthLimitingTextInputFormatter(40),
+                        ],
                         decoration: _decoration('Nombre', Icons.person_outline),
-                        validator: _nameValidator,
+                        validator: (v) => _nameValidator(v, 'El nombre'),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: TextFormField(
                         controller: _lastName,
+                        keyboardType: TextInputType.name,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑäëïöüÄËÏÖÜ\s]'),
+                          ),
+                          LengthLimitingTextInputFormatter(40),
+                        ],
                         decoration: _decoration(
                           'Apellido',
                           Icons.person_outline,
                         ),
-                        validator: _nameValidator,
+                        validator: (v) => _nameValidator(v, 'El apellido'),
                       ),
                     ),
                   ],
@@ -319,24 +392,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: TextFormField(
                         controller: _age,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(3),
+                        ],
                         decoration: _decoration('Edad', Icons.cake_outlined),
                         validator: _ageValidator,
                       ),
                     ),
                     if (!_isTrainer) const SizedBox(width: 10),
-                    if (!_isTrainer) Expanded(
-                      child: TextFormField(
-                        controller: _weight,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
+                    if (!_isTrainer)
+                      Expanded(
+                        child: TextFormField(
+                          controller: _weight,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*[\.,]?\d*'),
+                            ),
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                          decoration: _decoration(
+                            'Peso kg',
+                            Icons.monitor_weight_outlined,
+                          ),
+                          validator: _weightValidator,
                         ),
-                        decoration: _decoration(
-                          'Peso kg',
-                          Icons.monitor_weight_outlined,
-                        ),
-                        validator: _weightValidator,
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -581,7 +665,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _experienceController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(2),
+                  ],
                   decoration: _decoration('Años de Experiencia', Icons.timeline),
+                  validator: _experienceValidator,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

@@ -58,6 +58,87 @@ class _NutritionScreenState extends State<NutritionScreen> {
     );
   }
 
+  Widget _buildClinicalShieldCard() {
+    final user = AuthService.instance.loggedInUser;
+    final allergies = user?.foodAllergies;
+    final pathologies = user?.pathologyOrAllergies;
+    final injuries = user?.currentInjuries;
+
+    final hasRestrictions = (allergies != null && allergies.trim().isNotEmpty && allergies.toLowerCase() != 'ninguna' && allergies.toLowerCase() != 'ninguno') ||
+        (pathologies != null && pathologies.trim().isNotEmpty && pathologies.toLowerCase() != 'ninguna' && pathologies.toLowerCase() != 'ninguno') ||
+        (injuries != null && injuries.trim().isNotEmpty && injuries.toLowerCase() != 'ninguna' && injuries.toLowerCase() != 'ninguno');
+
+    if (!hasRestrictions) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF101B2D),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: Color(0xFF8BE0C0), size: 18),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Perfil clínico óptimo: Sin alergias alimentarias ni lesiones reportadas.',
+                style: TextStyle(color: Colors.white70, fontSize: 11.5),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final List<String> details = [];
+    if (allergies != null && allergies.trim().isNotEmpty && allergies.toLowerCase() != 'ninguna') {
+      details.add('🚫 Sin alérgenos: $allergies');
+    }
+    if (pathologies != null && pathologies.trim().isNotEmpty && pathologies.toLowerCase() != 'ninguna') {
+      details.add('🩺 Patología adaptada: $pathologies');
+    }
+    if (injuries != null && injuries.trim().isNotEmpty && injuries.toLowerCase() != 'ninguna') {
+      details.add('🩹 Cuidado articular: $injuries');
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF132D29),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.verified_user_rounded, color: Color(0xFF8BE0C0), size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Filtro Clínico & Seguridad Activo en Segundo Plano',
+                style: TextStyle(color: Color(0xFF8BE0C0), fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            details.join(' · '),
+            style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 3),
+          const Text(
+            'Tu Coach IA calibra automáticamente tus comidas y prescripciones evitando ingredientes e impactos que comprometan tu salud.',
+            style: TextStyle(color: Colors.white60, fontSize: 10.5),
+          ),
+        ],
+      ),
+    );
+  }
+
   Map<String, dynamic>? get _day {
     for (final day in _service.days) {
       if (day['weekday'] == _selected) return day;
@@ -267,7 +348,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
           trainingDays: _trainingDays(),
           onSelect: (index) => setState(() => _selected = index),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
+        _buildClinicalShieldCard(),
         _DayHeader(day: day, isToday: isToday),
         if (synergyText.isNotEmpty) ...[
           const SizedBox(height: 14),

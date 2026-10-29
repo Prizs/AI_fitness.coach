@@ -31,6 +31,32 @@ class _CoachScreenState extends State<CoachScreen> {
   String _userIntensity = 'Baja';
   bool _isListening = false;
 
+  String _cleanQrItem(dynamic qr) {
+    if (qr == null) return '';
+    if (qr is Map) {
+      final val = qr['title'] ?? qr['text'] ?? qr['label'] ?? qr['payload'];
+      if (val != null) return val.toString().trim();
+    }
+    String s = qr.toString().trim();
+    if (s.startsWith('{') && (s.contains('title') || s.contains('text') || s.contains('label'))) {
+      final match = RegExp(r"(?:title|text|label)\s*[:=]\s*(.+?)(?:,\s*[a-zA-Z0-9_]+[:=]|\}\s*$)").firstMatch(s);
+      if (match != null) {
+        String extracted = match.group(1)!.trim();
+        extracted = extracted.replaceAll(RegExp(r"^['" + '"]|[' + '"]' + r"$"), '').trim();
+        if (extracted.isNotEmpty) return extracted;
+      }
+    }
+    return s;
+  }
+
+  List<String> _sanitizeQuickReplies(dynamic list) {
+    if (list is! List) return [];
+    return list
+        .map((item) => _cleanQrItem(item))
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -209,7 +235,7 @@ class _CoachScreenState extends State<CoachScreen> {
                 'category': item['category'],
                 'rule': item['rule'],
                 'suggest_questionnaire': item['suggest_questionnaire'] == true,
-                'quick_replies': item['quick_replies'],
+                'quick_replies': item['quick_replies'] is List ? _sanitizeQuickReplies(item['quick_replies']) : null,
                 'recommended_intensity': item['recommended_intensity'],
               });
             }
@@ -307,7 +333,7 @@ class _CoachScreenState extends State<CoachScreen> {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final replyText = (data['reply'] ?? '¡Hola! Bienvenido a tu entrenamiento.').toString();
         final qReplies = data['quick_replies'] is List
-            ? List<String>.from(data['quick_replies'])
+            ? _sanitizeQuickReplies(data['quick_replies'])
             : <String>[
                 '📋 Completar mi estado de salud',
                 '🏋️ Ver ejercicios de hoy',
@@ -831,7 +857,7 @@ class _CoachScreenState extends State<CoachScreen> {
 
         final replyText = (data['reply'] ?? 'Sin respuesta del Coach.').toString();
         final bool showStateBtn = !isSubmission && data['suggest_questionnaire'] == true;
-        final qReplies = data['quick_replies'] is List ? List<String>.from(data['quick_replies']) : null;
+        final qReplies = data['quick_replies'] is List ? _sanitizeQuickReplies(data['quick_replies']) : null;
         final recIntensity = data['recommended_intensity'] as String?;
         final updatedGoal = data['updated_user_goal'] as String?;
         if (updatedGoal != null && updatedGoal.isNotEmpty && updatedGoal != _userGoal) {
@@ -1164,7 +1190,8 @@ class _CoachScreenState extends State<CoachScreen> {
                             spacing: 6,
                             runSpacing: 6,
                             children: (msg['quick_replies'] as List).map<Widget>((qr) {
-                              final qrText = qr.toString();
+                              final qrText = _cleanQrItem(qr);
+                              if (qrText.isEmpty) return const SizedBox.shrink();
                               final lower = qrText.toLowerCase();
                               final isStateBtn = lower.contains('completar') || lower.contains('estado actual') || lower.contains('estado de salud');
                               final isWhereTrain = lower.contains('dónde vas a entrenar') || lower.contains('donde vas a entrenar') || lower.contains('gimnasio o casa');

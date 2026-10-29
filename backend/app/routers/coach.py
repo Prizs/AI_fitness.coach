@@ -1226,6 +1226,84 @@ def _sanitize_exercise_by_intensity(name: str, intensity_hint: str) -> str:
     return name
 
 
+def _clean_quick_replies(raw_list) -> list[str]:
+    """Limpia y extrae solo texto de respuestas rápidas, desenvolviendo diccionarios retornados por LLMs."""
+    if not isinstance(raw_list, list):
+        return []
+    clean: list[str] = []
+    for item in raw_list:
+        if isinstance(item, dict):
+            val = item.get("title") or item.get("text") or item.get("label") or item.get("payload")
+            if val and isinstance(val, str) and val.strip():
+                clean.append(val.strip())
+        elif isinstance(item, str):
+            s = item.strip()
+            if s.startswith("{") and ("title" in s or "text" in s or "label" in s):
+                m = re.search(r"(?:title|text|label)['\":\s=]+(.+?)(?:,\s*[a-zA-Z0-9_]+['\":\s=]|\}\s*$)", s)
+                if m:
+                    extracted = m.group(1).strip().strip("'\"")
+                    if extracted:
+                        clean.append(extracted)
+                        continue
+            if s:
+                clean.append(s)
+        elif isinstance(item, (int, float)):
+            clean.append(str(item))
+    return clean
+
+
+def _build_safe_nutrition(allergies: str | None = None, pathologies: str | None = None, goal: str | None = None) -> dict:
+    """Construye un plan nutricional criollo adaptado a patologías y libre de alimentos alergénicos."""
+    allergies_lower = (allergies or "").lower()
+    pathology_lower = (pathologies or "").lower()
+
+    # Desayuno
+    breakfast_protein = "2 huevos revueltos con tomate y cebolla (perico criollo)"
+    if any(a in allergies_lower for a in ("huevo", "huevos")):
+        breakfast_protein = "100g de pechuga de pollo desmechada o carne molida magra"
+
+    # Almuerzo
+    lunch_protein = "150g de pechuga de pollo a la plancha o carne molida magra"
+    if any(a in allergies_lower for a in ("pollo", "carne")):
+        lunch_protein = "150g de atún al natural o sardinas frescas"
+    if any(a in allergies_lower for a in ("pescado", "atun", "atún", "marisco", "mariscos")) and any(a in allergies_lower for a in ("pollo", "carne")):
+        lunch_protein = "1 taza abundante de caraotas negras con arroz y aguacate"
+
+    # Cena
+    dinner_protein = "2 huevos sancochados o 120g de atún al agua"
+    if any(a in allergies_lower for a in ("huevo", "huevos")):
+        dinner_protein = "120g de atún al agua o pechuga de pollo"
+    if any(a in allergies_lower for a in ("pescado", "atun", "atún", "marisco", "mariscos")):
+        dinner_protein = "2 huevos sancochados o 100g de carne molida magra"
+    if any(a in allergies_lower for a in ("huevo", "huevos")) and any(a in allergies_lower for a in ("pescado", "atun", "atún", "marisco")):
+        dinner_protein = "100g de pollo a la plancha o carne molida magra"
+
+    dairy_extra = " con queso blanco llanero rallado"
+    if any(a in allergies_lower for a in ("lacteo", "lácteo", "leche", "queso", "caseina", "lactosa")):
+        dairy_extra = " con aguacate criollo en rebanadas"
+
+    # Carbohidratos adaptados a patologías metabólicas
+    carb_lunch = "1 taza de arroz blanco o batata cocida"
+    carb_dinner = "1/2 plátano maduro asado"
+    if "diabet" in pathology_lower:
+        carb_lunch = "1 taza de batata cocida o caraotas negras (bajo índice glucémico)"
+        carb_dinner = "1/2 arepa de maíz con afrecho y ensalada verde abundante"
+
+    sodium_note = ""
+    if "hiperten" in pathology_lower:
+        sodium_note = " (sazonar con orégano, ajo y hierbas naturales sin sal añadida)"
+
+    asthma_note = ""
+    if "asma" in pathology_lower:
+        asthma_note = " · Mantén una hidratación constante de 2.5 a 3L de agua."
+
+    return {
+        "desayuno": f"{breakfast_protein}, 1 arepa de maíz asada y café o té sin azúcar.{asthma_note}",
+        "almuerzo": f"{lunch_protein}{sodium_note}, {carb_lunch} y ensalada fresca con aceite vegetal o aguacate.",
+        "cena": f"{dinner_protein}{dairy_extra} y {carb_dinner}."
+    }
+
+
 def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", seed: int = 0) -> list[dict]:
     int_k = intensity_hint if intensity_hint in ("baja", "media", "alta") else "media"
     lbl = {
@@ -2414,7 +2492,7 @@ Retorna SOLO JSON."""
             "suggest_questionnaire": suggest_q,
             "has_plan": False,
             "structured_plan": None,
-            "quick_replies": quick_replies,
+            "quick_replies": _clean_quick_replies(quick_replies),
             "recommended_intensity": None,
             "fatigue_detected": False,
         }
@@ -2546,7 +2624,7 @@ Devuelve SOLO JSON."""
             "suggest_questionnaire": False,
             "has_plan": False,
             "structured_plan": None,
-            "quick_replies": quick_replies,
+            "quick_replies": _clean_quick_replies(quick_replies),
             "recommended_intensity": None,
             "fatigue_detected": False,
         }
@@ -2737,7 +2815,7 @@ Devuelve SOLO JSON."""
             "suggest_questionnaire": False,
             "has_plan": False,
             "structured_plan": None,
-            "quick_replies": quick_replies,
+            "quick_replies": _clean_quick_replies(quick_replies),
             "recommended_intensity": recommended_intensity,
             "fatigue_detected": fatigue_detected,
             "updated_user_goal": updated_user_goal,
@@ -2777,11 +2855,19 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
    - En tu respuesta explicativa, aclara explícitamente la ventaja biomecánica:
      'He organizado tus ejercicios en **Bloques de 2 (estímulo alternado agonista-antagonista)**, que es la forma fisiológicamente más óptima: mientras un grupo muscular descansa y recupera sus depósitos de fosfocreatina (ATP-PC), trabajas el grupo no competidor. Esto ahorra tiempo, eleva la densidad del entrenamiento y evita la fatiga neural prematura.'
 
-4. REGLA OBLIGATORIA DE NUTRICIÓN ADAPTADA A VENEZUELA (MERCADO LOCAL ACCESIBLE):
+4. REGLA OBLIGATORIA DE NUTRICIÓN ADAPTADA A VENEZUELA Y FILTRADO CLÍNICO DE SALUD:
    - Todos los planes de alimentación DEBEN usar ingredientes económicos y fáciles de conseguir en Venezuela:
      * Proteínas: huevos (pericos criollos con tomate y cebolla, o sancochados), pechuga o muslos de pollo, carne molida magra, atún, sardinas, queso blanco llanero o paisa.
      * Carbohidratos: arepa de maíz, avena en hojuelas, arroz blanco, caraotas negras, lentejas, frijoles, batata, yuca, plátano verde o maduro (asado o hervido).
-    - PROHIBIDO TERMINANTEMENTE incluir salmón, quinoa, espárragos, semillas de chía, frutos rojos importados ni suplementos costosos.{fatigue_instruction}{motor_instruction}
+   - PROHIBIDO TERMINANTEMENTE incluir salmón, quinoa, espárragos, semillas de chía, frutos rojos importados ni suplementos costosos.
+   - FILTRO OBLIGATORIO DE ALERGIAS ALIMENTARIAS ({payload.allergies or 'Ninguna'}):
+     * Si el atleta reporta alguna alergia (ej. lácteos/queso, huevos, pescado/atún, maní, frutos secos, gluten): ESTÁ TERMINANTEMENTE PROHIBIDO incluir ese alimento o derivados en las comidas. Sustitúyelo de inmediato por opciones seguras de mercado local.
+   - FILTRO CLÍNICO DE PATOLOGÍAS Y CONDICIONES ({payload.pathology_or_allergies or 'Ninguna'}):
+     * Si reporta Hipertensión: Prohibido maniobras de Valsalva prolongadas; en nutrición, recalcar bajo sodio y especias naturales.
+     * Si reporta Asma: Pausas ventilatorias adecuadas (60-90s) y calentamiento progresivo; hidratación constante.
+     * Si reporta Diabetes: En nutrición, priorizar carbohidratos de bajo índice glucémico (avena, caraotas, batata) y evitar azúcares o exceso de plátano muy maduro.
+   - FILTRO BIOMECÁNICO DE LESIONES O DOLOR ({payload.injuries or 'Ninguna'} / ZONAS A EVITAR {payload.areas_to_avoid or 'Ninguna'}):
+     * ESTÁ TERMINANTEMENTE PROHIBIDO prescribir ejercicios que comprometan o impacten las articulaciones o zonas lesionadas (ej. si reporta rodilla, CERO impacto o sentadillas con flexión aguda forzada; si reporta hombro, CERO presses tras nuca; si reporta lumbares, CERO peso muerto pesado con compresión vertebral). Prescribe variantes terapéuticas seguras.{fatigue_instruction}{motor_instruction}
  
 6. REGLA DE ORIGINALIDAD, DIVERSIDAD BIOMECÁNICA Y CERO REPETICIÓN:
    - Está TERMINANTEMENTE PROHIBIDO recomendar siempre los mismos ejercicios monótonos o predecibles (no repitas siempre Sentadilla Goblet, Hip Thrust o Prensa básica).
@@ -2915,11 +3001,7 @@ Devuelve SOLO JSON."""
                     "Jueves": "Movilidad Articular o Tren Superior"
                 },
                 "exercises": fallback_exercises,
-                "nutrition": {
-                    "desayuno": "2 huevos revueltos con tomate y cebolla (perico criollo), 1 arepa de maíz asada y café o té.",
-                    "almuerzo": "150g de pechuga de pollo o carne molida magra, 1 taza de arroz blanco o batata y ensalada fresca.",
-                    "cena": "2 huevos sancochados o atún al agua con queso blanco llanero y 1/2 plátano maduro asado."
-                }
+                "nutrition": _build_safe_nutrition(payload.allergies, payload.pathology_or_allergies, payload.user_goal)
             }
         }
 
@@ -3080,7 +3162,7 @@ Devuelve SOLO JSON."""
         "suggest_questionnaire": suggest_q,
         "has_plan": has_plan,
         "structured_plan": structured_plan if has_plan else None,
-        "quick_replies": quick_replies or data.get("quick_replies"),
+        "quick_replies": _clean_quick_replies(quick_replies or data.get("quick_replies")),
         "recommended_intensity": recommended_intensity,
         "fatigue_detected": fatigue_detected,
         "updated_user_goal": updated_user_goal,
