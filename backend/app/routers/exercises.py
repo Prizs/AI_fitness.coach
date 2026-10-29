@@ -222,9 +222,9 @@ CURATED_BY_INTENSITY = [
         "match_any": ("deslizador", "toalla en piso", "toalla en suelo", "piso liso", "curl femoral en suelo", "femoral en suelo", "slide curl", "deslizante", "curl de piernas deslizante"),
         "exclude_any": ("maquina", "máquina", "lever"),
         "gifs": {
-            "baja": "https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif",
-            "media": "https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif",
-            "alta": "https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif",
+            "baja": "https://ai-fitness-coach-818a.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
+            "media": "https://ai-fitness-coach-818a.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
+            "alta": "https://ai-fitness-coach-818a.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
         },
         "biomechanics": "Flexión activa de rodillas en decúbito supino elevando la cadera en puente y deslizando los talones sobre la toalla hacia los glúteos.",
         "posture": "Pelvis en retroversión manteniendo el puente glúteo elevado sin arquear la zona lumbar, glúteos e isquiotibiales contraídos en el punto máximo.",

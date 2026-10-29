@@ -34110,7 +34110,7 @@ if(B.b.m(b2,"plancha")||B.b.m(b2,"plank"))return"https://raw.githubusercontent.c
 if(B.b.m(b2,"crunch")||B.b.m(b2,"abdominal")||B.b.m(b2,"abdomen")||B.b.m(b2,"twist")){if(b4)q="abs/oblique-crunches-floor.gif"
 else q=b5?"abs/hanging-leg-raise.gif":"abs/crunch-floor.gif"
 return d+q}if(B.b.m(b2,"superman")||B.b.m(b2,"lumbar")||B.b.m(b2,"lumbares"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/glutes/band-straight-back-stiff-leg-deadlift.gif"
-if(B.b.m(b2,f)||B.b.m(b2,"toalla en piso")||B.b.m(b2,"toalla en suelo")||B.b.m(b2,e)||B.b.m(b2,"femoral en suelo")||B.b.m(b2,"deslizante"))return"https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif"
+if(B.b.m(b2,f)||B.b.m(b2,"toalla en piso")||B.b.m(b2,"toalla en suelo")||B.b.m(b2,e)||B.b.m(b2,"femoral en suelo")||B.b.m(b2,"deslizante"))return"https://ai-fitness-coach-818a.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif"
 if(B.b.m(b2,"curl femoral")||B.b.m(b2,"curl de isquio")||B.b.m(b2,"curl de pierna")||B.b.m(b2,"leg curl")||B.b.m(b2,"nordico")||B.b.m(b2,"n\xf3rdico")){if(b4)q=a0
 else q=b5?"hamstrings/lever-lying-leg-curl.gif":a1
 return d+q}if(B.b.m(b2,l)||B.b.m(b2,m)||B.b.m(b2,"rdl")){if(b4)q="glutes/band-stiff-leg-deadlift.gif"

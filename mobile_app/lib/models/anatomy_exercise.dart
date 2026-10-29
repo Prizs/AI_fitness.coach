@@ -142,7 +142,7 @@ String resolveGuaranteedGifUrl({
 
   // 9a. Curl Femoral en Suelo / con Deslizador / Toalla (Sliding Leg Curl on Floor with Towel)
   if (nameLower.contains('deslizador') || nameLower.contains('toalla en piso') || nameLower.contains('toalla en suelo') || nameLower.contains('piso liso') || nameLower.contains('femoral en suelo') || nameLower.contains('deslizante')) {
-    return 'https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif';
+    return 'https://ai-fitness-coach-818a.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif';
   }
 
   // 9. Curl Femoral / Isquiotibiales (Hamstring Curls)
