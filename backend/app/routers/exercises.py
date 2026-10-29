@@ -219,16 +219,16 @@ CURATED_BY_INTENSITY = [
     },
     # 4a. Curl Femoral en Suelo con Deslizador / Toalla (Hamstring Slide)
     {
-        "match_any": ("deslizador", "toalla en piso", "toalla en suelo", "piso liso", "curl femoral en suelo", "femoral en suelo", "slide curl"),
+        "match_any": ("deslizador", "toalla en piso", "toalla en suelo", "piso liso", "curl femoral en suelo", "femoral en suelo", "slide curl", "deslizante", "curl de piernas deslizante"),
         "exclude_any": ("maquina", "máquina", "lever"),
         "gifs": {
-            "baja": "hamstrings/single-leg-platform-slide.gif",
-            "media": "hamstrings/single-leg-platform-slide.gif",
-            "alta": "hamstrings/self-assisted-inverse-leg-curl-on-floor.gif",
+            "baja": "https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif",
+            "media": "https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif",
+            "alta": "https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif",
         },
-        "biomechanics": "Flexión activa de rodillas en decúbito supino elevando la cadera y deslizando los talones hacia los glúteos.",
-        "posture": "Pelvis en retroversión sin arquear la zona lumbar, glúteos contraídos en el punto máximo de flexión.",
-        "warning": "Evita hiperextender la zona lumbar; el movimiento debe generarse exclusivamente desde los isquiotibiales.",
+        "biomechanics": "Flexión activa de rodillas en decúbito supino elevando la cadera en puente y deslizando los talones sobre la toalla hacia los glúteos.",
+        "posture": "Pelvis en retroversión manteniendo el puente glúteo elevado sin arquear la zona lumbar, glúteos e isquiotibiales contraídos en el punto máximo.",
+        "warning": "Evita dejar caer la pelvis al suelo durante la flexión; el movimiento debe ser fluido y continuo desde los isquiotibiales.",
     },
     # 4. Curl Femoral / Isquiotibiales (Hamstring Curls)
     {
@@ -768,6 +768,12 @@ def _is_gym_gif(path: str) -> bool:
     return any(w in slug for w in GYM_EQUIPMENT_KEYWORDS)
 
 
+def _to_gif_url(path: str) -> str:
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    return f"{BASE_GIF_URL}{path}"
+
+
 @router.get("/gif")
 def get_exercise_gif(
     query: str,
@@ -799,7 +805,7 @@ def get_exercise_gif(
                     baja_gif = entry["gifs"].get("baja")
                     if baja_gif and not _is_gym_gif(baja_gif):
                         chosen_gif = baja_gif
-                gif_url = f"{BASE_GIF_URL}{chosen_gif}"
+                gif_url = _to_gif_url(chosen_gif)
                 return {
                     "url": gif_url,
                     "gif_url": gif_url,
@@ -821,7 +827,7 @@ def get_exercise_gif(
                     baja_gif = entry["gifs"].get("baja")
                     if baja_gif and not _is_gym_gif(baja_gif):
                         chosen_gif = baja_gif
-                gif_url = f"{BASE_GIF_URL}{chosen_gif}"
+                gif_url = _to_gif_url(chosen_gif)
                 return {
                     "url": gif_url,
                     "gif_url": gif_url,
@@ -899,7 +905,7 @@ def get_exercise_gif(
                 if bw_in_folder:
                     best_match = bw_in_folder[0]
 
-    gif_url = f"{BASE_GIF_URL}{best_match}"
+    gif_url = _to_gif_url(best_match)
     return {
         "url": gif_url,
         "gif_url": gif_url,

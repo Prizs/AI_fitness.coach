@@ -79,8 +79,8 @@ String resolveGuaranteedGifUrl({
         ((nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated')) && cleanExisting.contains('standing-calf-raise')) ||
         // 5. Talones unipodal mostrando elevación bilateral de pie
         ((nameLower.contains('unipodal') || nameLower.contains('una pierna') || nameLower.contains('single leg')) && cleanExisting.contains('standing-calf-raise')) ||
-        // 6. Ejercicios caseros con toalla o deslizador mostrando máquinas de gimnasio
-        ((nameLower.contains('toalla') || nameLower.contains('deslizador') || nameLower.contains('piso liso')) && (cleanExisting.contains('lever') || cleanExisting.contains('cable') || cleanExisting.contains('smith') || cleanExisting.contains('seated-leg-curl'))) ||
+        // 6. Ejercicios caseros con toalla o deslizador mostrando máquinas de gimnasio o slide plano
+        ((nameLower.contains('toalla') || nameLower.contains('deslizador') || nameLower.contains('piso liso')) && (cleanExisting.contains('single-leg-platform-slide') || cleanExisting.contains('lever') || cleanExisting.contains('cable') || cleanExisting.contains('smith') || cleanExisting.contains('seated-leg-curl'))) ||
         // 7. Plancha frontal en antebrazos mostrando rodillas apoyadas
         ((nameLower.contains('antebrazo') || nameLower.contains('frontal')) && cleanExisting.contains('kneeling-plank'));
 
@@ -140,9 +140,9 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + 'glutes/band-straight-back-stiff-leg-deadlift.gif';
   }
 
-  // 9a. Curl Femoral en Suelo / con Deslizador / Toalla
-  if (nameLower.contains('deslizador') || nameLower.contains('toalla en piso') || nameLower.contains('toalla en suelo') || nameLower.contains('piso liso') || nameLower.contains('femoral en suelo')) {
-    return _kGifBase + 'hamstrings/single-leg-platform-slide.gif';
+  // 9a. Curl Femoral en Suelo / con Deslizador / Toalla (Sliding Leg Curl on Floor with Towel)
+  if (nameLower.contains('deslizador') || nameLower.contains('toalla en piso') || nameLower.contains('toalla en suelo') || nameLower.contains('piso liso') || nameLower.contains('femoral en suelo') || nameLower.contains('deslizante')) {
+    return 'https://raw.githubusercontent.com/Prizs/AI_fitness.coach/main/backend/app/static/sliding-leg-curl-on-floor-with-towel.gif';
   }
 
   // 9. Curl Femoral / Isquiotibiales (Hamstring Curls)
