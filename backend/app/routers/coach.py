@@ -1305,7 +1305,121 @@ def _build_safe_nutrition(allergies: str | None = None, pathologies: str | None 
     }
 
 
-def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", seed: int = 0) -> list[dict]:
+def _is_no_equipment(equipment_details: str | None, user_message: str, is_home: bool = False) -> bool:
+    text = f"{equipment_details or ''} {user_message or ''}".lower()
+    no_equip_keywords = (
+        "sin herramientas", "sin herramienta", "sin equipo", "sin maquinas", "sin máquinas",
+        "sin pesas", "sin mancuernas", "peso corporal", "calistenia", "en casa", "solo casa",
+        "cero equipo", "nada de equipo", "sin nada", "ninguno", "ninguna", "cuerpo libre",
+        "solo mi cuerpo", "con mi peso", "no tengo herramientas", "no tengo equipo", "no tengo pesas",
+        "no tengo nada", "no dispongo de equipo", "no dispongo de herramientas", "casa"
+    )
+    return bool(is_home or any(k in text for k in no_equip_keywords))
+
+
+def _sanitize_exercise_by_equipment(name: str, primary: str, animation_key: str, is_no_equipment: bool) -> tuple[str, str, str]:
+    if not is_no_equipment:
+        return name, primary, animation_key
+    lower = name.lower()
+
+    # Elevación de talones / gemelos / sóleo con máquina, carga o Smith
+    if any(w in lower for w in ("talon", "talón", "sóleo", "soleo", "gemelo", "pantorrilla")):
+        if any(w in lower for w in ("máquina", "maquina", "smith", "prensa", "mancuerna", "barra", "polea", "disco", "carga")):
+            return "Elevación de talones unipodal en escalón o libro grueso (Intermedio)", "Sóleo / Gemelos", "calf-raise"
+
+    # Prensa 45°, máquina Smith o Hack
+    if "prensa" in lower or "smith" in lower or "hack" in lower:
+        return "Sentadilla isométrica apoyado en pared (Wall Sit 45s) (Intermedio)", "Cuádriceps", "squat"
+
+    # Extensión de cuádriceps en máquina
+    if "extensión de cuádriceps" in lower or "extension de cuadriceps" in lower or "leg-extension" in lower:
+        return "Sentadilla isométrica en pared (Wall Sit 45s) (Intermedio)", "Cuádriceps", "squat"
+
+    # Curl de femoral / isquiotibiales en máquina
+    if ("curl" in lower and ("femoral" in lower or "isquio" in lower)) or "curl de isquiotibiales" in lower:
+        return "Curl femoral en suelo con deslizador o toalla en piso liso (Intermedio)", "Isquiotibiales", "leg-curl"
+
+    # Peso muerto con mancuernas o barra
+    if "peso muerto" in lower and ("mancuerna" in lower or "barra" in lower or "olímpica" in lower or "olimpica" in lower or "disco" in lower):
+        return "Peso muerto rumano unilateral con peso corporal y balance (Intermedio)", "Isquiotibiales", "deadlift"
+
+    # Sentadilla búlgara con mancuernas
+    if "búlgara" in lower or "bulgara" in lower:
+        return "Sentadilla búlgara con pie en silla o cama con peso corporal (Intermedio)", "Cuádriceps", "split-squat"
+
+    # Sentadilla goblet o sumo con mancuerna / barra
+    if "goblet" in lower or ("sumo" in lower and ("mancuerna" in lower or "barra" in lower or "peso" in lower)):
+        return "Sentadilla libre profunda con peso corporal y pausa de 2s (Intermedio)", "Cuádriceps", "squat"
+
+    # Hip Thrust con mancuerna / barra / banco
+    if "hip thrust" in lower and ("mancuerna" in lower or "barra" in lower or "banco" in lower or "disco" in lower):
+        return "Elevación de cadera (Hip Thrust) con espalda en sofá o silla (Intermedio)", "Glúteos", "hip-thrust"
+
+    # Patada de glúteos en polea
+    if "patada de glúteos" in lower and ("polea" in lower or "máquina" in lower or "maquina" in lower):
+        return "Patada de glúteos en cuadrupedia con contracción isométrica (Intermedio)", "Glúteos", "glute-bridge"
+
+    # Press de banca / con mancuernas
+    if "press" in lower and ("banca" in lower or "pecho" in lower or "mancuerna" in lower or "barra" in lower):
+        if "inclinado" in lower:
+            return "Flexiones declinadas con pies en cama o sofá (Intermedio)", "Pectoral Clavicular", "pushup"
+        return "Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "Pectoral Mayor", "pushup"
+
+    # Jalón o remo con mancuernas / polea / barra
+    if ("remo" in lower or "jalón" in lower or "jalon" in lower) and ("mancuerna" in lower or "polea" in lower or "barra" in lower):
+        return "Remo invertido bajo mesa firme con talones apoyados (Intermedio)", "Dorsal Ancho", "row"
+
+    # Press militar o de hombros con mancuernas / barra
+    if "press militar" in lower or ("press" in lower and "hombro" in lower):
+        return "Flexiones en pica en suelo para hombros (Pike Push-ups) (Intermedio)", "Deltoides", "shoulder-press"
+
+    # Elevaciones laterales con mancuernas / polea
+    if "elevaciones laterales" in lower and ("mancuerna" in lower or "polea" in lower or "banda" in lower):
+        return "Elevaciones laterales isométricas contra marco de puerta (Intermedio)", "Deltoides Lateral", "lateral-raise"
+
+    # Curl de bíceps con mancuernas / barra
+    if "curl" in lower and ("bíceps" in lower or "biceps" in lower) and ("mancuerna" in lower or "barra" in lower):
+        return "Curl de bíceps casero con toalla bajo pie generando tensión (Intermedio)", "Bíceps Braquial", "bicep-curl"
+
+    # Extensiones de tríceps en polea / press francés
+    if ("tríceps" in lower or "triceps" in lower) and ("polea" in lower or "francés" in lower or "frances" in lower or "mancuerna" in lower):
+        return "Fondos de tríceps en silla o borde de cama (Chair Dips) (Intermedio)", "Tríceps", "pushup"
+
+    # Limpieza general de términos de gimnasio
+    cleaned = re.sub(r"\s*(?:con mancuernas?|en máquina\w*|en maquina\w*|con barra\w*|en polea\w*|con disco\w*|en banco plano|en banco|en multipower|en smith)\s*", " ", name, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    # Si todavía contiene términos de herramientas prohibidas, fallback seguro según grupo muscular
+    forbidden = ("máquina", "maquina", "smith", "prensa", "hack", "multipower", "mancuerna", "mancuernas", "barra", "polea", "disco")
+    if any(t in cleaned.lower() for t in forbidden):
+        p_low = (primary or "").lower()
+        if any(m in p_low for m in ("cuádriceps", "cuadriceps", "pierna")):
+            return "Sentadilla libre profunda con peso corporal (Intermedio)", "Cuádriceps", "squat"
+        elif any(m in p_low for m in ("isquio", "femoral")):
+            return "Curl femoral en suelo con deslizador o toalla (Intermedio)", "Isquiotibiales", "leg-curl"
+        elif any(m in p_low for m in ("glúteo", "gluteo")):
+            return "Elevación de cadera (Hip Thrust) en borde de sofá o silla (Intermedio)", "Glúteos", "hip-thrust"
+        elif any(m in p_low for m in ("pantorrilla", "gemelo", "sóleo", "soleo")):
+            return "Elevación de talones unipodal en escalón (Intermedio)", "Pantorrillas", "calf-raise"
+        elif any(m in p_low for m in ("pecho", "pectoral")):
+            return "Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "Pectoral Mayor", "pushup"
+        elif any(m in p_low for m in ("espalda", "dorsal")):
+            return "Remo invertido bajo mesa firme (Intermedio)", "Dorsal Ancho", "row"
+        elif any(m in p_low for m in ("hombro", "deltoides")):
+            return "Flexiones en pica en suelo para hombros (Pike Push-ups) (Intermedio)", "Deltoides", "shoulder-press"
+        elif any(m in p_low for m in ("tríceps", "triceps")):
+            return "Fondos de tríceps en silla o banco (Chair Dips) (Intermedio)", "Tríceps", "pushup"
+        elif any(m in p_low for m in ("bíceps", "biceps")):
+            return "Curl de bíceps isométrico con toalla bajo pie (Intermedio)", "Bíceps", "bicep-curl"
+        else:
+            return "Plancha frontal isométrica en antebrazos (Intermedio)", "Core", "plank"
+
+    if cleaned != name:
+        cleaned += " (Peso Corporal)"
+    return cleaned, primary, animation_key
+
+
+def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", seed: int = 0, is_no_equipment: bool = False) -> list[dict]:
     int_k = intensity_hint if intensity_hint in ("baja", "media", "alta") else "media"
     lbl = {
         "baja": "Básico (Intensidad Baja)",
@@ -1315,238 +1429,427 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
     sets_num = 4 if int_k == "alta" else 3
     reps_str = "8-10" if int_k == "alta" else ("10-12" if int_k == "media" else "12-15")
 
-    quads_dict = {
-        "baja": [
-            ("Sentadilla asistida en banco con peso corporal (Básico)", "Cuádriceps", "Glúteos", "squat"),
-            ("Prensa horizontal suave en máquina (Básico)", "Cuádriceps", "Glúteos", "leg-press"),
-            ("Extensión isométrica de rodilla en silla (Básico)", "Cuádriceps", "Rótula", "leg-extension"),
-            ("Zancada estática asistida con apoyo en pared (Básico)", "Cuádriceps", "Isquiotibiales", "lunge"),
-        ],
-        "media": [
-            ("Sentadilla Goblet con mancuerna (Intermedio)", "Cuádriceps", "Glúteos, Core", "squat"),
-            ("Prensa de piernas inclinada 45° (Intermedio)", "Cuádriceps", "Glúteos", "leg-press"),
-            ("Sentadilla búlgara con mancuernas (Intermedio)", "Cuádriceps", "Glúteos, Estabilizadores", "split-squat"),
-            ("Extensión de cuádriceps en máquina (Intermedio)", "Cuádriceps", "Vasto medial", "leg-extension"),
-            ("Sentadilla sumo con mancuerna (Intermedio)", "Cuádriceps, Aductores", "Glúteos", "squat"),
-            ("Zancadas frontales alternas con mancuernas (Intermedio)", "Cuádriceps", "Isquiotibiales", "lunge"),
-        ],
-        "alta": [
-            ("Sentadilla profunda con barra libre (Avanzado)", "Cuádriceps", "Glúteos, Core", "squat"),
-            ("Prensa 45° pesada pies juntos (Avanzado)", "Cuádriceps", "Glúteos", "leg-press"),
-            ("Sentadilla búlgara con mancuernas pesadas (Avanzado)", "Cuádriceps", "Glúteos", "split-squat"),
-            ("Sentadilla en máquina Hack (Avanzado)", "Cuádriceps", "Glúteos", "squat"),
-            ("Sentadilla frontal con barra olímpica (Avanzado)", "Cuádriceps", "Core, Erectores", "squat"),
-        ],
-    }
-
-    hams_dict = {
-        "baja": [
-            ("Peso muerto rumano ligero con mancuernas (Básico)", "Isquiotibiales", "Glúteos, Espalda baja", "deadlift"),
-            ("Curl femoral de pie sin peso con control (Básico)", "Isquiotibiales", "Gemelos", "leg-curl"),
-            ("Buenos días con control motor y manos tras nuca (Básico)", "Isquiotibiales", "Erectores espinales", "deadlift"),
-            ("Curl femoral en suelo con deslizador o toalla (Básico)", "Isquiotibiales", "Glúteos", "leg-curl"),
-        ],
-        "media": [
-            ("Peso muerto rumano con mancuernas (Intermedio)", "Isquiotibiales", "Glúteos, Cadena posterior", "deadlift"),
-            ("Curl de isquiotibiales / femoral tumbado en máquina (Intermedio)", "Isquiotibiales", "Gemelos", "leg-curl"),
-            ("Curl femoral sentado en máquina (Intermedio)", "Isquiotibiales", "Gemelos", "leg-curl"),
-            ("Buenos días con barra guiada o mancuernas (Intermedio)", "Isquiotibiales", "Glúteos, Lumbar", "deadlift"),
-            ("Peso muerto unilateral con mancuerna (Intermedio)", "Isquiotibiales", "Glúteos", "deadlift"),
-        ],
-        "alta": [
-            ("Peso muerto rumano pesado con barra olímpica (Avanzado)", "Isquiotibiales", "Glúteos, Cadena posterior", "deadlift"),
-            ("Curl femoral sentado en máquina pesada (Avanzado)", "Isquiotibiales", "Gemelos", "leg-curl"),
-            ("Curl nórdico asistido excéntrico (Avanzado)", "Isquiotibiales", "Glúteos", "leg-curl"),
-            ("Peso muerto rumano con déficit (Avanzado)", "Isquiotibiales", "Cadena posterior", "deadlift"),
-        ],
-    }
-
-    glutes_dict = {
-        "baja": [
-            ("Puente de glúteos en suelo con pausa (Básico)", "Glúteos", "Isquiotibiales", "glute-bridge"),
-            ("Patada de glúteos en cuadrupedia (Básico)", "Glúteos", "Core", "glute-bridge"),
-            ("Abducción de cadera tumbado de lado (Básico)", "Glúteo Medio", "Cadera", "mobility"),
-            ("Elevación de cadera en suelo con banda (Básico)", "Glúteos", "Isquiotibiales", "glute-bridge"),
-        ],
-        "media": [
-            ("Elevación de cadera (Hip Thrust) en banco con mancuerna (Intermedio)", "Glúteo Mayor", "Isquiotibiales", "hip-thrust"),
-            ("Puente de glúteos unilateral en suelo (Intermedio)", "Glúteo Mayor", "Isquiotibiales", "glute-bridge"),
-            ("Patada de glúteos en polea baja con tobillera (Intermedio)", "Glúteos", "Cadera", "glute-bridge"),
-            ("Step-ups con mancuernas en cajón (Intermedio)", "Glúteos", "Cuádriceps", "lunge"),
-            ("Sentadilla sumo profunda con mancuerna (Intermedio)", "Glúteos, Aductores", "Cuádriceps", "squat"),
-        ],
-        "alta": [
-            ("Hip Thrust con barra olímpica pesada (Avanzado)", "Glúteo Mayor", "Isquiotibiales", "hip-thrust"),
-            ("Hip Thrust con banda elástica y barra (Avanzado)", "Glúteo Mayor", "Glúteo Medio", "hip-thrust"),
-            ("Zancadas búlgaras profundas con mancuernas pesadas (Avanzado)", "Glúteos, Cuádriceps", "Estabilidad", "split-squat"),
-            ("Step-ups explosivos en cajón alto (Avanzado)", "Glúteos", "Potencia", "lunge"),
-        ],
-    }
-
-    soleo_dict = {
-        "baja": [
-            ("Elevación de talones sentado en silla con peso corporal (Básico)", "Sóleo (Batata profunda)", "Tendón de Aquiles", "calf-raise"),
-            ("Elevación de talones sentado con mancuerna sobre muslos (Básico)", "Sóleo (Batatas)", "Tobillos", "calf-raise"),
-        ],
-        "media": [
-            ("Elevación de talones en máquina sentado (Sóleo / Batatas) (Intermedio)", "Sóleo", "Tríceps Sural", "calf-raise"),
-            ("Elevación de talones sentado con mancuernas en banco (Intermedio)", "Sóleo (Batatas)", "Tobillos", "calf-raise"),
-            ("Elevación de talones en máquina Smith sentado (Intermedio)", "Sóleo", "Tendón de Aquiles", "calf-raise"),
-        ],
-        "alta": [
-            ("Elevación de talones sentado en máquina pesada (Sóleo) (Avanzado)", "Sóleo", "Tríceps Sural", "calf-raise"),
-            ("Elevación de talones en máquina sentado con pausa de 2s arriba (Avanzado)", "Sóleo", "Fuerza articular", "calf-raise"),
-        ],
-    }
-
-    calves_pies_dict = {
-        "baja": [
-            ("Elevación de talones de pie con apoyo en pared (Básico)", "Gemelos (Gastrocnemio)", "Sóleo, Tobillo", "calf-raise"),
-            ("Caminata controlada de talones y de puntillas (Básico)", "Tríceps Sural, Pies", "Estabilizadores del tobillo", "mobility"),
-            ("Dorsiflexión de tobillos en suelo para tibial anterior (Básico)", "Tibial Anterior", "Arco Plantar", "mobility"),
-        ],
-        "media": [
-            ("Elevación de talones unipodal en escalón (Intermedio)", "Tríceps Sural", "Estabilidad del Pie y Tobillo", "calf-raise"),
-            ("Elevación de talones de pie con mancuernas en escalón (Intermedio)", "Gemelos (Gastrocnemio)", "Sóleo, Tobillo", "calf-raise"),
-            ("Elevación de talones en prensa 45° (Intermedio)", "Gemelos", "Sóleo", "calf-raise"),
-            ("Dorsiflexión tibial con banda elástica resistida (Intermedio)", "Tibial Anterior", "Pies", "mobility"),
-            ("Pogo jumps / Saltos elásticos de tobillo (Intermedio)", "Tendón de Aquiles, Sóleo", "Fascia Plantar", "jump"),
-        ],
-        "alta": [
-            ("Elevación de talones en prensa 45° con carga pesada (Avanzado)", "Gemelos (Tríceps Sural)", "Sóleo", "calf-raise"),
-            ("Elevación de talones de pie con barra pesada (Avanzado)", "Gemelos", "Pies y Tobillos", "calf-raise"),
-            ("Elevaciones unipodales lentas en escalón (3s excéntrica) (Avanzado)", "Tríceps Sural", "Arco Plantar y Tobillo", "calf-raise"),
-            ("Elevación de talones tipo Donkey Calf Raise con carga (Avanzado)", "Gastrocnemio completo", "Batata", "calf-raise"),
-        ],
-    }
-
-    chest_dict = {
-        "baja": [
-            ("Flexiones inclinadas con manos en banco (Básico)", "Pectorales", "Tríceps", "pushup"),
-            ("Press plano con mancuernas ligeras (Básico)", "Pectorales", "Deltoides", "bench-press"),
-            ("Aperturas con banda elástica en banco (Básico)", "Pectorales", "Hombros", "fly"),
-        ],
-        "media": [
-            ("Press de pecho con mancuernas en banco plano (Intermedio)", "Pectoral Mayor", "Tríceps", "bench-press"),
-            ("Press inclinado con mancuernas en banco 30° (Intermedio)", "Pectoral Clavicular", "Deltoides anterior", "bench-press"),
-            ("Aperturas con mancuernas en banco plano (Intermedio)", "Pectoral Mayor", "Hombros", "fly"),
-            ("Cruces en polea alta para pectoral (Intermedio)", "Pectoral Esternal", "Bíceps", "fly"),
-            ("Fondos de pecho en paralelas (Intermedio)", "Pectoral inferior", "Tríceps", "pushup"),
-            ("Flexiones de pecho estándar en suelo (Intermedio)", "Pectorales", "Core", "pushup"),
-        ],
-        "alta": [
-            ("Press de banca plano con barra olímpica (Avanzado)", "Pectoral Mayor", "Tríceps", "bench-press"),
-            ("Press inclinado pesado con mancuernas (Avanzado)", "Pectoral Clavicular", "Hombros", "bench-press"),
-            ("Cruces de poleas en dropset (Avanzado)", "Pectorales", "Bíceps", "fly"),
-            ("Fondos en paralelas con lastre (Avanzado)", "Pectoral inferior", "Tríceps", "pushup"),
-        ],
-    }
-
-    back_dict = {
-        "baja": [
-            ("Remo sentado con banda elástica o polea suave (Básico)", "Espalda Media", "Bíceps", "row"),
-            ("Jalón al pecho asistido en polea (Básico)", "Dorsal Ancho", "Bíceps", "pulldown"),
-            ("Retracciones escapulares en polea (Básico)", "Romboides", "Espalda alta", "row"),
-        ],
-        "media": [
-            ("Remo con mancuerna a una mano apoyado en banco (Intermedio)", "Dorsal Ancho", "Bíceps", "row"),
-            ("Jalón al pecho en polea alta con agarre ancho (Intermedio)", "Dorsales", "Bíceps", "pulldown"),
-            ("Remo sentado en polea baja con agarre estrecho en V (Intermedio)", "Espalda Media, Dorsales", "Bíceps", "row"),
-            ("Remo con barra inclinada agarre prono (Intermedio)", "Espalda completa", "Core", "row"),
-            ("Pullover en polea alta con brazos rectos (Intermedio)", "Dorsal Ancho", "Tríceps largo", "pulldown"),
-            ("Face pulls con cuerda a la frente (Intermedio)", "Deltoides posterior, Romboides", "Trapecio", "row"),
-        ],
-        "alta": [
-            ("Remo con barra olímpica pesado (Avanzado)", "Dorsal, Espalda media", "Core", "row"),
-            ("Dominadas con peso corporal o lastre (Avanzado)", "Dorsales", "Bíceps", "pulldown"),
-            ("Jalón al pecho pesado con agarre neutro (Avanzado)", "Dorsales", "Bíceps", "pulldown"),
-            ("Remo en barra T con apoyo en pecho (Avanzado)", "Espalda media, Romboides", "Dorsales", "row"),
-        ],
-    }
-
-    shoulders_dict = {
-        "baja": [
-            ("Press de hombros sentado con mancuernas ligeras (Básico)", "Deltoides", "Tríceps", "shoulder-press"),
-            ("Elevaciones laterales con banda elástica (Básico)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
-            ("Elevaciones frontales alternas ligeras (Básico)", "Deltoides Anterior", "Pecho superior", "lateral-raise"),
-        ],
-        "media": [
-            ("Press militar con mancuernas sentado (Intermedio)", "Deltoides", "Tríceps", "shoulder-press"),
-            ("Elevaciones laterales con mancuernas en escalón (Intermedio)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
-            ("Pájaros para deltoides posterior con mancuernas (Intermedio)", "Deltoides Posterior", "Romboides", "fly"),
-            ("Press Arnold con mancuernas (Intermedio)", "Deltoides Completo", "Tríceps", "shoulder-press"),
-            ("Elevaciones laterales en polea baja a una mano (Intermedio)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
-        ],
-        "alta": [
-            ("Press militar con barra olímpica de pie (Avanzado)", "Deltoides", "Core, Tríceps", "shoulder-press"),
-            ("Elevaciones laterales pesadas con pausa (Avanzado)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
-            ("Pájaros en máquina pec-deck invertida (Avanzado)", "Deltoides Posterior", "Romboides", "fly"),
-        ],
-    }
-
-    arms_dict = {
-        "baja": [
-            ("Curl de bíceps sentado con mancuernas ligeras (Básico)", "Bíceps Braquial", "Antebrazo", "bicep-curl"),
-            ("Extensiones de tríceps en polea alta con cuerda (Básico)", "Tríceps", "Codo", "tricep-pushdown"),
-            ("Fondos de tríceps en banco con rodillas flexionadas (Básico)", "Tríceps", "Hombros", "pushup"),
-        ],
-        "media": [
-            ("Curl alterno de bíceps con mancuernas de pie (Intermedio)", "Bíceps Braquial", "Antebrazo", "bicep-curl"),
-            ("Curl martillo con mancuernas (Intermedio)", "Braquiorradial, Bíceps", "Antebrazo", "bicep-curl"),
-            ("Curl en banco predicador con barra Z (Intermedio)", "Bíceps Braquial", "Antebrazo", "bicep-curl"),
-            ("Extensiones de tríceps en polea alta con cuerda (Intermedio)", "Tríceps", "Antebrazo", "tricep-pushdown"),
-            ("Press francés con mancuernas acostado (Intermedio)", "Tríceps (Cabeza Larga)", "Codo", "tricep-extension"),
-            ("Extensiones de tríceps tras nuca a dos manos (Intermedio)", "Tríceps (Cabeza Larga)", "Hombros", "tricep-extension"),
-        ],
-        "alta": [
-            ("Curl con barra olímpica estricto (Avanzado)", "Bíceps", "Antebrazo", "bicep-curl"),
-            ("Fondos en paralelas con lastre para tríceps (Avanzado)", "Tríceps", "Pectoral", "pushup"),
-            ("Press francés con barra Z pesada (Avanzado)", "Tríceps", "Codo", "tricep-extension"),
-            ("Curl martillo pesado en banco inclinado (Avanzado)", "Braquiorradial", "Bíceps", "bicep-curl"),
-        ],
-    }
-
-    core_dict = {
-        "baja": [
-            ("Crunches controlados en suelo con rodillas a 90° (Básico)", "Recto Abdominal", "Core", "crunch"),
-            ("Plancha frontal isométrica en antebrazos (Básico)", "Core Global", "Zona Lumbar", "plank"),
-            ("Dead Bug unilateral suave (Básico)", "Core Profundo", "Estabilidad", "plank"),
-            ("Bird-Dog con control pélvico (Básico)", "Erectores, Glúteos", "Core", "mobility"),
-        ],
-        "media": [
-            ("Plancha frontal isométrica estándar (Intermedio)", "Core Global", "Hombros, Glúteos", "plank"),
-            ("Crunches en polea alta de rodillas con cuerda (Intermedio)", "Recto Abdominal", "Oblicuos", "crunch"),
-            ("Elevaciones de piernas en suelo o banco plano (Intermedio)", "Abdomen Inferior", "Flexores cadera", "leg-raise"),
-            ("Plancha lateral con elevación de cadera (Intermedio)", "Oblicuos", "Core", "plank"),
-            ("Giros rusos con mancuerna o disco (Intermedio)", "Oblicuos", "Recto abdominal", "twist"),
-            ("Bicicleta abdominal con torsión controlada (Intermedio)", "Oblicuos, Recto", "Flexores", "crunch"),
-        ],
-        "alta": [
-            ("Elevaciones de piernas colgado en barra (Avanzado)", "Abdomen Inferior, Core", "Agarre", "leg-raise"),
-            ("Rueda abdominal en suelo (Ab Roller) (Avanzado)", "Core Profundo, Dorsal", "Hombros", "rollout"),
-            ("Plancha frontal con pies elevados (Avanzado)", "Core Global", "Hombros", "plank"),
-            ("Leñador en polea alta cruzado (Avanzado)", "Oblicuos, Rotadores", "Core", "woodchopper"),
-        ],
-    }
-
-    mobility_dict = {
-        "baja": [
-            ("Movilidad articular 90/90 de cadera y tobillos (Básico)", "Movilidad, Cadera", "Tobillos", "mobility"),
-            ("Caminata dinámica en sitio con respiración diafragmática (Básico)", "Cardio Suave", "Sistema cardiovascular", "cardio"),
-            ("Gato-Camello para columna vertebral (Básico)", "Columna, Core", "Espalda", "mobility"),
-        ],
-        "media": [
-            ("Burpees controlados sin impacto (Intermedio)", "Cardio, Full Body", "Metabolismo", "cardio"),
-            ("Mountain Climbers / Escaladores en suelo (Intermedio)", "Core, Cardio", "Hombros", "cardio"),
-            ("Paso del oso dinámico (Bear Crawl) (Intermedio)", "Full Body, Hombros", "Core", "mobility"),
-            ("Zancadas dinámicas con salto alternado suave (Intermedio)", "Piernas, Cardio", "Potencia", "lunge"),
-        ],
-        "alta": [
-            ("Burpees completos con salto vertical explosivo (Avanzado)", "Cardio HIIT, Full Body", "Potencia", "cardio"),
-            ("Mountain Climbers a alta velocidad (Avanzado)", "Cardio, Core", "Hombros", "cardio"),
-            ("Saltos de caja pliométricos (Box Jumps) (Avanzado)", "Potencia de Piernas", "Tendón de Aquiles", "jump"),
-        ],
-    }
+    if is_no_equipment:
+        quads_dict = {
+            "baja": [
+                ("Sentadilla libre asistida en silla con peso corporal (Básico)", "Cuádriceps", "Glúteos", "squat"),
+                ("Sentadilla isométrica apoyado en pared (Wall Sit 25s) (Básico)", "Cuádriceps", "Rótula", "squat"),
+                ("Extensión de rodilla en silla sin peso con control (Básico)", "Cuádriceps", "Rótula", "leg-extension"),
+                ("Zancada estática asistida con apoyo en pared (Básico)", "Cuádriceps", "Isquiotibiales", "lunge"),
+            ],
+            "media": [
+                ("Sentadilla libre profunda con peso corporal (Intermedio)", "Cuádriceps", "Glúteos, Core", "squat"),
+                ("Sentadilla búlgara con pie en silla o cama (Intermedio)", "Cuádriceps", "Glúteos, Estabilizadores", "split-squat"),
+                ("Sentadilla isométrica en pared (Wall Sit 45s) (Intermedio)", "Cuádriceps", "Vasto medial", "squat"),
+                ("Zancadas frontales alternas con peso corporal (Intermedio)", "Cuádriceps", "Isquiotibiales", "lunge"),
+                ("Sentadilla sumo profunda con peso corporal y pausa (Intermedio)", "Cuádriceps, Aductores", "Glúteos", "squat"),
+            ],
+            "alta": [
+                ("Sentadilla búlgara con salto controlado (Avanzado)", "Cuádriceps", "Glúteos, Potencia", "split-squat"),
+                ("Sentadilla sissy con control excéntrico y apoyo (Avanzado)", "Cuádriceps", "Tendón rotuliano", "squat"),
+                ("Sentadilla pistol asistida a una pierna (Avanzado)", "Cuádriceps", "Glúteos, Estabilidad", "squat"),
+                ("Zancadas pliométricas con salto alternado (Avanzado)", "Cuádriceps", "Potencia", "lunge"),
+            ],
+        }
+        hams_dict = {
+            "baja": [
+                ("Puente de glúteos e isquios en suelo con pausa (Básico)", "Isquiotibiales", "Glúteos", "glute-bridge"),
+                ("Buenos días con manos tras nuca y control motor (Básico)", "Isquiotibiales", "Erectores espinales", "deadlift"),
+                ("Curl femoral en suelo con talones apoyados (Básico)", "Isquiotibiales", "Cadena posterior", "leg-curl"),
+            ],
+            "media": [
+                ("Curl femoral en suelo con deslizador o toalla en piso liso (Intermedio)", "Isquiotibiales", "Glúteos", "leg-curl"),
+                ("Peso muerto rumano unilateral con peso corporal y balance (Intermedio)", "Isquiotibiales", "Glúteos, Cadena posterior", "deadlift"),
+                ("Puente de isquiotibiales con talones alejados en suelo (Intermedio)", "Isquiotibiales", "Glúteos", "glute-bridge"),
+                ("Buenos días con pausa isométrica abajo (Intermedio)", "Isquiotibiales", "Lumbar", "deadlift"),
+            ],
+            "alta": [
+                ("Curl nórdico excéntrico asistido con pies trabados bajo sofá (Avanzado)", "Isquiotibiales", "Glúteos", "leg-curl"),
+                ("Curl femoral deslizante a una sola pierna (Avanzado)", "Isquiotibiales", "Glúteo Mayor", "leg-curl"),
+                ("Peso muerto rumano a una pierna con pausa excéntrica de 3s (Avanzado)", "Isquiotibiales", "Cadena posterior", "deadlift"),
+            ],
+        }
+        glutes_dict = {
+            "baja": [
+                ("Puente de glúteos en suelo con pausa de 2s (Básico)", "Glúteos", "Isquiotibiales", "glute-bridge"),
+                ("Patada de glúteos en cuadrupedia (Básico)", "Glúteos", "Core", "glute-bridge"),
+                ("Abducción de cadera tumbado de lado (Clamshell) (Básico)", "Glúteo Medio", "Cadera", "mobility"),
+            ],
+            "media": [
+                ("Elevación de cadera (Hip Thrust) con espalda en sofá o silla (Intermedio)", "Glúteo Mayor", "Isquiotibiales", "hip-thrust"),
+                ("Puente de glúteos unilateral en suelo con pierna extendida (Intermedio)", "Glúteo Mayor", "Isquiotibiales", "glute-bridge"),
+                ("Patada de glúteos en cuadrupedia con pausa de 3s arriba (Intermedio)", "Glúteo Mayor", "Core", "glute-bridge"),
+                ("Sentadilla sumo libre con pausa profunda isométrica (Intermedio)", "Glúteos, Aductores", "Cuádriceps", "squat"),
+            ],
+            "alta": [
+                ("Hip Thrust unilateral en silla o sofá (Avanzado)", "Glúteo Mayor", "Isquiotibiales", "hip-thrust"),
+                ("Step-ups explosivos en silla firme o escalón alto (Avanzado)", "Glúteos", "Potencia", "lunge"),
+                ("Puente de glúteos en suelo con pies elevados sobre silla (Avanzado)", "Glúteos", "Isquiotibiales", "glute-bridge"),
+            ],
+        }
+        soleo_dict = {
+            "baja": [
+                ("Elevación de talones sentado en silla con presión manual (Básico)", "Sóleo (Batata profunda)", "Tendón de Aquiles", "calf-raise"),
+                ("Elevación isométrica de talones sentado manteniendo 5s (Básico)", "Sóleo", "Tobillos", "calf-raise"),
+            ],
+            "media": [
+                ("Elevación de talones sentado en silla con pausa excéntrica lenta (Intermedio)", "Sóleo", "Tríceps Sural", "calf-raise"),
+                ("Elevación de talones en cuclillas asistido con rodillas flexionadas (Intermedio)", "Sóleo (Batatas)", "Tobillos", "calf-raise"),
+            ],
+            "alta": [
+                ("Elevación de talones sentado con rodillas flexionadas a 90° unipodal (Avanzado)", "Sóleo", "Tríceps Sural", "calf-raise"),
+                ("Elevación de talones isométrica prolongada de 45s (Avanzado)", "Sóleo", "Fuerza articular", "calf-raise"),
+            ],
+        }
+        calves_pies_dict = {
+            "baja": [
+                ("Elevación de talones de pie con apoyo en pared (Básico)", "Gemelos (Gastrocnemio)", "Sóleo, Tobillo", "calf-raise"),
+                ("Caminata controlada de talones y de puntillas en casa (Básico)", "Tríceps Sural, Pies", "Estabilizadores del tobillo", "mobility"),
+            ],
+            "media": [
+                ("Elevación de talones unipodal en escalón o libro grueso (Intermedio)", "Tríceps Sural", "Estabilidad del Pie y Tobillo", "calf-raise"),
+                ("Elevación de talones en escalón con rango completo y estiramiento (Intermedio)", "Gemelos (Gastrocnemio)", "Sóleo, Tobillo", "calf-raise"),
+                ("Pogo jumps / Saltos elásticos de tobillo en sitio (Intermedio)", "Tendón de Aquiles, Sóleo", "Fascia Plantar", "jump"),
+            ],
+            "alta": [
+                ("Elevaciones unipodales lentas en escalón (3s bajada / 2s subida) (Avanzado)", "Tríceps Sural", "Arco Plantar y Tobillo", "calf-raise"),
+                ("Saltos reactivos de puntillas continuos tipo cuerda imaginaria (Avanzado)", "Gemelos", "Pies y Tobillos", "jump"),
+            ],
+        }
+        chest_dict = {
+            "baja": [
+                ("Flexiones inclinadas con manos en pared o mesa (Básico)", "Pectorales", "Tríceps", "pushup"),
+                ("Flexiones en suelo con rodillas apoyadas (Básico)", "Pectoral Mayor", "Deltoides", "pushup"),
+                ("Empujes isométricos de palmas frente al pecho (Básico)", "Pectorales", "Hombros", "pushup"),
+            ],
+            "media": [
+                ("Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "Pectoral Mayor", "Tríceps", "pushup"),
+                ("Flexiones declinadas con pies en cama o sofá (Intermedio)", "Pectoral Clavicular", "Deltoides anterior", "pushup"),
+                ("Flexiones con agarre ancho en suelo (Intermedio)", "Pectoral Mayor", "Core", "pushup"),
+                ("Fondos de pecho y tríceps en silla firme (Intermedio)", "Pectoral inferior", "Tríceps", "pushup"),
+            ],
+            "alta": [
+                ("Flexiones con palmada o salto pliométrico (Avanzado)", "Pectoral Mayor", "Tríceps, Potencia", "pushup"),
+                ("Flexiones arquero alternas en suelo (Avanzado)", "Pectoral", "Tríceps, Estabilizadores", "pushup"),
+                ("Flexiones pseudo-planche con inclinación anterior (Avanzado)", "Pectoral, Deltoides", "Core", "pushup"),
+            ],
+        }
+        back_dict = {
+            "baja": [
+                ("Remo invertido bajo mesa firme con rodillas flexionadas (Básico)", "Dorsal Ancho", "Bíceps", "row"),
+                ("Tracción dorsal con toalla en marco de puerta (Básico)", "Dorsal Ancho", "Romboides", "row"),
+                ("Retracción escapular en suelo boca abajo (Básico)", "Espalda media", "Trapecio", "mobility"),
+            ],
+            "media": [
+                ("Remo invertido bajo mesa firme con talones apoyados (Intermedio)", "Dorsal Ancho", "Bíceps, Core", "row"),
+                ("Tracción dorsal isométrica unilateral en puerta (Intermedio)", "Dorsal Ancho", "Romboides", "row"),
+                ("Superman con pausa isométrica de 3s en suelo (Intermedio)", "Erectores, Dorsal", "Glúteos", "mobility"),
+                ("Remo en suelo con toalla deslizante (Intermedio)", "Dorsal Ancho", "Bíceps", "row"),
+            ],
+            "alta": [
+                ("Remo invertido a una sola mano bajo mesa (Avanzado)", "Dorsal Ancho", "Core, Bíceps", "row"),
+                ("Dominadas estrictas en barra o saliente firme (Avanzado)", "Dorsal Ancho", "Bíceps, Romboides", "pullup"),
+                ("Remo invertido con pies elevados en silla (Avanzado)", "Espalda alta", "Dorsal, Bíceps", "row"),
+            ],
+        }
+        shoulders_dict = {
+            "baja": [
+                ("Elevaciones laterales isométricas contra marco de puerta (Básico)", "Deltoides lateral", "Trapecio", "lateral-raise"),
+                ("Retracción y elevación escapular Prone Y-T-W en suelo (Básico)", "Deltoides posterior", "Espalda alta", "lateral-raise"),
+                ("Empuje en pared para serrato anterior (Básico)", "Serrato, Hombros", "Core", "pushup"),
+            ],
+            "media": [
+                ("Flexiones en pica en suelo (Pike Push-ups) (Intermedio)", "Deltoides", "Tríceps, Trapecio", "shoulder-press"),
+                ("Elevaciones laterales isométricas contra marco de puerta (Intermedio)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+                ("Retracción escapular en suelo boca abajo Prone Y-T-W (Intermedio)", "Deltoides posterior", "Romboides", "lateral-raise"),
+                ("Flexiones en pica con pies en escalón (Intermedio)", "Deltoides anterior y lateral", "Tríceps", "shoulder-press"),
+            ],
+            "alta": [
+                ("Flexiones de pino asistidas en pared (Handstand Push-ups) (Avanzado)", "Deltoides", "Tríceps, Core", "shoulder-press"),
+                ("Pike Push-ups con pies en cama o silla alta (Avanzado)", "Deltoides", "Trapecio", "shoulder-press"),
+                ("Flexiones hindú / Dive-bomber push-ups (Avanzado)", "Deltoides, Pectoral", "Tríceps", "shoulder-press"),
+            ],
+        }
+        arms_dict = {
+            "baja": [
+                ("Curl de bíceps isométrico con toalla bajo pie (Básico)", "Bíceps Braquial", "Antebrazo", "bicep-curl"),
+                ("Fondos de tríceps en silla con rodillas flexionadas (Básico)", "Tríceps", "Hombros", "pushup"),
+                ("Extensiones de tríceps contra pared (Básico)", "Tríceps", "Codo", "pushup"),
+            ],
+            "media": [
+                ("Fondos de tríceps en silla o borde de cama (Chair Dips) (Intermedio)", "Tríceps", "Hombros, Pectoral", "pushup"),
+                ("Flexiones diamante en suelo con rodillas o completas (Intermedio)", "Tríceps", "Pectoral interior", "pushup"),
+                ("Curl de bíceps casero con toalla bajo pie generando tensión (Intermedio)", "Bíceps Braquial", "Antebrazo", "bicep-curl"),
+                ("Curl martillo isométrico con toalla (Intermedio)", "Braquiorradial", "Bíceps", "bicep-curl"),
+            ],
+            "alta": [
+                ("Fondos de tríceps entre dos sillas con piernas elevadas (Avanzado)", "Tríceps", "Codo", "pushup"),
+                ("Flexiones diamante estrictas con pausa abajo (Avanzado)", "Tríceps", "Pectoral", "pushup"),
+                ("Flexiones esfinge en suelo para tríceps (Avanzado)", "Tríceps", "Core", "pushup"),
+            ],
+        }
+        core_dict = {
+            "baja": [
+                ("Crunches controlados en suelo con rodillas a 90° (Básico)", "Recto Abdominal", "Core", "crunch"),
+                ("Plancha frontal isométrica en antebrazos (Básico)", "Core Global", "Zona Lumbar", "plank"),
+                ("Dead Bug unilateral suave (Básico)", "Core Profundo", "Estabilidad", "plank"),
+                ("Bird-Dog con control pélvico (Básico)", "Erectores, Glúteos", "Core", "mobility"),
+            ],
+            "media": [
+                ("Plancha frontal isométrica estándar en antebrazos (Intermedio)", "Core Global", "Hombros, Glúteos", "plank"),
+                ("Dead Bug alterno completo sin apoyo (Intermedio)", "Core Profundo", "Estabilidad Lumbar", "dead-bug"),
+                ("Elevaciones de piernas en suelo con control lumbar (Intermedio)", "Abdomen Inferior", "Flexores cadera", "leg-raise"),
+                ("Plancha lateral con elevación de cadera (Intermedio)", "Oblicuos", "Core", "plank"),
+                ("Giros rusos con peso corporal y balance de talones (Intermedio)", "Oblicuos", "Recto abdominal", "twist"),
+                ("Bicicleta abdominal con torsión controlada (Intermedio)", "Oblicuos, Recto", "Flexores", "crunch"),
+            ],
+            "alta": [
+                ("Elevaciones de piernas en suelo hasta vela vertical (Avanzado)", "Abdomen Inferior, Core", "Cadera", "leg-raise"),
+                ("Plancha frontal con pies elevados en silla (Avanzado)", "Core Global", "Hombros", "plank"),
+                ("Hollow Body Hold estricto de 45s (Avanzado)", "Core Profundo, Transverso", "Erectores", "plank"),
+                ("Plancha lateral con rotación de aguja (Avanzado)", "Oblicuos, Rotadores", "Core", "plank"),
+            ],
+        }
+        mobility_dict = {
+            "baja": [
+                ("Movilidad articular 90/90 de cadera y tobillos (Básico)", "Movilidad, Cadera", "Tobillos", "mobility"),
+                ("Caminata dinámica en sitio con respiración diafragmática (Básico)", "Cardio Suave", "Sistema cardiovascular", "cardio"),
+                ("Gato-Camello para columna vertebral (Básico)", "Columna, Core", "Espalda", "mobility"),
+            ],
+            "media": [
+                ("Burpees controlados sin impacto (Intermedio)", "Cardio, Full Body", "Metabolismo", "cardio"),
+                ("Mountain Climbers / Escaladores en suelo (Intermedio)", "Core, Cardio", "Hombros", "cardio"),
+                ("Paso del oso dinámico (Bear Crawl) (Intermedio)", "Full Body, Hombros", "Core", "mobility"),
+                ("Zancadas dinámicas con salto alternado suave (Intermedio)", "Piernas, Cardio", "Potencia", "lunge"),
+            ],
+            "alta": [
+                ("Burpees completos con salto vertical explosivo (Avanzado)", "Cardio HIIT, Full Body", "Potencia", "cardio"),
+                ("Mountain Climbers a alta velocidad (Avanzado)", "Cardio, Core", "Hombros", "cardio"),
+                ("Saltos reactivos continuos en sitio (Avanzado)", "Potencia de Piernas", "Tendón de Aquiles", "jump"),
+            ],
+        }
+    else:
+        quads_dict = {
+            "baja": [
+                ("Sentadilla asistida en banco con peso corporal (Básico)", "Cuádriceps", "Glúteos", "squat"),
+                ("Prensa horizontal suave en máquina (Básico)", "Cuádriceps", "Glúteos", "leg-press"),
+                ("Extensión isométrica de rodilla en silla (Básico)", "Cuádriceps", "Rótula", "leg-extension"),
+                ("Zancada estática asistida con apoyo en pared (Básico)", "Cuádriceps", "Isquiotibiales", "lunge"),
+            ],
+            "media": [
+                ("Sentadilla Goblet con mancuerna (Intermedio)", "Cuádriceps", "Glúteos, Core", "squat"),
+                ("Prensa de piernas inclinada 45° (Intermedio)", "Cuádriceps", "Glúteos", "leg-press"),
+                ("Sentadilla búlgara con mancuernas (Intermedio)", "Cuádriceps", "Glúteos, Estabilizadores", "split-squat"),
+                ("Extensión de cuádriceps en máquina (Intermedio)", "Cuádriceps", "Vasto medial", "leg-extension"),
+                ("Sentadilla sumo con mancuerna (Intermedio)", "Cuádriceps, Aductores", "Glúteos", "squat"),
+                ("Zancadas frontales alternas con mancuernas (Intermedio)", "Cuádriceps", "Isquiotibiales", "lunge"),
+            ],
+            "alta": [
+                ("Sentadilla profunda con barra libre (Avanzado)", "Cuádriceps", "Glúteos, Core", "squat"),
+                ("Prensa 45° pesada pies juntos (Avanzado)", "Cuádriceps", "Glúteos", "leg-press"),
+                ("Sentadilla búlgara con mancuernas pesadas (Avanzado)", "Cuádriceps", "Glúteos", "split-squat"),
+                ("Sentadilla en máquina Hack (Avanzado)", "Cuádriceps", "Glúteos", "squat"),
+                ("Sentadilla frontal con barra olímpica (Avanzado)", "Cuádriceps", "Core, Erectores", "squat"),
+            ],
+        }
+        hams_dict = {
+            "baja": [
+                ("Peso muerto rumano ligero con mancuernas (Básico)", "Isquiotibiales", "Glúteos, Espalda baja", "deadlift"),
+                ("Curl femoral de pie sin peso con control (Básico)", "Isquiotibiales", "Gemelos", "leg-curl"),
+                ("Buenos días con control motor y manos tras nuca (Básico)", "Isquiotibiales", "Erectores espinales", "deadlift"),
+                ("Curl femoral en suelo con deslizador o toalla (Básico)", "Isquiotibiales", "Glúteos", "leg-curl"),
+            ],
+            "media": [
+                ("Peso muerto rumano con mancuernas (Intermedio)", "Isquiotibiales", "Glúteos, Cadena posterior", "deadlift"),
+                ("Curl de isquiotibiales / femoral tumbado en máquina (Intermedio)", "Isquiotibiales", "Gemelos", "leg-curl"),
+                ("Curl femoral sentado en máquina (Intermedio)", "Isquiotibiales", "Gemelos", "leg-curl"),
+                ("Buenos días con barra guiada o mancuernas (Intermedio)", "Isquiotibiales", "Glúteos, Lumbar", "deadlift"),
+                ("Peso muerto unilateral con mancuerna (Intermedio)", "Isquiotibiales", "Glúteos", "deadlift"),
+            ],
+            "alta": [
+                ("Peso muerto rumano pesado con barra olímpica (Avanzado)", "Isquiotibiales", "Glúteos, Cadena posterior", "deadlift"),
+                ("Curl femoral sentado en máquina pesada (Avanzado)", "Isquiotibiales", "Gemelos", "leg-curl"),
+                ("Curl nórdico asistido excéntrico (Avanzado)", "Isquiotibiales", "Glúteos", "leg-curl"),
+                ("Peso muerto rumano con déficit (Avanzado)", "Isquiotibiales", "Cadena posterior", "deadlift"),
+            ],
+        }
+        glutes_dict = {
+            "baja": [
+                ("Puente de glúteos en suelo con pausa (Básico)", "Glúteos", "Isquiotibiales", "glute-bridge"),
+                ("Patada de glúteos en cuadrupedia (Básico)", "Glúteos", "Core", "glute-bridge"),
+                ("Abducción de cadera tumbado de lado (Básico)", "Glúteo Medio", "Cadera", "mobility"),
+                ("Elevación de cadera en suelo con banda (Básico)", "Glúteos", "Isquiotibiales", "glute-bridge"),
+            ],
+            "media": [
+                ("Elevación de cadera (Hip Thrust) en banco con mancuerna (Intermedio)", "Glúteo Mayor", "Isquiotibiales", "hip-thrust"),
+                ("Puente de glúteos unilateral en suelo (Intermedio)", "Glúteo Mayor", "Isquiotibiales", "glute-bridge"),
+                ("Patada de glúteos en polea baja con tobillera (Intermedio)", "Glúteos", "Cadera", "glute-bridge"),
+                ("Step-ups con mancuernas en cajón (Intermedio)", "Glúteos", "Cuádriceps", "lunge"),
+                ("Sentadilla sumo profunda con mancuerna (Intermedio)", "Glúteos, Aductores", "Cuádriceps", "squat"),
+            ],
+            "alta": [
+                ("Hip Thrust con barra olímpica pesada (Avanzado)", "Glúteo Mayor", "Isquiotibiales", "hip-thrust"),
+                ("Hip Thrust con banda elástica y barra (Avanzado)", "Glúteo Mayor", "Glúteo Medio", "hip-thrust"),
+                ("Zancadas búlgaras profundas con mancuernas pesadas (Avanzado)", "Glúteos, Cuádriceps", "Estabilidad", "split-squat"),
+                ("Step-ups explosivos en cajón alto (Avanzado)", "Glúteos", "Potencia", "lunge"),
+            ],
+        }
+        soleo_dict = {
+            "baja": [
+                ("Elevación de talones sentado en silla con peso corporal (Básico)", "Sóleo (Batata profunda)", "Tendón de Aquiles", "calf-raise"),
+                ("Elevación de talones sentado con mancuerna sobre muslos (Básico)", "Sóleo (Batatas)", "Tobillos", "calf-raise"),
+            ],
+            "media": [
+                ("Elevación de talones en máquina sentado (Sóleo / Batatas) (Intermedio)", "Sóleo", "Tríceps Sural", "calf-raise"),
+                ("Elevación de talones sentado con mancuernas en banco (Intermedio)", "Sóleo (Batatas)", "Tobillos", "calf-raise"),
+                ("Elevación de talones en máquina Smith sentado (Intermedio)", "Sóleo", "Tendón de Aquiles", "calf-raise"),
+            ],
+            "alta": [
+                ("Elevación de talones sentado en máquina pesada (Sóleo) (Avanzado)", "Sóleo", "Tríceps Sural", "calf-raise"),
+                ("Elevación de talones en máquina sentado con pausa de 2s arriba (Avanzado)", "Sóleo", "Fuerza articular", "calf-raise"),
+            ],
+        }
+        calves_pies_dict = {
+            "baja": [
+                ("Elevación de talones de pie con apoyo en pared (Básico)", "Gemelos (Gastrocnemio)", "Sóleo, Tobillo", "calf-raise"),
+                ("Caminata controlada de talones y de puntillas (Básico)", "Tríceps Sural, Pies", "Estabilizadores del tobillo", "mobility"),
+                ("Dorsiflexión de tobillos en suelo para tibial anterior (Básico)", "Tibial Anterior", "Arco Plantar", "mobility"),
+            ],
+            "media": [
+                ("Elevación de talones unipodal en escalón (Intermedio)", "Tríceps Sural", "Estabilidad del Pie y Tobillo", "calf-raise"),
+                ("Elevación de talones de pie con mancuernas en escalón (Intermedio)", "Gemelos (Gastrocnemio)", "Sóleo, Tobillo", "calf-raise"),
+                ("Elevación de talones en prensa 45° (Intermedio)", "Gemelos", "Sóleo", "calf-raise"),
+                ("Dorsiflexión tibial con banda elástica resistida (Intermedio)", "Tibial Anterior", "Pies", "mobility"),
+                ("Pogo jumps / Saltos elásticos de tobillo (Intermedio)", "Tendón de Aquiles, Sóleo", "Fascia Plantar", "jump"),
+            ],
+            "alta": [
+                ("Elevación de talones en prensa 45° con carga pesada (Avanzado)", "Gemelos (Tríceps Sural)", "Sóleo", "calf-raise"),
+                ("Elevación de talones de pie con barra pesada (Avanzado)", "Gemelos", "Pies y Tobillos", "calf-raise"),
+                ("Elevaciones unipodales lentas en escalón (3s excéntrica) (Avanzado)", "Tríceps Sural", "Arco Plantar y Tobillo", "calf-raise"),
+                ("Elevación de talones tipo Donkey Calf Raise con carga (Avanzado)", "Gastrocnemio completo", "Batata", "calf-raise"),
+            ],
+        }
+        chest_dict = {
+            "baja": [
+                ("Flexiones inclinadas con manos en banco (Básico)", "Pectorales", "Tríceps", "pushup"),
+                ("Press plano con mancuernas ligeras (Básico)", "Pectorales", "Deltoides", "bench-press"),
+                ("Aperturas con banda elástica en banco (Básico)", "Pectorales", "Hombros", "fly"),
+            ],
+            "media": [
+                ("Press de pecho con mancuernas en banco plano (Intermedio)", "Pectoral Mayor", "Tríceps", "bench-press"),
+                ("Press inclinado con mancuernas en banco 30° (Intermedio)", "Pectoral Clavicular", "Deltoides anterior", "bench-press"),
+                ("Aperturas con mancuernas en banco plano (Intermedio)", "Pectoral Mayor", "Hombros", "fly"),
+                ("Cruces en polea alta para pectoral (Intermedio)", "Pectoral Esternal", "Bíceps", "fly"),
+                ("Fondos de pecho en paralelas (Intermedio)", "Pectoral inferior", "Tríceps", "pushup"),
+                ("Flexiones de pecho estándar en suelo (Intermedio)", "Pectorales", "Core", "pushup"),
+            ],
+            "alta": [
+                ("Press de banca plano con barra olímpica (Avanzado)", "Pectoral Mayor", "Tríceps", "bench-press"),
+                ("Press inclinado con barra olímpica pesada (Avanzado)", "Pectoral Clavicular", "Deltoides", "bench-press"),
+                ("Press declinado con mancuernas pesadas (Avanzado)", "Pectoral inferior", "Tríceps", "bench-press"),
+                ("Cruces en polea baja para haz clavicular (Avanzado)", "Pectoral Superior", "Hombros", "fly"),
+            ],
+        }
+        back_dict = {
+            "baja": [
+                ("Remo sentado con banda elástica (Básico)", "Dorsal Ancho", "Bíceps", "row"),
+                ("Jalón al pecho con agarre neutro suave (Básico)", "Dorsal", "Romboides", "row"),
+                ("Retracción escapular en suelo (Básico)", "Espalda media", "Trapecio", "mobility"),
+            ],
+            "media": [
+                ("Remo en polea baja con agarre cerrado (Intermedio)", "Espalda Media, Dorsal", "Bíceps", "row"),
+                ("Jalón al pecho en polea alta con agarre prono (Intermedio)", "Dorsal Ancho", "Romboides", "pulldown"),
+                ("Remo unilateral con mancuerna apoyado en banco (Intermedio)", "Dorsal Ancho", "Bíceps", "row"),
+                ("Pullover con mancuerna en banco plano (Intermedio)", "Dorsal Ancho, Serrato", "Pectoral", "pullover"),
+                ("Remo con barra inclinado 45° (Intermedio)", "Dorsal, Trapecio", "Erectores", "row"),
+            ],
+            "alta": [
+                ("Dominadas pronadas estrictas con peso corporal o lastre (Avanzado)", "Dorsal Ancho", "Bíceps", "pullup"),
+                ("Remo Pendlay con barra olímpica desde el suelo (Avanzado)", "Espalda Completa", "Core, Bíceps", "row"),
+                ("Remo con barra agarre supino pesado (Avanzado)", "Dorsal, Bíceps", "Erectores", "row"),
+                ("Jalón unilateral pesado en polea (Avanzado)", "Dorsal", "Romboides", "pulldown"),
+            ],
+        }
+        shoulders_dict = {
+            "baja": [
+                ("Press militar sentado con mancuernas muy ligeras (Básico)", "Deltoides", "Tríceps", "shoulder-press"),
+                ("Elevaciones laterales suaves con mancuernas o sin peso (Básico)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+                ("Pájaros posteriores sin peso con control escapular (Básico)", "Deltoides Posterior", "Romboides", "fly"),
+            ],
+            "media": [
+                ("Press militar con mancuernas sentado (Intermedio)", "Deltoides", "Tríceps", "shoulder-press"),
+                ("Elevaciones laterales de hombros con mancuernas (Intermedio)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+                ("Face pulls con cuerda a la frente (Intermedio)", "Deltoides posterior, Romboides", "Trapecio", "row"),
+                ("Press Arnold con mancuernas sentado (Intermedio)", "Deltoides Completo", "Tríceps", "shoulder-press"),
+                ("Elevaciones laterales en polea baja a una mano (Intermedio)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+            ],
+            "alta": [
+                ("Press militar con barra olímpica de pie (Avanzado)", "Deltoides", "Core, Tríceps", "shoulder-press"),
+                ("Elevaciones laterales pesadas con pausa (Avanzado)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+                ("Pájaros en máquina pec-deck invertida (Avanzado)", "Deltoides Posterior", "Romboides", "fly"),
+            ],
+        }
+        arms_dict = {
+            "baja": [
+                ("Curl de bíceps sentado con mancuernas ligeras (Básico)", "Bíceps Braquial", "Antebrazo", "bicep-curl"),
+                ("Extensiones de tríceps en polea alta con cuerda (Básico)", "Tríceps", "Codo", "tricep-pushdown"),
+                ("Fondos de tríceps en banco con rodillas flexionadas (Básico)", "Tríceps", "Hombros", "pushup"),
+            ],
+            "media": [
+                ("Curl alterno de bíceps con mancuernas de pie (Intermedio)", "Bíceps Braquial", "Antebrazo", "bicep-curl"),
+                ("Curl martillo con mancuernas (Intermedio)", "Braquiorradial, Bíceps", "Antebrazo", "bicep-curl"),
+                ("Curl en banco predicador con barra Z (Intermedio)", "Bíceps Braquial", "Antebrazo", "bicep-curl"),
+                ("Extensiones de tríceps en polea alta con cuerda (Intermedio)", "Tríceps", "Antebrazo", "tricep-pushdown"),
+                ("Press francés con mancuernas acostado (Intermedio)", "Tríceps (Cabeza Larga)", "Codo", "tricep-extension"),
+                ("Extensiones de tríceps tras nuca a dos manos (Intermedio)", "Tríceps (Cabeza Larga)", "Hombros", "tricep-extension"),
+            ],
+            "alta": [
+                ("Curl con barra olímpica estricto (Avanzado)", "Bíceps", "Antebrazo", "bicep-curl"),
+                ("Fondos en paralelas con lastre para tríceps (Avanzado)", "Tríceps", "Pectoral", "pushup"),
+                ("Press francés con barra Z pesada (Avanzado)", "Tríceps", "Codo", "tricep-extension"),
+                ("Curl martillo pesado en banco inclinado (Avanzado)", "Braquiorradial", "Bíceps", "bicep-curl"),
+            ],
+        }
+        core_dict = {
+            "baja": [
+                ("Crunches controlados en suelo con rodillas a 90° (Básico)", "Recto Abdominal", "Core", "crunch"),
+                ("Plancha frontal isométrica en antebrazos (Básico)", "Core Global", "Zona Lumbar", "plank"),
+                ("Dead Bug unilateral suave (Básico)", "Core Profundo", "Estabilidad", "plank"),
+                ("Bird-Dog con control pélvico (Básico)", "Erectores, Glúteos", "Core", "mobility"),
+            ],
+            "media": [
+                ("Plancha frontal isométrica estándar (Intermedio)", "Core Global", "Hombros, Glúteos", "plank"),
+                ("Crunches en polea alta de rodillas con cuerda (Intermedio)", "Recto Abdominal", "Oblicuos", "crunch"),
+                ("Elevaciones de piernas en suelo o banco plano (Intermedio)", "Abdomen Inferior", "Flexores cadera", "leg-raise"),
+                ("Plancha lateral con elevación de cadera (Intermedio)", "Oblicuos", "Core", "plank"),
+                ("Giros rusos con mancuerna o disco (Intermedio)", "Oblicuos", "Recto abdominal", "twist"),
+                ("Bicicleta abdominal con torsión controlada (Intermedio)", "Oblicuos, Recto", "Flexores", "crunch"),
+            ],
+            "alta": [
+                ("Elevaciones de piernas colgado en barra (Avanzado)", "Abdomen Inferior, Core", "Agarre", "leg-raise"),
+                ("Rueda abdominal en suelo (Ab Roller) (Avanzado)", "Core Profundo, Dorsal", "Hombros", "rollout"),
+                ("Plancha frontal con pies elevados (Avanzado)", "Core Global", "Hombros", "plank"),
+                ("Leñador en polea alta cruzado (Avanzado)", "Oblicuos, Rotadores", "Core", "woodchopper"),
+            ],
+        }
+        mobility_dict = {
+            "baja": [
+                ("Movilidad articular 90/90 de cadera y tobillos (Básico)", "Movilidad, Cadera", "Tobillos", "mobility"),
+                ("Caminata dinámica en sitio con respiración diafragmática (Básico)", "Cardio Suave", "Sistema cardiovascular", "cardio"),
+                ("Gato-Camello para columna vertebral (Básico)", "Columna, Core", "Espalda", "mobility"),
+            ],
+            "media": [
+                ("Burpees controlados sin impacto (Intermedio)", "Cardio, Full Body", "Metabolismo", "cardio"),
+                ("Mountain Climbers / Escaladores en suelo (Intermedio)", "Core, Cardio", "Hombros", "cardio"),
+                ("Paso del oso dinámico (Bear Crawl) (Intermedio)", "Full Body, Hombros", "Core", "mobility"),
+                ("Zancadas dinámicas con salto alternado suave (Intermedio)", "Piernas, Cardio", "Potencia", "lunge"),
+            ],
+            "alta": [
+                ("Burpees completos con salto vertical explosivo (Avanzado)", "Cardio HIIT, Full Body", "Potencia", "cardio"),
+                ("Mountain Climbers a alta velocidad (Avanzado)", "Cardio, Core", "Hombros", "cardio"),
+                ("Saltos de caja pliométricos (Box Jumps) (Avanzado)", "Potencia de Piernas", "Tendón de Aquiles", "jump"),
+            ],
+        }
 
     # SELECCIÓN HIPER-DIVERSIFICADA POR RANURAS
     fk = (focus_key or "piernas").lower()
@@ -1638,12 +1941,13 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
 
     res = []
     for item in selected_tuples:
+        ex_name, ex_prim, ex_anim = _sanitize_exercise_by_equipment(item[0], item[1], item[3], is_no_equipment)
         res.append({
-            "name": item[0],
+            "name": ex_name,
             "sets": sets_num,
             "reps": reps_str,
-            "animation_key": item[3],
-            "primary_muscle": item[1],
+            "animation_key": ex_anim,
+            "primary_muscle": ex_prim,
             "secondary_muscle": item[2],
             "intensity_level": lbl,
             "biomechanics": "Movimiento controlado en todo el recorrido con respiración sincronizada.",
@@ -1658,6 +1962,7 @@ def _normalize_exercises(
     intensity: str = "Media",
     level: str = "Intermedio",
     requested_focus: str | None = None,
+    is_no_equipment: bool = False,
 ) -> list[dict]:
     exercises: list[dict] = []
     if not isinstance(raw_exercises, list):
@@ -1737,6 +2042,7 @@ def _normalize_exercises(
             replaced_from_pool = True
 
         clean_name = _sanitize_exercise_by_intensity(raw_name, intensity_hint)
+        clean_name, primary, anim_key = _sanitize_exercise_by_equipment(clean_name, primary, anim_key, is_no_equipment)
         gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint)
 
         exercises.append(
@@ -1790,6 +2096,7 @@ def _normalize_structured_plan(
     requested_focus: str | None = None,
     is_complementary_days: bool = False,
     user_message: str = "",
+    is_no_equipment: bool = False,
 ) -> dict | None:
     if not isinstance(raw_plan, dict):
         return None
@@ -1798,6 +2105,7 @@ def _normalize_structured_plan(
         intensity=intensity,
         level=level,
         requested_focus=requested_focus,
+        is_no_equipment=is_no_equipment,
     )
     if not exercises:
         return None
@@ -1821,62 +2129,109 @@ def _normalize_structured_plan(
 
     # Pools de ejercicios normalizados por zona y por día (Día A vs Día B con máxima diversidad)
     dynamic_base_seed = abs(hash(user_message + str(int(time.time() / 10)))) % 1000
-    leg_day_a_exs = _normalize_exercises(_generate_diverse_session("piernas", int_hint, seed=dynamic_base_seed), intensity=intensity, level=level, requested_focus="piernas")
-    leg_day_b_exs = _normalize_exercises(_generate_diverse_session("piernas_b", int_hint, seed=dynamic_base_seed + 13), intensity=intensity, level=level, requested_focus="piernas")
-    calves_feet_exs = _normalize_exercises(_generate_diverse_session("pantorrillas_pies", int_hint, seed=dynamic_base_seed + 27), intensity=intensity, level=level, requested_focus="pantorrillas_pies")
-    triceps_legs_exs = _normalize_exercises(_generate_diverse_session("triceps_piernas", int_hint, seed=dynamic_base_seed + 41), intensity=intensity, level=level, requested_focus="triceps_piernas")
+    leg_day_a_exs = _normalize_exercises(_generate_diverse_session("piernas", int_hint, seed=dynamic_base_seed, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="piernas", is_no_equipment=is_no_equipment)
+    leg_day_b_exs = _normalize_exercises(_generate_diverse_session("piernas_b", int_hint, seed=dynamic_base_seed + 13, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="piernas", is_no_equipment=is_no_equipment)
+    calves_feet_exs = _normalize_exercises(_generate_diverse_session("pantorrillas_pies", int_hint, seed=dynamic_base_seed + 27, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="pantorrillas_pies", is_no_equipment=is_no_equipment)
+    triceps_legs_exs = _normalize_exercises(_generate_diverse_session("triceps_piernas", int_hint, seed=dynamic_base_seed + 41, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="triceps_piernas", is_no_equipment=is_no_equipment)
 
-    upper_exs = _normalize_exercises(_generate_diverse_session("tren_superior", int_hint, seed=dynamic_base_seed + 53), intensity=intensity, level=level, requested_focus="tren_superior")
-    core_exs = _normalize_exercises(_generate_diverse_session("core", int_hint, seed=dynamic_base_seed + 67), intensity=intensity, level=level, requested_focus="core")
-    mobility_exs = _normalize_exercises(_generate_diverse_session("movilidad_cardio", int_hint, seed=dynamic_base_seed + 79), intensity=intensity, level=level, requested_focus="movilidad_cardio")
+    upper_exs = _normalize_exercises(_generate_diverse_session("tren_superior", int_hint, seed=dynamic_base_seed + 53, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="tren_superior", is_no_equipment=is_no_equipment)
+    core_exs = _normalize_exercises(_generate_diverse_session("core", int_hint, seed=dynamic_base_seed + 67, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="core", is_no_equipment=is_no_equipment)
+    mobility_exs = _normalize_exercises(_generate_diverse_session("movilidad_cardio", int_hint, seed=dynamic_base_seed + 79, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="movilidad_cardio", is_no_equipment=is_no_equipment)
 
-    # Sub-pools especializados para máxima variación sin repeticiones:
-    legs_quads = [
-        {"name": "Sentadilla profunda asistida" if int_hint == "baja" else ("Sentadilla Goblet con mancuerna" if int_hint == "media" else "Sentadilla profunda con barra libre"), "sets": 4, "reps": "10-12", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
-        {"name": "Extensión de cuádriceps isométrica" if int_hint == "baja" else "Prensa de piernas inclinada 45°", "sets": 3, "reps": "12", "animation_key": "leg-press", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
-        {"name": "Zancadas estáticas asistidas" if int_hint == "baja" else "Zancadas frontales alternas con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps", "secondary_muscle": "Isquiotibiales"},
-    ]
-    legs_hams = [
-        {"name": "Peso muerto rumano con mancuernas" if int_hint != "alta" else "Peso muerto rumano con barra", "sets": 4, "reps": "10-12", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Glúteos"},
-        {"name": "Curl femoral de pie sin peso" if int_hint == "baja" else "Curl de isquiotibiales en máquina", "sets": 3, "reps": "12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
-        {"name": "Buenos días con control motor", "sets": 3, "reps": "10", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Espalda baja"},
-    ]
-    legs_glutes = [
-        {"name": "Puente de glúteos en suelo" if int_hint == "baja" else "Hip Thrust con mancuerna en banco", "sets": 4, "reps": "12-15", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales"},
-        {"name": "Sentadilla sumo con peso corporal" if int_hint == "baja" else "Sentadilla sumo con mancuerna", "sets": 3, "reps": "12", "animation_key": "squat", "primary_muscle": "Glúteos, Aductores", "secondary_muscle": "Cuádriceps"},
-        {"name": "Patada de glúteos en cuadrupedia" if int_hint == "baja" else "Patada de glúteos en polea o con banda", "sets": 3, "reps": "12 por pierna", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Core"},
-    ]
-    legs_unipodal_calves = [
-        {"name": "Step-ups en escalón bajo" if int_hint == "baja" else "Sentadilla búlgara con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps, Glúteos", "secondary_muscle": "Estabilizadores"},
-        {"name": "Elevación de talones de pie con peso corporal" if int_hint == "baja" else "Elevación de talones de pie con carga", "sets": 4, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Gemelos", "secondary_muscle": "Tobillos"},
-        {"name": "Elevación de talones sentado en máquina (Sóleo)", "sets": 3, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Sóleo", "secondary_muscle": "Gemelos"},
-    ]
-    legs_power_mob = [
-        {"name": "Sentadilla pausada en el fondo (3s)" if int_hint == "baja" else "Sentadillas con salto controlado (Jump Squat)", "sets": 3, "reps": "10", "animation_key": "squat", "primary_muscle": "Cuádriceps, Potencia", "secondary_muscle": "Glúteos"},
-        {"name": "Estocadas dinámicas suaves" if int_hint == "baja" else "Zancadas dinámicas con salto alternado", "sets": 3, "reps": "8 por pierna", "animation_key": "lunge", "primary_muscle": "Piernas completas", "secondary_muscle": "Cardio"},
-        {"name": "Movilidad dinámica articular de cadera 90/90 y tobillos", "sets": 3, "reps": "10 por lado", "animation_key": "mobility", "primary_muscle": "Flexores de cadera", "secondary_muscle": "Articulaciones"},
-    ]
+    # Sub-pools especializados para máxima variación sin repeticiones adaptados a equipamiento:
+    if is_no_equipment:
+        legs_quads = [
+            {"name": "Sentadilla asistida en silla" if int_hint == "baja" else ("Sentadilla libre profunda con peso corporal" if int_hint == "media" else "Sentadilla búlgara con salto controlado"), "sets": 4, "reps": "10-12", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
+            {"name": "Sentadilla isométrica en pared (Wall Sit)" if int_hint != "alta" else "Sentadilla sissy con control corporal", "sets": 3, "reps": "45s", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Vasto medial"},
+            {"name": "Zancadas estáticas asistidas" if int_hint == "baja" else "Sentadilla búlgara con pie en silla o cama", "sets": 3, "reps": "10 por pierna", "animation_key": "split-squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Isquiotibiales"},
+        ]
+        legs_hams = [
+            {"name": "Puente de glúteos e isquios en suelo" if int_hint == "baja" else "Peso muerto rumano unilateral con peso corporal", "sets": 4, "reps": "10-12", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Glúteos"},
+            {"name": "Curl femoral en suelo con talones" if int_hint == "baja" else "Curl femoral en suelo con deslizador o toalla en piso liso", "sets": 3, "reps": "12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
+            {"name": "Buenos días con control motor y manos tras nuca", "sets": 3, "reps": "10", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Espalda baja"},
+        ]
+        legs_glutes = [
+            {"name": "Puente de glúteos en suelo con pausa de 2s" if int_hint == "baja" else "Elevación de cadera (Hip Thrust) en borde de sofá o silla", "sets": 4, "reps": "12-15", "animation_key": "hip-thrust", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales"},
+            {"name": "Sentadilla sumo libre con peso corporal", "sets": 3, "reps": "12", "animation_key": "squat", "primary_muscle": "Glúteos, Aductores", "secondary_muscle": "Cuádriceps"},
+            {"name": "Patada de glúteos en cuadrupedia con pausa isométrica", "sets": 3, "reps": "12 por pierna", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Core"},
+        ]
+        legs_unipodal_calves = [
+            {"name": "Step-ups en escalón bajo" if int_hint == "baja" else "Sentadilla búlgara con apoyo en silla", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps, Glúteos", "secondary_muscle": "Estabilizadores"},
+            {"name": "Elevación de talones de pie en suelo con pausa de 2s" if int_hint == "baja" else "Elevación de talones unipodal en escalón o libro grueso", "sets": 4, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Gemelos", "secondary_muscle": "Tobillos"},
+            {"name": "Elevación de talones sentado en silla con presión manual (Sóleo)", "sets": 3, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Sóleo", "secondary_muscle": "Gemelos"},
+        ]
+        legs_power_mob = [
+            {"name": "Sentadilla pausada en el fondo (3s)", "sets": 3, "reps": "10", "animation_key": "squat", "primary_muscle": "Cuádriceps, Potencia", "secondary_muscle": "Glúteos"},
+            {"name": "Estocadas dinámicas suaves con peso corporal", "sets": 3, "reps": "8 por pierna", "animation_key": "lunge", "primary_muscle": "Piernas completas", "secondary_muscle": "Cardio"},
+            {"name": "Movilidad dinámica articular de cadera 90/90 y tobillos", "sets": 3, "reps": "10 por lado", "animation_key": "mobility", "primary_muscle": "Flexores de cadera", "secondary_muscle": "Articulaciones"},
+        ]
+        upper_chest_tri = [
+            {"name": "Flexiones inclinadas con apoyo en pared o mesa" if int_hint == "baja" else "Flexiones de pecho estándar en suelo (Push-ups)", "sets": 4, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+            {"name": "Flexiones declinadas con pies en cama o sofá" if int_hint != "baja" else "Flexiones en suelo con rodillas apoyadas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Pectoral Clavicular", "secondary_muscle": "Tríceps"},
+            {"name": "Fondos de tríceps en silla o banco (Chair Dips)", "sets": 3, "reps": "12", "animation_key": "pushup", "primary_muscle": "Tríceps", "secondary_muscle": "Hombros"},
+        ]
+        upper_back_bi = [
+            {"name": "Remo invertido bajo mesa firme con rodillas flexionadas" if int_hint == "baja" else "Remo invertido bajo mesa firme con talones en suelo", "sets": 4, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho, Espalda Media", "secondary_muscle": "Bíceps"},
+            {"name": "Tracción dorsal isométrica con toalla en marco de puerta", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides"},
+            {"name": "Curl de bíceps isométrico con toalla bajo pie generando tensión", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
+        ]
+        upper_shoulders_post = [
+            {"name": "Flexiones en pica en suelo (Pike Push-ups)", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps"},
+            {"name": "Elevaciones laterales isométricas contra marco de puerta", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
+            {"name": "Retracción escapular en suelo boca abajo (Prone Y-T-W)", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+        ]
+        upper_arms_torso = [
+            {"name": "Fondos de tríceps en silla con piernas estiradas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Tríceps", "secondary_muscle": "Pectoral"},
+            {"name": "Flexiones diamante en suelo con rodillas o completas", "sets": 3, "reps": "10", "animation_key": "pushup", "primary_muscle": "Tríceps, Pectoral", "secondary_muscle": "Hombros"},
+            {"name": "Extensiones lumbares y dorsales Superman en suelo", "sets": 3, "reps": "10-12", "animation_key": "mobility", "primary_muscle": "Espalda media, Lumbar", "secondary_muscle": "Glúteos"},
+        ]
+    else:
+        legs_quads = [
+            {"name": "Sentadilla profunda asistida" if int_hint == "baja" else ("Sentadilla Goblet con mancuerna" if int_hint == "media" else "Sentadilla profunda con barra libre"), "sets": 4, "reps": "10-12", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
+            {"name": "Extensión de cuádriceps isométrica" if int_hint == "baja" else "Prensa de piernas inclinada 45°", "sets": 3, "reps": "12", "animation_key": "leg-press", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
+            {"name": "Zancadas estáticas asistidas" if int_hint == "baja" else "Zancadas frontales alternas con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps", "secondary_muscle": "Isquiotibiales"},
+        ]
+        legs_hams = [
+            {"name": "Peso muerto rumano con mancuernas" if int_hint != "alta" else "Peso muerto rumano con barra", "sets": 4, "reps": "10-12", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Glúteos"},
+            {"name": "Curl femoral de pie sin peso" if int_hint == "baja" else "Curl de isquiotibiales en máquina", "sets": 3, "reps": "12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
+            {"name": "Buenos días con control motor", "sets": 3, "reps": "10", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Espalda baja"},
+        ]
+        legs_glutes = [
+            {"name": "Puente de glúteos en suelo" if int_hint == "baja" else "Hip Thrust con mancuerna en banco", "sets": 4, "reps": "12-15", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales"},
+            {"name": "Sentadilla sumo con peso corporal" if int_hint == "baja" else "Sentadilla sumo con mancuerna", "sets": 3, "reps": "12", "animation_key": "squat", "primary_muscle": "Glúteos, Aductores", "secondary_muscle": "Cuádriceps"},
+            {"name": "Patada de glúteos en cuadrupedia" if int_hint == "baja" else "Patada de glúteos en polea o con banda", "sets": 3, "reps": "12 por pierna", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Core"},
+        ]
+        legs_unipodal_calves = [
+            {"name": "Step-ups en escalón bajo" if int_hint == "baja" else "Sentadilla búlgara con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps, Glúteos", "secondary_muscle": "Estabilizadores"},
+            {"name": "Elevación de talones de pie con peso corporal" if int_hint == "baja" else "Elevación de talones de pie con carga", "sets": 4, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Gemelos", "secondary_muscle": "Tobillos"},
+            {"name": "Elevación de talones sentado en máquina (Sóleo)", "sets": 3, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Sóleo", "secondary_muscle": "Gemelos"},
+        ]
+        legs_power_mob = [
+            {"name": "Sentadilla pausada en el fondo (3s)" if int_hint == "baja" else "Sentadillas con salto controlado (Jump Squat)", "sets": 3, "reps": "10", "animation_key": "squat", "primary_muscle": "Cuádriceps, Potencia", "secondary_muscle": "Glúteos"},
+            {"name": "Estocadas dinámicas suaves" if int_hint == "baja" else "Zancadas dinámicas con salto alternado", "sets": 3, "reps": "8 por pierna", "animation_key": "lunge", "primary_muscle": "Piernas completas", "secondary_muscle": "Cardio"},
+            {"name": "Movilidad dinámica articular de cadera 90/90 y tobillos", "sets": 3, "reps": "10 por lado", "animation_key": "mobility", "primary_muscle": "Flexores de cadera", "secondary_muscle": "Articulaciones"},
+        ]
 
-    upper_chest_tri = [
-        {"name": "Flexiones inclinadas con apoyo en banco" if int_hint == "baja" else ("Press de pecho con mancuernas en banco" if int_hint == "media" else "Press de banca plano con barra"), "sets": 4, "reps": "10-12", "animation_key": "bench-press", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
-        {"name": "Flexiones en suelo con control" if int_hint != "baja" else "Flexiones con apoyo en rodillas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Pectorales", "secondary_muscle": "Deltoides anterior"},
-        {"name": "Extensiones de tríceps sobre la cabeza con mancuerna", "sets": 3, "reps": "12", "animation_key": "tricep-extension", "primary_muscle": "Tríceps", "secondary_muscle": "Codo"},
-    ]
-    upper_back_bi = [
-        {"name": "Remo sentado con banda elástica" if int_hint == "baja" else "Remo en polea baja sentado", "sets": 4, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho, Espalda Media", "secondary_muscle": "Bíceps"},
-        {"name": "Jalón al pecho en polea o con banda", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides"},
-        {"name": "Curl de bíceps alterno con mancuernas", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
-    ]
-    upper_shoulders_post = [
-        {"name": "Press militar con mancuernas sentado", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps"},
-        {"name": "Elevaciones laterales de hombros con mancuernas", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
-        {"name": "Face pulls con cuerda o pájaros posteriores", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
-    ]
-    upper_arms_torso = [
-        {"name": "Curl de bíceps tipo martillo", "sets": 3, "reps": "10-12", "animation_key": "bicep-curl", "primary_muscle": "Braquial, Bíceps", "secondary_muscle": "Antebrazo"},
-        {"name": "Fondos entre bancos o en paralelas asistidas", "sets": 3, "reps": "10", "animation_key": "pushup", "primary_muscle": "Tríceps, Pectoral", "secondary_muscle": "Hombros"},
-        {"name": "Remo invertido o tracción horizontal controlada", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Espalda media", "secondary_muscle": "Bíceps"},
-    ]
+        upper_chest_tri = [
+            {"name": "Flexiones inclinadas con apoyo en banco" if int_hint == "baja" else ("Press de pecho con mancuernas en banco" if int_hint == "media" else "Press de banca plano con barra"), "sets": 4, "reps": "10-12", "animation_key": "bench-press", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+            {"name": "Flexiones en suelo con control" if int_hint != "baja" else "Flexiones con apoyo en rodillas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Pectorales", "secondary_muscle": "Deltoides anterior"},
+            {"name": "Extensiones de tríceps sobre la cabeza con mancuerna", "sets": 3, "reps": "12", "animation_key": "tricep-extension", "primary_muscle": "Tríceps", "secondary_muscle": "Codo"},
+        ]
+        upper_back_bi = [
+            {"name": "Remo sentado con banda elástica" if int_hint == "baja" else "Remo en polea baja sentado", "sets": 4, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho, Espalda Media", "secondary_muscle": "Bíceps"},
+            {"name": "Jalón al pecho en polea o con banda", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides"},
+            {"name": "Curl de bíceps alterno con mancuernas", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
+        ]
+        upper_shoulders_post = [
+            {"name": "Press militar con mancuernas sentado", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps"},
+            {"name": "Elevaciones laterales de hombros con mancuernas", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
+            {"name": "Face pulls con cuerda o pájaros posteriores", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+        ]
+        upper_arms_torso = [
+            {"name": "Curl de bíceps tipo martillo", "sets": 3, "reps": "10-12", "animation_key": "bicep-curl", "primary_muscle": "Braquial, Bíceps", "secondary_muscle": "Antebrazo"},
+            {"name": "Fondos entre bancos o en paralelas asistidas", "sets": 3, "reps": "10", "animation_key": "pushup", "primary_muscle": "Tríceps, Pectoral", "secondary_muscle": "Hombros"},
+            {"name": "Remo invertido o tracción horizontal controlada", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Espalda media", "secondary_muscle": "Bíceps"},
+        ]
 
     core_front = [
         {"name": "Plancha frontal isométrica en antebrazos", "sets": 3, "reps": "30-45 seg", "animation_key": "plank", "primary_muscle": "Core, Recto Abdominal", "secondary_muscle": "Transverso"},
@@ -1926,7 +2281,8 @@ def _normalize_structured_plan(
                     "title": f"Rutina Complementaria: Tren Superior (Pecho y Espalda) ({level} · {badge_lbl})",
                     "exercises": _normalize_exercises(
                         upper_chest_tri + upper_back_bi,
-                        intensity=intensity, level=level, requested_focus="tren_superior"
+                        intensity=intensity, level=level, requested_focus="tren_superior",
+                        is_no_equipment=is_no_equipment,
                     ),
                 }
             elif d == "Jueves":
@@ -1937,7 +2293,8 @@ def _normalize_structured_plan(
                     # Martes y Jueves NUNCA repiten los mismos ejercicios
                     "exercises": _normalize_exercises(
                         upper_shoulders_post + upper_arms_torso[:1] + core_front[:1],
-                        intensity=intensity, level=level, requested_focus="tren_superior_core"
+                        intensity=intensity, level=level, requested_focus="tren_superior_core",
+                        is_no_equipment=is_no_equipment,
                     ),
                 }
             elif d == "Lunes":
@@ -1947,7 +2304,8 @@ def _normalize_structured_plan(
                     "title": f"Rutina Principal: Piernas (Cuádriceps y Glúteos) ({level} · {badge_lbl})",
                     "exercises": _normalize_exercises(
                         legs_quads + legs_glutes[:2],
-                        intensity=intensity, level=level, requested_focus="piernas"
+                        intensity=intensity, level=level, requested_focus="piernas",
+                        is_no_equipment=is_no_equipment,
                     ),
                 }
             elif d == "Miércoles":
@@ -1958,7 +2316,8 @@ def _normalize_structured_plan(
                     # Lunes y Miércoles NUNCA repiten los mismos ejercicios
                     "exercises": _normalize_exercises(
                         legs_hams + legs_unipodal_calves[:2],
-                        intensity=intensity, level=level, requested_focus="piernas"
+                        intensity=intensity, level=level, requested_focus="piernas",
+                        is_no_equipment=is_no_equipment,
                     ),
                 }
             elif d == "Viernes":
@@ -1968,7 +2327,8 @@ def _normalize_structured_plan(
                     "title": f"Rutina: Full Body Funcional, Core y Brazos ({level} · {badge_lbl})",
                     "exercises": _normalize_exercises(
                         upper_arms_torso + core_obliques + legs_power_mob[:1],
-                        intensity=intensity, level=level, requested_focus="tren_superior_core"
+                        intensity=intensity, level=level, requested_focus="tren_superior_core",
+                        is_no_equipment=is_no_equipment,
                     ),
                 }
             else:
@@ -1995,8 +2355,8 @@ def _normalize_structured_plan(
                 ]
                 idx = day_idx % len(day_titles)
                 focus_tag = "piernas" if idx % 2 == 0 else "piernas_b"
-                diverse_day_exs = _generate_diverse_session(focus_tag, int_hint, seed=dynamic_base_seed + day_idx * 17)
-                return day_titles[idx], _normalize_exercises(diverse_day_exs, intensity=intensity, level=level, requested_focus="piernas")
+                diverse_day_exs = _generate_diverse_session(focus_tag, int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(diverse_day_exs, intensity=intensity, level=level, requested_focus="piernas", is_no_equipment=is_no_equipment)
 
             elif requested_focus == "solo_tren_superior":
                 day_titles = [
@@ -2008,7 +2368,7 @@ def _normalize_structured_plan(
                 ]
                 day_exs_map = [upper_chest_tri, upper_back_bi, upper_shoulders_post, upper_chest_tri[:2] + upper_back_bi[:1], upper_arms_torso]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="tren_superior")
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="tren_superior", is_no_equipment=is_no_equipment)
 
             elif requested_focus == "solo_core":
                 day_titles = [
@@ -2020,7 +2380,7 @@ def _normalize_structured_plan(
                 ]
                 day_exs_map = [core_front, core_obliques, core_deep, core_front + core_obliques[:1], core_obliques + core_deep[:1]]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="core")
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="core", is_no_equipment=is_no_equipment)
 
             elif requested_focus == "piernas_tren_superior":
                 day_titles = [
@@ -2038,7 +2398,7 @@ def _normalize_structured_plan(
                     legs_power_mob[:2] + upper_chest_tri[:1] + upper_back_bi[:1],
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_tren_superior")
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_tren_superior", is_no_equipment=is_no_equipment)
 
             elif requested_focus == "piernas_core":
                 day_titles = [
@@ -2056,7 +2416,7 @@ def _normalize_structured_plan(
                     legs_power_mob[:2] + core_deep,
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_core")
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_core", is_no_equipment=is_no_equipment)
 
             elif requested_focus == "tren_superior_core":
                 day_titles = [
@@ -2074,13 +2434,14 @@ def _normalize_structured_plan(
                     upper_chest_tri[:1] + upper_back_bi[:1] + core_front,
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="tren_superior_core")
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="tren_superior_core", is_no_equipment=is_no_equipment)
 
             elif requested_focus == "pantorrillas_pies":
+                soleo_desc = "Sóleo en Suelo/Silla" if is_no_equipment else "Sóleo en Máquina"
                 day_titles = [
                     f"Piernas: Pantorrillas, Batatas y Cuádriceps ({badge_lbl})",
                     f"Tren Superior: Espalda Dorsal, Pecho y Brazos ({badge_lbl})",
-                    f"Piernas: Sóleo en Máquina, Isquiotibiales y Femoral ({badge_lbl})",
+                    f"Piernas: {soleo_desc}, Isquiotibiales y Femoral ({badge_lbl})",
                     f"Tren Superior: Hombros, Deltoides y Core ({badge_lbl})",
                     f"Piernas: Fuerza Unipodal de Tobillo, Pies y Glúteos ({badge_lbl})",
                 ]
@@ -2093,14 +2454,15 @@ def _normalize_structured_plan(
                     [calves_pool[2] if len(calves_pool) > 2 else calves_pool[0]] + legs_glutes[:2],
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_tren_superior")
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_tren_superior", is_no_equipment=is_no_equipment)
 
             elif requested_focus == "triceps_piernas":
+                tri_desc = "Batatas/Sóleo y Fondos en Silla" if is_no_equipment else "Batatas/Sóleo y Polea"
                 day_titles = [
                     f"Tríceps + Piernas: Cuádriceps y Extensiones ({badge_lbl})",
                     f"Tríceps + Piernas: Isquios, Femorales y Fondos ({badge_lbl})",
-                    f"Tríceps + Piernas: Glúteos y Press Francés ({badge_lbl})",
-                    f"Tríceps + Piernas: Batatas/Sóleo y Polea ({badge_lbl})",
+                    f"Tríceps + Piernas: Glúteos y Fondos de Tríceps ({badge_lbl})",
+                    f"Tríceps + Piernas: {tri_desc} ({badge_lbl})",
                     f"Tríceps + Piernas: Potencia y Fuerza Completa ({badge_lbl})",
                 ]
                 tri_legs_pool = TRICEPS_LEGS_POOLS.get(int_hint, TRICEPS_LEGS_POOLS["media"])
@@ -2112,7 +2474,7 @@ def _normalize_structured_plan(
                     tri_legs_pool,
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="triceps_piernas")
+                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="triceps_piernas", is_no_equipment=is_no_equipment)
 
             else:
                 default_titles = [
@@ -2124,7 +2486,8 @@ def _normalize_structured_plan(
                 ]
                 upper_day_b = _normalize_exercises(
                     upper_shoulders_post + upper_arms_torso,
-                    intensity=intensity, level=level, requested_focus="tren_superior"
+                    intensity=intensity, level=level, requested_focus="tren_superior",
+                    is_no_equipment=is_no_equipment,
                 )
                 default_exs = [
                     exercises if (requested_focus == "piernas" and exercises) else leg_day_a_exs,
@@ -2685,6 +3048,18 @@ Devuelve SOLO JSON."""
             f"   - ACLARACIÓN OBLIGATORIA: Enfatiza que su **nivel de experiencia ({effective_level}) se mantiene intacto**, ya que regular la intensidad no disminuye su nivel atlético.\n"
             f"   - Todos los ejercicios recomendados deben coincidir rigurosamente con la intensidad **{effective_intensity}**."
         )
+
+    is_no_equipment = _is_no_equipment(payload.equipment_details, payload.message, payload.today_is_home)
+    equip_instruction = ""
+    if is_no_equipment:
+        equip_instruction = (
+            f"\n7. REGLA ESTRICTA DE CERO HERRAMIENTAS (CALISTENIA / PESO CORPORAL / EN CASA):\n"
+            f"   - El atleta indicó EXPLÍCITAMENTE que NO TIENE HERRAMIENTAS NI EQUIPOS ('Sin Herramientas' / 'En Casa' / 'Sin equipo').\n"
+            f"   - ESTÁ TERMINANTEMENTE PROHIBIDO prescribir máquinas de gimnasio (Prensa 45°, Máquina Smith, Camilla de femoral, Extensión de cuádriceps, Poleas, Hack, Multipower).\n"
+            f"   - ESTÁ TERMINANTEMENTE PROHIBIDO prescribir mancuernas, barras olímpicas o discos.\n"
+            f"   - TODOS LOS EJERCICIOS DEBEN SER 100% DE PESO CORPORAL / CALISTENIA / IMPLEMENTOS CASEROS (silla firme, pared, suelo, toalla en piso liso).\n"
+            f"   - Ejemplos obligatorios: Sentadilla libre profunda, Wall Sit en pared, Sentadilla búlgara en silla, Peso muerto unilateral libre, Puentes de glúteo en suelo, Curl femoral con toalla en suelo, Flexiones de pecho en suelo, Fondos en silla, Remo invertido bajo mesa, Pike push-ups, Planchas.\n"
+        )
     user_msg_lower = (payload.message or "").lower()
 
     is_rest_request = (
@@ -2868,7 +3243,7 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
      * Si reporta Asma: Pausas ventilatorias adecuadas (60-90s) y calentamiento progresivo; hidratación constante.
      * Si reporta Diabetes: En nutrición, priorizar carbohidratos de bajo índice glucémico (avena, caraotas, batata) y evitar azúcares o exceso de plátano muy maduro.
    - FILTRO BIOMECÁNICO DE LESIONES O DOLOR ({payload.injuries or 'Ninguna'} / ZONAS A EVITAR {payload.areas_to_avoid or 'Ninguna'}):
-     * ESTÁ TERMINANTEMENTE PROHIBIDO prescribir ejercicios que comprometan o impacten las articulaciones o zonas lesionadas (ej. si reporta rodilla, CERO impacto o sentadillas con flexión aguda forzada; si reporta hombro, CERO presses tras nuca; si reporta lumbares, CERO peso muerto pesado con compresión vertebral). Prescribe variantes terapéuticas seguras.{fatigue_instruction}{motor_instruction}
+     * ESTÁ TERMINANTEMENTE PROHIBIDO prescribir ejercicios que comprometan o impacten las articulaciones o zonas lesionadas (ej. si reporta rodilla, CERO impacto o sentadillas con flexión aguda forzada; si reporta hombro, CERO presses tras nuca; si reporta lumbares, CERO peso muerto pesado con compresión vertebral). Prescribe variantes terapéuticas seguras.{fatigue_instruction}{motor_instruction}{equip_instruction}
  
 6. REGLA DE ORIGINALIDAD, DIVERSIDAD BIOMECÁNICA Y CERO REPETICIÓN:
    - Está TERMINANTEMENTE PROHIBIDO recomendar siempre los mismos ejercicios monótonos o predecibles (no repitas siempre Sentadilla Goblet, Hip Thrust o Prensa básica).
@@ -2964,7 +3339,7 @@ Devuelve SOLO JSON."""
             focus_name = "Piernas y Glúteos"
 
         dynamic_seed = abs(hash((payload.message or "") + str(int(time.time() / 5)))) % 1000
-        diverse_raw = _generate_diverse_session(focus_key, intensity_hint, seed=dynamic_seed)
+        diverse_raw = _generate_diverse_session(focus_key, intensity_hint, seed=dynamic_seed, is_no_equipment=is_no_equipment)
         fallback_exercises = []
         for ex in diverse_raw:
             fallback_exercises.append({
@@ -3013,6 +3388,7 @@ Devuelve SOLO JSON."""
         requested_focus=requested_focus,
         is_complementary_days=is_complementary,
         user_message=payload.message or "",
+        is_no_equipment=is_no_equipment,
     )
     has_plan = bool(data.get("has_plan")) and structured_plan is not None and should_generate_plan
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
