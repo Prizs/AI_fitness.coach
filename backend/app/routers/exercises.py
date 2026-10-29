@@ -133,6 +133,24 @@ def _detect_target_folders(query: str, muscle: Optional[str] = None) -> list[str
     norm_m = _normalize(muscle or "")
     combined = f"{norm_q} {norm_m}".strip()
 
+    # 0. Reglas prioritarias que contienen palabras de piernas o flexiones pero pertenecen a Core, Brazos o Cardio
+    if any(w in combined for w in ("elevacion de pierna", "elevacion de piernas", "elevaciones de piernas", "leg raise", "piernas en suelo", "piernas en banco", "piernas al pecho")):
+        return ["abs"]
+    if any(w in combined for w in ("giro ruso", "giros rusos", "russian twist", "rotacion rusa")):
+        return ["abs"]
+    if any(w in combined for w in ("flexion diamante", "flexiones diamante", "diamond push")):
+        return ["triceps"]
+    if any(w in combined for w in ("flexion en pica", "flexiones en pica", "pike push")):
+        return ["delts", "pectorals"]
+    if any(w in combined for w in ("jumping jack", "jumping jacks", "salto en tijera", "saltos en tijera")):
+        return ["cardio"]
+    if any(w in combined for w in ("escalador", "escaladores", "mountain climber", "mountain climbers")):
+        return ["cardio", "abs"]
+    if any(w in combined for w in ("patada de gluteo", "patada de gluteos", "glute kickback", "patada en cuadrupedia")):
+        return ["glutes"]
+    if any(w in combined for w in ("wall sit", "sentadilla en pared", "sentadilla isometrica en pared")):
+        return ["glutes", "quads"]
+
     # 1. Reglas prioritarias de Brazos (Tríceps y Bíceps) para evitar colisión con 'flexión'
     if any(w in combined for w in ("triceps", "tricep", "fondo", "dips", "dip", "copa", "press frances", "rompecraneos", "skull", "pushdown", "patada de triceps")):
         return ["triceps"]
@@ -282,10 +300,23 @@ CURATED_BY_INTENSITY = [
         "posture": "Aterriza primero sobre metatarsos amortiguando con flexión fluida.",
         "warning": "Evitar en caso de dolor articular en rodillas o tobillos.",
     },
+    # 7b. Sentadilla Isométrica en Pared (Wall Sit)
+    {
+        "match_any": ("wall sit", "sentadilla en pared", "sentadilla isometrica en pared", "isometria en pared", "silla en pared"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "glutes/march-sit-wall.gif",
+            "media": "glutes/march-sit-wall.gif",
+            "alta": "glutes/march-sit-wall.gif",
+        },
+        "biomechanics": "Sujeción isométrica con muslos paralelos al suelo y espalda apoyada en pared reclutando cuádriceps sin impacto.",
+        "posture": "Ángulo de 90° en caderas y rodillas; espalda completa pegada a la pared.",
+        "warning": "No apoyes las manos sobre los muslos ni permitas que las rodillas sobrepasen las puntas de los pies.",
+    },
     # 8. Sentadillas Libres / Goblet / Profundas (Squats)
     {
         "match_any": ("sentadilla", "squat"),
-        "exclude_any": ("bulgara", "split", "salto", "jump", "hack", "sissy"),
+        "exclude_any": ("bulgara", "split", "salto", "jump", "hack", "sissy", "pared", "wall"),
         "gifs": {
             "baja": "glutes/potty-squat-with-support.gif",
             "media": "quads/dumbbell-goblet-squat.gif",
@@ -379,24 +410,24 @@ CURATED_BY_INTENSITY = [
         "exclude_any": (),
         "gifs": {
             "baja": "delts/band-shoulder-press.gif",
-            "media": "delts/dumbbell-seated-shoulder-press.gif",
-            "alta": "delts/dumbbell-seated-shoulder-press.gif",
+            "media": "delts/band-shoulder-press.gif",
+            "alta": "triceps/handstand-push-up.gif",
         },
-        "biomechanics": "Empuje vertical en inversión estimulando deltoides anterior, lateral y tríceps.",
-        "posture": "Cadera elevada formando una V invertida; cabeza desciende hacia adelante de las manos.",
+        "biomechanics": "Empuje vertical en inversión con peso corporal estimulando deltoides anterior, superior y tríceps.",
+        "posture": "Cadera elevada formando una V invertida; cabeza desciende suavemente por delante de las manos.",
         "warning": "Mantén los codos en ángulo de 45° sin abrirlos excesivamente hacia afuera.",
     },
     # 16. Flexiones Diamante (Diamond Push-ups)
     {
-        "match_any": ("flexiones diamante", "flexion diamante", "diamond push"),
+        "match_any": ("flexiones diamante", "flexion diamante", "diamond push", "flexion manos juntas"),
         "exclude_any": (),
         "gifs": {
-            "baja": "triceps/bench-dip-knees-bent.gif",
-            "media": "pectorals/push-up.gif",
-            "alta": "pectorals/decline-push-up.gif",
+            "baja": "triceps/close-grip-push-up-on-knees.gif",
+            "media": "triceps/diamond-push-up.gif",
+            "alta": "triceps/diamond-push-up.gif",
         },
-        "biomechanics": "Flexión de pecho con manos juntas enfocando la carga sobre las cabezas del tríceps.",
-        "posture": "Manos juntas formando un triángulo o diamante bajo el esternón.",
+        "biomechanics": "Flexión de pecho con manos juntas formando un diamante bajo el esternón, maximizando la carga sobre las tres cabezas del tríceps.",
+        "posture": "Manos juntas en el centro del pecho, codos rozando las costillas y abdomen activo.",
         "warning": "Si sientes molestia en muñecas, separa ligeramente los dedos o apóyate en rodillas.",
     },
     # 17. Flexiones de Pecho Estándar (Push-ups)
@@ -568,10 +599,36 @@ CURATED_BY_INTENSITY = [
         "posture": "Codos bajo hombros, pelvis retrovertida y glúteos apretados.",
         "warning": "Evita hundir la cadera para no comprimir las vértebras lumbares.",
     },
-    # 28. Crunches / Abdomen Clásico / Bicicleta
+    # 28a. Giros Rusos (Russian Twists)
     {
-        "match_any": ("crunch", "crunches", "abdominal clasico", "bicicleta abdominal", "giros rusos", "russian twist"),
+        "match_any": ("giro ruso", "giros rusos", "russian twist", "rotacion rusa", "twists"),
         "exclude_any": (),
+        "gifs": {
+            "baja": "abs/band-seated-twist.gif",
+            "media": "abs/assisted-motion-russian-twist.gif",
+            "alta": "abs/weighted-russian-twist-legs-up.gif",
+        },
+        "biomechanics": "Rotación torácica dinámica en posición de V-sit reclutando oblicuos y transverso abdominal.",
+        "posture": "Espalda recta inclinada a 45°, pecho abierto y rotación desde el torso.",
+        "warning": "Evita rotaciones descontroladas de la pelvis; el movimiento es torácico.",
+    },
+    # 28b. Elevación de Piernas en Suelo o Banco (Leg Raises)
+    {
+        "match_any": ("elevacion de pierna", "elevacion de piernas", "elevaciones de piernas", "leg raise", "piernas al pecho", "piernas en suelo", "piernas en banco"),
+        "exclude_any": ("talon", "talones", "gemelo", "calf"),
+        "gifs": {
+            "baja": "abs/lying-leg-raise-flat-bench.gif",
+            "media": "abs/lying-leg-raise-flat-bench.gif",
+            "alta": "abs/hanging-leg-raise.gif",
+        },
+        "biomechanics": "Flexión lumbopélvica de cadera activando el recto abdominal inferior y transverso sin impacto.",
+        "posture": "Zona lumbar permanentemente adherida al suelo o banco, descenso lento de piernas.",
+        "warning": "Detén el descenso si sientes que la espalda baja se despega de la colchoneta.",
+    },
+    # 28c. Crunches / Abdomen Clásico / Bicicleta
+    {
+        "match_any": ("crunch", "crunches", "abdominal clasico", "bicicleta abdominal", "abdominales"),
+        "exclude_any": ("giro ruso", "russian twist", "elevacion de pierna", "leg raise"),
         "gifs": {
             "baja": "abs/oblique-crunches-floor.gif",
             "media": "abs/crunch-floor.gif",
@@ -593,6 +650,58 @@ CURATED_BY_INTENSITY = [
         "biomechanics": "Extensión de columna activando erectores espinales, glúteos y cadena posterior.",
         "posture": "Elevación sutil y controlada de pecho y muslos sin hiperextensión forzada.",
         "warning": "Mantén la mirada al suelo para alinear las vértebras cervicales.",
+    },
+    # 30. Patada de Glúteos en Cuadrupedia (Glute Kickback)
+    {
+        "match_any": ("patada de gluteo", "patada de gluteos", "glute kickback", "patada en cuadrupedia", "patada cuadrupedia"),
+        "exclude_any": ("barra", "bench press"),
+        "gifs": {
+            "baja": "glutes/low-glute-bridge-on-floor.gif",
+            "media": "glutes/bench-hip-extension.gif",
+            "alta": "glutes/twist-hip-lift.gif",
+        },
+        "biomechanics": "Extensión aislada de cadera en 4 apoyos activando las fibras del glúteo mayor.",
+        "posture": "Espalda neutra, abdomen contraído y empuje del talón hacia arriba y atrás.",
+        "warning": "No arquees la zona lumbar al patear.",
+    },
+    # 31. Jumping Jacks (Saltos en Tijera)
+    {
+        "match_any": ("jumping jack", "jumping jacks", "salto en tijera", "saltos en tijera"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "cardio/jack-jump-male.gif",
+            "media": "cardio/jack-jump-male.gif",
+            "alta": "cardio/star-jump-male.gif",
+        },
+        "biomechanics": "Saltos coordinados abriendo y cerrando extremidades para acondicionamiento cardiovascular.",
+        "posture": "Aterrizaje suave en puntas de pies con rodillas ligeramente flexionadas.",
+        "warning": "Disipa el impacto amortiguando con los tobillos y rodillas.",
+    },
+    # 32. Escaladores de Montaña (Mountain Climbers)
+    {
+        "match_any": ("escalador", "escaladores", "mountain climber", "mountain climbers"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "cardio/mountain-climber.gif",
+            "media": "cardio/mountain-climber.gif",
+            "alta": "cardio/mountain-climber.gif",
+        },
+        "biomechanics": "Flexión alternada rápida de rodillas al pecho desde plancha alta estabilizando core y tren superior.",
+        "posture": "Manos bajo hombros y cadera baja en línea con los hombros.",
+        "warning": "No rebotes la pelvis arriba y abajo.",
+    },
+    # 33. Dominadas / Pull-ups
+    {
+        "match_any": ("dominada", "dominadas", "pull up", "pull-up", "pullups"),
+        "exclude_any": ("toalla",),
+        "gifs": {
+            "baja": "lats/band-close-grip-pulldown.gif",
+            "media": "lats/pull-up.gif",
+            "alta": "lats/pull-up.gif",
+        },
+        "biomechanics": "Tracción vertical de cadena cerrada con agarre pronado activando dorsal ancho y bíceps.",
+        "posture": "Pecho proyectado hacia la barra, escápulas deprimidas y tracción desde los codos.",
+        "warning": "Evita el balanceo o kipping descontrolado.",
     },
 ]
 
@@ -744,6 +853,31 @@ def _translate_tokens(query: str) -> list[str]:
         "puente de gluteos": "low glute bridge",
         "puente de cadera": "low glute bridge",
         "elevacion de talones": "standing calf raise",
+        "elevacion de piernas": "lying leg raise flat bench",
+        "elevacion de pierna": "lying leg raise flat bench",
+        "giros rusos": "assisted motion russian twist",
+        "giro ruso": "assisted motion russian twist",
+        "flexiones diamante": "diamond push up",
+        "flexion diamante": "diamond push up",
+        "flexiones en pica": "band shoulder press",
+        "sentadilla en pared": "march sit wall",
+        "wall sit": "march sit wall",
+        "jumping jacks": "jack jump",
+        "saltos en tijera": "jack jump",
+        "patada de gluteos": "bench hip extension",
+        "patada de gluteo": "bench hip extension",
+        "fondos de triceps": "bench dip",
+        "press de banca con barra": "barbell bench press",
+        "press de banca con mancuernas": "dumbbell bench press",
+        "remo con barra": "barbell bent over row",
+        "remo con mancuerna": "dumbbell one arm bent over row",
+        "remo en polea": "cable low seated row",
+        "sentadilla profunda con barra": "barbell full squat",
+        "sentadilla con barra": "barbell full squat",
+        "sentadilla goblet": "dumbbell goblet squat",
+        "curl de biceps con mancuernas": "dumbbell biceps curl",
+        "curl de biceps con barra": "barbell curl",
+        "curl martillo": "dumbbell hammer curl",
     }
     for esp_phrase, eng_phrase in phrase_map.items():
         if esp_phrase in norm:

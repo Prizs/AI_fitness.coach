@@ -34089,71 +34089,89 @@ this.b=b},
 aJz:function aJz(a){this.a=a},
 aJy:function aJy(a,b){this.a=a
 this.b=b},
-bbq(b6,b7,b8,b9){var s,r,q,p,o="hip thrust",n="buenos d",m="deadlift",l="peso muerto",k="dead bug",j="standing-calf-raise",i="unipodal",h="una pierna",g="single leg",f="deslizador",e="piso liso",d="https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/",c="glutes/low-glute-bridge-on-floor.gif",b="glutes/glute-bridge-two-legs-on-bench-male.gif",a="triceps/bench-dip-knees-bent.gif",a0="hamstrings/standing-single-leg-curl.gif",a1="hamstrings/lever-seated-leg-curl.gif",a2="quads/split-squats.gif",a3="glutes/potty-squat-with-support.gif",a4="quads/dumbbell-goblet-squat.gif",a5="pantorrilla",a6="delts/band-shoulder-press.gif",a7="delts/dumbbell-seated-shoulder-press.gif",a8="pectorals/push-up.gif",a9="pectorals/incline-push-up.gif",b0="pectorals/barbell-bench-press.gif",b1="martillo",b2=b9.toLowerCase(),b3=b8.toLowerCase(),b4=B.b.m(b3,"baja")||B.b.m(b3,"basico")||B.b.m(b3,"b\xe1sico"),b5=B.b.m(b3,"alta")||B.b.m(b3,"avanzado")
-if(b7!=null&&B.b.ad(b7).length!==0){s=B.b.ad(b7)
+bbq(d2,d3,d4,d5){var s,r,q,p,o,n="hip thrust",m="buenos d",l="deadlift",k="peso muerto",j="dead bug",i="calf",h="standing-calf-raise",g="unipodal",f="una pierna",e="single leg",d="deslizador",c="piso liso",b="diamante",a="diamond",a0="giro ruso",a1="russian twist",a2="elevacion de pierna",a3="elevaci\xf3n de pierna",a4="leg raise",a5="wall sit",a6="en pared",a7="jumping jack",a8="saltos en tijera",a9="https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/",b0="abs/hanging-leg-raise.gif",b1="triceps/close-grip-push-up-on-knees.gif",b2="triceps/diamond-push-up.gif",b3="delts/band-shoulder-press.gif",b4="triceps/handstand-push-up.gif",b5="glutes/low-glute-bridge-on-floor.gif",b6="glutes/glute-bridge-two-legs-on-bench-male.gif",b7="triceps/bench-dip-knees-bent.gif",b8="hamstrings/standing-single-leg-curl.gif",b9="hamstrings/lever-seated-leg-curl.gif",c0="quads/split-squats.gif",c1="barra",c2="glutes/potty-squat-with-support.gif",c3="quads/dumbbell-goblet-squat.gif",c4="pantorrilla",c5="pectorals/incline-push-up.gif",c6="martillo",c7="dominada",c8=d5.toLowerCase(),c9=d4.toLowerCase(),d0=B.b.m(c9,"baja")||B.b.m(c9,"basico")||B.b.m(c9,"b\xe1sico"),d1=B.b.m(c9,"alta")||B.b.m(c9,"avanzado")
+if(d3!=null&&B.b.ad(d3).length!==0){s=B.b.ad(d3)
 r=!0
-if(!((B.b.m(b2,"puente")||B.b.m(b2,"bridge")||B.b.m(b2,o)||B.b.m(b2,n)||B.b.m(b2,m)||B.b.m(b2,l))&&B.b.m(s,"curl")))if(!((B.b.m(b2,"fondo")||B.b.m(b2,"dip")||B.b.m(b2,"tricep")||B.b.m(b2,"tr\xedcep"))&&B.b.m(s,"push-up"))){if(!((B.b.m(b2,k)||B.b.m(b2,"plank")||B.b.m(b2,"plancha")||B.b.m(b2,"remo")||B.b.m(b2,"flexion")||B.b.m(b2,"flexi\xf3n"))&&B.b.m(s,"calf")))if(!((B.b.m(b2,"sentado")||B.b.m(b2,"silla")||B.b.m(b2,"seated"))&&B.b.m(s,j)))if(!((B.b.m(b2,i)||B.b.m(b2,h)||B.b.m(b2,g))&&B.b.m(s,j))){if(B.b.m(b2,"toalla")||B.b.m(b2,f)||B.b.m(b2,e))q=B.b.m(s,"single-leg-platform-slide")||B.b.m(s,"lever")||B.b.m(s,"cable")||B.b.m(s,"smith")||B.b.m(s,"seated-leg-curl")
+if(!((B.b.m(c8,"puente")||B.b.m(c8,"bridge")||B.b.m(c8,n)||B.b.m(c8,m)||B.b.m(c8,l)||B.b.m(c8,k))&&B.b.m(s,"curl")))if(!((B.b.m(c8,"fondo")||B.b.m(c8,"dip")||B.b.m(c8,"tricep")||B.b.m(c8,"tr\xedcep"))&&B.b.m(s,"push-up"))){if(!((B.b.m(c8,j)||B.b.m(c8,"plank")||B.b.m(c8,"plancha")||B.b.m(c8,"remo")||B.b.m(c8,"flexion")||B.b.m(c8,"flexi\xf3n"))&&B.b.m(s,i)))if(!((B.b.m(c8,"sentado")||B.b.m(c8,"silla")||B.b.m(c8,"seated"))&&B.b.m(s,h)))if(!((B.b.m(c8,g)||B.b.m(c8,f)||B.b.m(c8,e))&&B.b.m(s,h))){if(B.b.m(c8,"toalla")||B.b.m(c8,d)||B.b.m(c8,c))q=B.b.m(s,"single-leg-platform-slide")||B.b.m(s,"lever")||B.b.m(s,"cable")||B.b.m(s,"smith")||B.b.m(s,"seated-leg-curl")
 else q=!1
-if(!q)q=(B.b.m(b2,"antebrazo")||B.b.m(b2,"frontal"))&&B.b.m(s,"kneeling-plank")
+if(!q)if(!((B.b.m(c8,"antebrazo")||B.b.m(c8,"frontal"))&&B.b.m(s,"kneeling-plank")))if(!((B.b.m(c8,b)||B.b.m(c8,a))&&!B.b.m(s,a)&&!B.b.m(s,"close-grip")))if(!((B.b.m(c8,a0)||B.b.m(c8,a1))&&!B.b.m(s,"twist")))if(!((B.b.m(c8,a2)||B.b.m(c8,a3)||B.b.m(c8,a4))&&B.b.m(s,i)))if(!((B.b.m(c8,a5)||B.b.m(c8,a6))&&!B.b.m(s,"wall")))q=(B.b.m(c8,a7)||B.b.m(c8,a8))&&!B.b.m(s,"jack")
+else q=r
+else q=r
+else q=r
+else q=r
+else q=r
 else q=r}else q=r
 else q=r
 else q=r
-r=q}if(!r)return s}if(B.b.m(b2,"puente")||B.b.m(b2,"bridge")||B.b.m(b2,o)||B.b.m(b2,"elevacion pelvica")||B.b.m(b2,"elevaci\xf3n p\xe9lvica")){if(b4)q=c
-else q=b5?"glutes/barbell-glute-bridge.gif":b
-return d+q}if(B.b.m(b2,"buenos dias")||B.b.m(b2,"buenos d\xedas")||B.b.m(b2,"good morning")||B.b.m(b2,n))return d+(b4?"glutes/band-straight-back-stiff-leg-deadlift.gif":"hamstrings/barbell-good-morning.gif")
-if(B.b.m(b2,"fondo")||B.b.m(b2,"fondos")||B.b.m(b2,"dip")||B.b.m(b2,"chair dip")||B.b.m(b2,"bench dip")){if(b4)q=a
-else q=b5?"triceps/triceps-dip.gif":"triceps/bench-dip-on-floor.gif"
-return d+q}if(B.b.m(b2,k)||B.b.m(b2,"dead-bug")||B.b.m(b2,"bicho muerto"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/abs/dead-bug.gif"
-if(B.b.m(b2,"plancha lateral")||B.b.m(b2,"side plank"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/abs/side-bridge-v-2.gif"
-if(B.b.m(b2,"rodillas apoyadas")||B.b.m(b2,"plancha suave")||B.b.m(b2,"con rodillas"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/abs/kneeling-plank-tap-shoulder-male.gif"
-if(B.b.m(b2,"plancha")||B.b.m(b2,"plank"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/abs/front-plank-with-twist.gif"
-if(B.b.m(b2,"crunch")||B.b.m(b2,"abdominal")||B.b.m(b2,"abdomen")||B.b.m(b2,"twist")){if(b4)q="abs/oblique-crunches-floor.gif"
-else q=b5?"abs/hanging-leg-raise.gif":"abs/crunch-floor.gif"
-return d+q}if(B.b.m(b2,"superman")||B.b.m(b2,"lumbar")||B.b.m(b2,"lumbares"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/glutes/band-straight-back-stiff-leg-deadlift.gif"
-if(B.b.m(b2,f)||B.b.m(b2,"toalla en piso")||B.b.m(b2,"toalla en suelo")||B.b.m(b2,e)||B.b.m(b2,"femoral en suelo")||B.b.m(b2,"deslizante"))return"https://ai-fitness-coach-818a.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif"
-if(B.b.m(b2,"curl femoral")||B.b.m(b2,"curl de isquio")||B.b.m(b2,"curl de pierna")||B.b.m(b2,"leg curl")||B.b.m(b2,"nordico")||B.b.m(b2,"n\xf3rdico")){if(b4)q=a0
-else q=b5?"hamstrings/lever-lying-leg-curl.gif":a1
-return d+q}if(B.b.m(b2,l)||B.b.m(b2,m)||B.b.m(b2,"rdl")){if(b4)q="glutes/band-stiff-leg-deadlift.gif"
-else q=b5?"glutes/barbell-deadlift.gif":"glutes/dumbbell-romanian-deadlift.gif"
-return d+q}if(B.b.m(b2,"bulgara")||B.b.m(b2,"b\xfalgara")||B.b.m(b2,"split squat")){if(b4)q=a2
-else q=b5?"quads/barbell-single-leg-split-squat.gif":"quads/dumbbell-single-leg-split-squat.gif"
-return d+q}if(B.b.m(b2,"salto")||B.b.m(b2,"jump")){if(b4)q=a2
-else q=b5?"glutes/bodyweight-drop-jump-squat.gif":"glutes/jump-squat.gif"
-return d+q}if(B.b.m(b2,"sentadilla")||B.b.m(b2,"squat")){if(b4)q=a3
-else q=b5?"glutes/barbell-full-squat.gif":a4
-return d+q}if(B.b.m(b2,"zancada")||B.b.m(b2,"desplante")||B.b.m(b2,"lunge")){if(b4)q="glutes/forward-lunge-male.gif"
-else q=b5?"glutes/barbell-lunge.gif":"glutes/dumbbell-lunge.gif"
-return d+q}if(B.b.m(b2,"prensa")||B.b.m(b2,"leg press")){if(B.b.m(b2,"gemelo")||B.b.m(b2,"talon")||B.b.m(b2,a5))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/calves/sled-calf-press-on-leg-press.gif"
-return d+(b4?"quads/lever-alternate-leg-press.gif":"glutes/sled-45-leg-press.gif")}if(B.b.m(b2,"extension de cuadriceps")||B.b.m(b2,"extensi\xf3n de cu\xe1driceps")||B.b.m(b2,"extension de pierna")||B.b.m(b2,"leg extension"))return d+(b4?"quads/resistance-band-leg-extension.gif":"quads/lever-leg-extension.gif")
-if(B.b.m(b2,"talon")||B.b.m(b2,"tal\xf3n")||B.b.m(b2,"gemelo")||B.b.m(b2,a5)||B.b.m(b2,"calf")||B.b.m(b2,"soleo")||B.b.m(b2,"s\xf3leo")){if(B.b.m(b2,"sentado")||B.b.m(b2,"silla")||B.b.m(b2,"seated")){if(b4)q="calves/seated-calf-stretch-male.gif"
-else q=b5?"calves/barbell-seated-calf-raise.gif":"calves/lever-seated-calf-raise.gif"
-return d+q}if(B.b.m(b2,i)||B.b.m(b2,h)||B.b.m(b2,g)){if(b4)q="calves/band-single-leg-calf-raise.gif"
-else q=b5?"calves/single-leg-calf-raise-on-a-dumbbell.gif":"calves/dumbbell-single-leg-calf-raise.gif"
-return d+q}if(b4)q="calves/bodyweight-standing-calf-raise.gif"
-else q=b5?"calves/lever-standing-calf-raise.gif":"calves/dumbbell-standing-calf-raise.gif"
-return d+q}if(B.b.m(b2,"pica")||B.b.m(b2,"pike"))return d+(b4?a6:a7)
-if(B.b.m(b2,"diamante")||B.b.m(b2,"diamond"))return d+(b4?a:a8)
-if(B.b.m(b2,"flexion de pecho")||B.b.m(b2,"flexi\xf3n de pecho")||B.b.m(b2,"flexiones")||B.b.m(b2,"push up")||B.b.m(b2,"pushup")||B.b.m(b2,"lagartija")){if(b4)q=a9
-else q=b5?b0:a8
-return d+q}if(B.b.m(b2,"press de banca")||B.b.m(b2,"bench press")||B.b.m(b2,"press de pecho")||B.b.m(b2,"pecho")||B.b.m(b2,"pectoral")){if(b4)q=a9
-else q=b5?b0:"pectorals/dumbbell-bench-press.gif"
-return d+q}if(B.b.m(b2,"tricep")||B.b.m(b2,"tr\xedcep")||B.b.m(b2,"press frances")||B.b.m(b2,"copa")){if(b4)q=a
-else q=b5?"triceps/barbell-lying-triceps-extension.gif":"triceps/cable-alternate-triceps-extension.gif"
-return d+q}if(B.b.m(b2,"bicep")||B.b.m(b2,"b\xedcep")||B.b.m(b2,b1)||B.b.m(b2,"curl")){if(B.b.m(b2,b1)||B.b.m(b2,"hammer"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/biceps/dumbbell-seated-hammer-curl.gif"
-if(b4)q="biceps/band-alternating-biceps-curl.gif"
-else q=b5?"biceps/barbell-curl.gif":"biceps/dumbbell-biceps-curl.gif"
-return d+q}if(B.b.m(b2,"lateral raise")||B.b.m(b2,"elevacion lateral")||B.b.m(b2,"elevaciones laterales")||B.b.m(b2,"elevaci\xf3n lateral"))return d+(b4?"delts/band-front-lateral-raise.gif":"delts/dumbbell-lateral-raise.gif")
-if(B.b.m(b2,"militar")||B.b.m(b2,"shoulder press")||B.b.m(b2,"hombro")||B.b.m(b2,"deltoid")){if(b4)q=a6
-else q=b5?"delts/barbell-seated-overhead-press.gif":a7
-return d+q}if(B.b.m(b2,"toalla")||B.b.m(b2,"towel"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/upper-back/bodyweight-standing-row-with-towel.gif"
-if(B.b.m(b2,"remo")||B.b.m(b2,"row")||B.b.m(b2,"jalon")||B.b.m(b2,"jal\xf3n")||B.b.m(b2,"dominada")||B.b.m(b2,"pulldown")||B.b.m(b2,"espalda")||B.b.m(b2,"dorsal")){if(b4)q="upper-back/band-one-arm-twisting-seated-row.gif"
-else q=b5?"upper-back/barbell-bent-over-row.gif":"upper-back/cable-low-seated-row.gif"
-return d+q}if(B.b.m(b2,"abduc"))return d+(b4?"abductors/side-hip-abduction.gif":"abductors/lever-seated-hip-abduction.gif")
-if(B.b.m(b2,"aduc"))return d+(b4?"adductors/side-lying-hip-adduction-male.gif":"adductors/lever-seated-hip-adduction.gif")
-p=b2+" "+b6.toLowerCase()
-if(B.b.m(p,"isquio")||B.b.m(p,"femoral"))return d+(b4?a0:a1)
-if(B.b.m(p,"glute")||B.b.m(p,"gl\xfate"))return d+(b4?c:b)
-if(B.b.m(p,"cuadricep")||B.b.m(p,"cu\xe1dricep")||B.b.m(p,"pierna"))return d+(b4?a3:a4)
+r=q}if(!r)return s}if(B.b.m(c8,a2)||B.b.m(c8,a3)||B.b.m(c8,"elevaciones de piernas")||B.b.m(c8,a4)||B.b.m(c8,"piernas al pecho"))return a9+(d1?b0:"abs/lying-leg-raise-flat-bench.gif")
+if(B.b.m(c8,a0)||B.b.m(c8,"giros rusos")||B.b.m(c8,a1))return a9+(d1?"abs/weighted-russian-twist-legs-up.gif":"abs/assisted-motion-russian-twist.gif")
+if(B.b.m(c8,a5)||B.b.m(c8,"sentadilla en pared")||B.b.m(c8,a6))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/glutes/march-sit-wall.gif"
+q=!B.b.m(c8,b)
+if(!q||B.b.m(c8,a))return a9+(d0?b1:b2)
+p=!B.b.m(c8,"pica")
+if(!p||B.b.m(c8,"pike"))return a9+(d0?b3:b4)
+if(B.b.m(c8,a7)||B.b.m(c8,"salto en tijera")||B.b.m(c8,a8))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/cardio/jack-jump-male.gif"
+if(B.b.m(c8,"escalador")||B.b.m(c8,"escaladores")||B.b.m(c8,"mountain climber"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/cardio/mountain-climber.gif"
+if(B.b.m(c8,"patada de gluteo")||B.b.m(c8,"patada de gl\xfateo")||B.b.m(c8,"glute kickback")||B.b.m(c8,"cuadrupedia"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/glutes/bench-hip-extension.gif"
+if(B.b.m(c8,"puente")||B.b.m(c8,"bridge")||B.b.m(c8,n)||B.b.m(c8,"elevacion pelvica")||B.b.m(c8,"elevaci\xf3n p\xe9lvica")){if(d0)q=b5
+else q=d1?"glutes/barbell-glute-bridge.gif":b6
+return a9+q}if(B.b.m(c8,"buenos dias")||B.b.m(c8,"buenos d\xedas")||B.b.m(c8,"good morning")||B.b.m(c8,m))return a9+(d0?"glutes/band-straight-back-stiff-leg-deadlift.gif":"hamstrings/barbell-good-morning.gif")
+if(B.b.m(c8,"fondo")||B.b.m(c8,"fondos")||B.b.m(c8,"dip")||B.b.m(c8,"chair dip")||B.b.m(c8,"bench dip")){if(d0)q=b7
+else q=d1?"triceps/triceps-dip.gif":"triceps/bench-dip-on-floor.gif"
+return a9+q}if(B.b.m(c8,j)||B.b.m(c8,"dead-bug")||B.b.m(c8,"bicho muerto"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/abs/dead-bug.gif"
+if(B.b.m(c8,"plancha lateral")||B.b.m(c8,"side plank"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/abs/side-bridge-v-2.gif"
+if(B.b.m(c8,"rodillas apoyadas")||B.b.m(c8,"plancha suave")||B.b.m(c8,"con rodillas"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/abs/kneeling-plank-tap-shoulder-male.gif"
+if(B.b.m(c8,"plancha")||B.b.m(c8,"plank"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/abs/front-plank-with-twist.gif"
+if(B.b.m(c8,"crunch")||B.b.m(c8,"abdominal")||B.b.m(c8,"abdomen")){if(d0)q="abs/oblique-crunches-floor.gif"
+else q=d1?b0:"abs/crunch-floor.gif"
+return a9+q}if(B.b.m(c8,"superman")||B.b.m(c8,"lumbar")||B.b.m(c8,"lumbares"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/glutes/band-straight-back-stiff-leg-deadlift.gif"
+if(B.b.m(c8,d)||B.b.m(c8,"toalla en piso")||B.b.m(c8,"toalla en suelo")||B.b.m(c8,c)||B.b.m(c8,"femoral en suelo")||B.b.m(c8,"deslizante"))return"https://ai-fitness-coach-818a.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif"
+if(B.b.m(c8,"curl femoral")||B.b.m(c8,"curl de isquio")||B.b.m(c8,"curl de pierna")||B.b.m(c8,"leg curl")||B.b.m(c8,"nordico")||B.b.m(c8,"n\xf3rdico")){if(d0)q=b8
+else q=d1?"hamstrings/lever-lying-leg-curl.gif":b9
+return a9+q}if(B.b.m(c8,k)||B.b.m(c8,l)||B.b.m(c8,"rdl")){if(d0)q="glutes/band-stiff-leg-deadlift.gif"
+else q=d1?"glutes/barbell-deadlift.gif":"glutes/dumbbell-romanian-deadlift.gif"
+return a9+q}if(B.b.m(c8,"bulgara")||B.b.m(c8,"b\xfalgara")||B.b.m(c8,"split squat")){if(d0)q=c0
+else q=d1?"quads/barbell-single-leg-split-squat.gif":"quads/dumbbell-single-leg-split-squat.gif"
+return a9+q}if(B.b.m(c8,"salto")||B.b.m(c8,"jump")){if(d0)q=c0
+else q=d1?"glutes/bodyweight-drop-jump-squat.gif":"glutes/jump-squat.gif"
+return a9+q}if(B.b.m(c8,"sentadilla")||B.b.m(c8,"squat")){if(B.b.m(c8,c1)||d1)return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/glutes/barbell-full-squat.gif"
+return a9+(d0?c2:c3)}if(B.b.m(c8,"zancada")||B.b.m(c8,"desplante")||B.b.m(c8,"lunge")){if(d0)q="glutes/forward-lunge-male.gif"
+else q=d1?"glutes/barbell-lunge.gif":"glutes/dumbbell-lunge.gif"
+return a9+q}if(B.b.m(c8,"prensa")||B.b.m(c8,"leg press")){if(B.b.m(c8,"gemelo")||B.b.m(c8,"talon")||B.b.m(c8,c4))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/calves/sled-calf-press-on-leg-press.gif"
+return a9+(d0?"quads/lever-alternate-leg-press.gif":"glutes/sled-45-leg-press.gif")}if(B.b.m(c8,"extension de cuadriceps")||B.b.m(c8,"extensi\xf3n de cu\xe1driceps")||B.b.m(c8,"extension de pierna")||B.b.m(c8,"leg extension"))return a9+(d0?"quads/resistance-band-leg-extension.gif":"quads/lever-leg-extension.gif")
+if(B.b.m(c8,"talon")||B.b.m(c8,"tal\xf3n")||B.b.m(c8,"gemelo")||B.b.m(c8,c4)||B.b.m(c8,i)||B.b.m(c8,"soleo")||B.b.m(c8,"s\xf3leo")){if(B.b.m(c8,"sentado")||B.b.m(c8,"silla")||B.b.m(c8,"seated")){if(d0)q="calves/seated-calf-stretch-male.gif"
+else q=d1?"calves/barbell-seated-calf-raise.gif":"calves/lever-seated-calf-raise.gif"
+return a9+q}if(B.b.m(c8,g)||B.b.m(c8,f)||B.b.m(c8,e)){if(d0)q="calves/band-single-leg-calf-raise.gif"
+else q=d1?"calves/single-leg-calf-raise-on-a-dumbbell.gif":"calves/dumbbell-single-leg-calf-raise.gif"
+return a9+q}if(d0)q="calves/bodyweight-standing-calf-raise.gif"
+else q=d1?"calves/lever-standing-calf-raise.gif":"calves/dumbbell-standing-calf-raise.gif"
+return a9+q}if(!p||B.b.m(c8,"pike"))return a9+(d0?b3:b4)
+if(!q||B.b.m(c8,a))return a9+(d0?b1:b2)
+if(B.b.m(c8,"flexion de pecho")||B.b.m(c8,"flexi\xf3n de pecho")||B.b.m(c8,"flexiones")||B.b.m(c8,"push up")||B.b.m(c8,"pushup")||B.b.m(c8,"lagartija")){if(d0)q=c5
+else q=d1?"pectorals/barbell-bench-press.gif":"pectorals/push-up.gif"
+return a9+q}if(B.b.m(c8,"press de banca")||B.b.m(c8,"bench press")||B.b.m(c8,"press de pecho")||B.b.m(c8,"pecho")||B.b.m(c8,"pectoral")){if(B.b.m(c8,c1)||d1)return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/pectorals/barbell-bench-press.gif"
+return a9+(d0?c5:"pectorals/dumbbell-bench-press.gif")}if(B.b.m(c8,"tricep")||B.b.m(c8,"tr\xedcep")||B.b.m(c8,"press frances")||B.b.m(c8,"copa")){if(d0)q=b7
+else q=d1?"triceps/barbell-lying-triceps-extension.gif":"triceps/cable-alternate-triceps-extension.gif"
+return a9+q}if(B.b.m(c8,"bicep")||B.b.m(c8,"b\xedcep")||B.b.m(c8,c6)||B.b.m(c8,"curl")){if(B.b.m(c8,c6)||B.b.m(c8,"hammer"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/biceps/dumbbell-seated-hammer-curl.gif"
+if(B.b.m(c8,c1))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/biceps/barbell-curl.gif"
+if(d0)q="biceps/band-alternating-biceps-curl.gif"
+else q=d1?"biceps/barbell-curl.gif":"biceps/dumbbell-biceps-curl.gif"
+return a9+q}if(B.b.m(c8,"lateral raise")||B.b.m(c8,"elevacion lateral")||B.b.m(c8,"elevaciones laterales")||B.b.m(c8,"elevaci\xf3n lateral"))return a9+(d0?"delts/band-front-lateral-raise.gif":"delts/dumbbell-lateral-raise.gif")
+if(B.b.m(c8,"militar")||B.b.m(c8,"shoulder press")||B.b.m(c8,"hombro")||B.b.m(c8,"deltoid")){if(B.b.m(c8,c1))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/delts/barbell-seated-overhead-press.gif"
+if(d0)q=b3
+else q=d1?"delts/barbell-seated-overhead-press.gif":"delts/dumbbell-seated-shoulder-press.gif"
+return a9+q}if(B.b.m(c8,"toalla")||B.b.m(c8,"towel"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/upper-back/bodyweight-standing-row-with-towel.gif"
+if(B.b.m(c8,"remo")||B.b.m(c8,"row")||B.b.m(c8,"jalon")||B.b.m(c8,"jal\xf3n")||B.b.m(c8,c7)||B.b.m(c8,"pulldown")||B.b.m(c8,"espalda")||B.b.m(c8,"dorsal")){if(B.b.m(c8,c7)||B.b.m(c8,"pull up")||B.b.m(c8,"pull-up"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/lats/pull-up.gif"
+if(B.b.m(c8,c1))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/upper-back/barbell-bent-over-row.gif"
+if(B.b.m(c8,"polea"))return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/upper-back/cable-low-seated-row.gif"
+if(d0)q="upper-back/band-one-arm-twisting-seated-row.gif"
+else q=d1?"upper-back/barbell-bent-over-row.gif":"upper-back/cable-low-seated-row.gif"
+return a9+q}if(B.b.m(c8,"abduc"))return a9+(d0?"abductors/side-hip-abduction.gif":"abductors/lever-seated-hip-abduction.gif")
+if(B.b.m(c8,"aduc"))return a9+(d0?"adductors/side-lying-hip-adduction-male.gif":"adductors/lever-seated-hip-adduction.gif")
+o=c8+" "+d2.toLowerCase()
+if(B.b.m(o,"isquio")||B.b.m(o,"femoral"))return a9+(d0?b8:b9)
+if(B.b.m(o,"glute")||B.b.m(o,"gl\xfate"))return a9+(d0?b5:b6)
+if(B.b.m(o,"cuadricep")||B.b.m(o,"cu\xe1dricep")||B.b.m(o,"pierna"))return a9+(d0?c2:c3)
 return"https://raw.githubusercontent.com/JahelCuadrado/ExerciseGymGifsDB/main/delts/dumbbell-seated-shoulder-press.gif"},
 hj:function hj(a,b,c,d,e,f,g,h,i,j,k){var _=this
 _.a=a

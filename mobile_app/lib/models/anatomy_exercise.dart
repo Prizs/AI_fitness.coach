@@ -82,11 +82,61 @@ String resolveGuaranteedGifUrl({
         // 6. Ejercicios caseros con toalla o deslizador mostrando máquinas de gimnasio o slide plano
         ((nameLower.contains('toalla') || nameLower.contains('deslizador') || nameLower.contains('piso liso')) && (cleanExisting.contains('single-leg-platform-slide') || cleanExisting.contains('lever') || cleanExisting.contains('cable') || cleanExisting.contains('smith') || cleanExisting.contains('seated-leg-curl'))) ||
         // 7. Plancha frontal en antebrazos mostrando rodillas apoyadas
-        ((nameLower.contains('antebrazo') || nameLower.contains('frontal')) && cleanExisting.contains('kneeling-plank'));
+        ((nameLower.contains('antebrazo') || nameLower.contains('frontal')) && cleanExisting.contains('kneeling-plank')) ||
+        // 8. Flexiones diamante mostrando flexión de pecho regular o fondos
+        ((nameLower.contains('diamante') || nameLower.contains('diamond')) && !cleanExisting.contains('diamond') && !cleanExisting.contains('close-grip')) ||
+        // 9. Giros rusos mostrando crunches estándar
+        ((nameLower.contains('giro ruso') || nameLower.contains('russian twist')) && !cleanExisting.contains('twist')) ||
+        // 10. Elevación de piernas mostrando gemelos
+        ((nameLower.contains('elevacion de pierna') || nameLower.contains('elevación de pierna') || nameLower.contains('leg raise')) && cleanExisting.contains('calf')) ||
+        // 11. Sentadilla en pared mostrando sentadilla estándar
+        ((nameLower.contains('wall sit') || nameLower.contains('en pared')) && !cleanExisting.contains('wall')) ||
+        // 12. Jumping Jacks mostrando burpees
+        ((nameLower.contains('jumping jack') || nameLower.contains('saltos en tijera')) && !cleanExisting.contains('jack'));
 
     if (!hasMismatch) {
       return cleanExisting;
     }
+  }
+
+  // 0a. Elevación de Piernas en Suelo o Banco (Leg Raises)
+  if (nameLower.contains('elevacion de pierna') || nameLower.contains('elevación de pierna') || nameLower.contains('elevaciones de piernas') || nameLower.contains('leg raise') || nameLower.contains('piernas al pecho')) {
+    return _kGifBase + (isHigh ? 'abs/hanging-leg-raise.gif' : 'abs/lying-leg-raise-flat-bench.gif');
+  }
+
+  // 0b. Giros Rusos (Russian Twists)
+  if (nameLower.contains('giro ruso') || nameLower.contains('giros rusos') || nameLower.contains('russian twist')) {
+    return _kGifBase + (isHigh ? 'abs/weighted-russian-twist-legs-up.gif' : 'abs/assisted-motion-russian-twist.gif');
+  }
+
+  // 0c. Sentadilla Isométrica en Pared (Wall Sit)
+  if (nameLower.contains('wall sit') || nameLower.contains('sentadilla en pared') || nameLower.contains('en pared')) {
+    return _kGifBase + 'glutes/march-sit-wall.gif';
+  }
+
+  // 0d. Flexiones Diamante (Diamond Push-ups)
+  if (nameLower.contains('diamante') || nameLower.contains('diamond')) {
+    return _kGifBase + (isLow ? 'triceps/close-grip-push-up-on-knees.gif' : 'triceps/diamond-push-up.gif');
+  }
+
+  // 0e. Flexiones en Pica (Pike Push-ups)
+  if (nameLower.contains('pica') || nameLower.contains('pike')) {
+    return _kGifBase + (isLow ? 'delts/band-shoulder-press.gif' : 'triceps/handstand-push-up.gif');
+  }
+
+  // 0f. Jumping Jacks (Saltos en Tijera)
+  if (nameLower.contains('jumping jack') || nameLower.contains('salto en tijera') || nameLower.contains('saltos en tijera')) {
+    return _kGifBase + 'cardio/jack-jump-male.gif';
+  }
+
+  // 0g. Escaladores de Montaña (Mountain Climbers)
+  if (nameLower.contains('escalador') || nameLower.contains('escaladores') || nameLower.contains('mountain climber')) {
+    return _kGifBase + 'cardio/mountain-climber.gif';
+  }
+
+  // 0h. Patada de Glúteos en Cuadrupedia
+  if (nameLower.contains('patada de gluteo') || nameLower.contains('patada de glúteo') || nameLower.contains('glute kickback') || nameLower.contains('cuadrupedia')) {
+    return _kGifBase + 'glutes/bench-hip-extension.gif';
   }
 
   // 1. Puentes de Glúteo / Hip Thrust / Elevación Pélvica
@@ -129,7 +179,7 @@ String resolveGuaranteedGifUrl({
   }
 
   // 7. Crunches / Abdomen
-  if (nameLower.contains('crunch') || nameLower.contains('abdominal') || nameLower.contains('abdomen') || nameLower.contains('twist')) {
+  if (nameLower.contains('crunch') || nameLower.contains('abdominal') || nameLower.contains('abdomen')) {
     return _kGifBase + (isLow
         ? 'abs/oblique-crunches-floor.gif'
         : (isHigh ? 'abs/hanging-leg-raise.gif' : 'abs/crunch-floor.gif'));
@@ -175,9 +225,12 @@ String resolveGuaranteedGifUrl({
 
   // 13. Sentadillas (Squats)
   if (nameLower.contains('sentadilla') || nameLower.contains('squat')) {
+    if (nameLower.contains('barra') || isHigh) {
+      return _kGifBase + 'glutes/barbell-full-squat.gif';
+    }
     return _kGifBase + (isLow
         ? 'glutes/potty-squat-with-support.gif'
-        : (isHigh ? 'glutes/barbell-full-squat.gif' : 'quads/dumbbell-goblet-squat.gif'));
+        : 'quads/dumbbell-goblet-squat.gif');
   }
 
   // 14. Zancadas / Lunges
@@ -219,12 +272,12 @@ String resolveGuaranteedGifUrl({
 
   // 18. Flexiones en Pica / Pike Push-ups
   if (nameLower.contains('pica') || nameLower.contains('pike')) {
-    return _kGifBase + (isLow ? 'delts/band-shoulder-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif');
+    return _kGifBase + (isLow ? 'delts/band-shoulder-press.gif' : 'triceps/handstand-push-up.gif');
   }
 
   // 19. Flexiones Diamante
   if (nameLower.contains('diamante') || nameLower.contains('diamond')) {
-    return _kGifBase + (isLow ? 'triceps/bench-dip-knees-bent.gif' : 'pectorals/push-up.gif');
+    return _kGifBase + (isLow ? 'triceps/close-grip-push-up-on-knees.gif' : 'triceps/diamond-push-up.gif');
   }
 
   // 20. Flexiones de Pecho (Push-ups)
@@ -236,9 +289,12 @@ String resolveGuaranteedGifUrl({
 
   // 21. Press de Banca / Pecho
   if (nameLower.contains('press de banca') || nameLower.contains('bench press') || nameLower.contains('press de pecho') || nameLower.contains('pecho') || nameLower.contains('pectoral')) {
+    if (nameLower.contains('barra') || isHigh) {
+      return _kGifBase + 'pectorals/barbell-bench-press.gif';
+    }
     return _kGifBase + (isLow
         ? 'pectorals/incline-push-up.gif'
-        : (isHigh ? 'pectorals/barbell-bench-press.gif' : 'pectorals/dumbbell-bench-press.gif'));
+        : 'pectorals/dumbbell-bench-press.gif');
   }
 
   // 22. Extensiones de Tríceps / Francés / Copa
@@ -253,6 +309,9 @@ String resolveGuaranteedGifUrl({
     if (nameLower.contains('martillo') || nameLower.contains('hammer')) {
       return _kGifBase + 'biceps/dumbbell-seated-hammer-curl.gif';
     }
+    if (nameLower.contains('barra')) {
+      return _kGifBase + 'biceps/barbell-curl.gif';
+    }
     return _kGifBase + (isLow
         ? 'biceps/band-alternating-biceps-curl.gif'
         : (isHigh ? 'biceps/barbell-curl.gif' : 'biceps/dumbbell-biceps-curl.gif'));
@@ -265,6 +324,9 @@ String resolveGuaranteedGifUrl({
 
   // 25. Press Militar / Hombros
   if (nameLower.contains('militar') || nameLower.contains('shoulder press') || nameLower.contains('hombro') || nameLower.contains('deltoid')) {
+    if (nameLower.contains('barra')) {
+      return _kGifBase + 'delts/barbell-seated-overhead-press.gif';
+    }
     return _kGifBase + (isLow
         ? 'delts/band-shoulder-press.gif'
         : (isHigh ? 'delts/barbell-seated-overhead-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif'));
@@ -277,6 +339,15 @@ String resolveGuaranteedGifUrl({
 
   // 26. Remos / Jalones / Dominadas
   if (nameLower.contains('remo') || nameLower.contains('row') || nameLower.contains('jalon') || nameLower.contains('jalón') || nameLower.contains('dominada') || nameLower.contains('pulldown') || nameLower.contains('espalda') || nameLower.contains('dorsal')) {
+    if (nameLower.contains('dominada') || nameLower.contains('pull up') || nameLower.contains('pull-up')) {
+      return _kGifBase + 'lats/pull-up.gif';
+    }
+    if (nameLower.contains('barra')) {
+      return _kGifBase + 'upper-back/barbell-bent-over-row.gif';
+    }
+    if (nameLower.contains('polea')) {
+      return _kGifBase + 'upper-back/cable-low-seated-row.gif';
+    }
     return _kGifBase + (isLow
         ? 'upper-back/band-one-arm-twisting-seated-row.gif'
         : (isHigh ? 'upper-back/barbell-bent-over-row.gif' : 'upper-back/cable-low-seated-row.gif'));
