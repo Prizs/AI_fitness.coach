@@ -217,6 +217,19 @@ CURATED_BY_INTENSITY = [
         "posture": "Hombros deprimidos hacia abajo y lejos de las orejas; espalda pegada al borde de apoyo.",
         "warning": "No desciendas más allá de 90° de flexión en el codo para no sobrecargar el hombro anterior.",
     },
+    # 4a. Curl Femoral en Suelo con Deslizador / Toalla (Hamstring Slide)
+    {
+        "match_any": ("deslizador", "toalla en piso", "toalla en suelo", "piso liso", "curl femoral en suelo", "femoral en suelo", "slide curl"),
+        "exclude_any": ("maquina", "máquina", "lever"),
+        "gifs": {
+            "baja": "hamstrings/single-leg-platform-slide.gif",
+            "media": "hamstrings/single-leg-platform-slide.gif",
+            "alta": "hamstrings/self-assisted-inverse-leg-curl-on-floor.gif",
+        },
+        "biomechanics": "Flexión activa de rodillas en decúbito supino elevando la cadera y deslizando los talones hacia los glúteos.",
+        "posture": "Pelvis en retroversión sin arquear la zona lumbar, glúteos contraídos en el punto máximo de flexión.",
+        "warning": "Evita hiperextender la zona lumbar; el movimiento debe generarse exclusivamente desde los isquiotibiales.",
+    },
     # 4. Curl Femoral / Isquiotibiales (Hamstring Curls)
     {
         "match_any": ("curl femoral", "curl de isquiotibial", "curl de isquiotibiales", "curl de pierna", "leg curl", "curl nordico", "nordic curl"),
@@ -477,10 +490,23 @@ CURATED_BY_INTENSITY = [
         "posture": "Junta las escápulas atrás y mantén el mentón hacia adentro.",
         "warning": "No tenses el cuello excesivamente.",
     },
+    # 24a. Tracción Dorsal / Remo con Toalla en Marco de Puerta (Towel Door Row)
+    {
+        "match_any": ("toalla en marco", "remo con toalla", "traccion dorsal con toalla", "traccion con toalla", "towel row", "bodyweight row with towel", "toalla en puerta", "con toalla"),
+        "exclude_any": ("polea", "cable", "maquina"),
+        "gifs": {
+            "baja": "upper-back/bodyweight-standing-row-with-towel.gif",
+            "media": "upper-back/bodyweight-standing-one-arm-row-with-towel.gif",
+            "alta": "upper-back/one-arm-towel-row.gif",
+        },
+        "biomechanics": "Tracción horizontal con peso corporal usando una toalla anclada al marco de puerta, activando dorsal ancho y romboides sin herramientas de gimnasio.",
+        "posture": "Torso inclinado en línea recta, empuje firme de talones contra el suelo y retracción escapular activa.",
+        "warning": "Asegúrate de que la toalla o anclaje esté firme y la puerta asegurada para evitar deslizamientos.",
+    },
     # 24. Remos / Jalón Dorsal (Rows / Pulls)
     {
         "match_any": ("remo", "row", "jalon", "jalón", "pulldown", "dominada", "pull up", "pull-up", "traccion dorsal"),
-        "exclude_any": (),
+        "exclude_any": ("toalla", "towel"),
         "gifs": {
             "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
             "media": "upper-back/cable-low-seated-row.gif",
@@ -516,12 +542,25 @@ CURATED_BY_INTENSITY = [
         "posture": "Hombro alineado sobre el codo, cuerpo recto desde pies hasta la cabeza.",
         "warning": "No permitas que la cadera caiga hacia el suelo.",
     },
-    # 27. Plancha Frontal (Front Plank)
+    # 27a. Plancha con Rodillas Apoyadas / Suave (Kneeling Plank)
     {
-        "match_any": ("plancha", "plank"),
-        "exclude_any": ("lateral", "side"),
+        "match_any": ("rodillas apoyadas", "plancha con rodillas", "plancha suave", "plancha abdominal suave", "kneeling plank"),
+        "exclude_any": (),
         "gifs": {
             "baja": "abs/kneeling-plank-tap-shoulder-male.gif",
+            "media": "abs/kneeling-plank-tap-shoulder-male.gif",
+            "alta": "abs/kneeling-plank-tap-shoulder-male.gif",
+        },
+        "biomechanics": "Regresión de plancha isométrica con apoyo en rodillas para disminuir el brazo de palanca y proteger la columna lumbar.",
+        "posture": "Codos bajo hombros, pelvis neutra y activación voluntaria del transverso abdominal.",
+        "warning": "No permitas que la espalda baja se arquee hacia el suelo.",
+    },
+    # 27b. Plancha Frontal Estándar en Antebrazos (Front Plank)
+    {
+        "match_any": ("plancha", "plank", "plancha frontal", "plancha en antebrazos", "plancha isometrica"),
+        "exclude_any": ("lateral", "side", "rodillas"),
+        "gifs": {
+            "baja": "abs/front-plank-with-twist.gif",
             "media": "abs/front-plank-with-twist.gif",
             "alta": "abs/front-plank-with-twist.gif",
         },

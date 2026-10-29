@@ -1911,32 +1911,43 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
             m_list[(seed + 3) % len(m_list)],
         ]
     elif "piernas_b" in fk:
-        # Día B de Piernas: Cadena posterior (Isquios + Glúteos + Sóleo + Pantorrillas + Cuádriceps accesorio)
+        # Día B de Piernas: Cadena posterior (Isquios + Glúteos + Cuádriceps + Unilateral accesorio + 1 Pantorrilla)
         h_list = hams_dict[int_k]
         g_list = glutes_dict[int_k]
-        s_list = soleo_dict[int_k]
-        c_list = calves_pies_dict[int_k]
         q_list = quads_dict[int_k]
+        uni_b = [
+            ("Step-ups en banco o silla firme (Intermedio)", "Glúteos, Cuádriceps", "Estabilidad", "lunge"),
+            ("Zancadas estáticas asistidas con apoyo en pared (Básico)", "Cuádriceps", "Isquiotibiales", "lunge"),
+            ("Zancadas frontales alternas (Intermedio)", "Cuádriceps", "Isquiotibiales", "lunge"),
+        ]
+        calf_choice_b = calves_pies_dict[int_k][(seed) % len(calves_pies_dict[int_k])]
         selected_tuples = [
             h_list[(seed + 0) % len(h_list)],
             g_list[(seed + 1) % len(g_list)],
-            s_list[(seed + 2) % len(s_list)],
-            c_list[(seed + 3) % len(c_list)],
-            q_list[(seed + 4) % len(q_list)],
+            q_list[(seed + 2) % len(q_list)],
+            uni_b[(seed + 3) % len(uni_b)],
+            calf_choice_b,
         ]
     else:
-        # Día A / Piernas Completo: Cuádriceps + Isquiotibiales + Glúteos + Sóleo + Pantorrillas/Pies
+        # Día A / Piernas Completo: Cuádriceps + Isquiotibiales + Glúteos + Unilateral accesorio + 1 Pantorrilla (CERO repetición)
         q_list = quads_dict[int_k]
         h_list = hams_dict[int_k]
         g_list = glutes_dict[int_k]
-        s_list = soleo_dict[int_k]
-        c_list = calves_pies_dict[int_k]
+        uni_a = [
+            ("Zancada estática asistida con apoyo en pared (Básico)", "Cuádriceps", "Isquiotibiales", "lunge") if int_k == "baja" else (
+                ("Sentadilla búlgara con mancuernas (Intermedio)", "Cuádriceps", "Glúteos", "split-squat") if int_k == "media" else
+                ("Zancadas búlgaras profundas con mancuernas pesadas (Avanzado)", "Glúteos, Cuádriceps", "split-squat")
+            ),
+            ("Step-ups en banco o silla firme (Intermedio)", "Glúteos, Cuádriceps", "Estabilidad", "lunge"),
+            ("Zancadas frontales alternas (Intermedio)", "Cuádriceps", "Isquiotibiales", "lunge"),
+        ]
+        calf_choice_a = soleo_dict[int_k][(seed) % len(soleo_dict[int_k])] if (seed % 2 == 0) else calves_pies_dict[int_k][(seed) % len(calves_pies_dict[int_k])]
         selected_tuples = [
             q_list[(seed + 0) % len(q_list)],
             h_list[(seed + 1) % len(h_list)],
             g_list[(seed + 2) % len(g_list)],
-            s_list[(seed + 3) % len(s_list)],
-            c_list[(seed + 4) % len(c_list)],
+            uni_a[(seed + 3) % len(uni_a)],
+            calf_choice_a,
         ]
 
     res = []

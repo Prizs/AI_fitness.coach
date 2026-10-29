@@ -78,7 +78,11 @@ String resolveGuaranteedGifUrl({
         // 4. Talones sentado / en silla mostrando elevación de pie
         ((nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated')) && cleanExisting.contains('standing-calf-raise')) ||
         // 5. Talones unipodal mostrando elevación bilateral de pie
-        ((nameLower.contains('unipodal') || nameLower.contains('una pierna') || nameLower.contains('single leg')) && cleanExisting.contains('standing-calf-raise'));
+        ((nameLower.contains('unipodal') || nameLower.contains('una pierna') || nameLower.contains('single leg')) && cleanExisting.contains('standing-calf-raise')) ||
+        // 6. Ejercicios caseros con toalla o deslizador mostrando máquinas de gimnasio
+        ((nameLower.contains('toalla') || nameLower.contains('deslizador') || nameLower.contains('piso liso')) && (cleanExisting.contains('lever') || cleanExisting.contains('cable') || cleanExisting.contains('smith') || cleanExisting.contains('seated-leg-curl'))) ||
+        // 7. Plancha frontal en antebrazos mostrando rodillas apoyadas
+        ((nameLower.contains('antebrazo') || nameLower.contains('frontal')) && cleanExisting.contains('kneeling-plank'));
 
     if (!hasMismatch) {
       return cleanExisting;
@@ -117,10 +121,11 @@ String resolveGuaranteedGifUrl({
   }
 
   // 6. Plancha Frontal (Plank)
+  if (nameLower.contains('rodillas apoyadas') || nameLower.contains('plancha suave') || nameLower.contains('con rodillas')) {
+    return _kGifBase + 'abs/kneeling-plank-tap-shoulder-male.gif';
+  }
   if (nameLower.contains('plancha') || nameLower.contains('plank')) {
-    return _kGifBase + (isLow
-        ? 'abs/kneeling-plank-tap-shoulder-male.gif'
-        : 'abs/front-plank-with-twist.gif');
+    return _kGifBase + 'abs/front-plank-with-twist.gif';
   }
 
   // 7. Crunches / Abdomen
@@ -133,6 +138,11 @@ String resolveGuaranteedGifUrl({
   // 8. Superman / Lumbares
   if (nameLower.contains('superman') || nameLower.contains('lumbar') || nameLower.contains('lumbares')) {
     return _kGifBase + 'glutes/band-straight-back-stiff-leg-deadlift.gif';
+  }
+
+  // 9a. Curl Femoral en Suelo / con Deslizador / Toalla
+  if (nameLower.contains('deslizador') || nameLower.contains('toalla en piso') || nameLower.contains('toalla en suelo') || nameLower.contains('piso liso') || nameLower.contains('femoral en suelo')) {
+    return _kGifBase + 'hamstrings/single-leg-platform-slide.gif';
   }
 
   // 9. Curl Femoral / Isquiotibiales (Hamstring Curls)
@@ -258,6 +268,11 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + (isLow
         ? 'delts/band-shoulder-press.gif'
         : (isHigh ? 'delts/barbell-seated-overhead-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif'));
+  }
+
+  // 26a. Remo / Tracción con Toalla en Marco de Puerta o Calistenia
+  if (nameLower.contains('toalla') || nameLower.contains('towel')) {
+    return _kGifBase + 'upper-back/bodyweight-standing-row-with-towel.gif';
   }
 
   // 26. Remos / Jalones / Dominadas
