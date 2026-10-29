@@ -430,10 +430,23 @@ CURATED_BY_INTENSITY = [
         "posture": "Manos juntas en el centro del pecho, codos rozando las costillas y abdomen activo.",
         "warning": "Si sientes molestia en muñecas, separa ligeramente los dedos o apóyate en rodillas.",
     },
+    # 16b. Flexiones Declinadas con Pies Elevados (Decline Push-ups)
+    {
+        "match_any": ("flexiones declinadas", "flexion declinada", "decline push up", "decline push-up", "decline pushup", "pies en cama o sofa", "pies elevados en cama"),
+        "exclude_any": ("pica", "pike", "diamante"),
+        "gifs": {
+            "baja": "pectorals/incline-push-up.gif",
+            "media": "pectorals/decline-push-up.gif",
+            "alta": "pectorals/decline-push-up.gif",
+        },
+        "biomechanics": "Empuje declinado con pies elevados enfocando el estímulo en el haz clavicular del pectoral mayor y deltoides anterior.",
+        "posture": "Pies sobre superficie elevada firme, cuerpo alineado en plancha y core contraído.",
+        "warning": "No permitas que la cadera se hunda durante el descenso.",
+    },
     # 17. Flexiones de Pecho Estándar (Push-ups)
     {
-        "match_any": ("flexiones de pecho", "flexion de pecho", "push up", "push-up", "pushup", "lagartija", "flexiones en suelo", "flexiones inclinadas", "flexiones declinadas"),
-        "exclude_any": ("pica", "pike", "diamante"),
+        "match_any": ("flexiones de pecho", "flexion de pecho", "push up", "push-up", "pushup", "lagartija", "flexiones en suelo", "flexiones inclinadas"),
+        "exclude_any": ("pica", "pike", "diamante", "declinada", "declinadas", "decline", "pies en"),
         "gifs": {
             "baja": "pectorals/incline-push-up.gif",
             "media": "pectorals/push-up.gif",
@@ -640,12 +653,12 @@ CURATED_BY_INTENSITY = [
     },
     # 29. Superman / Extensiones Lumbares
     {
-        "match_any": ("superman", "extensiones lumbares", "lumbares en suelo"),
-        "exclude_any": (),
+        "match_any": ("superman", "extensiones lumbares", "lumbares en suelo", "extension lumbar"),
+        "exclude_any": ("deadlift", "peso muerto"),
         "gifs": {
-            "baja": "glutes/band-straight-back-stiff-leg-deadlift.gif",
-            "media": "glutes/band-straight-back-stiff-leg-deadlift.gif",
-            "alta": "glutes/barbell-deadlift.gif",
+            "baja": "spine/hyperextension.gif",
+            "media": "spine/hyperextension.gif",
+            "alta": "spine/hyperextension-on-bench.gif",
         },
         "biomechanics": "Extensión de columna activando erectores espinales, glúteos y cadena posterior.",
         "posture": "Elevación sutil y controlada de pecho y muslos sin hiperextensión forzada.",

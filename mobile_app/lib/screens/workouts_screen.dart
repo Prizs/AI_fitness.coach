@@ -788,6 +788,14 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           totalCount: scheduledDays.length,
           onNewRoutinePressed: _handleNewRoutinePress,
         ),
+        if (_service.hasUpcomingPlan) ...[
+          const SizedBox(height: 12),
+          _UpcomingCycleCard(
+            service: _service,
+            onOpenCoach: _openCoach,
+            onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
+          ),
+        ],
         const SizedBox(height: 18),
 
         if (pendingScheduled.isNotEmpty) ...[
@@ -894,6 +902,247 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
               : (dyn.isNotEmpty ? dyn.first.id : 'squat'),
           dynamicExercises: dyn.isNotEmpty ? dyn : null,
         ),
+      ),
+    );
+  }
+}
+
+class _UpcomingCycleCard extends StatefulWidget {
+  const _UpcomingCycleCard({
+    required this.service,
+    required this.onOpenCoach,
+    required this.onExerciseTap,
+  });
+
+  final WeeklyPlanService service;
+  final VoidCallback onOpenCoach;
+  final void Function(Map<String, dynamic> exercise, List<dynamic> allExercises) onExerciseTap;
+
+  @override
+  State<_UpcomingCycleCard> createState() => _UpcomingCycleCardState();
+}
+
+class _UpcomingCycleCardState extends State<_UpcomingCycleCard> {
+  bool _isExpanded = false;
+
+  void _confirmActivateNow() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF101C2F),
+        title: const Text('¿Activar próximo ciclo ahora?'),
+        content: Text(
+          'El plan programado para ${widget.service.upcomingCycleRangeStr} pasará a ser tu ciclo activo inmediatamente.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8BE0C0)),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await widget.service.activateUpcomingPlanNow();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('¡Próximo ciclo activado como ciclo actual!'),
+                    backgroundColor: Color(0xFF173B45),
+                  ),
+                );
+              }
+            },
+            child: const Text('Activar ahora', style: TextStyle(color: Color(0xFF0D1B2A), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDiscard() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF101C2F),
+        title: const Text('¿Descartar próximo ciclo?'),
+        content: const Text(
+          'Se eliminará la planificación futura guardada. Tu ciclo activo actual no se verá afectado.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await widget.service.clearUpcomingPlan();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Próximo ciclo descartado.'),
+                    backgroundColor: Color(0xFF173B45),
+                  ),
+                );
+              }
+            },
+            child: const Text('Descartar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final upcomingDays = widget.service.upcomingDays;
+    final trainingDays = upcomingDays.where((d) => (d['exercises'] as List?)?.isNotEmpty == true).toList();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF132238),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFFFB340).withOpacity(0.55),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF332612),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_month_rounded, size: 14, color: Color(0xFFFFB340)),
+                        const SizedBox(width: 5),
+                        Text(
+                          'PRÓXIMO CICLO: ${widget.service.upcomingCycleRangeStr}',
+                          style: const TextStyle(
+                            color: Color(0xFFFFB340),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    _isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                    color: const Color(0xFFFFB340),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Programado para la semana del ${widget.service.upcomingCycleRangeStr}. Se activará automáticamente al comenzar esa fecha.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.3),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_isExpanded) ...[
+            const Divider(color: Colors.white12, height: 1),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Días y rutinas planificadas para el próximo ciclo:',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 8),
+                  ...trainingDays.map((d) {
+                    final dName = d['weekday_name'] ?? 'Día';
+                    final dTitle = d['title'] ?? 'Rutina';
+                    final exs = (d['exercises'] as List?) ?? [];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E1826),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF173B45),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              dName,
+                              style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$dTitle (${exs.length} ejercicios)',
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF8BE0C0)),
+                            foregroundColor: const Color(0xFF8BE0C0),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          onPressed: _confirmActivateNow,
+                          icon: const Icon(Icons.flash_on_rounded, size: 16),
+                          label: const Text('Activar como ciclo actual ahora', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Descartar próximo ciclo',
+                        onPressed: _confirmDiscard,
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.white54, size: 18),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }

@@ -12,6 +12,7 @@ class WeeklyPlanService extends ChangeNotifier {
   static final WeeklyPlanService instance = WeeklyPlanService();
 
   Map<String, dynamic>? week;
+  Map<String, dynamic>? upcomingWeek;
   String? lastError;
   bool isLoading = false;
   bool loadedFromCache = false;
@@ -115,6 +116,44 @@ class WeeklyPlanService extends ChangeNotifier {
     final sMonth = s.month < 10 ? '0${s.month}' : '${s.month}';
     return '${m.day}/$mMonth al ${s.day}/$sMonth';
   }
+
+  bool get hasUpcomingPlan =>
+      upcomingWeek != null &&
+      upcomingWeek!['days'] is List &&
+      (upcomingWeek!['days'] as List).isNotEmpty;
+
+  String get upcomingCycleRangeStr {
+    final range = upcomingWeek?['cycle_range_str']?.toString();
+    if (range != null && range.trim().isNotEmpty) return range;
+    final nextM = nextCycleMonday;
+    final nextS = nextM.add(const Duration(days: 6));
+    final mMonth = nextM.month < 10 ? '0${nextM.month}' : '${nextM.month}';
+    final sMonth = nextS.month < 10 ? '0${nextS.month}' : '${nextS.month}';
+    return '${nextM.day}/$mMonth al ${nextS.day}/$sMonth';
+  }
+
+  String get upcomingCycleStartDate =>
+      upcomingWeek?['cycle_start_date']?.toString() ??
+      upcomingWeek?['week_monday']?.toString() ??
+      nextCycleMonday.toIso8601String();
+
+  List<Map<String, dynamic>> get upcomingDays {
+    final list = upcomingWeek?['days'];
+    if (list is! List) return const [];
+    final mapped = list.whereType<Map>().map((entry) {
+      final m = Map<String, dynamic>.from(entry);
+      final w = (m['weekday'] is int) ? (m['weekday'] as int).clamp(0, 6) : 0;
+      m['weekday'] = w;
+      if (m['weekday_name'] == null ||
+          m['weekday_name'].toString().trim().isEmpty) {
+        m['weekday_name'] = _weekdayNames[w];
+      }
+      return m;
+    }).toList();
+    mapped.sort((a, b) => (a['weekday'] as int).compareTo(b['weekday'] as int));
+    return mapped;
+  }
+
 
   bool get isTodayHomeWorkout {
     final t = today;
@@ -260,6 +299,41 @@ class WeeklyPlanService extends ChangeNotifier {
         } catch (_) {}
       }
     } catch (_) {}
+
+    try {
+      final cachedUpcomingJson = await DBHelper.instance
+          .getCachedUpcomingPlan()
+          .timeout(const Duration(seconds: 2), onTimeout: () => null);
+      if (cachedUpcomingJson != null && cachedUpcomingJson.trim().isNotEmpty) {
+        try {
+          final decodedUp = jsonDecode(cachedUpcomingJson);
+          if (decodedUp is Map<String, dynamic>) {
+            upcomingWeek = decodedUp;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // Auto-promoción inteligente: cuando la fecha de inicio del ciclo futuro llega (today >= upDate),
+    // se promueve automáticamente a ciclo activo principal
+    if (upcomingWeek != null) {
+      final upStartStr = upcomingWeek!['cycle_start_date'] as String? ??
+          upcomingWeek!['week_monday'] as String?;
+      if (upStartStr != null) {
+        final upDate = DateTime.tryParse(upStartStr);
+        final now = DateTime.now();
+        final todayDate = DateTime(now.year, now.month, now.day);
+        if (upDate != null && (todayDate.isAfter(upDate) || todayDate.isAtSameMomentAs(upDate))) {
+          week = upcomingWeek;
+          upcomingWeek = null;
+          try {
+            await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
+            await DBHelper.instance.clearUpcomingPlanCache();
+          } catch (_) {}
+        }
+      }
+    }
+
 
     try {
       const storage = FlutterSecureStorage();
@@ -821,6 +895,39 @@ class WeeklyPlanService extends ChangeNotifier {
         }
       }
 
+      final bool isFutureCycle = structuredPlan['is_future_cycle'] == true;
+      final bool replaceActive = structuredPlan['replace_active_cycle'] == true;
+      final bool shouldScheduleUpcoming = (isFutureCycle && !replaceActive && hasActivePlan);
+
+      if (shouldScheduleUpcoming) {
+        upcomingWeek = {
+          'id': 'coach_upcoming_${DateTime.now().millisecondsSinceEpoch}',
+          'goal': title,
+          'week_monday': structuredPlan['cycle_start_date'] ?? nextCycleMonday.toIso8601String(),
+          'created_at': DateTime.now().toIso8601String(),
+          'cycle_start_date': structuredPlan['cycle_start_date'],
+          'cycle_end_date': structuredPlan['cycle_end_date'],
+          'cycle_range_str': structuredPlan['cycle_range_str'],
+          'is_upcoming': true,
+          'days': newDays,
+        };
+
+        isLoading = false;
+        _pending = null;
+        lastError = null;
+        notifyListeners();
+        try {
+          await DBHelper.instance.saveUpcomingPlan(jsonEncode(upcomingWeek!));
+        } catch (_) {}
+
+        return {
+          'assigned_days': assignedDayNames,
+          'scheduled_in_next_cycle': true,
+          'cycle_range_str': structuredPlan['cycle_range_str'] ?? '',
+          'preserved_routines_count': (week?['days'] as List?)?.length ?? 0,
+        };
+      }
+
       week = {
         'id': 'coach_plan_${DateTime.now().millisecondsSinceEpoch}',
         'goal': title,
@@ -843,6 +950,7 @@ class WeeklyPlanService extends ChangeNotifier {
         'preserved_routines_count': 0,
       };
     }
+
 
     if (week == null) {
       // Si no hay plan previo, se inicializa la semana normalmente
@@ -974,4 +1082,25 @@ class WeeklyPlanService extends ChangeNotifier {
       await DBHelper.instance.saveCompletedDays({});
     } catch (_) {}
   }
+
+  Future<void> activateUpcomingPlanNow() async {
+    if (upcomingWeek == null) return;
+    week = Map<String, dynamic>.from(upcomingWeek!);
+    upcomingWeek = null;
+    notifyListeners();
+    try {
+      await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
+      await DBHelper.instance.clearUpcomingPlanCache();
+    } catch (_) {}
+  }
+
+  Future<void> clearUpcomingPlan() async {
+    upcomingWeek = null;
+    notifyListeners();
+    try {
+      await DBHelper.instance.clearUpcomingPlanCache();
+    } catch (_) {}
+  }
 }
+
+

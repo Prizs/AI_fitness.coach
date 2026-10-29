@@ -185,7 +185,15 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
     def _match_focus(txt: str) -> str | None:
         t = (txt or "").lower()
 
-        # 0. Verificación explícita de solicitud COMPLETA de Pierna o Tren Inferior
+        # 0. Verificación prioritaria de Cuerpo Completo / Full Body
+        if any(w in t for w in (
+            "cuerpo completo", "cuerpo entero", "full body", "fullbody", "full-body",
+            "todo el cuerpo", "toda la anatomia", "toda la anatomía",
+            "rutina de cuerpo completo", "plan de cuerpo completo"
+        )):
+            return "cuerpo_completo"
+
+        # 0.1 Verificación explícita de solicitud COMPLETA de Pierna o Tren Inferior
         # Previene que 'piernas' active por error sub-áreas como pantorrillas/pie
         is_full_leg_request = any(w in t for w in (
             "completo de pierna", "completo de piernas", "entrenamiento completo de piernas",
@@ -2007,6 +2015,8 @@ def _normalize_exercises(
     level: str = "Intermedio",
     requested_focus: str | None = None,
     is_no_equipment: bool = False,
+    seen_names_global: set[str] | None = None,
+    seen_gifs_global: set[str] | None = None,
 ) -> list[dict]:
     exercises: list[dict] = []
     if not isinstance(raw_exercises, list):
@@ -2030,7 +2040,8 @@ def _normalize_exercises(
     core_pool = CORE_POOLS[intensity_hint]
     mobility_pool = MOBILITY_CARDIO_POOLS[intensity_hint]
 
-    seen_names: set[str] = set()
+    seen_names = seen_names_global if seen_names_global is not None else set()
+    seen_gifs = seen_gifs_global if seen_gifs_global is not None else set()
 
     for idx, exercise in enumerate(raw_exercises):
         if not isinstance(exercise, dict):
@@ -2090,27 +2101,54 @@ def _normalize_exercises(
         clean_name = _sanitize_exercise_by_intensity(raw_name, intensity_hint)
         clean_name, primary, anim_key = _sanitize_exercise_by_equipment(clean_name, primary, anim_key, is_no_equipment)
 
-        # Deduplication Guard: evitar ejercicios duplicados o biomecánicamente repetidos en la misma rutina
         base_norm = re.sub(r"\(.*?\)", "", clean_name).strip().lower()
-        if base_norm in seen_names:
-            replacement_found = False
-            active_pool = leg_pool if (requested_focus == "piernas" or _is_leg_exercise(clean_name, primary)) else (
-                upper_pool if requested_focus in ("tren_superior", "pecho", "espalda", "brazos_hombros") else core_pool
+        gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint, is_no_equipment=is_no_equipment)
+        gif_url = (gif_meta.get("url") or "").strip()
+
+        # Deduplication Guard Radical: CERO repetición de nombre Y CERO repetición de GIF URL
+        if (base_norm in seen_names) or (gif_url and gif_url in seen_gifs):
+            all_deep_cands = (
+                upper_pool + leg_pool + core_pool + mobility_pool +
+                CALVES_FEET_POOLS.get(intensity_hint, []) +
+                TRICEPS_LEGS_POOLS.get(intensity_hint, []) +
+                LEGS_DAY_A_POOLS.get(intensity_hint, []) +
+                LEGS_DAY_B_POOLS.get(intensity_hint, []) +
+                CORE_POOLS.get("baja", []) + CORE_POOLS.get("alta", []) +
+                UPPER_BODY_POOLS.get("baja", []) + UPPER_BODY_POOLS.get("alta", []) +
+                MOBILITY_CARDIO_POOLS.get("baja", []) + MOBILITY_CARDIO_POOLS.get("alta", []) +
+                BEGINNER_LOW_LEG_EXERCISES + ADVANCED_HIGH_LEG_EXERCISES
             )
-            for cand in active_pool:
-                cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(cand["name"], cand["primary_muscle"], cand["animation_key"], is_no_equipment)
+            if requested_focus == "cuerpo_completo":
+                cand_pool = all_deep_cands
+            elif requested_focus == "piernas" or _is_leg_exercise(clean_name, primary):
+                cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, []) + mobility_pool
+            elif requested_focus in ("tren_superior", "pecho", "espalda", "brazos_hombros"):
+                cand_pool = upper_pool + UPPER_BODY_POOLS.get("baja", []) + UPPER_BODY_POOLS.get("alta", []) + core_pool
+            else:
+                cand_pool = all_deep_cands
+
+            for cand in cand_pool:
+                cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
+                    cand["name"], cand["primary_muscle"], cand["animation_key"], is_no_equipment
+                )
                 cand_base = re.sub(r"\(.*?\)", "", cand_clean).strip().lower()
-                if cand_base not in seen_names:
+                cand_gif = get_exercise_gif(cand_clean, muscle=cand_prim, intensity=intensity_hint, is_no_equipment=is_no_equipment)
+                cand_url = (cand_gif.get("url") or "").strip()
+
+                if (cand_base not in seen_names) and (not cand_url or cand_url not in seen_gifs):
                     clean_name = cand_clean
                     primary = cand_prim
                     anim_key = cand_anim
                     base_norm = cand_base
+                    gif_meta = cand_gif
+                    gif_url = cand_url
                     replaced_from_pool = True
                     replacement_found = True
                     break
-        seen_names.add(base_norm)
 
-        gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint, is_no_equipment=is_no_equipment)
+        seen_names.add(base_norm)
+        if gif_url:
+            seen_gifs.add(gif_url)
 
         exercises.append(
             {
@@ -2121,7 +2159,7 @@ def _normalize_exercises(
                 "primary_muscle": primary,
                 "secondary_muscle": secondary,
                 "intensity_level": forced_label,
-                "gif_url": gif_meta.get("url") or "",
+                "gif_url": gif_url,
                 "biomechanics": str(
                     (gif_meta.get("biomechanics") if replaced_from_pool else (exercise.get("biomechanics") or gif_meta.get("biomechanics")))
                     or "Movimiento controlado respetando el rango articular."
@@ -2156,6 +2194,126 @@ def _detect_plan_mode(user_msg: str) -> str:
     return "weekly"
 
 
+def _extract_cycle_dates(user_msg: str, has_active_plan: bool = False, history: list | None = None) -> dict:
+    import datetime
+    combined = (user_msg or "").lower()
+    if history:
+        for turn in history[-4:]:
+            content = turn.content if hasattr(turn, "content") else (turn.get("content") if isinstance(turn, dict) else str(turn))
+            combined = (content or "").lower() + " " + combined
+
+    # Si el usuario pide explícitamente cambiar o reemplazar la rutina o ciclo actual:
+    replace_keywords = (
+        "cambiar ciclo actual", "cambiar el ciclo actual", "cambiar mi ciclo actual", "cambiar este ciclo actual",
+        "reemplazar ciclo actual", "reemplazar el ciclo actual", "reemplazar mi ciclo actual",
+        "cambiar plan actual", "reemplazar plan actual", "cambiar mi plan actual", "reemplazar mi plan actual",
+        "cambiar rutina actual", "reemplazar rutina actual", "cambiar mi rutina actual", "reemplazar mi rutina actual",
+        "cambiar el vigente", "reemplazar el vigente", "cambiar ciclo vigente", "reemplazar ciclo vigente",
+        "cambiar la rutina vigente", "reemplazar la rutina vigente", "cambiar plan vigente", "reemplazar plan vigente",
+        "reiniciar ciclo actual", "reiniciar semana actual", "sobreescribir ciclo actual", "sobreescribir plan actual",
+        "reemplaza mi rutina actual", "cambia mi rutina actual", "reemplaza el ciclo actual", "cambia el ciclo actual",
+        "reemplazar ciclo", "cambiar ciclo", "reiniciar ciclo", "cambiar el ciclo", "reemplazar el ciclo",
+        "cambiar la rutina actual", "reemplazar la rutina actual"
+    )
+    wants_replace = any(w in combined for w in replace_keywords)
+
+    now = datetime.date.today()
+    current_year = now.year
+
+    # 1. Regex para rangos de fecha explícitos: ej. "del 9/11 al 13/11", "9/11 al viernes 13/11", "09-11 a 13-11"
+    m_range = re.search(
+        r"(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?\s*(?:al?|a|-|hasta)\s*(?:[a-záéíóú]+\s+)?(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?",
+        combined,
+    )
+    if m_range:
+        d1, m1 = int(m_range.group(1)), int(m_range.group(2))
+        d2, m2 = int(m_range.group(4)), int(m_range.group(5))
+        y1 = int(m_range.group(3)) if m_range.group(3) else current_year
+        if y1 < 100:
+            y1 += 2000
+        y2 = int(m_range.group(6)) if m_range.group(6) else y1
+        if y2 < 100:
+            y2 += 2000
+        try:
+            start_d = datetime.date(y1, m1, d1)
+            end_d = datetime.date(y2, m2, d2)
+            is_future = start_d > now or (has_active_plan and not wants_replace)
+            return {
+                "start_date": start_d.isoformat(),
+                "end_date": end_d.isoformat(),
+                "range_str": f"{d1:02d}/{m1:02d} al {d2:02d}/{m2:02d}",
+                "is_future_cycle": is_future,
+                "replace_active": wants_replace,
+            }
+        except ValueError:
+            pass
+
+    # 2. Regex para fecha única: ej. "del 2/11 en adelante", "a partir del 2/11", "desde el 9/11"
+    m_single = re.search(
+        r"(?:a partir del?|desde el?|del?|para el?|semana del?)\s*(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?",
+        combined,
+    )
+    if m_single:
+        d1, m1 = int(m_single.group(1)), int(m_single.group(2))
+        y1 = int(m_single.group(3)) if m_single.group(3) else current_year
+        if y1 < 100:
+            y1 += 2000
+        try:
+            start_d = datetime.date(y1, m1, d1)
+            end_d = start_d + datetime.timedelta(days=4)
+            is_future = start_d > now or (has_active_plan and not wants_replace)
+            return {
+                "start_date": start_d.isoformat(),
+                "end_date": end_d.isoformat(),
+                "range_str": f"{start_d.day:02d}/{start_d.month:02d} al {end_d.day:02d}/{end_d.month:02d}",
+                "is_future_cycle": is_future,
+                "replace_active": wants_replace,
+            }
+        except ValueError:
+            pass
+
+    # 3. Expresiones relativas: "próxima semana", "siguiente semana", "próximo ciclo", "siguiente ciclo"
+    is_relative_next = any(w in combined for w in (
+        "proxima semana", "próxima semana", "siguiente semana",
+        "proximo ciclo", "próximo ciclo", "siguiente ciclo", "otra semana",
+        "semana que viene", "semana siguiente"
+    ))
+
+    # Si quiere reemplazar explícitamente el ciclo actual:
+    if wants_replace:
+        return {
+            "start_date": None,
+            "end_date": None,
+            "range_str": None,
+            "is_future_cycle": False,
+            "replace_active": True,
+        }
+
+    # Si es relativo al próximo ciclo O ya tiene un plan activo vigente:
+    if is_relative_next or has_active_plan:
+        days_ahead = (0 - now.weekday() + 7) % 7
+        if days_ahead == 0:
+            days_ahead = 7
+        next_mon = now + datetime.timedelta(days=days_ahead)
+        next_fri = next_mon + datetime.timedelta(days=4)
+        return {
+            "start_date": next_mon.isoformat(),
+            "end_date": next_fri.isoformat(),
+            "range_str": f"{next_mon.day:02d}/{next_mon.month:02d} al {next_fri.day:02d}/{next_fri.month:02d}",
+            "is_future_cycle": True,
+            "replace_active": False,
+        }
+
+    return {
+        "start_date": None,
+        "end_date": None,
+        "range_str": None,
+        "is_future_cycle": False,
+        "replace_active": False,
+    }
+
+
+
 def _normalize_structured_plan(
     raw_plan,
     intensity: str = "Media",
@@ -2164,9 +2322,20 @@ def _normalize_structured_plan(
     is_complementary_days: bool = False,
     user_message: str = "",
     is_no_equipment: bool = False,
+    has_active_plan: bool = False,
+    history: list | None = None,
 ) -> dict | None:
     if not isinstance(raw_plan, dict):
         return None
+
+    if not requested_focus and user_message:
+        dummy_msg = ChatMessage(message=user_message, history=history or [])
+        requested_focus = _detect_requested_focus(dummy_msg)
+
+    weekly_seen_names: set[str] = set()
+    weekly_seen_gifs: set[str] = set()
+
+    # exercises es la lista de muestra/resumen en la raíz del plan; no debe consumir candidatos semanales
     exercises = _normalize_exercises(
         raw_plan.get("exercises"),
         intensity=intensity,
@@ -2194,16 +2363,8 @@ def _normalize_structured_plan(
         int_hint = "media"
         badge_lbl = "Intermedio (Intensidad Media)"
 
-    # Pools de ejercicios normalizados por zona y por día (Día A vs Día B con máxima diversidad)
+    # Base seed para generadores dinámicos
     dynamic_base_seed = abs(hash(user_message + str(int(time.time() / 10)))) % 1000
-    leg_day_a_exs = _normalize_exercises(_generate_diverse_session("piernas", int_hint, seed=dynamic_base_seed, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="piernas", is_no_equipment=is_no_equipment)
-    leg_day_b_exs = _normalize_exercises(_generate_diverse_session("piernas_b", int_hint, seed=dynamic_base_seed + 13, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="piernas", is_no_equipment=is_no_equipment)
-    calves_feet_exs = _normalize_exercises(_generate_diverse_session("pantorrillas_pies", int_hint, seed=dynamic_base_seed + 27, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="pantorrillas_pies", is_no_equipment=is_no_equipment)
-    triceps_legs_exs = _normalize_exercises(_generate_diverse_session("triceps_piernas", int_hint, seed=dynamic_base_seed + 41, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="triceps_piernas", is_no_equipment=is_no_equipment)
-
-    upper_exs = _normalize_exercises(_generate_diverse_session("tren_superior", int_hint, seed=dynamic_base_seed + 53, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="tren_superior", is_no_equipment=is_no_equipment)
-    core_exs = _normalize_exercises(_generate_diverse_session("core", int_hint, seed=dynamic_base_seed + 67, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="core", is_no_equipment=is_no_equipment)
-    mobility_exs = _normalize_exercises(_generate_diverse_session("movilidad_cardio", int_hint, seed=dynamic_base_seed + 79, is_no_equipment=is_no_equipment), intensity=intensity, level=level, requested_focus="movilidad_cardio", is_no_equipment=is_no_equipment)
 
     # Sub-pools especializados para máxima variación sin repeticiones adaptados a equipamiento:
     if is_no_equipment:
@@ -2303,14 +2464,17 @@ def _normalize_structured_plan(
     core_front = [
         {"name": "Plancha frontal isométrica en antebrazos", "sets": 3, "reps": "30-45 seg", "animation_key": "plank", "primary_muscle": "Core, Recto Abdominal", "secondary_muscle": "Transverso"},
         {"name": "Crunch abdominal clásico controlado", "sets": 3, "reps": "15", "animation_key": "crunch", "primary_muscle": "Recto Abdominal", "secondary_muscle": "Core"},
+        {"name": "Mountain Climbers lentos con control de cadera", "sets": 3, "reps": "15 por pierna", "animation_key": "cardio", "primary_muscle": "Core, Recto Abdominal", "secondary_muscle": "Flexores"},
     ]
     core_obliques = [
         {"name": "Plancha lateral isométrica", "sets": 3, "reps": "25-30 seg por lado", "animation_key": "plank", "primary_muscle": "Oblicuos", "secondary_muscle": "Estabilizadores"},
         {"name": "Giros rusos (Russian twists) controlados", "sets": 3, "reps": "20 giros", "animation_key": "crunch", "primary_muscle": "Oblicuos", "secondary_muscle": "Core"},
+        {"name": "Toques al talón alternos en suelo", "sets": 3, "reps": "20 toques", "animation_key": "crunch", "primary_muscle": "Oblicuos", "secondary_muscle": "Recto Abdominal"},
     ]
     core_deep = [
         {"name": "Elevación de piernas en suelo o banco", "sets": 3, "reps": "12", "animation_key": "crunch", "primary_muscle": "Abdomen Inferior", "secondary_muscle": "Flexores de cadera"},
         {"name": "Dead Bug unilateral cruzado", "sets": 3, "reps": "10 por lado", "animation_key": "plank", "primary_muscle": "Core Profundo", "secondary_muscle": "Zona Lumbar"},
+        {"name": "Bird-Dog con control motor y pausa isométrica", "sets": 3, "reps": "10 por lado", "animation_key": "mobility", "primary_muscle": "Core Profundo, Glúteos", "secondary_muscle": "Zona Lumbar"},
     ]
 
     week_order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -2350,6 +2514,7 @@ def _normalize_structured_plan(
                         upper_chest_tri + upper_back_bi,
                         intensity=intensity, level=level, requested_focus="tren_superior",
                         is_no_equipment=is_no_equipment,
+                        seen_names_global=weekly_seen_names, seen_gifs_global=weekly_seen_gifs,
                     ),
                 }
             elif d == "Jueves":
@@ -2357,11 +2522,11 @@ def _normalize_structured_plan(
                     "day_name": d,
                     "is_rest": False,
                     "title": f"Rutina Complementaria: Hombros, Brazos y Core ({level} · {badge_lbl})",
-                    # Martes y Jueves NUNCA repiten los mismos ejercicios
                     "exercises": _normalize_exercises(
                         upper_shoulders_post + upper_arms_torso[:1] + core_front[:1],
                         intensity=intensity, level=level, requested_focus="tren_superior_core",
                         is_no_equipment=is_no_equipment,
+                        seen_names_global=weekly_seen_names, seen_gifs_global=weekly_seen_gifs,
                     ),
                 }
             elif d == "Lunes":
@@ -2373,6 +2538,7 @@ def _normalize_structured_plan(
                         legs_quads + legs_glutes[:2],
                         intensity=intensity, level=level, requested_focus="piernas",
                         is_no_equipment=is_no_equipment,
+                        seen_names_global=weekly_seen_names, seen_gifs_global=weekly_seen_gifs,
                     ),
                 }
             elif d == "Miércoles":
@@ -2380,11 +2546,11 @@ def _normalize_structured_plan(
                     "day_name": d,
                     "is_rest": False,
                     "title": f"Rutina Principal: Piernas (Isquiotibiales y Batatas/Sóleo) ({level} · {badge_lbl})",
-                    # Lunes y Miércoles NUNCA repiten los mismos ejercicios
                     "exercises": _normalize_exercises(
                         legs_hams + legs_unipodal_calves[:2],
                         intensity=intensity, level=level, requested_focus="piernas",
                         is_no_equipment=is_no_equipment,
+                        seen_names_global=weekly_seen_names, seen_gifs_global=weekly_seen_gifs,
                     ),
                 }
             elif d == "Viernes":
@@ -2396,6 +2562,7 @@ def _normalize_structured_plan(
                         upper_arms_torso + core_obliques + legs_power_mob[:1],
                         intensity=intensity, level=level, requested_focus="tren_superior_core",
                         is_no_equipment=is_no_equipment,
+                        seen_names_global=weekly_seen_names, seen_gifs_global=weekly_seen_gifs,
                     ),
                 }
             else:
@@ -2412,7 +2579,33 @@ def _normalize_structured_plan(
         recommended_days = target_days
 
         def _get_day_content(day_idx: int) -> tuple[str, list]:
-            if requested_focus == "solo_piernas":
+            if requested_focus == "cuerpo_completo":
+                day_titles = [
+                    f"Cuerpo Completo: Piernas (Cuádriceps) + Pecho + Core ({badge_lbl})",
+                    f"Cuerpo Completo: Isquiotibiales/Femoral + Espalda Dorsal + Oblicuos ({badge_lbl})",
+                    f"Cuerpo Completo: Glúteos + Hombros (Deltoides) + Core Profundo ({badge_lbl})",
+                    f"Cuerpo Completo: Pantorrillas/Sóleo + Tríceps + Estabilidad ({badge_lbl})",
+                    f"Cuerpo Completo: Potencia Funcional + Bíceps + Movilidad ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    legs_quads[:2] + upper_chest_tri[:1] + core_front[:1],
+                    legs_hams[:2] + upper_back_bi[:1] + core_obliques[:1],
+                    legs_glutes[:2] + upper_shoulders_post[:1] + core_deep[:1],
+                    legs_unipodal_calves[:2] + upper_arms_torso[:1] + core_front[1:2],
+                    legs_power_mob[:2] + upper_back_bi[1:2] + core_deep[2:3],
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="cuerpo_completo",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus == "solo_piernas":
                 day_titles = [
                     f"Piernas: Cuádriceps, Glúteos y Batatas ({badge_lbl})",
                     f"Piernas: Isquiotibiales, Femoral y Sóleo ({badge_lbl})",
@@ -2423,7 +2616,15 @@ def _normalize_structured_plan(
                 idx = day_idx % len(day_titles)
                 focus_tag = "piernas" if idx % 2 == 0 else "piernas_b"
                 diverse_day_exs = _generate_diverse_session(focus_tag, int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)
-                return day_titles[idx], _normalize_exercises(diverse_day_exs, intensity=intensity, level=level, requested_focus="piernas", is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="piernas",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
             elif requested_focus == "solo_tren_superior":
                 day_titles = [
@@ -2435,7 +2636,15 @@ def _normalize_structured_plan(
                 ]
                 day_exs_map = [upper_chest_tri, upper_back_bi, upper_shoulders_post, upper_chest_tri[:2] + upper_back_bi[:1], upper_arms_torso]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="tren_superior", is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="tren_superior",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
             elif requested_focus == "solo_core":
                 day_titles = [
@@ -2447,7 +2656,15 @@ def _normalize_structured_plan(
                 ]
                 day_exs_map = [core_front, core_obliques, core_deep, core_front + core_obliques[:1], core_obliques + core_deep[:1]]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="core", is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="core",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
             elif requested_focus == "piernas_tren_superior":
                 day_titles = [
@@ -2465,7 +2682,15 @@ def _normalize_structured_plan(
                     legs_power_mob[:2] + upper_chest_tri[:1] + upper_back_bi[:1],
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_tren_superior", is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="piernas_tren_superior",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
             elif requested_focus == "piernas_core":
                 day_titles = [
@@ -2483,7 +2708,15 @@ def _normalize_structured_plan(
                     legs_power_mob[:2] + core_deep,
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_core", is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="piernas_core",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
             elif requested_focus == "tren_superior_core":
                 day_titles = [
@@ -2501,7 +2734,15 @@ def _normalize_structured_plan(
                     upper_chest_tri[:1] + upper_back_bi[:1] + core_front,
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="tren_superior_core", is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="tren_superior_core",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
             elif requested_focus == "pantorrillas_pies":
                 soleo_desc = "Sóleo en Suelo/Silla" if is_no_equipment else "Sóleo en Máquina"
@@ -2521,7 +2762,15 @@ def _normalize_structured_plan(
                     [calves_pool[2] if len(calves_pool) > 2 else calves_pool[0]] + legs_glutes[:2],
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="piernas_tren_superior", is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="piernas_tren_superior",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
             elif requested_focus == "triceps_piernas":
                 tri_desc = "Batatas/Sóleo y Fondos en Silla" if is_no_equipment else "Batatas/Sóleo y Polea"
@@ -2541,7 +2790,15 @@ def _normalize_structured_plan(
                     tri_legs_pool,
                 ]
                 idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(day_exs_map[idx], intensity=intensity, level=level, requested_focus="triceps_piernas", is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="triceps_piernas",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
             else:
                 default_titles = [
@@ -2551,20 +2808,23 @@ def _normalize_structured_plan(
                     f"Piernas y Glúteos (Isquiotibiales y Femoral) · {badge_lbl}",
                     f"Tren Superior (Hombros, Brazos y Postura) · {badge_lbl}",
                 ]
-                upper_day_b = _normalize_exercises(
+                day_raw_candidates = [
+                    legs_quads + legs_glutes[:1],
+                    upper_chest_tri + upper_back_bi[:1],
+                    core_front + core_obliques + core_deep[:1],
+                    legs_hams + legs_unipodal_calves[:2],
                     upper_shoulders_post + upper_arms_torso,
-                    intensity=intensity, level=level, requested_focus="tren_superior",
-                    is_no_equipment=is_no_equipment,
-                )
-                default_exs = [
-                    exercises if (requested_focus == "piernas" and exercises) else leg_day_a_exs,
-                    exercises if (requested_focus == "tren_superior" and exercises) else upper_exs,
-                    exercises if (requested_focus in ("core", "movilidad_cardio") and exercises) else core_exs,
-                    leg_day_b_exs,  # Día 4: Isquios, Femorales y Batatas -> CERO REPETICIÓN con Día 1
-                    upper_day_b,    # Día 5: Hombros, Brazos y Postura -> CERO REPETICIÓN con Día 2
                 ]
                 idx = day_idx % len(default_titles)
-                return default_titles[idx], default_exs[idx]
+                return default_titles[idx], _normalize_exercises(
+                    day_raw_candidates[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="tren_superior" if (idx in (1, 4)) else ("core" if idx == 2 else "piernas"),
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
 
         active_day_counter = 0
         for d in week_order:
@@ -2586,7 +2846,11 @@ def _normalize_structured_plan(
                     "rest_advice": f"Hoy {d} tus fibras musculares se reparan y sintetizan nuevas proteínas. El descanso neuromuscular de 48-72h optimiza la adaptación.",
                 }
 
-    if requested_focus == "solo_piernas":
+    cycle_dates = _extract_cycle_dates(user_message, has_active_plan=has_active_plan, history=history)
+
+    if requested_focus == "cuerpo_completo":
+        raw_title = f"Plan Integral de Cuerpo Completo (Full Body) ({badge_lbl})"
+    elif requested_focus == "solo_piernas":
         raw_title = f"Especialización en Piernas y Glúteos ({badge_lbl})"
     elif requested_focus == "pantorrillas_pies":
         raw_title = f"Especialización en Pantorrillas (Batatas), Sóleo y Pies ({badge_lbl})"
@@ -2633,6 +2897,11 @@ def _normalize_structured_plan(
         "exercises": exercises,
         "days_schedule": days_schedule,
         "nutrition": nutrition,
+        "cycle_start_date": cycle_dates.get("start_date"),
+        "cycle_end_date": cycle_dates.get("end_date"),
+        "cycle_range_str": cycle_dates.get("range_str"),
+        "is_future_cycle": cycle_dates.get("is_future_cycle", False),
+        "replace_active_cycle": cycle_dates.get("replace_active", False),
     }
 
 
@@ -3462,14 +3731,37 @@ Devuelve SOLO JSON."""
         is_complementary_days=is_complementary,
         user_message=payload.message or "",
         is_no_equipment=is_no_equipment,
+        has_active_plan=has_active_plan,
+        history=payload.history,
     )
     has_plan = bool(data.get("has_plan")) and structured_plan is not None and should_generate_plan
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
     user_msg_lower = (payload.message or "").lower()
 
+    if has_plan and structured_plan:
+        if structured_plan.get("is_future_cycle") and structured_plan.get("cycle_range_str"):
+            reply_str += (
+                f"\n\n📅 **Programado para tu Próximo Ciclo ({structured_plan['cycle_range_str']}):** "
+                f"Tu ciclo activo de esta semana continúa en curso sin modificaciones para proteger tu progresión. "
+                f"Esta nueva planificación queda guardada y programada para la semana del {structured_plan['cycle_range_str']}, "
+                f"y se activará automáticamente como tu ciclo principal al llegar esa fecha."
+            )
+        elif structured_plan.get("replace_active_cycle"):
+            reply_str += (
+                f"\n\n🔄 **Ciclo Activo Actualizado:** Siguiendo tu indicación explícita, "
+                f"he actualizado de inmediato el cronograma de tu ciclo activo vigente con esta nueva rutina."
+            )
+
     if has_plan and not is_complementary:
         lower_reply = reply_str.lower()
-        if requested_focus == "solo_piernas":
+        if requested_focus == "cuerpo_completo":
+            if "cuerpo completo" not in lower_reply and "full body" not in lower_reply:
+                reply_str += (
+                    f"\n\n🏋️‍♂️ **Plan Semanal de Cuerpo Completo (Full Body):** He estructurado tu programa con estímulos balanceados "
+                    f"para todo el cuerpo (Piernas, Torso, Core y Capacidad Funcional), garantizando máxima variedad día tras día, "
+                    f"cero ejercicios repetidos y respetando 48-72h de recuperación fisiológica."
+                )
+        elif requested_focus == "solo_piernas":
             if "semana de especialización" not in lower_reply and "piernas" not in lower_reply:
                 reply_str += (
                     f"\n\n🦵 **Especialización Semanal de Piernas:** He estructurado tu semana enfocada 100% en miembros inferiores "

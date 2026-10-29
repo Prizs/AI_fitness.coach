@@ -8,8 +8,10 @@ class DBHelper {
   static final DBHelper instance = DBHelper._init();
   static Database? _database;
   static String? _memoryCache;
+  static String? _memoryUpcomingCache;
   static Set<int>? _memoryCompletedDays;
   static const String _webStorageKey = 'cached_weekly_plan_v1';
+  static const String _upcomingStorageKey = 'cached_upcoming_plan_v1';
   static const String _completedDaysKey = 'cached_completed_days_v1';
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
@@ -35,6 +37,13 @@ class DBHelper {
   Future _createDB(Database db, int version) async {
     await db.execute('''
 CREATE TABLE cached_plan (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plan_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)
+''');
+    await db.execute('''
+CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   plan_json TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -124,6 +133,89 @@ CREATE TABLE cached_plan (
     }
     return null;
   }
+
+  Future<void> saveUpcomingPlan(String jsonString) async {
+    _memoryUpcomingCache = jsonString;
+    if (kIsWeb) {
+      try {
+        await _secureStorage
+            .write(key: _upcomingStorageKey, value: jsonString)
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+      return;
+    }
+    try {
+      final db = await instance.database.timeout(const Duration(seconds: 2));
+      await db.delete('cached_upcoming_plan');
+      await db.insert('cached_upcoming_plan', {
+        'plan_json': jsonString,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {
+      try {
+        await _secureStorage
+            .write(key: _upcomingStorageKey, value: jsonString)
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }
+  }
+
+  Future<void> clearUpcomingPlanCache() async {
+    _memoryUpcomingCache = null;
+    if (kIsWeb) {
+      try {
+        await _secureStorage.delete(key: _upcomingStorageKey);
+      } catch (_) {}
+      return;
+    }
+    try {
+      final db = await instance.database;
+      await db.delete('cached_upcoming_plan');
+    } catch (_) {
+      try {
+        await _secureStorage.delete(key: _upcomingStorageKey);
+      } catch (_) {}
+    }
+  }
+
+  Future<String?> getCachedUpcomingPlan() async {
+    if (_memoryUpcomingCache != null && _memoryUpcomingCache!.trim().isNotEmpty) {
+      return _memoryUpcomingCache;
+    }
+    if (kIsWeb) {
+      try {
+        final stored = await _secureStorage
+            .read(key: _upcomingStorageKey)
+            .timeout(const Duration(seconds: 2));
+        if (stored != null && stored.trim().isNotEmpty) {
+          _memoryUpcomingCache = stored;
+          return stored;
+        }
+      } catch (_) {}
+      return null;
+    }
+    try {
+      final db = await instance.database.timeout(const Duration(seconds: 2));
+      final result = await db.query('cached_upcoming_plan', limit: 1);
+      if (result.isNotEmpty) {
+        final plan = result.first['plan_json'] as String;
+        _memoryUpcomingCache = plan;
+        return plan;
+      }
+    } catch (_) {
+      try {
+        final stored = await _secureStorage
+            .read(key: _upcomingStorageKey)
+            .timeout(const Duration(seconds: 2));
+        if (stored != null && stored.trim().isNotEmpty) {
+          _memoryUpcomingCache = stored;
+          return stored;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
 
   static const String _workoutStatsKey = 'cached_workout_stats_v1';
   static const String _workoutHistoryKey = 'cached_workout_history_v1';
