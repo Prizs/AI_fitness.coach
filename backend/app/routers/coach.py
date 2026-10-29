@@ -1329,11 +1329,11 @@ def _sanitize_exercise_by_equipment(name: str, primary: str, animation_key: str,
 
     # Prensa 45°, máquina Smith o Hack
     if "prensa" in lower or "smith" in lower or "hack" in lower:
-        return "Sentadilla isométrica apoyado en pared (Wall Sit 45s) (Intermedio)", "Cuádriceps", "squat"
+        return "Sentadilla búlgara con pie elevado en silla o sofá (Intermedio)", "Cuádriceps", "split-squat"
 
     # Extensión de cuádriceps en máquina
     if "extensión de cuádriceps" in lower or "extension de cuadriceps" in lower or "leg-extension" in lower:
-        return "Sentadilla isométrica en pared (Wall Sit 45s) (Intermedio)", "Cuádriceps", "squat"
+        return "Sentadilla isométrica apoyado en pared (Wall Sit 45s) (Intermedio)", "Cuádriceps", "squat"
 
     # Curl de femoral / isquiotibiales en máquina
     if ("curl" in lower and ("femoral" in lower or "isquio" in lower)) or "curl de isquiotibiales" in lower:
@@ -1986,6 +1986,8 @@ def _normalize_exercises(
     core_pool = CORE_POOLS[intensity_hint]
     mobility_pool = MOBILITY_CARDIO_POOLS[intensity_hint]
 
+    seen_names: set[str] = set()
+
     for idx, exercise in enumerate(raw_exercises):
         if not isinstance(exercise, dict):
             continue
@@ -2043,6 +2045,27 @@ def _normalize_exercises(
 
         clean_name = _sanitize_exercise_by_intensity(raw_name, intensity_hint)
         clean_name, primary, anim_key = _sanitize_exercise_by_equipment(clean_name, primary, anim_key, is_no_equipment)
+
+        # Deduplication Guard: evitar ejercicios duplicados o biomecánicamente repetidos en la misma rutina
+        base_norm = re.sub(r"\(.*?\)", "", clean_name).strip().lower()
+        if base_norm in seen_names:
+            replacement_found = False
+            active_pool = leg_pool if (requested_focus == "piernas" or _is_leg_exercise(clean_name, primary)) else (
+                upper_pool if requested_focus in ("tren_superior", "pecho", "espalda", "brazos_hombros") else core_pool
+            )
+            for cand in active_pool:
+                cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(cand["name"], cand["primary_muscle"], cand["animation_key"], is_no_equipment)
+                cand_base = re.sub(r"\(.*?\)", "", cand_clean).strip().lower()
+                if cand_base not in seen_names:
+                    clean_name = cand_clean
+                    primary = cand_prim
+                    anim_key = cand_anim
+                    base_norm = cand_base
+                    replaced_from_pool = True
+                    replacement_found = True
+                    break
+        seen_names.add(base_norm)
+
         gif_meta = get_exercise_gif(clean_name, muscle=primary, intensity=intensity_hint)
 
         exercises.append(

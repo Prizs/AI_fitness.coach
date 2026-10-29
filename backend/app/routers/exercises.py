@@ -835,3 +835,11 @@ def get_exercise_gif(
         "posture": "Mantén el core activo, columna neutra y respiración acompasada en cada repetición.",
         "warning": "Si percibes molestia articular aguda, reduce el rango de movimiento o detén la serie.",
     }
+
+
+@router.get("/catalog/stats")
+def get_catalog_stats():
+    """Retorna las estadísticas del catálogo completo de 1.323 GIFs indexados por equipamiento, intensidad y seguridad clínica."""
+    from app.services.exercise_catalog_service import catalog_service
+    return catalog_service.stats()
+
