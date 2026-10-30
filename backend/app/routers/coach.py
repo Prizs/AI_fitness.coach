@@ -241,9 +241,13 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
             return "triceps_piernas"
 
         # Sub-área anatómica AISLADA de Pierna: Pantorrillas, Batatas, Sóleo, Pies y Tobillos
-        # SOLO si NO pidió piernas en general ni otros músculos mayores
-        if has_calves_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen")):
+        # SOLO si NO es un reporte de dolor o molestia que desea evitar
+        is_pain_report = any(w in t for w in ("molestia", "dolor", "lesion", "lesión", "inflama", "no demanden", "evitar", "sin demandar"))
+        if has_calves_word and not is_pain_report and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen")):
             return "pantorrillas_pies"
+        if has_calves_word and is_pain_report:
+            # Si le duele el tobillo/pie y pide ejercitarse sin demandar esa zona, asignar Tren Superior
+            return "tren_superior"
 
         # Sub-áreas aisladas de pierna si se piden de forma específica
         if has_quads_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
@@ -425,7 +429,17 @@ def _is_explicit_routine_request(message: str, history: list = None) -> bool:
     """Detecta si el usuario está pidiendo explícitamente generar o ver un plan o rutina."""
     msg = (message or "").lower()
 
-    # Si expresa dolor o molestia, es una consulta de salud/rehabilitación, no una orden de rutina
+    # Si el usuario menciona molestia pero explícitamente pide que le planifiquen ejercicios adaptados,
+    # SÍ es una solicitud de rutina adaptada.
+    wants_adaptation = any(k in msg for k in (
+        "quiero que me planifiques", "planifiques ejercicios", "planificar ejercicios",
+        "quiero entrenar", "deseo entrenar", "ejercicios que no", "rutina que no",
+        "sin demandar", "no demanden", "no afecte", "ejercicios seguros", "rutina adaptada"
+    ))
+    if wants_adaptation:
+        return True
+
+    # Si expresa dolor o molestia sin pedir ejercicios adaptados, es consulta de descanso/salud
     if any(k in msg for k in ("me duele", "molestia", "dolor", "lesión", "lesion", "tengo dudas", "tengo una duda", "pregunta")):
         return False
 
@@ -3338,6 +3352,7 @@ Devuelve SOLO JSON."""
     requested_focus = _detect_requested_focus(payload)
     is_complementary = _is_complementary_days_request(payload)
 
+    has_active_plan = bool(payload.has_active_plan)
     motor_disabled, motor_reason = _detect_motor_disability_or_seated_need(payload)
 
     if motor_disabled:
@@ -3398,7 +3413,14 @@ Devuelve SOLO JSON."""
         )
     user_msg_lower = (payload.message or "").lower()
 
-    is_rest_request = (
+    wants_adaptation = any(k in user_msg_lower for k in (
+        "quiero que me planifiques", "planifiques ejercicios", "planificar ejercicios",
+        "quiero entrenar", "deseo entrenar", "ejercicios que no demanden", "sin demandar",
+        "que no demanden este", "que no demanden esta", "rutina adaptada", "entrenar con cuidado",
+        "sin afectar", "sin tocar", "no afecte", "ejercicios seguros"
+    ))
+
+    raw_rest_request = (
         "me impide entrenar" in user_msg_lower
         or "descanso total" in user_msg_lower
         or "no puedo entrenar hoy" in user_msg_lower
@@ -3407,6 +3429,8 @@ Devuelve SOLO JSON."""
         or "reporte de descanso" in user_msg_lower
         or "tomar una pausa o descanso" in user_msg_lower
     )
+
+    is_rest_request = raw_rest_request and not wants_adaptation
 
     is_submission = (
         "mi estado actual para la sesión" in user_msg_lower
@@ -3436,7 +3460,10 @@ REGLAS OBLIGATORIAS:
 1. DIÁLOGO, EMPATÍA Y ASESORÍA HUMANA:
    - Responde directamente a lo que el usuario comenta, pregunta o expresa (dudas sobre nutrición, mitos, dolores musculares o articulares, suplementación, técnica biomecánica, motivación o charla casual).
    - Explica con claridad y sustento científico práctico.
-   - Si expresa alguna molestia física o lesión, dale recomendaciones de cuidado postural, descanso y prevención.
+   - Si el usuario solicitó PAUSA O DESCANSO POR DOLOR/LESIÓN (ej: tobillo, rodilla, hombro, espalda):
+     * ESTÁ TERMINANTEMENTE PROHIBIDO prescribir rutinas o incitarlo a entrenar hoy.
+     * Analiza sus síntomas con criterio profesional, explica el protocolo RICE (Hielo, Reposo, Elevación), tiempo estimado de recuperación (3 a 7 días o más) y criterios de alarma para consultar a un traumatólogo o fisioterapeuta.
+     * Ofrece ÚNICAMENTE botones de salud y recuperación (Protocolo RICE, tiempo de espera, señales de alarma médica).
    - Si consulta de alimentación, recuerda las pautas accesibles de Venezuela (huevos, pollo, carne molida magra, atún, queso blanco llanero, arepa de maíz, arroz blanco, avena, batata, yuca, plátano, cambur criollo. Cero ingredientes importados inaccesibles).
 2. META MENSUAL ESTRICTA (NO ASUMIR HIPERTROFIA):
    - La meta mensual elegida por el usuario es: "{payload.user_goal or 'Acondicionamiento físico general'}".
@@ -3487,7 +3514,15 @@ Devuelve SOLO JSON."""
             "💪 Rutina de Tren Superior",
             "🔥 Rutina Cardio HIIT & Core",
         ]
-        if fatigue_detected:
+        if is_rest_request:
+            category = "Protocolo de Recuperación y Reposo"
+            quick_replies = [
+                "🧊 Protocolo RICE y Alivio",
+                "⏳ ¿Cuándo podré volver a entrenar?",
+                "🩺 Señales para ir al traumatólogo",
+                "🍎 Nutrición antiinflamatoria",
+            ]
+        elif fatigue_detected:
             quick_replies = [
                 "Ver rutina con intensidad ajustada",
                 "Consultar rutina de movilidad/descarga",
@@ -3510,11 +3545,20 @@ Devuelve SOLO JSON."""
             print("Aviso: Fallback en diálogo de Coach IA:", e)
 
         if not reply_str:
-            reply_str = (
-                f"¡Hola! Te escucho con total atención. Como tu coach y amigo, estoy aquí para guiarte tanto en "
-                f"tus entrenamientos como en tus dudas de técnica, nutrición y recuperación. "
-                f"¿En qué aspecto específico te gustaría que nos enfoquemos ahora mismo?"
-            )
+            if is_rest_request:
+                reply_str = (
+                    "Comprendo y respeto totalmente tu necesidad de descanso. Ante una molestia física aguda, la prioridad "
+                    "inmediata es la recuperación neuromuscular y la protección articular. Te recomiendo aplicar el protocolo RICE "
+                    "(Reposo absoluto del área, aplicación de Hielo durante 15 a 20 minutos cada 3-4 horas, Compresión moderada y Elevación). "
+                    "El tiempo de espera recomendado antes de retomar actividad ligera es de 3 a 7 días si no hay dolor agudo ni inflamación. "
+                    "Si presentas inflamación severa, moretones o imposibilidad de apoyar o mover la articulación, es indispensable acudir de inmediato a un traumatólogo o fisioterapeuta."
+                )
+            else:
+                reply_str = (
+                    f"¡Hola! Te escucho con total atención. Como tu coach y amigo, estoy aquí para guiarte tanto en "
+                    f"tus entrenamientos como en tus dudas de técnica, nutrición y recuperación. "
+                    f"¿En qué aspecto específico te gustaría que nos enfoquemos ahora mismo?"
+                )
 
         return {
             "provider": "ai",
@@ -3796,7 +3840,14 @@ Devuelve SOLO JSON."""
 
 
 
-    is_rest_request = (
+    wants_adaptation = any(k in user_msg_lower for k in (
+        "quiero que me planifiques", "planifiques ejercicios", "planificar ejercicios",
+        "quiero entrenar", "deseo entrenar", "ejercicios que no demanden", "sin demandar",
+        "que no demanden este", "que no demanden esta", "rutina adaptada", "entrenar con cuidado",
+        "sin afectar", "sin tocar", "no afecte", "ejercicios seguros"
+    ))
+
+    raw_rest_request = (
         "me impide entrenar" in user_msg_lower
         or "descanso total" in user_msg_lower
         or "no puedo entrenar hoy" in user_msg_lower
@@ -3805,6 +3856,8 @@ Devuelve SOLO JSON."""
         or "reporte de descanso" in user_msg_lower
         or "tomar una pausa o descanso" in user_msg_lower
     )
+
+    is_rest_request = raw_rest_request and not wants_adaptation
     if is_rest_request:
         has_plan = False
         structured_plan = None

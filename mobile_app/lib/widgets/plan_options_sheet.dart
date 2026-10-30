@@ -57,7 +57,7 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
   final TextEditingController _molestiaController = TextEditingController();
   
   String _estado = 'Bien';
-  String _molestiaAction = 'Descanso';
+  String _molestiaAction = 'Adaptar';
   String _equipo = 'Gym Completo';
   String _intensity = 'Medio';
   String _experience = 'Intermedio';
@@ -401,7 +401,19 @@ class _PlanOptionsFormState extends State<_PlanOptionsForm> {
                   final buffer = StringBuffer();
                   buffer.writeln('📋 Mi Estado Actual para la sesión:');
                   if (_estado == 'Molestia') {
-                    if (isRest) {
+                    final rawMotivo = _molestiaController.text.trim();
+                    final lowerMotivo = rawMotivo.toLowerCase();
+                    // Si el usuario expresó explícitamente en el texto que desea entrenar o pide ejercicios adaptados,
+                    // prevalece su deseo de entrenar y se conmuta a modo Adaptar.
+                    final wantsTrainingInText = [
+                      'quiero que me planifiques', 'planifiques ejercicios', 'planificar ejercicios',
+                      'quiero entrenar', 'deseo entrenar', 'ejercicios que no', 'rutina que no',
+                      'sin tocar', 'no afecte', 'no demanden', 'sin demandar', 'no demanden este'
+                    ].any((k) => lowerMotivo.contains(k));
+
+                    final effectiveIsRest = isRest && !wantsTrainingInText;
+
+                    if (effectiveIsRest) {
                       buffer.writeln('• Estado Físico: Tengo una molestia/dolor que me IMPIDE ENTRENAR HOY.');
                       final motivo = _molestiaController.text.trim();
                       if (motivo.isNotEmpty) {
