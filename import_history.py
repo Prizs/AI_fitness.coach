@@ -20,9 +20,10 @@ def main():
         return 1
 
     user_profile = os.environ.get("USERPROFILE")
-    if not user_profile:
-        print("[ERROR] No se pudo determinar el directorio de usuario (USERPROFILE).")
-        return 1
+    if os.path.exists(r"C:\Users\USUARIO"):
+        user_profile = r"C:\Users\USUARIO"
+    elif not user_profile:
+        user_profile = r"C:\Users\USUARIO"
 
     agy_dir = os.path.join(user_profile, ".gemini", "antigravity")
     if not os.path.exists(agy_dir):
@@ -58,9 +59,8 @@ def main():
     print(f"[3/4] Copiando artefactos y memoria cerebral (brain/{conv_id})...")
     src_brain = os.path.join(temp_extract, "brain", conv_id)
     dest_brain = os.path.join(brain_dir, conv_id)
-    if os.path.exists(dest_brain):
-        shutil.rmtree(dest_brain)
-    shutil.copytree(src_brain, dest_brain)
+    os.makedirs(dest_brain, exist_ok=True)
+    shutil.copytree(src_brain, dest_brain, dirs_exist_ok=True)
 
     print("[4/4] Registrando conversacion en el indice de Antigravity (conversation_summaries.db)...")
     summaries_db_path = os.path.join(agy_dir, "conversation_summaries.db")
@@ -97,7 +97,7 @@ def main():
 
     shutil.rmtree(temp_extract)
     print("\n===============================================================================")
-    print("  ✔ ¡HISTORIAL MIGRADO AL 100% CON EXITO!")
+    print("  [EXITO] HISTORIAL MIGRADO AL 100% CON EXITO!")
     print("===============================================================================")
     print("Pasos finales:")
     print("1. Abre o reinicia Antigravity en tu laptop.")
