@@ -266,9 +266,10 @@ class WeeklyPlanService extends ChangeNotifier {
 
   Future<void> _load(UserProfile? profile) async {
     lastError = null;
+    final cedula = profile?.cedula ?? AuthService.instance.loggedInUser?.cedula;
     try {
       final cachedJson = await DBHelper.instance
-          .getCachedWeeklyPlan()
+          .getCachedWeeklyPlan(cedula: cedula)
           .timeout(const Duration(seconds: 2), onTimeout: () => null);
       if (cachedJson != null && cachedJson.trim().isNotEmpty) {
         try {
@@ -302,7 +303,7 @@ class WeeklyPlanService extends ChangeNotifier {
 
     try {
       final cachedUpcomingJson = await DBHelper.instance
-          .getCachedUpcomingPlan()
+          .getCachedUpcomingPlan(cedula: cedula)
           .timeout(const Duration(seconds: 2), onTimeout: () => null);
       if (cachedUpcomingJson != null && cachedUpcomingJson.trim().isNotEmpty) {
         try {
@@ -327,8 +328,8 @@ class WeeklyPlanService extends ChangeNotifier {
           week = upcomingWeek;
           upcomingWeek = null;
           try {
-            await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
-            await DBHelper.instance.clearUpcomingPlanCache();
+            await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!), cedula: cedula);
+            await DBHelper.instance.clearUpcomingPlanCache(cedula: cedula);
           } catch (_) {}
         }
       }
@@ -337,7 +338,11 @@ class WeeklyPlanService extends ChangeNotifier {
 
     try {
       const storage = FlutterSecureStorage();
-      final prefStr = await storage.read(key: 'user_preferences_v1');
+      final prefKey = (cedula != null && cedula.isNotEmpty)
+          ? 'user_preferences_$cedula'
+          : 'user_preferences_v1';
+      var prefStr = await storage.read(key: prefKey);
+      prefStr ??= await storage.read(key: 'user_preferences_v1');
       if (prefStr != null && prefStr.trim().isNotEmpty) {
         final pref = jsonDecode(prefStr);
         if (pref is Map) {
@@ -350,8 +355,9 @@ class WeeklyPlanService extends ChangeNotifier {
 
     try {
       _workoutStats = await DBHelper.instance.getWorkoutStats();
-      _completedDaysSet = await DBHelper.instance.getCompletedDays();
+      _completedDaysSet = await DBHelper.instance.getCompletedDays(cedula: cedula);
     } catch (_) {}
+
 
     isLoading = false;
     _pending = null;
@@ -917,7 +923,8 @@ class WeeklyPlanService extends ChangeNotifier {
         lastError = null;
         notifyListeners();
         try {
-          await DBHelper.instance.saveUpcomingPlan(jsonEncode(upcomingWeek!));
+          final userCedula = AuthService.instance.loggedInUser?.cedula;
+          await DBHelper.instance.saveUpcomingPlan(jsonEncode(upcomingWeek!), cedula: userCedula);
         } catch (_) {}
 
         return {
@@ -941,8 +948,10 @@ class WeeklyPlanService extends ChangeNotifier {
       lastError = null;
       notifyListeners();
       try {
-        await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
+        final userCedula = AuthService.instance.loggedInUser?.cedula;
+        await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!), cedula: userCedula);
       } catch (_) {}
+
 
       return {
         'assigned_days': assignedDayNames,
@@ -1062,7 +1071,8 @@ class WeeklyPlanService extends ChangeNotifier {
     lastError = null;
     notifyListeners();
     try {
-      await DBHelper.instance.saveWeeklyPlan(jsonEncode(week));
+      final userCedula = AuthService.instance.loggedInUser?.cedula;
+      await DBHelper.instance.saveWeeklyPlan(jsonEncode(week), cedula: userCedula);
     } catch (_) {}
 
     return {
@@ -1078,10 +1088,12 @@ class WeeklyPlanService extends ChangeNotifier {
     lastError = null;
     notifyListeners();
     try {
-      await DBHelper.instance.saveWeeklyPlan('');
-      await DBHelper.instance.saveCompletedDays({});
+      final userCedula = AuthService.instance.loggedInUser?.cedula;
+      await DBHelper.instance.saveWeeklyPlan('', cedula: userCedula);
+      await DBHelper.instance.saveCompletedDays({}, cedula: userCedula);
     } catch (_) {}
   }
+
 
   Future<void> activateUpcomingPlanNow() async {
     if (upcomingWeek == null) return;

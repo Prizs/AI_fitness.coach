@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:mobile_app/database/db_helper.dart';
 import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
@@ -356,7 +358,8 @@ class _OnboardingQuizScreenState extends State<OnboardingQuizScreen> {
       ];
     }
 
-    // Guardar en almacenamiento seguro
+    // Guardar en almacenamiento seguro y en base de datos por usuario
+    final cedula = widget.userProfile.cedula;
     final quizData = {
       'completed': true,
       'date': DateTime.now().toIso8601String(),
@@ -372,12 +375,30 @@ class _OnboardingQuizScreenState extends State<OnboardingQuizScreen> {
       'coachingStyle': _coachingStyle,
       'rules': _antiProcrastinationRules,
     };
+    final quizDataJson = jsonEncode(quizData);
 
     try {
-      await _storage.write(key: 'biopsycho_quiz_completed', value: 'true');
-      await _storage.write(key: 'biopsycho_archetype', value: _archetypeTitle);
-      await _storage.write(key: 'biopsycho_data', value: jsonEncode(quizData));
+      // 1. Guardar en DBHelper y secure storage asociado a la cédula
+      await DBHelper.instance.saveUserArchetype(cedula, _archetypeTitle, quizDataJson: quizDataJson);
+
+      // 2. Actualizar perfiles activos en memoria
+      widget.userProfile.archetype = _archetypeTitle;
+      if (AuthService.instance.loggedInUser != null) {
+        AuthService.instance.loggedInUser!.archetype = _archetypeTitle;
+      }
+
+      // 3. Persistir en backend Supabase de forma asíncrona
+      http.post(
+        Uri.parse('${AuthService.apiBaseUrl}/api/auth/profile/archetype'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'cedula': cedula,
+          'archetype': _archetypeTitle,
+          'archetype_data': quizDataJson,
+        }),
+      ).timeout(const Duration(seconds: 10));
     } catch (_) {}
+
 
     // Simulación de análisis estilo FitCraft
     await Future.delayed(const Duration(milliseconds: 1400));

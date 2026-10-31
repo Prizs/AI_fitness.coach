@@ -13,6 +13,7 @@ import 'package:mobile_app/screens/progress_screen.dart';
 import 'package:mobile_app/screens/notifications_screen.dart';
 import 'package:mobile_app/screens/nutrition_screen.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/database/db_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,7 +35,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadArchetype() async {
     try {
-      final arch = await _storage.read(key: 'biopsycho_archetype');
+      final user = AuthService.instance.loggedInUser;
+      final cedula = user?.cedula;
+      String? arch;
+
+      // 1. Verificar si ya está en el modelo UserProfile
+      if (user?.archetype != null && user!.archetype!.isNotEmpty) {
+        arch = user.archetype;
+      }
+
+      // 2. Verificar en DBHelper por usuario
+      if (arch == null || arch.isEmpty) {
+        arch = await DBHelper.instance.getUserArchetype(cedula);
+      }
+
+      // 3. Verificar en SecureStorage por cédula y clave general
+      if (arch == null || arch.isEmpty) {
+        if (cedula != null && cedula.isNotEmpty) {
+          arch = await _storage.read(key: 'biopsycho_archetype_$cedula');
+        }
+      }
+      if (arch == null || arch.isEmpty) {
+        arch = await _storage.read(key: 'biopsycho_archetype');
+      }
+
       if (mounted) {
         setState(() {
           _archetype = arch;
@@ -45,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _checkedArchetype = true);
     }
   }
+
 
   void _openQuiz() {
     final user = AuthService.instance.loggedInUser ??

@@ -16,6 +16,7 @@ class UserProfile {
     this.specialty,
     this.experienceYears,
     this.certifications,
+    this.archetype,
   });
 
   final String cedula;
@@ -34,4 +35,5 @@ class UserProfile {
   final String? specialty;
   final int? experienceYears;
   final String? certifications;
+  String? archetype;
 }

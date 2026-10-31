@@ -77,6 +77,8 @@ class AuthService {
         weight == null) {
       return false;
     }
+    final archetype = await _storage.read(key: 'biopsycho_archetype_$cedula') ??
+        await _storage.read(key: 'biopsycho_archetype');
     accessToken = token;
     loggedInUser = UserProfile(
       cedula: cedula,
@@ -91,6 +93,7 @@ class AuthService {
       motorDisability: await _storage.read(key: 'motor_disability'),
       areasToAvoid: await _storage.read(key: 'areas_to_avoid'),
       role: await _storage.read(key: 'role') ?? 'client',
+      archetype: archetype,
     );
     return true;
   }
@@ -201,6 +204,12 @@ class AuthService {
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final user = data['user'] as Map<String, dynamic>;
+    final rawArchetype = user['archetype'] as String?;
+    final resolvedArchetype = (rawArchetype != null && rawArchetype.isNotEmpty)
+        ? rawArchetype
+        : (await _storage.read(key: 'biopsycho_archetype_${user['cedula']}') ??
+            await _storage.read(key: 'biopsycho_archetype'));
+
     accessToken = data['access_token'] as String?;
     loggedInUser = UserProfile(
       cedula: user['cedula'] as String? ?? cedula,
@@ -219,7 +228,16 @@ class AuthService {
       specialty: user['specialty'] as String?,
       experienceYears: user['experience_years'] as int?,
       certifications: user['certifications'] as String?,
+      archetype: resolvedArchetype,
     );
+    if (resolvedArchetype != null && resolvedArchetype.isNotEmpty) {
+      try {
+        await _storage.write(key: 'biopsycho_archetype_${loggedInUser!.cedula}', value: resolvedArchetype);
+        await _storage.write(key: 'biopsycho_archetype', value: resolvedArchetype);
+        await _storage.write(key: 'biopsycho_quiz_completed_${loggedInUser!.cedula}', value: 'true');
+        await _storage.write(key: 'biopsycho_quiz_completed', value: 'true');
+      } catch (_) {}
+    }
     await _saveSession(loggedInUser!.cedula, accessToken);
     return true;
   }
@@ -257,10 +275,13 @@ class AuthService {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     loggedInUser = null;
     accessToken = null;
-    _storage.deleteAll();
+    try {
+      await _storage.delete(key: 'access_token');
+      await _storage.delete(key: 'cedula');
+    } catch (_) {}
   }
 }
 

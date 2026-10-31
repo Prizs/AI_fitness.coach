@@ -29,19 +29,21 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   }
 
   Future<void> _initSchedule() async {
-    await CoachChatService.instance.init();
-    await _service.ensureLoaded(AuthService.instance.loggedInUser);
+    final user = AuthService.instance.loggedInUser;
+    final cedula = user?.cedula;
+    await CoachChatService.instance.init(cedula: cedula);
+    await _service.ensureLoaded(user);
 
-    // Sincronización de concordancia: Si el Coach IA recomendó un plan y el usuario pulsó 'Agregar a Cronograma',
-    // sincronizarlo para asegurar que Rutinas refleje los 5 días completos sin desajustes:
+    // Sincronización de concordancia: Si el Coach IA recomendó un plan,
+    // sincronizarlo inmediatamente para que Rutinas lo refleje como activo:
     final latestCoachPlan = CoachChatService.instance.latestRecommendedPlan;
-    if (latestCoachPlan != null && latestCoachPlan['is_added_to_schedule'] == true) {
+    if (latestCoachPlan != null) {
       final currentTrainingDays = _service.activeTrainingDayNames.length;
       final coachDaysSched = latestCoachPlan['days_schedule'] as Map?;
       final int coachTrainingCount = coachDaysSched != null
           ? coachDaysSched.values.where((d) => d is Map && d['is_rest'] == false && (d['exercises'] as List?)?.isNotEmpty == true).length
           : 0;
-      if (_service.week == null || _service.isPlanExpired || (coachTrainingCount > currentTrainingDays && coachTrainingCount >= 3)) {
+      if (_service.week == null || _service.isPlanExpired || !_service.hasActivePlan || (coachTrainingCount > currentTrainingDays && coachTrainingCount >= 3)) {
         await _service.injectCustomPlanForToday(latestCoachPlan);
       }
     }
@@ -49,13 +51,15 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   }
 
   Future<void> _loadCompletedDays() async {
-    final saved = await DBHelper.instance.getCompletedDays();
+    final cedula = AuthService.instance.loggedInUser?.cedula;
+    final saved = await DBHelper.instance.getCompletedDays(cedula: cedula);
     if (mounted) {
       setState(() {
         _completed.addAll(saved);
       });
     }
   }
+
 
   void _handleToggleCompletion(Map<String, dynamic> day) {
     final weekday = day['weekday'] as int;

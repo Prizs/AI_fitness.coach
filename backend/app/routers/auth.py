@@ -45,16 +45,21 @@ def _auth_email(cedula: str) -> str:
 def _session_response(auth_response, profile: dict | None = None) -> dict:
     session = getattr(auth_response, "session", None)
     user = auth_response.user
+    meta = getattr(user, "user_metadata", {}) or {}
     return {
         "access_token": session.access_token if session else None,
         "refresh_token": session.refresh_token if session else None,
         "requires_confirmation": session is None,
         "user": {
             "id": user.id,
-            "cedula": user.user_metadata.get("cedula"),
+            "cedula": meta.get("cedula"),
+            "archetype": meta.get("archetype"),
+            "archetype_data": meta.get("archetype_data"),
+            "active_plan": meta.get("active_plan"),
             **(profile or {}),
         },
     }
+
 
 
 @router.post("/register")
@@ -233,3 +238,48 @@ def recover_password(payload: RecoverRequest):
             else:
                 raise HTTPException(status_code=403, detail="Respuesta incorrecta.")
     raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+
+class UpdateArchetypeRequest(BaseModel):
+    cedula: str
+    archetype: str
+    archetype_data: str | None = None
+
+
+@router.post("/profile/archetype")
+def save_archetype(payload: UpdateArchetypeRequest):
+    admin_client = get_supabase_admin_client()
+    try:
+        users = admin_client.auth.admin.list_users()
+        for u in users:
+            if f"cedula.{payload.cedula}@" in u.email:
+                meta = dict(u.user_metadata or {})
+                meta["archetype"] = payload.archetype
+                if payload.archetype_data:
+                    meta["archetype_data"] = payload.archetype_data
+                admin_client.auth.admin.update_user_by_id(u.id, {"user_metadata": meta})
+                return {"status": "ok", "archetype": payload.archetype}
+        return {"status": "not_found", "message": "Usuario no encontrado"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
+class UpdatePlanRequest(BaseModel):
+    cedula: str
+    plan_json: str
+
+
+@router.post("/profile/plan")
+def save_user_plan(payload: UpdatePlanRequest):
+    admin_client = get_supabase_admin_client()
+    try:
+        users = admin_client.auth.admin.list_users()
+        for u in users:
+            if f"cedula.{payload.cedula}@" in u.email:
+                meta = dict(u.user_metadata or {})
+                meta["active_plan"] = payload.plan_json
+                admin_client.auth.admin.update_user_by_id(u.id, {"user_metadata": meta})
+                return {"status": "ok"}
+        return {"status": "not_found"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}

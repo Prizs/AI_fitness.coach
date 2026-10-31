@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:mobile_app/services/auth_service.dart';
 
 class DBHelper {
   static final DBHelper instance = DBHelper._init();
@@ -13,9 +14,61 @@ class DBHelper {
   static const String _webStorageKey = 'cached_weekly_plan_v1';
   static const String _upcomingStorageKey = 'cached_upcoming_plan_v1';
   static const String _completedDaysKey = 'cached_completed_days_v1';
+  static const String _workoutStatsKey = 'cached_workout_stats_v1';
+  static const String _workoutHistoryKey = 'cached_workout_history_v1';
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
+  // Cache en memoria aislado por cédula de usuario
+  static final Map<String, String> _userPlanCache = {};
+  static final Map<String, String> _userUpcomingCache = {};
+  static final Map<String, String> _userArchetypeCache = {};
+  static final Map<String, Set<int>> _userCompletedDaysCache = {};
+
   DBHelper._init();
+
+  String _effectiveCedula(String? cedula) {
+    if (cedula != null && cedula.trim().isNotEmpty) {
+      return cedula.trim();
+    }
+    return AuthService.instance.loggedInUser?.cedula.trim() ?? 'default';
+  }
+
+  Future<void> saveUserArchetype(String cedula, String archetype, {String? quizDataJson}) async {
+    final userCedula = _effectiveCedula(cedula);
+    _userArchetypeCache[userCedula] = archetype;
+    try {
+      await _secureStorage.write(key: 'biopsycho_archetype_$userCedula', value: archetype);
+      await _secureStorage.write(key: 'biopsycho_quiz_completed_$userCedula', value: 'true');
+      await _secureStorage.write(key: 'biopsycho_archetype', value: archetype);
+      await _secureStorage.write(key: 'biopsycho_quiz_completed', value: 'true');
+      if (quizDataJson != null && quizDataJson.isNotEmpty) {
+        await _secureStorage.write(key: 'biopsycho_data_$userCedula', value: quizDataJson);
+        await _secureStorage.write(key: 'biopsycho_data', value: quizDataJson);
+      }
+    } catch (_) {}
+  }
+
+  Future<String?> getUserArchetype(String? cedula) async {
+    final userCedula = _effectiveCedula(cedula);
+    if (_userArchetypeCache.containsKey(userCedula) && _userArchetypeCache[userCedula]!.isNotEmpty) {
+      return _userArchetypeCache[userCedula];
+    }
+    try {
+      final val = await _secureStorage.read(key: 'biopsycho_archetype_$userCedula');
+      if (val != null && val.isNotEmpty) {
+        _userArchetypeCache[userCedula] = val;
+        return val;
+      }
+    } catch (_) {}
+    try {
+      final val = await _secureStorage.read(key: 'biopsycho_archetype');
+      if (val != null && val.isNotEmpty) {
+        _userArchetypeCache[userCedula] = val;
+        return val;
+      }
+    } catch (_) {}
+    return null;
+  }
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -51,16 +104,23 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
 ''');
   }
 
-  Future<void> saveWeeklyPlan(String jsonString) async {
+  Future<void> saveWeeklyPlan(String jsonString, {String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
     _memoryCache = jsonString;
-    if (kIsWeb) {
-      try {
-        await _secureStorage
-            .write(key: _webStorageKey, value: jsonString)
-            .timeout(const Duration(seconds: 2));
-      } catch (_) {}
-      return;
-    }
+    _userPlanCache[userCedula] = jsonString;
+    final userKey = 'cached_weekly_plan_$userCedula';
+
+    try {
+      await _secureStorage
+          .write(key: userKey, value: jsonString)
+          .timeout(const Duration(seconds: 2));
+      await _secureStorage
+          .write(key: _webStorageKey, value: jsonString)
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {}
+
+    if (kIsWeb) return;
+
     try {
       final db = await instance.database.timeout(const Duration(seconds: 2));
       await db.delete('cached_plan');
@@ -68,82 +128,90 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
         'plan_json': jsonString,
         'updated_at': DateTime.now().toIso8601String(),
       });
-    } catch (_) {
-      try {
-        await _secureStorage
-            .write(key: _webStorageKey, value: jsonString)
-            .timeout(const Duration(seconds: 2));
-      } catch (_) {}
-    }
+    } catch (_) {}
   }
 
-  Future<void> clearWeeklyPlanCache() async {
+  Future<void> clearWeeklyPlanCache({String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
     _memoryCache = null;
-    if (kIsWeb) {
-      try {
-        await _secureStorage.delete(key: _webStorageKey);
-      } catch (_) {}
-      return;
-    }
+    _userPlanCache.remove(userCedula);
+    try {
+      await _secureStorage.delete(key: 'cached_weekly_plan_$userCedula');
+      await _secureStorage.delete(key: _webStorageKey);
+    } catch (_) {}
+    if (kIsWeb) return;
     try {
       final db = await instance.database;
       await db.delete('cached_plan');
-    } catch (_) {
-      try {
-        await _secureStorage.delete(key: _webStorageKey);
-      } catch (_) {}
-    }
+    } catch (_) {}
   }
 
-  Future<String?> getCachedWeeklyPlan() async {
+  Future<String?> getCachedWeeklyPlan({String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
+    if (_userPlanCache.containsKey(userCedula) && _userPlanCache[userCedula]!.trim().isNotEmpty) {
+      return _userPlanCache[userCedula];
+    }
+
+    try {
+      final userKey = 'cached_weekly_plan_$userCedula';
+      final stored = await _secureStorage
+          .read(key: userKey)
+          .timeout(const Duration(seconds: 2));
+      if (stored != null && stored.trim().isNotEmpty) {
+        _userPlanCache[userCedula] = stored;
+        _memoryCache = stored;
+        return stored;
+      }
+    } catch (_) {}
 
     if (_memoryCache != null && _memoryCache!.trim().isNotEmpty) {
       return _memoryCache;
     }
-    if (kIsWeb) {
-      try {
-        final stored = await _secureStorage
-            .read(key: _webStorageKey)
-            .timeout(const Duration(seconds: 2));
-        if (stored != null && stored.trim().isNotEmpty) {
-          _memoryCache = stored;
-          return stored;
-        }
-      } catch (_) {}
-      return null;
-    }
+
     try {
-      final db = await instance.database.timeout(const Duration(seconds: 2));
-      final result = await db.query('cached_plan', limit: 1);
-      if (result.isNotEmpty) {
-        final plan = result.first['plan_json'] as String;
-        _memoryCache = plan;
-        return plan;
+      final stored = await _secureStorage
+          .read(key: _webStorageKey)
+          .timeout(const Duration(seconds: 2));
+      if (stored != null && stored.trim().isNotEmpty) {
+        _memoryCache = stored;
+        _userPlanCache[userCedula] = stored;
+        return stored;
       }
-    } catch (_) {
+    } catch (_) {}
+
+    if (!kIsWeb) {
       try {
-        final stored = await _secureStorage
-            .read(key: _webStorageKey)
-            .timeout(const Duration(seconds: 2));
-        if (stored != null && stored.trim().isNotEmpty) {
-          _memoryCache = stored;
-          return stored;
+        final db = await instance.database.timeout(const Duration(seconds: 2));
+        final result = await db.query('cached_plan', limit: 1);
+        if (result.isNotEmpty) {
+          final plan = result.first['plan_json'] as String;
+          _memoryCache = plan;
+          _userPlanCache[userCedula] = plan;
+          return plan;
         }
       } catch (_) {}
     }
     return null;
   }
 
-  Future<void> saveUpcomingPlan(String jsonString) async {
+
+  Future<void> saveUpcomingPlan(String jsonString, {String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
     _memoryUpcomingCache = jsonString;
-    if (kIsWeb) {
-      try {
-        await _secureStorage
-            .write(key: _upcomingStorageKey, value: jsonString)
-            .timeout(const Duration(seconds: 2));
-      } catch (_) {}
-      return;
-    }
+    _userUpcomingCache[userCedula] = jsonString;
+    final userKey = 'cached_upcoming_plan_$userCedula';
+
+    try {
+      await _secureStorage
+          .write(key: userKey, value: jsonString)
+          .timeout(const Duration(seconds: 2));
+      await _secureStorage
+          .write(key: _upcomingStorageKey, value: jsonString)
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {}
+
+    if (kIsWeb) return;
+
     try {
       final db = await instance.database.timeout(const Duration(seconds: 2));
       await db.delete('cached_upcoming_plan');
@@ -151,91 +219,100 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
         'plan_json': jsonString,
         'updated_at': DateTime.now().toIso8601String(),
       });
-    } catch (_) {
-      try {
-        await _secureStorage
-            .write(key: _upcomingStorageKey, value: jsonString)
-            .timeout(const Duration(seconds: 2));
-      } catch (_) {}
-    }
+    } catch (_) {}
   }
 
-  Future<void> clearUpcomingPlanCache() async {
+  Future<void> clearUpcomingPlanCache({String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
     _memoryUpcomingCache = null;
-    if (kIsWeb) {
-      try {
-        await _secureStorage.delete(key: _upcomingStorageKey);
-      } catch (_) {}
-      return;
-    }
+    _userUpcomingCache.remove(userCedula);
+    try {
+      await _secureStorage.delete(key: 'cached_upcoming_plan_$userCedula');
+      await _secureStorage.delete(key: _upcomingStorageKey);
+    } catch (_) {}
+    if (kIsWeb) return;
     try {
       final db = await instance.database;
       await db.delete('cached_upcoming_plan');
-    } catch (_) {
-      try {
-        await _secureStorage.delete(key: _upcomingStorageKey);
-      } catch (_) {}
-    }
+    } catch (_) {}
   }
 
-  Future<String?> getCachedUpcomingPlan() async {
+  Future<String?> getCachedUpcomingPlan({String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
+    if (_userUpcomingCache.containsKey(userCedula) && _userUpcomingCache[userCedula]!.trim().isNotEmpty) {
+      return _userUpcomingCache[userCedula];
+    }
+
+    try {
+      final userKey = 'cached_upcoming_plan_$userCedula';
+      final stored = await _secureStorage
+          .read(key: userKey)
+          .timeout(const Duration(seconds: 2));
+      if (stored != null && stored.trim().isNotEmpty) {
+        _userUpcomingCache[userCedula] = stored;
+        _memoryUpcomingCache = stored;
+        return stored;
+      }
+    } catch (_) {}
+
     if (_memoryUpcomingCache != null && _memoryUpcomingCache!.trim().isNotEmpty) {
       return _memoryUpcomingCache;
     }
-    if (kIsWeb) {
-      try {
-        final stored = await _secureStorage
-            .read(key: _upcomingStorageKey)
-            .timeout(const Duration(seconds: 2));
-        if (stored != null && stored.trim().isNotEmpty) {
-          _memoryUpcomingCache = stored;
-          return stored;
-        }
-      } catch (_) {}
-      return null;
-    }
+
     try {
-      final db = await instance.database.timeout(const Duration(seconds: 2));
-      final result = await db.query('cached_upcoming_plan', limit: 1);
-      if (result.isNotEmpty) {
-        final plan = result.first['plan_json'] as String;
-        _memoryUpcomingCache = plan;
-        return plan;
+      final stored = await _secureStorage
+          .read(key: _upcomingStorageKey)
+          .timeout(const Duration(seconds: 2));
+      if (stored != null && stored.trim().isNotEmpty) {
+        _memoryUpcomingCache = stored;
+        _userUpcomingCache[userCedula] = stored;
+        return stored;
       }
-    } catch (_) {
+    } catch (_) {}
+
+    if (!kIsWeb) {
       try {
-        final stored = await _secureStorage
-            .read(key: _upcomingStorageKey)
-            .timeout(const Duration(seconds: 2));
-        if (stored != null && stored.trim().isNotEmpty) {
-          _memoryUpcomingCache = stored;
-          return stored;
+        final db = await instance.database.timeout(const Duration(seconds: 2));
+        final result = await db.query('cached_upcoming_plan', limit: 1);
+        if (result.isNotEmpty) {
+          final plan = result.first['plan_json'] as String;
+          _memoryUpcomingCache = plan;
+          _userUpcomingCache[userCedula] = plan;
+          return plan;
         }
       } catch (_) {}
     }
     return null;
   }
 
-
-  static const String _workoutStatsKey = 'cached_workout_stats_v1';
-  static const String _workoutHistoryKey = 'cached_workout_history_v1';
-
-  Future<void> saveCompletedDays(Set<int> days) async {
+  Future<void> saveCompletedDays(Set<int> days, {String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
     _memoryCompletedDays = Set<int>.from(days);
+    _userCompletedDaysCache[userCedula] = Set<int>.from(days);
     final encoded = jsonEncode(days.toList());
     try {
+      await _secureStorage
+          .write(key: 'cached_completed_days_$userCedula', value: encoded)
+          .timeout(const Duration(seconds: 2));
       await _secureStorage
           .write(key: _completedDaysKey, value: encoded)
           .timeout(const Duration(seconds: 2));
     } catch (_) {}
   }
 
-  Future<Set<int>> getCompletedDays() async {
+  Future<Set<int>> getCompletedDays({String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
+    if (_userCompletedDaysCache.containsKey(userCedula)) {
+      return _userCompletedDaysCache[userCedula]!;
+    }
     if (_memoryCompletedDays != null) {
       return _memoryCompletedDays!;
     }
     try {
-      final stored = await _secureStorage
+      var stored = await _secureStorage
+          .read(key: 'cached_completed_days_$userCedula')
+          .timeout(const Duration(seconds: 2));
+      stored ??= await _secureStorage
           .read(key: _completedDaysKey)
           .timeout(const Duration(seconds: 2));
       if (stored != null && stored.trim().isNotEmpty) {
@@ -245,12 +322,14 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
               .map((e) => int.tryParse(e.toString()) ?? 0)
               .toSet();
           _memoryCompletedDays = set;
+          _userCompletedDaysCache[userCedula] = set;
           return set;
         }
       }
     } catch (_) {}
     return {};
   }
+
 
   Future<void> recordWorkoutSession({
     required int weekday,

@@ -892,8 +892,25 @@ class _CoachScreenState extends State<CoachScreen> {
 
         final structuredPlan = data['has_plan'] == true ? _sanitizeClientPlan(data['structured_plan'], text) : null;
         if (structuredPlan != null) {
-          structuredPlan['is_added_to_schedule'] = false;
+          structuredPlan['is_added_to_schedule'] = true;
+          try {
+            await WeeklyPlanService.instance.injectCustomPlanForToday(structuredPlan);
+            final userCedula = AuthService.instance.loggedInUser?.cedula;
+            if (userCedula != null && userCedula.isNotEmpty) {
+              http.post(
+                Uri.parse('${AuthService.apiBaseUrl}/api/auth/profile/plan'),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'cedula': userCedula,
+                  'plan_json': jsonEncode(structuredPlan),
+                }),
+              ).timeout(const Duration(seconds: 10));
+            }
+          } catch (e) {
+            debugPrint('Error auto-inyectando plan: $e');
+          }
         }
+
 
         setState(() {
           _messages.add({
