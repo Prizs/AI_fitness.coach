@@ -156,10 +156,13 @@ def _detect_requested_training_days(user_msg: str) -> list[str]:
     if any(k in msg for k in ("intermedio", "intermedios", "complement", "relacionar", "mientras descansan")):
         return ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
 
-    # Solamente si el usuario pide explícitamente restringir su entrenamiento a esos días exclusivos:
+    # Solamente si el usuario pide explícitamente restringir su entrenamiento a esos días exclusivos o los nombra:
     is_exclusive_request = any(k in msg for k in (
-        "solo", "únicamente", "unicamente", "solamente", "únicos días", "unicos dias",
-        "solo entreno", "solo puedo", "solo los", "únicamente los"
+        "solo", "oslo", "únicamente", "unicamente", "solamente", "únicos días", "unicos dias",
+        "solo entreno", "solo puedo", "solo los", "únicamente los", "nada mas", "nada más",
+        "estos dos dias", "estos 2 dias", "estos tres dias", "estos 3 dias", "estos dias", "estos días",
+        "para estos", "planificar para estos", "exclusivo", "exclusivamente", "solo quiero", "oslo quier",
+        "para el", "para los", "solo quier"
     ))
 
     days = []
@@ -168,7 +171,8 @@ def _detect_requested_training_days(user_msg: str) -> list[str]:
             if d not in days:
                 days.append(d)
 
-    if is_exclusive_request and len(days) >= 2:
+    has_full_week_req = any(k in msg for k in ("toda la semana", "semana completa", "todos los dias", "todos los días", "lunes a viernes"))
+    if days and (is_exclusive_request or (not has_full_week_req and len(days) < 5)):
         week_order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
         return [d for d in week_order if d in days]
 
@@ -1935,7 +1939,40 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
             ch_list[(seed + 3) % len(ch_list)],
             cr_list[(seed + 4) % len(cr_list)],
         ]
-    elif any(k in fk for k in ("tren_superior", "pecho", "espalda", "torso")):
+    elif any(k in fk for k in ("pecho", "pectoral")):
+        c_list = chest_dict[int_k]
+        a_list = arms_dict[int_k]
+        cr_list = core_dict[int_k]
+        selected_tuples = [
+            c_list[(seed + 0) % len(c_list)],
+            c_list[(seed + 1) % len(c_list)],
+            c_list[(seed + 2) % len(c_list)],
+            c_list[(seed + 3) % len(c_list)] if len(c_list) > 3 else a_list[(seed + 0) % len(a_list)],
+            a_list[(seed + 1) % len(a_list)] if (seed % 2 == 0) else cr_list[(seed + 2) % len(cr_list)],
+        ]
+    elif any(k in fk for k in ("espalda", "dorsal")):
+        b_list = back_dict[int_k]
+        a_list = arms_dict[int_k]
+        cr_list = core_dict[int_k]
+        selected_tuples = [
+            b_list[(seed + 0) % len(b_list)],
+            b_list[(seed + 1) % len(b_list)],
+            b_list[(seed + 2) % len(b_list)],
+            b_list[(seed + 3) % len(b_list)] if len(b_list) > 3 else a_list[(seed + 0) % len(a_list)],
+            a_list[(seed + 1) % len(a_list)] if (seed % 2 == 0) else cr_list[(seed + 2) % len(cr_list)],
+        ]
+    elif any(k in fk for k in ("brazo", "brazos", "biceps", "triceps")):
+        ar_list = arms_dict[int_k]
+        sh_list = shoulders_dict[int_k]
+        cr_list = core_dict[int_k]
+        selected_tuples = [
+            ar_list[(seed + 0) % len(ar_list)],
+            ar_list[(seed + 1) % len(ar_list)],
+            sh_list[(seed + 2) % len(sh_list)],
+            ar_list[(seed + 3) % len(ar_list)],
+            cr_list[(seed + 4) % len(cr_list)],
+        ]
+    elif any(k in fk for k in ("tren_superior", "torso")):
         ch_list = chest_dict[int_k]
         bk_list = back_dict[int_k]
         sh_list = shoulders_dict[int_k]
@@ -2079,8 +2116,34 @@ def _normalize_exercises(
             anim_key = fallback_ex["animation_key"]
             replaced_from_pool = True
 
-        # 2. Si el usuario pidió Tren Superior (o Pecho/Espalda/Brazos) y la IA repitió ejercicios de piernas, usar pool de Tren Superior
-        elif requested_focus in ("tren_superior", "pecho", "espalda", "brazos_hombros") and _is_leg_exercise(raw_name, primary):
+        # 2. Si el usuario pidió Pecho y la IA repitió ejercicios de piernas u otra zona, usar pool de Pecho
+        elif requested_focus in ("pecho", "pectorales") and (_is_leg_exercise(raw_name, primary) or not any(k in (raw_name + " " + primary).lower() for k in ("pecho", "pectoral", "pushup", "press", "flexion", "flexión", "apertura", "fondo", "banca"))):
+            chest_pool = [e for e in upper_pool if any(k in (e["name"] + " " + e.get("primary_muscle", "")).lower() for k in ("pecho", "pectoral", "press", "flexion", "flexión", "apertura", "fondo", "banca"))]
+            if not chest_pool:
+                chest_pool = upper_pool
+            fallback_ex = chest_pool[idx % len(chest_pool)]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex["secondary_muscle"]
+            sets_val = fallback_ex.get("sets", 3)
+            reps_val = fallback_ex.get("reps", "10-12")
+            anim_key = fallback_ex.get("animation_key", "pushup")
+            replaced_from_pool = True
+
+        elif requested_focus in ("espalda", "dorsales") and (_is_leg_exercise(raw_name, primary) or not any(k in (raw_name + " " + primary).lower() for k in ("espalda", "dorsal", "remo", "jalon", "jalón", "dominada", "pullover"))):
+            back_pool = [e for e in upper_pool if any(k in (e["name"] + " " + e.get("primary_muscle", "")).lower() for k in ("espalda", "dorsal", "remo", "jalon", "jalón", "dominada", "pullover"))]
+            if not back_pool:
+                back_pool = upper_pool
+            fallback_ex = back_pool[idx % len(back_pool)]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex["secondary_muscle"]
+            sets_val = fallback_ex.get("sets", 3)
+            reps_val = fallback_ex.get("reps", "10-12")
+            anim_key = fallback_ex.get("animation_key", "row")
+            replaced_from_pool = True
+
+        elif requested_focus in ("tren_superior", "brazos_hombros") and _is_leg_exercise(raw_name, primary):
             fallback_ex = upper_pool[idx % len(upper_pool)]
             raw_name = fallback_ex["name"]
             primary = fallback_ex["primary_muscle"]
@@ -2814,6 +2877,66 @@ def _normalize_structured_plan(
                     seen_gifs_global=weekly_seen_gifs,
                 )
 
+            elif requested_focus in ("pecho", "pectorales"):
+                day_titles = [
+                    f"Pecho: Fuerza Pectoral Mayor y Press ({badge_lbl})",
+                    f"Pecho: Haz Clavicular e Inclinados ({badge_lbl})",
+                    f"Pecho: Aperturas, Cruces y Haz Esternal ({badge_lbl})",
+                    f"Pecho: Fondos y Empuje Pectoral Inferior ({badge_lbl})",
+                    f"Pecho: Bombeo y Congestión Pectoral ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("pecho", int_hint, seed=dynamic_base_seed + day_idx * 19, is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="pecho",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("espalda", "dorsales"):
+                day_titles = [
+                    f"Espalda: Dorsal Ancho, Dominadas y Jalones ({badge_lbl})",
+                    f"Espalda: Remos Medios y Densidad ({badge_lbl})",
+                    f"Espalda: Remos Unilaterales y Trapecio ({badge_lbl})",
+                    f"Espalda: Pullover y Cadena Posterior ({badge_lbl})",
+                    f"Espalda: Postura Escapular y Romboides ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("espalda", int_hint, seed=dynamic_base_seed + day_idx * 19, is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="espalda",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("brazos_hombros", "hombros", "brazos", "biceps", "triceps"):
+                day_titles = [
+                    f"Hombros y Deltoides: Press Militar y Elevaciones ({badge_lbl})",
+                    f"Brazos: Bíceps y Tríceps Antagonistas ({badge_lbl})",
+                    f"Hombros: Deltoides Posterior y Escápula ({badge_lbl})",
+                    f"Brazos: Congestión Braquial y Antebrazos ({badge_lbl})",
+                    f"Torso: Brazos y Hombros Global ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("brazos_hombros", int_hint, seed=dynamic_base_seed + day_idx * 19, is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="brazos_hombros",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
             else:
                 default_titles = [
                     f"Piernas y Glúteos (Cuádriceps y Glúteos) · {badge_lbl}",
@@ -2864,6 +2987,12 @@ def _normalize_structured_plan(
 
     if requested_focus == "cuerpo_completo":
         raw_title = f"Plan Integral de Cuerpo Completo (Full Body) ({badge_lbl})"
+    elif requested_focus in ("pecho", "pectorales"):
+        raw_title = f"Especialización en Pecho y Pectorales ({badge_lbl})"
+    elif requested_focus in ("espalda", "dorsales"):
+        raw_title = f"Especialización en Espalda y Dorsales ({badge_lbl})"
+    elif requested_focus in ("brazos_hombros", "hombros", "brazos", "biceps", "triceps"):
+        raw_title = f"Especialización en Hombros y Brazos ({badge_lbl})"
     elif requested_focus == "solo_piernas":
         raw_title = f"Especialización en Piernas y Glúteos ({badge_lbl})"
     elif requested_focus == "pantorrillas_pies":
@@ -2880,6 +3009,8 @@ def _normalize_structured_plan(
         raw_title = f"Combinado Piernas + Core ({badge_lbl})"
     elif requested_focus == "tren_superior_core":
         raw_title = f"Combinado Tren Superior + Core ({badge_lbl})"
+    elif requested_focus == "piernas":
+        raw_title = f"Rutina de Piernas y Glúteos ({badge_lbl})"
     else:
         clean_t = str(raw_plan.get("title") or "Entrenamiento Completo")
         for prefix in ("Plan Semanal (Lun - Vie):", "Plan Semanal:", "Plan Diario:", "Plan Mensual:", "Plan Combinado/Complementario:"):
@@ -2896,7 +3027,7 @@ def _normalize_structured_plan(
         raw_title = f"Plan Semanal: {raw_title}"
 
     return {
-        "day": "Lunes a Viernes (Semanal)" if plan_mode != "daily" else "Sesión Diaria",
+        "day": " y ".join(recommended_days) if (len(recommended_days) <= 3 and plan_mode != "daily") else ("Lunes a Viernes (Semanal)" if plan_mode != "daily" else "Sesión Diaria"),
         "title": raw_title,
         "focus_area": requested_focus or "semanal_completo",
         "plan_mode": plan_mode,
@@ -3708,20 +3839,36 @@ Devuelve SOLO JSON."""
         focus_key = requested_focus or "semanal_completo"
         if motor_disabled:
             focus_name = "Tren Superior y Torso Sentado (Adaptado)"
+        elif focus_key in ("pecho", "pectorales"):
+            focus_name = "Pecho y Pectorales"
+        elif focus_key in ("espalda", "dorsales"):
+            focus_name = "Espalda y Dorsales"
+        elif focus_key in ("brazos_hombros", "hombros", "brazos", "biceps", "triceps"):
+            focus_name = "Hombros y Brazos"
         elif focus_key == "pantorrillas_pies":
             focus_name = "Pantorrillas (Batatas / Tríceps Sural) y Pies"
         elif focus_key == "triceps_piernas":
             focus_name = "Tríceps y Composición Completa de Piernas"
+        elif focus_key in ("cuadriceps",):
+            focus_name = "Cuádriceps"
+        elif focus_key in ("femorales_isquios",):
+            focus_name = "Isquiotibiales y Femoral"
+        elif focus_key in ("gluteos",):
+            focus_name = "Glúteos"
         elif focus_key in ("tren_superior", "solo_tren_superior"):
             focus_name = "Tren Superior (Espalda, Pecho y Brazos)"
         elif focus_key in ("core", "solo_core"):
             focus_name = "Core y Estabilidad Lumbar"
         elif focus_key in ("movilidad_cardio", "solo_cardio"):
             focus_name = "Movilidad Articular y Cardio Suave"
+        elif focus_key in ("cuerpo_completo",):
+            focus_name = "Plan Integral de Cuerpo Completo (Full Body)"
+        elif focus_key in ("solo_piernas", "piernas"):
+            focus_name = "Piernas y Glúteos"
         elif focus_key in ("plan_semanal_ia", "semanal_completo"):
             focus_name = "Plan Semanal Integral Personalizado"
         else:
-            focus_name = "Piernas y Glúteos"
+            focus_name = "Rutina Personalizada"
 
         dynamic_seed = abs(hash((payload.message or "") + str(int(time.time() / 5)))) % 1000
         diverse_raw = _generate_diverse_session(focus_key, intensity_hint, seed=dynamic_seed, is_no_equipment=is_no_equipment)
@@ -3740,6 +3887,8 @@ Devuelve SOLO JSON."""
             })
 
         eq_note = " (100% en casa sin herramientas)" if is_no_equipment else ""
+        target_days_fb = ["Martes", "Jueves"] if is_complementary else _detect_requested_training_days(payload.message or "")
+        days_lbl_fb = "Martes y Jueves" if is_complementary else (" y ".join(target_days_fb) if len(target_days_fb) <= 3 else "Lunes a Viernes (Semanal)")
         data = {
             "reply": reply_clean or (
                 f"¡Excelente decisión! He preparado tu plan de sesión enfocado en **{focus_name}**{eq_note}, "
@@ -3755,9 +3904,9 @@ Devuelve SOLO JSON."""
             "suggest_questionnaire": False,
             "has_plan": True,
             "structured_plan": {
-                "day": "Martes y Jueves" if is_complementary else "Lunes a Viernes (Semanal)",
+                "day": days_lbl_fb,
                 "title": f"Rutina personalizada: {focus_name} ({effective_level} · Intensidad {effective_intensity})",
-                "recommended_days": ["Martes", "Jueves"] if is_complementary else ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"],
+                "recommended_days": target_days_fb,
                 "complementary_days": {
                     "Martes": "Tren Superior Suave o Core",
                     "Jueves": "Movilidad Articular o Tren Superior"

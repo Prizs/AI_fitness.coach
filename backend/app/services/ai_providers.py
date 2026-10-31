@@ -27,7 +27,7 @@ import httpx
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 load_dotenv()
 
-GEMINI_TIMEOUT_SEC = 12.0
+GEMINI_TIMEOUT_SEC = 8.0
 
 OPENAI_COMPATIBLE_BASE_URLS = {
     "groq": "https://api.groq.com/openai/v1",
@@ -180,15 +180,15 @@ def _call_openai_compatible(provider: str, prompt: str, timeout: float) -> str:
 def generate_json_text(prompt: str, *, timeout: float = GEMINI_TIMEOUT_SEC) -> ProviderResult:
     """Intenta cada proveedor configurado respetando un límite de tiempo acumulativo estricto."""
     import time
-    deadline = time.time() + timeout
+    deadline = time.time() + min(timeout, 8.0)
     errors: dict[str, str] = {}
     for provider in configured_providers():
         remaining = deadline - time.time()
-        if remaining < 2.0:
+        if remaining < 1.5:
             errors[provider] = "timeout acumulado excedido"
             break
         try:
-            call_timeout = min(remaining, 7.0)
+            call_timeout = min(remaining, 5.0)
             if provider == "gemini":
                 text = _call_gemini(prompt, call_timeout)
             else:
