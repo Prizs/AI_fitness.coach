@@ -31,34 +31,40 @@ class CoachChatService extends ChangeNotifier {
     return null;
   }
 
+  /// Limpia la memoria RAM para aislamiento de usuario
+  void reset() {
+    _messages.clear();
+    _isInitialized = false;
+    _activeCedula = '';
+    notifyListeners();
+  }
+
   /// Inicializa o carga el historial existente desde memoria o almacenamiento local.
   Future<void> init({String? cedula}) async {
     final targetCedula = (cedula != null && cedula.isNotEmpty)
         ? cedula
         : (AuthService.instance.loggedInUser?.cedula ?? 'default');
 
-    // Si ya tenemos mensajes en memoria RAM para este usuario, no los borramos
+    // Si ya tenemos mensajes en memoria RAM para este usuario exacto, los conservamos
     if (_isInitialized && _activeCedula == targetCedula && _messages.isNotEmpty) {
       return;
     }
 
     _activeCedula = targetCedula;
     _isInitialized = true;
+    _messages.clear(); // Limpiar siempre mensajes de usuarios previos
 
     try {
       const storage = FlutterSecureStorage();
       final localKey = 'coach_chat_history_$targetCedula';
-      const genericKey = 'coach_chat_history_active';
-
       String? cachedStr = await storage.read(key: localKey);
-      if (cachedStr == null || cachedStr.trim().isEmpty) {
-        cachedStr = await storage.read(key: genericKey);
+      if ((cachedStr == null || cachedStr.trim().isEmpty) && targetCedula == 'default') {
+        cachedStr = await storage.read(key: 'coach_chat_history_active');
       }
 
       if (cachedStr != null && cachedStr.trim().isNotEmpty) {
         final decoded = jsonDecode(cachedStr);
         if (decoded is List && decoded.isNotEmpty) {
-          _messages.clear();
           for (final item in decoded) {
             if (item is Map) {
               _messages.add(Map<String, dynamic>.from(item));

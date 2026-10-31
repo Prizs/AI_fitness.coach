@@ -254,7 +254,31 @@ class WeeklyPlanService extends ChangeNotifier {
     return week != null && days.any((d) => (d['exercises'] as List?)?.isNotEmpty == true);
   }
 
+  String? _loadedCedula;
+
+  void resetForUser([String? cedula]) {
+    _loadedCedula = cedula;
+    week = null;
+    upcomingWeek = null;
+    _pending = null;
+    _completedDaysSet.clear();
+    _workoutStats = {
+      'current_streak': 0,
+      'best_streak': 0,
+      'total_sessions': 0,
+      'last_rpe': 7,
+      'last_feeling': 'Con energía',
+    };
+    isLoading = false;
+    loadedFromCache = false;
+    notifyListeners();
+  }
+
   Future<void> ensureLoaded(UserProfile? profile) {
+    final targetCedula = profile?.cedula ?? AuthService.instance.loggedInUser?.cedula;
+    if (_loadedCedula != null && targetCedula != null && _loadedCedula != targetCedula) {
+      resetForUser(targetCedula);
+    }
     if (week != null && !isPlanExpired) {
       isLoading = false;
       return Future<void>.value();
@@ -267,6 +291,7 @@ class WeeklyPlanService extends ChangeNotifier {
   Future<void> _load(UserProfile? profile) async {
     lastError = null;
     final cedula = profile?.cedula ?? AuthService.instance.loggedInUser?.cedula;
+    _loadedCedula = cedula;
     try {
       final cachedJson = await DBHelper.instance
           .getCachedWeeklyPlan(cedula: cedula)
@@ -354,7 +379,7 @@ class WeeklyPlanService extends ChangeNotifier {
     } catch (_) {}
 
     try {
-      _workoutStats = await DBHelper.instance.getWorkoutStats();
+      _workoutStats = await DBHelper.instance.getWorkoutStats(cedula: cedula);
       _completedDaysSet = await DBHelper.instance.getCompletedDays(cedula: cedula);
     } catch (_) {}
 
@@ -399,8 +424,9 @@ class WeeklyPlanService extends ChangeNotifier {
   }
 
   Future<void> refreshWorkoutStats() async {
-    _workoutStats = await DBHelper.instance.getWorkoutStats();
-    _completedDaysSet = await DBHelper.instance.getCompletedDays();
+    final cedula = AuthService.instance.loggedInUser?.cedula;
+    _workoutStats = await DBHelper.instance.getWorkoutStats(cedula: cedula);
+    _completedDaysSet = await DBHelper.instance.getCompletedDays(cedula: cedula);
     notifyListeners();
   }
 

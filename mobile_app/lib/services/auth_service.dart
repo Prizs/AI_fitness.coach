@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile_app/models/user_profile.dart';
+import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/services/coach_chat_service.dart';
+import 'package:mobile_app/database/db_helper.dart';
 
 class AuthService {
   AuthService._internal();
@@ -144,9 +147,15 @@ class AuthService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       accessToken = data['access_token'] as String?;
       loggedInUser = profile;
+      WeeklyPlanService.instance.resetForUser(profile.cedula);
+      CoachChatService.instance.reset();
+      DBHelper.instance.clearMemoryCache();
       await _saveSession(profile.cedula, accessToken);
     } catch (_) {
       loggedInUser = profile;
+      WeeklyPlanService.instance.resetForUser(profile.cedula);
+      CoachChatService.instance.reset();
+      DBHelper.instance.clearMemoryCache();
     }
     return true;
   }
@@ -238,6 +247,9 @@ class AuthService {
         await _storage.write(key: 'biopsycho_quiz_completed', value: 'true');
       } catch (_) {}
     }
+    WeeklyPlanService.instance.resetForUser(loggedInUser!.cedula);
+    CoachChatService.instance.reset();
+    DBHelper.instance.clearMemoryCache();
     await _saveSession(loggedInUser!.cedula, accessToken);
     return true;
   }
@@ -278,6 +290,9 @@ class AuthService {
   Future<void> logout() async {
     loggedInUser = null;
     accessToken = null;
+    WeeklyPlanService.instance.resetForUser();
+    CoachChatService.instance.reset();
+    DBHelper.instance.clearMemoryCache();
     try {
       await _storage.delete(key: 'access_token');
       await _storage.delete(key: 'cedula');

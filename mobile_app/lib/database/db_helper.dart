@@ -14,8 +14,6 @@ class DBHelper {
   static const String _webStorageKey = 'cached_weekly_plan_v1';
   static const String _upcomingStorageKey = 'cached_upcoming_plan_v1';
   static const String _completedDaysKey = 'cached_completed_days_v1';
-  static const String _workoutStatsKey = 'cached_workout_stats_v1';
-  static const String _workoutHistoryKey = 'cached_workout_history_v1';
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   // Cache en memoria aislado por cédula de usuario
@@ -146,6 +144,16 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
     } catch (_) {}
   }
 
+  void clearMemoryCache() {
+    _memoryCache = null;
+    _memoryUpcomingCache = null;
+    _memoryCompletedDays = null;
+    _userPlanCache.clear();
+    _userUpcomingCache.clear();
+    _userArchetypeCache.clear();
+    _userCompletedDaysCache.clear();
+  }
+
   Future<String?> getCachedWeeklyPlan({String? cedula}) async {
     final userCedula = _effectiveCedula(cedula);
     if (_userPlanCache.containsKey(userCedula) && _userPlanCache[userCedula]!.trim().isNotEmpty) {
@@ -159,35 +167,20 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
           .timeout(const Duration(seconds: 2));
       if (stored != null && stored.trim().isNotEmpty) {
         _userPlanCache[userCedula] = stored;
-        _memoryCache = stored;
         return stored;
       }
     } catch (_) {}
 
-    if (_memoryCache != null && _memoryCache!.trim().isNotEmpty) {
-      return _memoryCache;
-    }
-
-    try {
-      final stored = await _secureStorage
-          .read(key: _webStorageKey)
-          .timeout(const Duration(seconds: 2));
-      if (stored != null && stored.trim().isNotEmpty) {
-        _memoryCache = stored;
-        _userPlanCache[userCedula] = stored;
-        return stored;
+    if (userCedula == 'default') {
+      if (_memoryCache != null && _memoryCache!.trim().isNotEmpty) {
+        return _memoryCache;
       }
-    } catch (_) {}
-
-    if (!kIsWeb) {
       try {
-        final db = await instance.database.timeout(const Duration(seconds: 2));
-        final result = await db.query('cached_plan', limit: 1);
-        if (result.isNotEmpty) {
-          final plan = result.first['plan_json'] as String;
-          _memoryCache = plan;
-          _userPlanCache[userCedula] = plan;
-          return plan;
+        final stored = await _secureStorage
+            .read(key: _webStorageKey)
+            .timeout(const Duration(seconds: 2));
+        if (stored != null && stored.trim().isNotEmpty) {
+          return stored;
         }
       } catch (_) {}
     }
@@ -250,35 +243,20 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
           .timeout(const Duration(seconds: 2));
       if (stored != null && stored.trim().isNotEmpty) {
         _userUpcomingCache[userCedula] = stored;
-        _memoryUpcomingCache = stored;
         return stored;
       }
     } catch (_) {}
 
-    if (_memoryUpcomingCache != null && _memoryUpcomingCache!.trim().isNotEmpty) {
-      return _memoryUpcomingCache;
-    }
-
-    try {
-      final stored = await _secureStorage
-          .read(key: _upcomingStorageKey)
-          .timeout(const Duration(seconds: 2));
-      if (stored != null && stored.trim().isNotEmpty) {
-        _memoryUpcomingCache = stored;
-        _userUpcomingCache[userCedula] = stored;
-        return stored;
+    if (userCedula == 'default') {
+      if (_memoryUpcomingCache != null && _memoryUpcomingCache!.trim().isNotEmpty) {
+        return _memoryUpcomingCache;
       }
-    } catch (_) {}
-
-    if (!kIsWeb) {
       try {
-        final db = await instance.database.timeout(const Duration(seconds: 2));
-        final result = await db.query('cached_upcoming_plan', limit: 1);
-        if (result.isNotEmpty) {
-          final plan = result.first['plan_json'] as String;
-          _memoryUpcomingCache = plan;
-          _userUpcomingCache[userCedula] = plan;
-          return plan;
+        final stored = await _secureStorage
+            .read(key: _upcomingStorageKey)
+            .timeout(const Duration(seconds: 2));
+        if (stored != null && stored.trim().isNotEmpty) {
+          return stored;
         }
       } catch (_) {}
     }
@@ -294,9 +272,11 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
       await _secureStorage
           .write(key: 'cached_completed_days_$userCedula', value: encoded)
           .timeout(const Duration(seconds: 2));
-      await _secureStorage
-          .write(key: _completedDaysKey, value: encoded)
-          .timeout(const Duration(seconds: 2));
+      if (userCedula == 'default') {
+        await _secureStorage
+            .write(key: _completedDaysKey, value: encoded)
+            .timeout(const Duration(seconds: 2));
+      }
     } catch (_) {}
   }
 
@@ -305,15 +285,9 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
     if (_userCompletedDaysCache.containsKey(userCedula)) {
       return _userCompletedDaysCache[userCedula]!;
     }
-    if (_memoryCompletedDays != null) {
-      return _memoryCompletedDays!;
-    }
     try {
-      var stored = await _secureStorage
+      final stored = await _secureStorage
           .read(key: 'cached_completed_days_$userCedula')
-          .timeout(const Duration(seconds: 2));
-      stored ??= await _secureStorage
-          .read(key: _completedDaysKey)
           .timeout(const Duration(seconds: 2));
       if (stored != null && stored.trim().isNotEmpty) {
         final decoded = jsonDecode(stored);
@@ -321,15 +295,17 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
           final set = decoded
               .map((e) => int.tryParse(e.toString()) ?? 0)
               .toSet();
-          _memoryCompletedDays = set;
           _userCompletedDaysCache[userCedula] = set;
           return set;
         }
       }
     } catch (_) {}
+
+    if (userCedula == 'default' && _memoryCompletedDays != null) {
+      return _memoryCompletedDays!;
+    }
     return {};
   }
-
 
   Future<void> recordWorkoutSession({
     required int weekday,
@@ -337,8 +313,10 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
     required int rpe,
     required String feeling,
     String? notes,
+    String? cedula,
   }) async {
-    final stats = await getWorkoutStats();
+    final userCedula = _effectiveCedula(cedula);
+    final stats = await getWorkoutStats(cedula: userCedula);
     int currentStreak = (stats['current_streak'] as int? ?? 0) + 1;
     int bestStreak = stats['best_streak'] as int? ?? 0;
     if (currentStreak > bestStreak) {
@@ -346,7 +324,7 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
     }
     int totalSessions = (stats['total_sessions'] as int? ?? 0) + 1;
 
-    final history = await getSessionHistory();
+    final history = await getSessionHistory(cedula: userCedula);
     history.insert(0, {
       'weekday': weekday,
       'title': title,
@@ -370,26 +348,27 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
 
     try {
       await _secureStorage.write(
-        key: _workoutStatsKey,
+        key: 'cached_workout_stats_$userCedula',
         value: jsonEncode(updatedStats),
       );
       await _secureStorage.write(
-        key: _workoutHistoryKey,
+        key: 'cached_workout_history_$userCedula',
         value: jsonEncode(history),
       );
     } catch (_) {}
 
-    final completed = await getCompletedDays();
+    final completed = await getCompletedDays(cedula: userCedula);
     completed.add(weekday);
-    await saveCompletedDays(completed);
+    await saveCompletedDays(completed, cedula: userCedula);
   }
 
-  Future<void> removeSessionRecord(int weekday) async {
-    final completed = await getCompletedDays();
+  Future<void> removeSessionRecord(int weekday, {String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
+    final completed = await getCompletedDays(cedula: userCedula);
     completed.remove(weekday);
-    await saveCompletedDays(completed);
+    await saveCompletedDays(completed, cedula: userCedula);
 
-    final stats = await getWorkoutStats();
+    final stats = await getWorkoutStats(cedula: userCedula);
     int currentStreak = (stats['current_streak'] as int? ?? 1) - 1;
     if (currentStreak < 0) currentStreak = 0;
     int total = (stats['total_sessions'] as int? ?? 1) - 1;
@@ -400,15 +379,16 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
 
     try {
       await _secureStorage.write(
-        key: _workoutStatsKey,
+        key: 'cached_workout_stats_$userCedula',
         value: jsonEncode(stats),
       );
     } catch (_) {}
   }
 
-  Future<Map<String, dynamic>> getWorkoutStats() async {
+  Future<Map<String, dynamic>> getWorkoutStats({String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
     try {
-      final stored = await _secureStorage.read(key: _workoutStatsKey);
+      final stored = await _secureStorage.read(key: 'cached_workout_stats_$userCedula');
       if (stored != null && stored.trim().isNotEmpty) {
         final decoded = jsonDecode(stored);
         if (decoded is Map<String, dynamic>) {
@@ -426,9 +406,10 @@ CREATE TABLE IF NOT EXISTS cached_upcoming_plan (
     };
   }
 
-  Future<List<Map<String, dynamic>>> getSessionHistory() async {
+  Future<List<Map<String, dynamic>>> getSessionHistory({String? cedula}) async {
+    final userCedula = _effectiveCedula(cedula);
     try {
-      final stored = await _secureStorage.read(key: _workoutHistoryKey);
+      final stored = await _secureStorage.read(key: 'cached_workout_history_$userCedula');
       if (stored != null && stored.trim().isNotEmpty) {
         final decoded = jsonDecode(stored);
         if (decoded is List) {
