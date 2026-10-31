@@ -311,9 +311,9 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         has_brazos = any(w in t for w in ("brazo", "brazos", "bicep", "biceps", "bíceps", "tricep", "triceps", "tríceps", "hombro", "hombros"))
         has_upper = any(w in t for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso")) or has_pecho or has_espalda or has_brazos
         has_core = any(w in t for w in ("abdomen", "abdominal", "core", "estabilidad lumbar"))
-        has_cardio = any(w in t for w in ("movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa"))
+        has_cardio = any(w in t for w in ("movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa", "cardio", "cardiovascular", "calidad cardiovascular", "aerobico", "aeróbico", "resistencia", "corazon", "corazón"))
 
-        if has_legs and has_upper:
+        if has_legs and (has_pecho or has_upper):
             return "piernas_tren_superior"
         if has_legs and has_core:
             return "piernas_core"
@@ -327,6 +327,14 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
                 return "solo_piernas"
             return "piernas"
 
+        # Prioridad a zonas musculares específicas si no se combinaron con otras
+        if has_pecho and not (has_espalda or has_brazos):
+            return "pecho"
+        if has_espalda and not (has_pecho or has_brazos):
+            return "espalda"
+        if has_brazos and not (has_pecho or has_espalda):
+            return "brazos_hombros"
+
         if has_upper:
             if any(w in t for w in ("semana", "semanal", "lunes a viernes", "dias", "días")):
                 return "solo_tren_superior"
@@ -337,14 +345,8 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
                 return "solo_core"
             return "core"
 
-        if has_pecho:
-            return "pecho"
-        if has_espalda:
-            return "espalda"
-        if has_brazos:
-            return "brazos_hombros"
         if has_cardio:
-            return "movilidad_cardio"
+            return "solo_cardio"
 
         # 4. Plan Semanal General / Recomendado por IA (cuando no pide una zona específica)
         if any(w in t for w in (
@@ -452,9 +454,18 @@ def _is_explicit_routine_request(message: str, history: list = None) -> bool:
         return True
 
     # 2. Expresiones con tolerancia a tipeos (ej. "recomeidnes ejercicos", "recomiendame ejercicios")
-    if re.search(r"(recom|dame|arma|dise|haz|crea|prepar|gener).*(ejerci|rutin|plan)", msg):
+    exercise_root = r"(ejerci|ejeric|ejercic|rutin|plan|entren|ejer)"
+    if re.search(r"(recom|dame|arma|dise|haz|crea|prepar|gener).*" + exercise_root, msg):
         return True
-    if re.search(r"(ejerci|rutin|plan).*(semana|hoy|casa|gimnasio|dias|días|arriba|pierna|descarga)", msg):
+    if re.search(exercise_root + r".*(cardio|cardiovascular|corazon|corazón|resistencia|aerob|hiit|semana|hoy|casa|gimnasio|dias|días|arriba|pierna|pecho|espalda|brazo|hombro|core|abdomen|glute|descarga|calidad|salud)", msg):
+        return True
+    if re.search(r"(cardio|cardiovascular|aerob|hiit|resistencia).*" + exercise_root, msg):
+        return True
+    if any(k in msg for k in (
+        "ejercicio para", "ejercicios para", "ejericicos para", "ejericicio para", "ejercicos para",
+        "ejercicio de", "ejercicios de", "ejericicos de", "ejericico de", "ejercicos de",
+        "rutina de", "rutina para", "rutina", "cardiovascular", "calidad cardiovascular", "ejericicos cardiovascular"
+    )):
         return True
 
     explicit_phrases = (
@@ -2950,6 +2961,26 @@ def _normalize_structured_plan(
                     seen_gifs_global=weekly_seen_gifs,
                 )
 
+            elif requested_focus in ("solo_cardio", "movilidad_cardio", "cardio"):
+                day_titles = [
+                    f"Cardio HIIT: Intervalos y Capacidad Aeróbica ({badge_lbl})",
+                    f"Cardio & Resistencia: Estamina y Capacidad Pulmonar ({badge_lbl})",
+                    f"Cardio Funcional: Movilidad Dinámica y Agilidad ({badge_lbl})",
+                    f"Cardio Quema Grasa: Intervalos Metabólicos y Core ({badge_lbl})",
+                    f"Cardio & Recuperación Activa: Flujo Circulatorio ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("cardio", int_hint, seed=dynamic_base_seed + day_idx * 19, is_no_equipment=is_no_equipment)
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="solo_cardio",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
             else:
                 default_titles = [
                     f"Piernas y Glúteos (Cuádriceps y Glúteos) · {badge_lbl}",
@@ -3006,6 +3037,8 @@ def _normalize_structured_plan(
         raw_title = f"Especialización en Espalda y Dorsales ({badge_lbl})"
     elif requested_focus in ("brazos_hombros", "hombros", "brazos", "biceps", "triceps"):
         raw_title = f"Especialización en Hombros y Brazos ({badge_lbl})"
+    elif requested_focus in ("solo_cardio", "movilidad_cardio", "cardio"):
+        raw_title = f"Especialización en Cardio y Capacidad Cardiovascular ({badge_lbl})"
     elif requested_focus == "solo_piernas":
         raw_title = f"Especialización en Piernas y Glúteos ({badge_lbl})"
     elif requested_focus == "pantorrillas_pies":
@@ -3874,8 +3907,8 @@ Devuelve SOLO JSON."""
             focus_name = "Tren Superior (Espalda, Pecho y Brazos)"
         elif focus_key in ("core", "solo_core"):
             focus_name = "Core y Estabilidad Lumbar"
-        elif focus_key in ("movilidad_cardio", "solo_cardio"):
-            focus_name = "Movilidad Articular y Cardio Suave"
+        elif focus_key in ("movilidad_cardio", "solo_cardio", "cardio"):
+            focus_name = "Cardio, Resistencia y Capacidad Cardiovascular"
         elif focus_key in ("cuerpo_completo",):
             focus_name = "Plan Integral de Cuerpo Completo (Full Body)"
         elif focus_key in ("solo_piernas", "piernas"):

@@ -37,7 +37,7 @@ OPENAI_COMPATIBLE_BASE_URLS = {
 
 DEFAULT_MODELS = {
     "groq": "openai/gpt-oss-120b",
-    "openrouter": "google/gemma-4-31b-it:free",
+    "openrouter": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
     "mistral": "mistral-small-latest",
 }
 
@@ -46,8 +46,9 @@ DEFAULT_MODELS = {
 # intermitente con HTTP 429. Se prueban en orden hasta que uno responda.
 MODEL_CANDIDATES = {
     "openrouter": (
-        "nvidia/nemotron-3.5-lightning:free",
-        "recursive/flint-v1.0:free",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "nvidia/nemotron-3.5-super-vl:free",
+        "cohere/north-mini-code:free",
     ),
 }
 
@@ -71,7 +72,7 @@ MODEL_ENV = {
 #     un bloqueo por red/pais. Se deja al final y solo se usa si hay clave.
 #   - OpenRouter, Mistral, Cohere y DeepSeek si responden y validan la clave.
 #   - Gemini funciona, pero su cuota gratuita se agota con rapidez.
-PROVIDER_ORDER = ("gemini", "openrouter", "mistral", "groq")
+PROVIDER_ORDER = ("openrouter", "gemini", "mistral", "groq")
 
 
 @dataclass(frozen=True)
