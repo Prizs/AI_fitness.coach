@@ -306,12 +306,12 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
 
         # 3. Zonas específicas estándar
         has_legs = any(w in t for w in ("pierna", "piernas", "tren inferior", "gluteo", "glúteo", "cuadriceps", "cuádriceps", "isquio", "femoral", "batata", "pantorrilla"))
-        has_upper = any(w in t for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso"))
+        has_pecho = any(w in t for w in ("pecho", "pechos", "pectoral", "pectorales", "empuje", "banca", "flexiones de pecho"))
+        has_espalda = any(w in t for w in ("espalda", "espaldas", "dorsal", "dorsales", "traccion", "tracción", "remo", "jalon", "jalón", "dominada", "dominadas"))
+        has_brazos = any(w in t for w in ("brazo", "brazos", "bicep", "biceps", "bíceps", "tricep", "triceps", "tríceps", "hombro", "hombros"))
+        has_upper = any(w in t for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso")) or has_pecho or has_espalda or has_brazos
         has_core = any(w in t for w in ("abdomen", "abdominal", "core", "estabilidad lumbar"))
         has_cardio = any(w in t for w in ("movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa"))
-        has_pecho = any(w in t for w in ("pecho", "pectoral", "empuje"))
-        has_espalda = any(w in t for w in ("espalda", "dorsal", "traccion", "tracción"))
-        has_brazos = any(w in t for w in ("brazo", "brazos", "biceps", "bíceps", "triceps", "tríceps", "hombro", "hombros"))
 
         if has_legs and has_upper:
             return "piernas_tren_superior"
@@ -1971,6 +1971,19 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
             sh_list[(seed + 2) % len(sh_list)],
             ar_list[(seed + 3) % len(ar_list)],
             cr_list[(seed + 4) % len(cr_list)],
+        ]
+    elif "piernas_tren_superior" in fk or ("pierna" in fk and any(k in fk for k in ("pecho", "tren_superior", "torso", "espalda", "brazo"))):
+        q_list = quads_dict[int_k]
+        h_list = hams_dict[int_k]
+        ch_list = chest_dict[int_k]
+        bk_list = back_dict[int_k]
+        sh_list = shoulders_dict[int_k]
+        selected_tuples = [
+            q_list[(seed + 0) % len(q_list)],
+            ch_list[(seed + 1) % len(ch_list)],
+            h_list[(seed + 2) % len(h_list)],
+            ch_list[(seed + 3) % len(ch_list)] if "pecho" in fk else bk_list[(seed + 3) % len(bk_list)],
+            sh_list[(seed + 4) % len(sh_list)],
         ]
     elif any(k in fk for k in ("tren_superior", "torso")):
         ch_list = chest_dict[int_k]
@@ -3855,6 +3868,8 @@ Devuelve SOLO JSON."""
             focus_name = "Isquiotibiales y Femoral"
         elif focus_key in ("gluteos",):
             focus_name = "Glúteos"
+        elif focus_key in ("piernas_tren_superior",):
+            focus_name = "Piernas y Pecho (Tren Superior)"
         elif focus_key in ("tren_superior", "solo_tren_superior"):
             focus_name = "Tren Superior (Espalda, Pecho y Brazos)"
         elif focus_key in ("core", "solo_core"):
