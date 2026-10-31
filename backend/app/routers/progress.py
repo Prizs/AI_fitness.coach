@@ -96,7 +96,7 @@ def extract_scale_weight_from_image(img_bytes: bytes, mime_type: str = "image/jp
     """
     try:
         if model_instance is None:
-            vision_model_name = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+            vision_model_name = os.environ.get("GEMINI_MODEL") or "gemini-3.1-flash-lite"
             model_instance = genai.GenerativeModel(vision_model_name)
         resp = model_instance.generate_content([
             prompt,
@@ -140,11 +140,11 @@ async def upload_progress_photo(
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         if api_key:
             genai.configure(api_key=api_key)
-        vision_model_name = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+        vision_model_name = os.environ.get("GEMINI_MODEL") or "gemini-3.1-flash-lite"
         try:
             model = genai.GenerativeModel(vision_model_name)
         except Exception:
-            model = genai.GenerativeModel("gemini-2.5-flash")
+            model = genai.GenerativeModel("gemini-3.1-flash-lite")
 
         detected_weight: Optional[float] = None
         scale_notes: str = ""

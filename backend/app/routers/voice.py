@@ -47,7 +47,7 @@ async def transcribe_audio(payload: TranscribeRequest):
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
-            "gemini-2.5-flash",
+            os.environ.get("GEMINI_MODEL") or "gemini-3.1-flash-lite",
             generation_config={"temperature": 0.0},
             system_instruction=SYSTEM_INSTRUCTION,
         )

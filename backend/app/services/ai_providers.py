@@ -27,7 +27,7 @@ import httpx
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 load_dotenv()
 
-GEMINI_TIMEOUT_SEC = 8.0
+GEMINI_TIMEOUT_SEC = 25.0
 
 OPENAI_COMPATIBLE_BASE_URLS = {
     "groq": "https://api.groq.com/openai/v1",
@@ -72,7 +72,7 @@ MODEL_ENV = {
 #     un bloqueo por red/pais. Se deja al final y solo se usa si hay clave.
 #   - OpenRouter, Mistral, Cohere y DeepSeek si responden y validan la clave.
 #   - Gemini funciona, pero su cuota gratuita se agota con rapidez.
-PROVIDER_ORDER = ("openrouter", "gemini", "mistral", "groq")
+PROVIDER_ORDER = ("gemini", "openrouter", "mistral", "groq")
 
 
 @dataclass(frozen=True)
@@ -125,15 +125,30 @@ def _call_gemini(prompt: str, timeout: float) -> str:
     import google.generativeai as genai
 
     genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
-    model = genai.GenerativeModel(
-        (os.getenv("GEMINI_MODEL", "") or "").strip() or "gemini-2.5-flash",
-        generation_config={"response_mime_type": "application/json"},
-    )
-    response = model.generate_content(
-        prompt,
-        request_options={"timeout": timeout},
-    )
-    return _strip_code_fences(response.text or "")
+    configured_model = (os.getenv("GEMINI_MODEL", "") or "").strip()
+    raw_candidates = [configured_model] if (configured_model and "2.5-flash" not in configured_model) else []
+    raw_candidates.extend(["gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-3.8-flash"])
+    candidates = list(dict.fromkeys(raw_candidates))
+    last_err = None
+    for model_name in candidates:
+        if not model_name:
+            continue
+        try:
+            model = genai.GenerativeModel(
+                model_name,
+                generation_config={"response_mime_type": "application/json"},
+            )
+            response = model.generate_content(
+                prompt,
+                request_options={"timeout": timeout},
+            )
+            return _strip_code_fences(response.text or "")
+        except Exception as e:
+            last_err = e
+            continue
+    if last_err:
+        raise last_err
+    raise RuntimeError("No se pudo contactar a Gemini con ningun modelo.")
 
 
 def _call_openai_compatible(provider: str, prompt: str, timeout: float) -> str:
@@ -181,15 +196,15 @@ def _call_openai_compatible(provider: str, prompt: str, timeout: float) -> str:
 def generate_json_text(prompt: str, *, timeout: float = GEMINI_TIMEOUT_SEC) -> ProviderResult:
     """Intenta cada proveedor configurado respetando un límite de tiempo acumulativo estricto."""
     import time
-    deadline = time.time() + min(timeout, 8.0)
+    deadline = time.time() + timeout
     errors: dict[str, str] = {}
     for provider in configured_providers():
         remaining = deadline - time.time()
-        if remaining < 1.5:
+        if remaining < 2.0:
             errors[provider] = "timeout acumulado excedido"
             break
         try:
-            call_timeout = min(remaining, 5.0)
+            call_timeout = remaining
             if provider == "gemini":
                 text = _call_gemini(prompt, call_timeout)
             else:

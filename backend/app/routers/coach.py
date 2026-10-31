@@ -17,7 +17,7 @@ from app.services.ai_providers import (
 router = APIRouter()
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
-AI_TIMEOUT_SEC = 14.0
+AI_TIMEOUT_SEC = 25.0
 MAX_HISTORY_TURNS = 20
 
 
