@@ -46,6 +46,10 @@ class CreateUserRequest(BaseModel):
     discapacidad_motora: Optional[str] = None
     zonas_a_evitar: Optional[str] = None
 
+class ToggleSuspendRequest(BaseModel):
+    pin: str
+    suspend: bool
+
 
 def _verify_pin(pin: str):
     if not pin or str(pin).strip() not in ADMIN_PINS:
@@ -72,11 +76,14 @@ def get_ecosystem_status(pin: str = Query(...)):
     # Usuarios y estadísticas
     users_count = 0
     trainers_count = 0
+    suspended_count = 0
     try:
         admin = get_supabase_admin_client()
         res = admin.table("usuarios").select("id, role").execute()
-        users_count = len(res.data or [])
-        trainers_count = len([u for u in (res.data or []) if u.get("role") == "trainer"])
+        raw_users = res.data or []
+        users_count = len(raw_users)
+        trainers_count = len([u for u in raw_users if str(u.get("role", "")).lower() == "trainer"])
+        suspended_count = len([u for u in raw_users if "suspended" in str(u.get("role", "")).lower()])
     except Exception:
         pass
 
@@ -105,6 +112,7 @@ def get_ecosystem_status(pin: str = Query(...)):
             "latency_ms": sb_lat,
             "total_users": users_count,
             "trainers_count": trainers_count,
+            "suspended_count": suspended_count,
         },
         "app_updates": {
             "version_name": ver_name,
@@ -204,6 +212,23 @@ def create_user_admin(payload: CreateUserRequest):
         raise HTTPException(status_code=500, detail=f"Error creando usuario: {e}")
 
 
+@router.post("/api/admin/users/{user_id}/toggle-suspend")
+def toggle_suspend_user(user_id: str, payload: ToggleSuspendRequest):
+    _verify_pin(payload.pin)
+    admin = get_supabase_admin_client()
+    try:
+        user_res = admin.table("usuarios").select("role").eq("id", user_id).single().execute()
+        current_role = str(user_res.data.get("role", "client")) if user_res.data else "client"
+
+        new_role = "suspended" if payload.suspend else ("client" if current_role == "suspended" else current_role.replace("suspended_", ""))
+        admin.table("usuarios").update({"role": new_role}).eq("id", user_id).execute()
+
+        action_str = "suspendido" if payload.suspend else "reactivado"
+        return {"success": True, "new_role": new_role, "message": f"Usuario {action_str} exitosamente."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error actualizando estado de usuario: {e}")
+
+
 @router.delete("/api/admin/users/{user_id}")
 def delete_user_admin(user_id: str, pin: str = Query(...)):
     _verify_pin(pin)
@@ -230,7 +255,6 @@ def delete_user_admin(user_id: str, pin: str = Query(...)):
 @router.post("/api/admin/purge-cache")
 def purge_system_cache(payload: AdminLoginRequest):
     _verify_pin(payload.pin)
-    # Lógica de limpieza en memoria
     return {
         "success": True,
         "message": "Caché de IA, estados temporales y conexiones reseteados satisfactoriamente."
@@ -238,7 +262,7 @@ def purge_system_cache(payload: AdminLoginRequest):
 
 
 # =====================================================================
-# VISTAS HTML: PANEL ADMIN Y PÁGINA DE DESCARGAS
+# VISTAS HTML
 # =====================================================================
 
 @router.get("/descargar", response_class=HTMLResponse)
@@ -284,9 +308,14 @@ def download_landing_page():
         <p class="text-xs text-emerald-400/80 font-medium">Entrenador y Nutrición Inteligente</p>
       </div>
     </div>
-    <a href="/" class="text-xs font-semibold px-4 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/30 text-emerald-300 transition-all">
-      Abrir Versión Web &rarr;
-    </a>
+    <div class="flex items-center gap-2">
+      <a href="/admin" class="text-xs font-semibold px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition-all">
+        Panel Admin &rarr;
+      </a>
+      <a href="/" class="text-xs font-semibold px-3 py-2 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/30 text-emerald-300 transition-all">
+        Abrir Versión Web &rarr;
+      </a>
+    </div>
   </header>
 
   <!-- Main Card -->
@@ -444,7 +473,7 @@ def admin_portal_html():
         <!-- Google Gemini Card -->
         <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Google Gemini</span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Google Gemini Pro</span>
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
           </div>
           <div class="text-xl font-extrabold text-white" id="geminiModelLabel">Cargando...</div>
@@ -464,11 +493,11 @@ def admin_portal_html():
         <!-- Registered Users Card -->
         <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Usuarios Activos</span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Usuarios Registrados</span>
             <span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300">BD Real</span>
           </div>
           <div class="text-2xl font-extrabold text-white" id="totalUsersCount">--</div>
-          <p class="text-xs text-slate-400 mt-1" id="trainersCountLabel">-- entrenadores</p>
+          <p class="text-xs text-slate-400 mt-1" id="trainersCountLabel">-- activos</p>
         </div>
 
         <!-- Mobile APK Card -->
@@ -490,7 +519,7 @@ def admin_portal_html():
           <p class="text-xs text-slate-400">Restablece la memoria interna del servidor y contadores de los proveedores.</p>
         </div>
         <div class="flex gap-3">
-          <button onclick="purgeCache()" class="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all flex items-center gap-2">
+          <button onclick="promptSecurityAction('purgeCache', 'Limpiar la caché de IA y estados temporales')" class="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             Limpiar Caché IA
           </button>
@@ -509,7 +538,7 @@ def admin_portal_html():
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 class="text-xl font-extrabold text-white">Directorio de Usuarios</h2>
-          <p class="text-xs text-slate-400">Ver ficha médica/clínica, objetivos o eliminar usuarios corruptos</p>
+          <p class="text-xs text-slate-400">Suspende el acceso temporalmente, reactívalo o crea usuarios de soporte con confirmación segura</p>
         </div>
         <div class="flex items-center gap-3">
           <input type="text" id="userSearchInput" oninput="filterUsers()" placeholder="Buscar por cédula o nombre..." class="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500 w-64">
@@ -528,9 +557,9 @@ def admin_portal_html():
                 <th class="py-3 px-4">Cédula</th>
                 <th class="py-3 px-4">Nombre Completo</th>
                 <th class="py-3 px-4">Edad / Peso</th>
-                <th class="py-3 px-4">Rol</th>
+                <th class="py-3 px-4">Estado / Rol</th>
                 <th class="py-3 px-4">Filtro Clínico</th>
-                <th class="py-3 px-4 text-right">Acciones</th>
+                <th class="py-3 px-4 text-right">Acciones de Seguridad</th>
               </tr>
             </thead>
             <tbody id="usersTableBody" class="divide-y divide-slate-800/60 text-slate-300">
@@ -571,6 +600,26 @@ def admin_portal_html():
     </div>
 
   </main>
+
+  <!-- Modal Confirmación con Clave PIN -->
+  <div id="securityConfirmModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-slate-900 border border-amber-500/40 rounded-2xl p-6 shadow-2xl text-center">
+      <div class="w-12 h-12 mx-auto rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      </div>
+      <h3 class="font-bold text-white text-base mb-1" id="securityActionTitle">Confirmar Acción</h3>
+      <p class="text-xs text-slate-400 mb-4" id="securityActionDesc">Ingresa tu PIN de administrador para autorizar esta operación:</p>
+      
+      <form onsubmit="executeSecurityAction(event)">
+        <input type="password" id="securityPinInput" placeholder="PIN de Administrador" class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-center text-sm font-bold text-amber-400 focus:outline-none focus:border-amber-500 mb-3" required>
+        <p id="securityError" class="text-xs text-rose-400 mb-3 hidden"></p>
+        <div class="flex gap-2">
+          <button type="button" onclick="closeSecurityModal()" class="flex-1 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700">Cancelar</button>
+          <button type="submit" id="securitySubmitBtn" class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs">Confirmar</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Modal Nuevo Usuario -->
   <div id="newUserModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4">
@@ -632,6 +681,7 @@ def admin_portal_html():
   <script>
     let adminPin = localStorage.getItem('fitness_admin_pin') || '';
     let globalUsers = [];
+    let pendingSecurityAction = null;
 
     // Check if previously logged in
     window.addEventListener('DOMContentLoaded', () => {{
@@ -696,7 +746,7 @@ def admin_portal_html():
           document.getElementById('supabaseStatusLabel').textContent = data.supabase.status === 'ok' ? 'Conectado (OK)' : 'Revisar';
           document.getElementById('supabaseLatencyLabel').textContent = 'Latencia: ' + data.supabase.latency_ms + ' ms';
           document.getElementById('totalUsersCount').textContent = data.supabase.total_users;
-          document.getElementById('trainersCountLabel').textContent = data.supabase.trainers_count + ' entrenadores';
+          document.getElementById('trainersCountLabel').textContent = (data.supabase.total_users - data.supabase.suspended_count) + ' activos · ' + data.supabase.suspended_count + ' suspendidos';
           if (data.app_updates && data.app_updates.apk_size_mb) {{
             document.getElementById('apkSizeLabel').textContent = data.app_updates.apk_size_mb + ' MB disponible';
           }}
@@ -719,26 +769,41 @@ def admin_portal_html():
         tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-500">No hay usuarios registrados.</td></tr>';
         return;
       }}
-      tbody.innerHTML = users.map(u => `
-        <tr class="hover:bg-slate-800/40 transition-colors">
-          <td class="py-3 px-4 font-mono font-bold text-emerald-400">${{u.cedula}}</td>
-          <td class="py-3 px-4 font-semibold text-white">${{u.nombre}} ${{u.apellido || ''}}</td>
-          <td class="py-3 px-4 text-slate-400">${{u.edad || '--'}} años / ${{u.peso || '--'}} kg</td>
-          <td class="py-3 px-4">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${{u.role === 'trainer' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-300'}}">
-              ${{u.role || 'client'}}
-            </span>
-          </td>
-          <td class="py-3 px-4 text-slate-400 text-[11px] max-w-xs truncate" title="${{u.patologia_o_alergias || 'Ninguna'}}">
-            ${{u.patologia_o_alergias || '<span class="text-slate-600">Ninguna</span>'}}
-          </td>
-          <td class="py-3 px-4 text-right">
-            <button onclick="deleteUser('${{u.id}}', '${{u.cedula}}')" class="text-rose-400 hover:text-rose-300 font-semibold px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 transition-all">
-              Eliminar
-            </button>
-          </td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = users.map(u => {{
+        const isSuspended = (u.role || '').toLowerCase().includes('suspended');
+        return `
+          <tr class="hover:bg-slate-800/40 transition-colors ${{isSuspended ? 'opacity-70 bg-slate-950/40' : ''}}">
+            <td class="py-3 px-4 font-mono font-bold ${{isSuspended ? 'text-slate-500 line-through' : 'text-emerald-400'}}">${{u.cedula}}</td>
+            <td class="py-3 px-4 font-semibold text-white">
+              ${{u.nombre}} ${{u.apellido || ''}}
+              ${{isSuspended ? '<span class="ml-2 text-[10px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded">SUSPENDIDO</span>' : ''}}
+            </td>
+            <td class="py-3 px-4 text-slate-400">${{u.edad || '--'}} años / ${{u.peso || '--'}} kg</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${{isSuspended ? 'bg-rose-500/20 text-rose-300' : (u.role === 'trainer' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-300')}}">
+                ${{u.role || 'client'}}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-slate-400 text-[11px] max-w-xs truncate" title="${{u.patologia_o_alergias || 'Ninguna'}}">
+              ${{u.patologia_o_alergias || '<span class="text-slate-600">Ninguna</span>'}}
+            </td>
+            <td class="py-3 px-4 text-right space-x-1">
+              ${{isSuspended ? `
+                <button onclick="promptSecurityAction('reactivateUser', 'Reactivar acceso al usuario con cédula ${{u.cedula}}', '${{u.id}}')" class="text-emerald-400 hover:text-emerald-300 font-semibold px-2 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 transition-all text-[11px]">
+                  Reactivar
+                </button>
+              ` : `
+                <button onclick="promptSecurityAction('suspendUser', 'Suspender temporalmente al usuario con cédula ${{u.cedula}}', '${{u.id}}')" class="text-amber-400 hover:text-amber-300 font-semibold px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 transition-all text-[11px]">
+                  Suspender
+                </button>
+              `}}
+              <button onclick="promptSecurityAction('deleteUser', 'ELIMINAR DEFINITIVAMENTE al usuario con cédula ${{u.cedula}}', '${{u.id}}')" class="text-rose-400 hover:text-rose-300 font-semibold px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 transition-all text-[11px]">
+                Eliminar
+              </button>
+            </td>
+          </tr>
+        `;
+      }}).join('');
     }}
 
     function filterUsers() {{
@@ -751,18 +816,88 @@ def admin_portal_html():
       renderUsersTable(filtered);
     }}
 
-    function deleteUser(id, cedula) {{
-      if (!confirm(`¿Estás seguro de eliminar el usuario con cédula ${{cedula}}? Esta acción es irreversible.`)) return;
-      fetch(`/api/admin/users/${{id}}?pin=${{encodeURIComponent(adminPin)}}`, {{ method: 'DELETE' }})
-        .then(r => r.json())
-        .then(res => {{
+    // MODAL DE CONFIRMACIÓN CON CLAVE PIN PARA ACCIONES DE SEGURIDAD
+    function promptSecurityAction(actionType, description, targetId = null) {{
+      pendingSecurityAction = {{ actionType, description, targetId }};
+      document.getElementById('securityActionTitle').textContent = 'Confirmación de Seguridad';
+      document.getElementById('securityActionDesc').textContent = description;
+      document.getElementById('securityPinInput').value = '';
+      document.getElementById('securityError').classList.add('hidden');
+      document.getElementById('securityConfirmModal').classList.remove('hidden');
+      document.getElementById('securityConfirmModal').classList.add('flex');
+      document.getElementById('securityPinInput').focus();
+    }}
+
+    function closeSecurityModal() {{
+      pendingSecurityAction = null;
+      document.getElementById('securityConfirmModal').classList.add('hidden');
+      document.getElementById('securityConfirmModal').classList.remove('flex');
+    }}
+
+    function executeSecurityAction(e) {{
+      e.preventDefault();
+      const enteredPin = document.getElementById('securityPinInput').value.trim();
+      const err = document.getElementById('securityError');
+      err.classList.add('hidden');
+
+      if (!pendingSecurityAction) return;
+      const {{ actionType, targetId }} = pendingSecurityAction;
+
+      if (actionType === 'suspendUser') {{
+        fetch(`/api/admin/users/${{targetId}}/toggle-suspend`, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ pin: enteredPin, suspend: true }})
+        }}).then(r => r.json()).then(res => {{
           if (res.success) {{
-            alert('Usuario eliminado correctamente.');
+            closeSecurityModal();
             fetchUsers();
           }} else {{
-            alert('Aviso: ' + JSON.stringify(res));
+            err.textContent = res.detail || 'PIN incorrecto o error.';
+            err.classList.remove('hidden');
           }}
         }});
+      }} else if (actionType === 'reactivateUser') {{
+        fetch(`/api/admin/users/${{targetId}}/toggle-suspend`, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ pin: enteredPin, suspend: false }})
+        }}).then(r => r.json()).then(res => {{
+          if (res.success) {{
+            closeSecurityModal();
+            fetchUsers();
+          }} else {{
+            err.textContent = res.detail || 'PIN incorrecto o error.';
+            err.classList.remove('hidden');
+          }}
+        }});
+      }} else if (actionType === 'deleteUser') {{
+        fetch(`/api/admin/users/${{targetId}}?pin=${{encodeURIComponent(enteredPin)}}`, {{ method: 'DELETE' }})
+          .then(r => r.json()).then(res => {{
+            if (res.success) {{
+              closeSecurityModal();
+              fetchUsers();
+            }} else {{
+              err.textContent = res.detail || 'PIN incorrecto o error.';
+              err.classList.remove('hidden');
+            }}
+          }});
+      }} else if (actionType === 'purgeCache') {{
+        fetch('/api/admin/purge-cache', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ pin: enteredPin }})
+        }}).then(r => r.json()).then(res => {{
+          if (res.success) {{
+            alert(res.message);
+            closeSecurityModal();
+            fetchEcosystem();
+          }} else {{
+            err.textContent = res.detail || 'PIN incorrecto.';
+            err.classList.remove('hidden');
+          }}
+        }});
+      }}
     }}
 
     function openNewUserModal() {{
@@ -799,18 +934,6 @@ def admin_portal_html():
         }} else {{
           alert('Error: ' + (res.detail || JSON.stringify(res)));
         }}
-      }});
-    }}
-
-    function purgeCache() {{
-      if (!confirm('¿Limpiar caché de la IA y memoria de proveedores?')) return;
-      fetch('/api/admin/purge-cache', {{
-        method: 'POST',
-        headers: {{ 'Content-Type': 'application/json' }},
-        body: JSON.stringify({{ pin: adminPin }})
-      }}).then(r => r.json()).then(res => {{
-        alert(res.message);
-        fetchEcosystem();
       }});
     }}
 

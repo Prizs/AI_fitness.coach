@@ -183,7 +183,16 @@ def login(payload: LoginRequest):
             .single()
             .execute()
         )
-        return _session_response(auth_response, profile_result.data)
+        user_data = profile_result.data or {}
+        role_str = str(user_data.get("role", "")).lower()
+        if "suspended" in role_str or user_data.get("is_suspended") is True:
+            raise HTTPException(
+                status_code=403,
+                detail="Esta cuenta ha sido temporalmente suspendida por el administrador. Contacta a soporte."
+            )
+        return _session_response(auth_response, user_data)
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(status_code=401, detail="Cédula o contraseña incorrectos.") from error
 
