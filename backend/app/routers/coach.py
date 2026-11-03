@@ -66,6 +66,274 @@ class ChatMessage(BaseModel):
     today_is_home: bool | None = Field(default=False)
 
 
+# =====================================================================
+# MOTOR CLÍNICO DE ADAPTACIÓN BIOMECÁNICA POR DOLOR O LESIÓN ARTICULAR
+# =====================================================================
+
+CLINICAL_INJURY_PROFILES = {
+    "tobillo": {
+        "label": "Tobillo y Pie",
+        "keywords": (
+            "tobillo", "tobillos", "pie", "pies", "talon", "talón", "talones",
+            "aquiles", "tendon de aquiles", "tendón de aquiles", "fascitis",
+            "esguince de tobillo", "torcedura de tobillo", "dolor de tobillo",
+            "molestia en el tobillo", "me duele el tobillo", "tobillo lastimado"
+        ),
+        "prohibited_exercise_terms": (
+            "sentadilla", "squat", "zancada", "lunge", "desplante", "prensa",
+            "salto", "jump", "burpee", "trotar", "correr", "elevacion de talones",
+            "elevación de talones", "calf raise", "pantorrilla", "talon", "talón",
+            "cuerda", "escalera", "step"
+        ),
+        "prohibited_prompt_text": "Cero sentadillas, zancadas, saltos, elevación de talones pesada, trote o bipedestación con carga axial sobre el pie.",
+        "safe_prompt_text": "Todos los ejercicios deben ser 100% de TREN SUPERIOR Y TORSO SENTADO CON RESPALDO (press con mancuernas sentado, remo con soporte en pecho, curl sentado) o CORE EN COLCHONETA sin apoyo de pies (Dead Bug, Crunch con pies elevados). Cero demanda mecánica sobre el tobillo.",
+        "replacements": {
+            "Sentadilla": "Press de pecho con mancuernas sentado con soporte",
+            "Zancada": "Remo con soporte en pecho en banco inclinado",
+            "Prensa": "Press militar de hombros sentado con respaldo",
+            "Elevación de talones": "Dead Bug en colchoneta (Core sin apoyo plantar)",
+            "Burpees": "Crunch abdominal clásico en suelo con pies en banco",
+            "Salto": "Curl de bíceps sentado con mancuernas",
+        },
+        "quick_replies": [
+            "💪 Tren Superior Sentado (Cero tobillo)",
+            "🧘 Descanso y Protocolo RICE",
+            "🦵 Piernas en colchoneta sin pisar",
+            "🩹 Señales de alarma médica",
+        ]
+    },
+    "rodilla": {
+        "label": "Rodilla",
+        "keywords": (
+            "rodilla", "rodillas", "menisco", "meniscos", "rotula", "rótula",
+            "ligamento cruzado", "cruzado anterior", "femororrotuliano", "femoropatelar",
+            "tendinitis rotuliana", "dolor de rodilla", "me duele la rodilla",
+            "molestia en la rodilla", "rodilla lastimada", "no puedo doblar la rodilla"
+        ),
+        "prohibited_exercise_terms": (
+            "sentadilla profunda", "sentadilla libre", "zancada", "lunge", "desplante",
+            "prensa", "prensa 45", "extension de cuadriceps", "extensión de cuádriceps",
+            "leg extension", "salto", "jump", "burpee", "step-up", "sentadilla bulgara",
+            "sentadilla búlgara", "hack"
+        ),
+        "prohibited_prompt_text": "Cero sentadillas profundas, zancadas dinámicas, prensa de 45° con flexión aguda, saltos o extensiones pesadas de cuádriceps.",
+        "safe_prompt_text": "Prioriza TREN SUPERIOR COMPLETO, o trabajo de tren inferior en cadena abierta y suelo sin flexión forzada de rodilla (Puente de glúteos en suelo con empuje de talones, curl femoral suave con banda, elevaciones laterales de pierna acostado, core en suelo).",
+        "replacements": {
+            "Sentadilla": "Puente de glúteos en suelo con control (Glute Bridge)",
+            "Zancada": "Elevaciones laterales de pierna en colchoneta (Glúteo Medio)",
+            "Prensa": "Press de pecho con mancuernas en banco plano",
+            "Extensión de cuádriceps": "Curl femoral acostado en colchoneta con banda",
+            "Burpees": "Remo con mancuernas con soporte en banco",
+            "Salto": "Plancha frontal isométrica en antebrazos",
+        },
+        "quick_replies": [
+            "💪 Rutina de Tren Superior (Cero rodilla)",
+            "🍑 Glúteos e Isquios sin doblar rodilla",
+            "🧘 Descanso y Cuidado Articular",
+            "🧊 Protocolo RICE para rodilla",
+        ]
+    },
+    "hombro": {
+        "label": "Hombro y Manguito Rotador",
+        "keywords": (
+            "hombro", "hombros", "manguito rotador", "manguito", "supraespinoso",
+            "clavicula", "clavícula", "bursitis subacromial", "pinzamiento de hombro",
+            "dolor de hombro", "me duele el hombro", "molestia en el hombro",
+            "hombro lastimado", "no puedo subir el brazo"
+        ),
+        "prohibited_exercise_terms": (
+            "press militar", "shoulder press", "press tras nuca", "fondos en paralelas",
+            "dips", "elevacion lateral pesada", "elevación lateral pesada",
+            "press de banca con agarre ancho", "dominadas pronas anchas", "face pull pesado"
+        ),
+        "prohibited_prompt_text": "Cero press militar vertical sobre la cabeza, press tras nuca, fondos en paralelas o abducciones forzadas de hombro.",
+        "safe_prompt_text": "Prioriza RUTINA COMPLETA DE PIERNAS Y GLÚTEOS (sentadillas, prensa, zancadas, puentes de glúteo) o trabajo de brazos con codos pegados al cuerpo (curl de bíceps pegado, extensiones de tríceps en polea baja, core en colchoneta). Cero carga sobre el manguito rotador.",
+        "replacements": {
+            "Press militar": "Sentadilla libre asistida con peso corporal",
+            "Press de hombros": "Prensa de piernas o sentadilla goblet",
+            "Fondos en paralelas": "Puente de glúteos en suelo",
+            "Press de banca": "Remo con mancuernas con codos pegados a las costillas",
+            "Elevaciones laterales": "Curl de bíceps con codos firmes pegados al torso",
+        },
+        "quick_replies": [
+            "🦵 Rutina de Piernas y Glúteos (Cero hombro)",
+            "💪 Brazos con codos pegados al cuerpo",
+            "🧘 Descanso y Movilidad de Hombro",
+            "🧊 Protocolo de Desinflamación",
+        ]
+    },
+    "lumbar": {
+        "label": "Espalda Baja y Zona Lumbar",
+        "keywords": (
+            "lumbar", "lumbares", "espalda baja", "ciatica", "ciática", "hernia discal",
+            "lumbago", "dolor lumbar", "me duele la cintura", "me duele la espalda baja",
+            "punzada en la espalda", "pinzamiento lumbar"
+        ),
+        "prohibited_exercise_terms": (
+            "peso muerto", "deadlift", "buenos dias", "buenos días", "sentadilla con barra tras nuca",
+            "remo con barra inclinado", "giros rusos", "russian twist", "hiperextensiones lumbares"
+        ),
+        "prohibited_prompt_text": "Cero peso muerto libre, sentadillas con barra axial tras nuca, remos con barra sin soporte o giros rusos balísticos que compriman los discos intervertebrales.",
+        "safe_prompt_text": "Prioriza EJERCICIOS CON SOPORTE ESTERNAL O ESPALDA APOYADA (remo en máquina o banco apoyando el pecho, press en banco plano, wall sit en pared con espalda apoyada, Dead Bug, Bird Dog con control estricto). Cero compresión axial en columna.",
+        "replacements": {
+            "Peso muerto": "Remo con pecho apoyado en banco inclinado",
+            "Sentadilla con barra": "Sentadilla isométrica en pared con espalda apoyada (Wall Sit)",
+            "Remo con barra": "Jalón al pecho en polea con espalda recta",
+            "Giros rusos": "Bird Dog controlado (Antiextensión lumbo-pélvica)",
+            "Buenos días": "Puente de glúteos en suelo con abdomen activo",
+        },
+        "quick_replies": [
+            "🏋️ Ejercicios con Espalda 100% Apoyada",
+            "🦵 Piernas sin compresión en columna",
+            "🧘 Descompresión Lumbar y Descanso",
+            "🚶 Movilidad lumbo-pélvica suave",
+        ]
+    },
+    "muneca": {
+        "label": "Muñeca y Antebrazo",
+        "keywords": (
+            "muñeca", "muñecas", "muneca", "munecas", "tunel carpiano", "túnel carpiano",
+            "tendinitis de muñeca", "dolor de muñeca", "me duele la muñeca", "no puedo apoyar la mano"
+        ),
+        "prohibited_exercise_terms": (
+            "flexiones con palmas", "push ups planas", "curl de muñeca", "press con barra rigida",
+            "fondos en suelo con palma", "handstand", "plancha con manos"
+        ),
+        "prohibited_prompt_text": "Cero flexiones o apoyos con palmas planas en suelo en hiperextensión de muñeca.",
+        "safe_prompt_text": "Usa AGARRE NEUTRO (mancuernas hexagonales, puños cerrados, correas) o entrena PIERNAS Y GLÚTEOS al 100% y Core en antebrazos o colchoneta sin usar muñecas.",
+        "replacements": {
+            "Flexiones de pecho": "Flexiones con agarre neutro sobre mancuernas o puños",
+            "Plancha con palmas": "Plancha frontal sobre antebrazos",
+            "Press de banca con barra": "Press con mancuernas con agarre neutro (palmas enfrentadas)",
+        },
+        "quick_replies": [
+            "🦵 Rutina de Piernas (Cero muñeca)",
+            "💪 Torso con Agarre Neutro / Puños",
+            "🧘 Descanso y Descarga Articular",
+        ]
+    },
+    "cuello": {
+        "label": "Cuello y Cervicales",
+        "keywords": (
+            "cuello", "cervical", "cervicales", "torticolis", "tortícolis",
+            "dolor de cuello", "me duele el cuello", "trapecio alto inflamado"
+        ),
+        "prohibited_exercise_terms": (
+            "crunch jalando cuello", "encogimientos pesados de trapecio", "press tras nuca",
+            "puente cervical", "saltos con impacto"
+        ),
+        "prohibited_prompt_text": "Cero tracción del cuello con manos, press tras nuca o impactos bruscos.",
+        "safe_prompt_text": "Ejercicios con CABEZA Y ESPALDA APOYADAS EN BANCO (Press plano, Aperturas) o Piernas en máquina/suelo con mirada al frente y columna cervical perfectamente neutra.",
+        "replacements": {
+            "Crunch abdominal": "Crunch con manos en el pecho y cuello neutro",
+            "Press militar tras nuca": "Press de pecho con mancuernas en banco plano",
+            "Encogimientos de hombros": "Elevaciones laterales ligeras controladas",
+        },
+        "quick_replies": [
+            "💪 Rutina con Cabeza y Espalda Apoyadas",
+            "🦵 Piernas y Glúteos (Mirada neutra)",
+            "🧘 Relajación Cervical y Descanso",
+        ]
+    },
+    "codo": {
+        "label": "Codo (Epicondilitis / Epitrocleitis)",
+        "keywords": (
+            "codo", "codos", "epicondilitis", "codo de tenista", "codo de golfista",
+            "tendinitis de codo", "dolor de codo", "me duele el codo"
+        ),
+        "prohibited_exercise_terms": (
+            "press frances", "press francés", "fondos en paralelas", "extensiones pesadas de triceps",
+            "curl predicador con barra z cerrada", "dominadas pronas estrictas"
+        ),
+        "prohibited_prompt_text": "Cero extensiones forzadas de tríceps, press francés pesado o bloqueos bruscos de codo.",
+        "safe_prompt_text": "Prioriza PIERNAS Y GLÚTEOS al 100%, Core en colchoneta o torso con agarre neutro y cargas moderadas sin hiperextensión.",
+        "replacements": {
+            "Press francés": "Sentadilla libre o goblet para piernas",
+            "Fondos en paralelas": "Puente de glúteos en suelo",
+            "Dominadas estrictas": "Remo con mancuernas con agarre neutro",
+        },
+        "quick_replies": [
+            "🦵 Rutina de Piernas y Core (Cero codo)",
+            "💪 Torso suave con agarre neutro",
+            "🧘 Descanso y Desinflamación",
+        ]
+    }
+}
+
+
+def _detect_affected_joint_or_injury(payload: ChatMessage) -> tuple[str | None, dict | None]:
+    """
+    Analiza el mensaje actual, el cuestionario de estado actual (injuries, areas_to_avoid),
+    las patologías y el historial reciente para identificar qué articulación o zona anatómica
+    está afectada o con dolor.
+    """
+    combined = " ".join([
+        (payload.message or ""),
+        (payload.injuries or ""),
+        (payload.areas_to_avoid or ""),
+        (payload.pathology_or_allergies or "")
+    ]).lower()
+
+    if payload.history:
+        for turn in payload.history[-2:]:
+            content = turn.content if hasattr(turn, "content") else (turn.get("content") if isinstance(turn, dict) else str(turn))
+            combined += " " + (content or "").lower()
+
+    # Si expresa dolor o molestia o pide adaptar por lesión:
+    has_pain_indicator = any(p in combined for p in (
+        "duele", "duelen", "dolor", "dolores", "doliend", "molest", "lesion", "lesión",
+        "lastimad", "inflamad", "hinchad", "afectad", "no puedo", "evitar", "sin tocar",
+        "sin demandar", "proteger", "cuidado con", "esguince", "tendinitis", "pinzamiento",
+        "hernia", "operad", "fractur", "contractur", "tirón", "tiron", "sobrecarga",
+        "tension", "tensión", "rigidez", "torticolis", "tortícolis", "lumbalgia", "lumbago"
+    ))
+
+    # También considerar si explícitamente se nombró en injuries o areas_to_avoid
+    has_explicit_area = bool(payload.injuries or payload.areas_to_avoid)
+
+    if not has_pain_indicator and not has_explicit_area:
+        return None, None
+
+    for zone_key, profile in CLINICAL_INJURY_PROFILES.items():
+        if any(kw in combined for kw in profile["keywords"]):
+            return zone_key, profile
+
+    return None, None
+
+
+def _sanitize_exercise_by_injury(name: str, primary: str, secondary: str, animation_key: str, zone_key: str | None) -> tuple[str, str, str, str]:
+    """
+    Verifica si el ejercicio prescrito viola las contraindicaciones clínicas de la articulación lesionada,
+    y si es así, lo sustituye de inmediato por una variante biomecánicamente segura.
+    """
+    if not zone_key or zone_key not in CLINICAL_INJURY_PROFILES:
+        return name, primary, secondary, animation_key
+
+    profile = CLINICAL_INJURY_PROFILES[zone_key]
+    lower_name = name.lower()
+
+    is_contraindicated = any(term in lower_name for term in profile["prohibited_exercise_terms"])
+    if not is_contraindicated:
+        return name, primary, secondary, animation_key
+
+    # Buscar reemplazo adecuado
+    for bad_term, safe_name in profile["replacements"].items():
+        if bad_term.lower() in lower_name:
+            # Reasignar músculos acordes a la nueva variante
+            if zone_key in ("tobillo", "rodilla"):
+                return safe_name, "Pectorales / Tren Superior", "Core / Estabilizadores", "bench_press"
+            elif zone_key in ("hombro", "codo"):
+                return safe_name, "Piernas / Cuádriceps", "Glúteos", "squat"
+            elif zone_key == "lumbar":
+                return safe_name, "Dorsales / Espalda con Soporte", "Bíceps", "row"
+            else:
+                return safe_name, "General Seguro", "Core", "mobility"
+
+    # Reemplazo por defecto seguro de la zona
+    first_safe = list(profile["replacements"].values())[0]
+    return first_safe, "Tren Superior / Adaptado", "Core", "mobility"
+
+
 def _extract_effective_level_and_intensity(payload: ChatMessage) -> tuple[str, str]:
     """Detecta el nivel de experiencia e intensidad reales a partir del mensaje y del historial sin acoplarlos."""
     combined_user_text = " ".join(
@@ -2139,6 +2407,7 @@ def _normalize_exercises(
     is_no_equipment: bool = False,
     seen_names_global: set[str] | None = None,
     seen_gifs_global: set[str] | None = None,
+    affected_zone: str | None = None,
 ) -> list[dict]:
     exercises: list[dict] = []
     if not isinstance(raw_exercises, list):
@@ -2175,6 +2444,12 @@ def _normalize_exercises(
         reps_val = str(exercise.get("reps") or "10-12")
         anim_key = str(exercise.get("animation_key") or "squat")
         replaced_from_pool = False
+
+        # Sanitización clínica obligatoria por lesión o molestia articular
+        if affected_zone:
+            raw_name, primary, secondary, anim_key = _sanitize_exercise_by_injury(
+                raw_name, primary, secondary, anim_key, affected_zone
+            )
 
         # 1. Si el usuario pidió piernas y la IA coló un ejercicio de otra parte, usar pool de piernas
         if requested_focus == "piernas" and not _is_leg_exercise(raw_name, primary):
@@ -2472,6 +2747,7 @@ def _normalize_structured_plan(
     is_no_equipment: bool = False,
     has_active_plan: bool = False,
     history: list | None = None,
+    affected_zone: str | None = None,
 ) -> dict | None:
     if not isinstance(raw_plan, dict):
         return None
@@ -2479,6 +2755,12 @@ def _normalize_structured_plan(
     if not requested_focus and user_message:
         dummy_msg = ChatMessage(message=user_message, history=history or [])
         requested_focus = _detect_requested_focus(dummy_msg)
+
+    if not affected_zone and user_message:
+        dummy_chk = ChatMessage(message=user_message, history=history or [])
+        detected_z, _ = _detect_affected_joint_or_injury(dummy_chk)
+        if detected_z:
+            affected_zone = detected_z
 
     weekly_seen_names: set[str] = set()
     weekly_seen_gifs: set[str] = set()
@@ -2490,6 +2772,7 @@ def _normalize_structured_plan(
         level=level,
         requested_focus=requested_focus,
         is_no_equipment=is_no_equipment,
+        affected_zone=affected_zone,
     )
     if not exercises:
         return None
@@ -3764,6 +4047,16 @@ Devuelve SOLO JSON."""
 
     has_active_plan = bool(payload.has_active_plan)
     motor_disabled, motor_reason = _detect_motor_disability_or_seated_need(payload)
+    affected_zone, affected_profile = _detect_affected_joint_or_injury(payload)
+
+    # Si hay articulación afectada y no hay un enfoque explícito fijado, adaptar el enfoque
+    if affected_zone and not requested_focus:
+        if affected_zone in ("tobillo", "rodilla"):
+            requested_focus = "tren_superior"
+        elif affected_zone in ("hombro", "codo"):
+            requested_focus = "piernas"
+        elif affected_zone == "lumbar":
+            requested_focus = "tren_superior_core"
 
     if motor_disabled:
         focus_instruction = (
@@ -3808,6 +4101,17 @@ Devuelve SOLO JSON."""
             f"   - Confírmale que has calibrado la intensidad recomendada a **{effective_intensity}** (fase de deload o descarga activa) para favorecer la supercompensación sin agotar el SNC.\n"
             f"   - ACLARACIÓN OBLIGATORIA: Enfatiza que su **nivel de experiencia ({effective_level}) se mantiene intacto**, ya que regular la intensidad no disminuye su nivel atlético.\n"
             f"   - Todos los ejercicios recomendados deben coincidir rigurosamente con la intensidad **{effective_intensity}**."
+        )
+
+    injury_clinical_instruction = ""
+    if affected_zone and affected_profile:
+        injury_clinical_instruction = (
+            f"\n8. PROTOCOLO CLÍNICO BIOMECÁNICO OBLIGATORIO POR DOLOR / LESIÓN EN {affected_profile['label'].upper()}:\n"
+            f"   - El usuario presenta dolor, sobrecarga, molestia o lesión en: **{affected_profile['label']}**.\n"
+            f"   - Valida el síntoma con empatía médica y explica biomecánicamente por qué debemos aislar esa articulación.\n"
+            f"   - PROHIBICIÓN ABSOLUTA: {affected_profile['prohibited_prompt_text']}\n"
+            f"   - OBLIGATORIO: {affected_profile['safe_prompt_text']}\n"
+            f"   - En cada ejercicio generado, la biomecánica y postura debe confirmar explícitamente: 'Cero carga o impacto en {affected_profile['label']}'.\n"
         )
 
     is_no_equipment = _is_no_equipment(payload.equipment_details, payload.message, payload.today_is_home, payload.history)
@@ -4033,7 +4337,7 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
      * Si reporta Asma: Pausas ventilatorias adecuadas (60-90s) y calentamiento progresivo; hidratación constante.
      * Si reporta Diabetes: En nutrición, priorizar carbohidratos de bajo índice glucémico (avena, caraotas, batata) y evitar azúcares o exceso de plátano muy maduro.
    - FILTRO BIOMECÁNICO DE LESIONES O DOLOR ({payload.injuries or 'Ninguna'} / ZONAS A EVITAR {payload.areas_to_avoid or 'Ninguna'}):
-     * ESTÁ TERMINANTEMENTE PROHIBIDO prescribir ejercicios que comprometan o impacten las articulaciones o zonas lesionadas (ej. si reporta rodilla, CERO impacto o sentadillas con flexión aguda forzada; si reporta hombro, CERO presses tras nuca; si reporta lumbares, CERO peso muerto pesado con compresión vertebral). Prescribe variantes terapéuticas seguras.{fatigue_instruction}{motor_instruction}{equip_instruction}
+     * ESTÁ TERMINANTEMENTE PROHIBIDO prescribir ejercicios que comprometan o impacten las articulaciones o zonas lesionadas (ej. si reporta rodilla, CERO impacto o sentadillas con flexión aguda forzada; si reporta hombro, CERO presses tras nuca; si reporta lumbares, CERO peso muerto pesado con compresión vertebral). Prescribe variantes terapéuticas seguras.{fatigue_instruction}{motor_instruction}{equip_instruction}{injury_clinical_instruction}
  
 6. REGLA DE ORIGINALIDAD, DIVERSIDAD BIOMECÁNICA Y CERO REPETICIÓN:
    - Está TERMINANTEMENTE PROHIBIDO recomendar siempre los mismos ejercicios monótonos o predecibles (no repitas siempre Sentadilla Goblet, Hip Thrust o Prensa básica).
