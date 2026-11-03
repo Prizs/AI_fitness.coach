@@ -3540,12 +3540,28 @@ Retorna SOLO JSON."""
 
     # 2. Consulta exploratoria sobre el Próximo Ciclo (ej: "Quiero diseñar un plan para el próximo ciclo")
     if _is_next_cycle_inquiry(payload.message):
+        import datetime
+        now = datetime.date.today()
+        # Cálculo dinámico del ciclo actual y del próximo ciclo según la fecha real:
+        curr_mon = now - datetime.timedelta(days=now.weekday())
+        curr_sun = curr_mon + datetime.timedelta(days=6)
+        next_mon = curr_mon + datetime.timedelta(days=7)
+        next_sun = next_mon + datetime.timedelta(days=6)
+
+        default_active_range = f"{curr_mon.day}/{curr_mon.month} al {curr_sun.day}/{curr_sun.month}"
+        default_next_cycle = f"Lunes {next_mon.day}/{next_mon.month}"
+        default_next_range = f"{next_mon.day:02d}/{next_mon.month:02d} al {next_sun.day:02d}/{next_sun.month:02d}"
+
         active_range = (
             f"{payload.active_plan_start} al {payload.active_plan_end}"
-            if payload.active_plan_start
-            else "2/11 al 8/11"
+            if (payload.active_plan_start and payload.active_plan_end)
+            else default_active_range
         )
-        next_cycle = payload.next_cycle_start or "Lunes 9/11"
+        next_cycle = payload.next_cycle_start or default_next_cycle
+
+        # Extracción dinámica del día/mes para el botón de respuesta rápida:
+        match_date = re.search(r"(\d{1,2}/\d{1,2})", next_cycle)
+        next_date_str = match_date.group(1) if match_date else f"{next_mon.day}/{next_mon.month}"
 
         reply_text = (
             f"¡Excelente iniciativa! Efectivamente, nuestro próximo ciclo de entrenamiento inicia el **{next_cycle}**, "
@@ -3567,7 +3583,7 @@ Retorna SOLO JSON."""
             "has_plan": False,
             "structured_plan": None,
             "quick_replies": [
-                "💪 ¡Listo para el 9/11! Tren Superior",
+                f"💪 ¡Listo para el {next_date_str}! Tren Superior",
                 "🦵 Enfocar en Piernas y Glúteos",
                 "🏖️ Planificar descanso completo / vacaciones",
                 "🧘 Semana de descarga (Deload suave)",
@@ -3578,8 +3594,15 @@ Retorna SOLO JSON."""
 
     # 3. Solicitud explícita de Ciclo de Descanso Completo / Vacaciones
     if _is_full_rest_or_vacation_request(payload.message):
+        import datetime
+        now = datetime.date.today()
+        curr_mon = now - datetime.timedelta(days=now.weekday())
+        next_mon = curr_mon + datetime.timedelta(days=7)
+        next_sun = next_mon + datetime.timedelta(days=6)
+        default_next_range = f"{next_mon.day:02d}/{next_mon.month:02d} al {next_sun.day:02d}/{next_sun.month:02d}"
+
         cycle_dates = _extract_cycle_dates(payload.message, has_active_plan=payload.has_active_plan, history=payload.history)
-        cycle_range = cycle_dates.get("cycle_range_str") or "09/11 al 15/11"
+        cycle_range = cycle_dates.get("cycle_range_str") or default_next_range
         days_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
         vacation_days = []
         for i, dname in enumerate(days_names):
