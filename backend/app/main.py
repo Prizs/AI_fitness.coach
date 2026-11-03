@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import app_updates, auth, coach, plans, workouts, recalibration, exercises, trainer, progress, voice
+from app.routers import app_updates, auth, coach, plans, workouts, recalibration, exercises, trainer, progress, voice, admin_portal
 from app.services.ai_providers import PROVIDER_ORDER, configured_providers
 from app.services.supabase_service import check_supabase_connection
 
@@ -50,6 +50,7 @@ app.include_router(exercises.router, prefix="/api/exercises", tags=["exercises"]
 app.include_router(trainer.router)
 app.include_router(progress.router)
 app.include_router(voice.router, prefix="/api/voice", tags=["voice"])
+app.include_router(admin_portal.router, tags=["admin_portal"])
 
 
 @app.get("/health")
