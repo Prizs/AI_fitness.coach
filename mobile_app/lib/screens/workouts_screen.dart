@@ -7,6 +7,7 @@ import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/database/db_helper.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:mobile_app/screens/adaptive_workout_screen.dart';
+import 'package:mobile_app/widgets/windows_calendar_dialog.dart';
 
 /// Rutinas de la semana, con el ciclo activo, días programados y fechas de periodización.
 class WorkoutsScreen extends StatefulWidget {
@@ -705,6 +706,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
               ),
             ),
+            IconButton(
+              icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BE0C0)),
+              tooltip: 'Calendario Mensual (Estilo Windows)',
+              onPressed: () => WindowsCalendarDialog.show(context),
+            ),
+            const SizedBox(width: 4),
             TextButton.icon(
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF8BE0C0),
@@ -791,14 +798,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           totalCount: scheduledDays.length,
           onNewRoutinePressed: _handleNewRoutinePress,
         ),
-        if (_service.hasUpcomingPlan) ...[
-          const SizedBox(height: 12),
-          _UpcomingCycleCard(
-            service: _service,
-            onOpenCoach: _openCoach,
-            onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
-          ),
-        ],
+
         const SizedBox(height: 18),
 
         if (pendingScheduled.isNotEmpty) ...[
@@ -851,6 +851,20 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                   ),
                 ),
               )),
+        ],
+        const SizedBox(height: 16),
+        // Acordeón del Próximo Ciclo al final de la pantalla (desplegable)
+        if (_service.hasUpcomingPlan) ...[
+          _UpcomingCycleCard(
+            service: _service,
+            onOpenCoach: _openCoach,
+            onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
+          ),
+        ] else ...[
+          _UpcomingCyclePlaceholderCard(
+            service: _service,
+            onOpenCoach: _openCoach,
+          ),
         ],
         const SizedBox(height: 80),
       ],
@@ -1566,6 +1580,137 @@ class _DayCard extends StatelessWidget {
             }),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+class _UpcomingCyclePlaceholderCard extends StatefulWidget {
+  const _UpcomingCyclePlaceholderCard({
+    required this.service,
+    required this.onOpenCoach,
+  });
+
+  final WeeklyPlanService service;
+  final VoidCallback onOpenCoach;
+
+  @override
+  State<_UpcomingCyclePlaceholderCard> createState() => _UpcomingCyclePlaceholderCardState();
+}
+
+class _UpcomingCyclePlaceholderCardState extends State<_UpcomingCyclePlaceholderCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final nextCycleDate = widget.service.nextCycleDateStr;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131D2D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFFFB340).withValues(alpha: 0.35),
+          width: 1.1,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2210),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.event_repeat_rounded, size: 14, color: Color(0xFFFFB340)),
+                        const SizedBox(width: 5),
+                        Text(
+                          'PRÓXIMO CICLO ($nextCycleDate en adelante)',
+                          style: const TextStyle(
+                            color: Color(0xFFFFB340),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    _isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                    color: const Color(0xFFFFB340),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isExpanded) ...[
+            const Divider(color: Colors.white12, height: 1),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tu próximo ciclo comenzará a partir del $nextCycleDate. '
+                    'Puedes conversar con el Coach IA para diseñarlo según cómo te sientas al culminar esta semana, '
+                    'o programar un ciclo de descanso completo / vacaciones si estarás fuera.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF8BE0C0),
+                            foregroundColor: const Color(0xFF0B1220),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: widget.onOpenCoach,
+                          icon: const Icon(Icons.smart_toy_rounded, size: 16),
+                          label: const Text(
+                            'Diseñar con Coach IA',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFFFB340),
+                            side: const BorderSide(color: Color(0xFFFFB340)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: widget.onOpenCoach,
+                          icon: const Icon(Icons.beach_access_rounded, size: 16),
+                          label: const Text(
+                            'Vacaciones / Descanso',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

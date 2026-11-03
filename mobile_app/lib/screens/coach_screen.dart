@@ -12,6 +12,7 @@ import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:mobile_app/screens/adaptive_workout_screen.dart';
 import 'package:mobile_app/widgets/plan_options_sheet.dart';
+import 'package:mobile_app/widgets/windows_calendar_dialog.dart';
 
 class CoachScreen extends StatefulWidget {
   const CoachScreen({super.key});
@@ -990,12 +991,9 @@ class _CoachScreenState extends State<CoachScreen> {
             onPressed: () => _openStateSheet(),
           ),
           IconButton(
-            icon: const Icon(Icons.calendar_month_rounded, color: Colors.white70),
-            tooltip: 'Cronograma Semanal',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const WorkoutScheduleScreen()),
-            ),
+            icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BE0C0)),
+            tooltip: 'Calendario Mensual (Estilo Windows)',
+            onPressed: () => WindowsCalendarDialog.show(context),
           ),
         ],
       ),
@@ -1155,6 +1153,7 @@ class _CoachScreenState extends State<CoachScreen> {
                     const SizedBox(width: 4),
                     InkWell(
                       onTap: () {
+                        WindowsCalendarDialog.show(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(

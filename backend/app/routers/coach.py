@@ -431,9 +431,56 @@ def _is_pure_greeting_or_conversation(message: str) -> bool:
     return False
 
 
+def _is_today_workout_query(message: str) -> bool:
+    """Detecta si el usuario esta consultando que le toca entrenar hoy o cual es su plan actual."""
+    msg = (message or "").lower()
+    return any(p in msg for p in (
+        "que me toca hoy", "qué me toca hoy", "que entreno hoy", "qué entreno hoy",
+        "cual es mi entrenamiento de hoy", "cuál es mi entrenamiento de hoy",
+        "cual es mi rutina de hoy", "cuál es mi rutina de hoy",
+        "que tengo para hoy", "qué tengo para hoy", "que tengo programado hoy", "qué tengo programado hoy",
+        "recuerdame que me toca", "recuérdame qué me toca", "recuerdame mi rutina", "recuérdame mi rutina",
+        "cual es el plan de la semana", "cuál es el plan de la semana",
+        "que ejercicios me tocan hoy", "qué ejercicios me tocan hoy",
+        "que ejercicios me tocan", "qué ejercicios me tocan", "cual es mi plan de hoy", "cuál es mi plan de hoy",
+        "recuerdame el entrenamiento de hoy", "recuérdame el entrenamiento de hoy"
+    ))
+
+
+def _is_next_cycle_inquiry(message: str) -> bool:
+    """Detecta si el usuario esta abriendo dialogo exploratorio sobre el proximo ciclo de entrenamiento."""
+    msg = (message or "").lower()
+    cycle_terms = (
+        "proximo ciclo", "próximo ciclo", "siguiente ciclo", "nuevo ciclo",
+        "proxima semana", "próxima semana", "siguiente semana", "semana que viene"
+    )
+    has_cycle_mention = any(c in msg for c in cycle_terms)
+    if not has_cycle_mention:
+        return False
+    # Si contiene una orden imperativa directa con configuracion de dias y musculos especificos, no es consulta exploratoria
+    has_detailed_spec = any(w in msg for w in (
+        "asigna lunes", "ponme lunes", "configura lunes", "crea 3 dias", "crea 4 dias"
+    ))
+    return not has_detailed_spec
+
+
+def _is_full_rest_or_vacation_request(message: str) -> bool:
+    """Detecta si el usuario pide descanso completo, vacaciones o semana de pausa total."""
+    msg = (message or "").lower()
+    return any(p in msg for p in (
+        "descanso completo", "vacaciones", "estare de viaje", "estaré de viaje",
+        "no voy a entrenar esta semana", "semana de descanso", "pausa completa",
+        "estare fuera", "estaré fuera", "voy a estar ocupado", "planificar descanso completo",
+        "ciclo de descanso", "descanso total"
+    ))
+
+
 def _is_explicit_routine_request(message: str, history: list = None) -> bool:
     """Detecta si el usuario está pidiendo explícitamente generar o ver un plan o rutina."""
     msg = (message or "").lower()
+
+    if _is_today_workout_query(msg) or _is_next_cycle_inquiry(msg) or _is_full_rest_or_vacation_request(msg):
+        return False
 
     # Si el usuario menciona molestia pero explícitamente pide que le planifiquen ejercicios adaptados,
     # SÍ es una solicitud de rutina adaptada.
@@ -3429,6 +3476,169 @@ Retorna SOLO JSON."""
                 payload.user_goal = g_name
                 break
 
+# 1. Consulta directa: "¿Qué me toca entrenar hoy?" o "¿Cuál es mi plan de hoy?"
+    if _is_today_workout_query(payload.message):
+        today_title = payload.today_title or (payload.today_routine.get("title") if isinstance(payload.today_routine, dict) else None)
+        today_exercises = payload.today_exercises or []
+        today_day_name = payload.today_day_name or "hoy"
+        today_has_workout = bool(payload.today_has_workout or (today_exercises and len(today_exercises) > 0))
+        today_is_completed = bool(payload.today_is_completed)
+
+        if today_has_workout:
+            if today_exercises:
+                ex_lines = "\n".join([f"• **{ex}**" for ex in today_exercises])
+            elif isinstance(payload.today_routine, dict) and payload.today_routine.get("exercises"):
+                raw_exs = payload.today_routine["exercises"]
+                ex_lines = "\n".join([
+                    f"• **{e.get('name', 'Ejercicio')}** ({e.get('sets', 3)} series × {e.get('reps', '10-12')} reps)"
+                    for e in raw_exs if isinstance(e, dict)
+                ])
+            else:
+                ex_lines = "• Ejercicios programados en tu cronograma semanal para este grupo muscular."
+
+            status_text = "¡Ya la completaste con éxito hoy! 👏" if today_is_completed else "¿Listo para realizarla hoy?"
+            reply_text = (
+                f"📋 Para hoy **{today_day_name}** tienes programada tu sesión de **{today_title or 'Entrenamiento del Día'}**:\n\n"
+                f"{ex_lines}\n\n"
+                f"{status_text}\n"
+                f"Recuerda calentar de 5 a 10 minutos antes de comenzar y mantener una técnica biomecánica estricta."
+            )
+            quick_replies = [
+                "🏋️ Ver ejercicios de hoy",
+                "📋 Completar mi estado de salud",
+                "💪 ¡Listo para empezar!",
+                "🏠 Entrenaré en casa"
+            ]
+        else:
+            reply_text = (
+                f"🧘 Para hoy **{today_day_name}** tienes programado un **Día de Descanso y Recuperación Muscular**.\n\n"
+                f"Este descanso es fundamental para la supercompensación de 48-72h y el crecimiento muscular. "
+                f"Si deseas mantenerte activo, puedes realizar una caminata ligera, estiramientos de movilidad o completar tu estado de salud."
+            )
+            quick_replies = [
+                "🧘 Consejos de recuperación",
+                "📋 Completar mi estado de salud",
+                "💧 Consejos de hidratación",
+                "🤝 Rutina complementaria suave"
+            ]
+
+        return {
+            "provider": "coach_direct",
+            "reply": reply_text,
+            "category": "Recordatorio de Entrenamiento de Hoy",
+            "duration_weeks": 4,
+            "rest_between_sets_sec": 60,
+            "progression_rule": "Monitorea tu técnica y respeta los descansos programados.",
+            "extracted_equipment": None,
+            "suggest_questionnaire": not today_is_completed,
+            "has_plan": False,
+            "structured_plan": None,
+            "quick_replies": quick_replies,
+            "recommended_intensity": effective_intensity,
+            "fatigue_detected": False,
+        }
+
+    # 2. Consulta exploratoria sobre el Próximo Ciclo (ej: "Quiero diseñar un plan para el próximo ciclo")
+    if _is_next_cycle_inquiry(payload.message):
+        active_range = (
+            f"{payload.active_plan_start} al {payload.active_plan_end}"
+            if payload.active_plan_start
+            else "2/11 al 8/11"
+        )
+        next_cycle = payload.next_cycle_start or "Lunes 9/11"
+
+        reply_text = (
+            f"¡Excelente iniciativa! Efectivamente, nuestro próximo ciclo de entrenamiento inicia el **{next_cycle}**, "
+            f"una vez culminemos tu ciclo actual del **{active_range}**.\n\n"
+            f"Para diseñarlo exactamente a tu medida y asegurar la mejor progresión biomecánica, cuéntame:\n\n"
+            f"1. **¿Cómo te fue y cómo te has sentido en este ciclo actual?** ¿Hubo fatiga, buena energía o alguna sobrecarga articular?\n"
+            f"2. **¿Deseas arrancar el {next_cycle} con un nuevo bloque de entrenamiento progresivo**, o prefieres planificar un **ciclo de descanso completo / vacaciones** (por viaje, trabajo u ocupaciones) o una **semana de descarga (deload)**?\n"
+            f"3. Si deseas entrenar, **¿qué área o grupo muscular específico te gustaría priorizar** (Tren Superior, Piernas/Glúteos, Core, Full Body o Definición/Cardio)?"
+        )
+        return {
+            "provider": "coach_direct",
+            "reply": reply_text,
+            "category": "Planificación Interactiva del Próximo Ciclo",
+            "duration_weeks": 4,
+            "rest_between_sets_sec": 60,
+            "progression_rule": "Monitorea tu fatiga acumulada antes de programar nuevas cargas.",
+            "extracted_equipment": None,
+            "suggest_questionnaire": False,
+            "has_plan": False,
+            "structured_plan": None,
+            "quick_replies": [
+                "💪 ¡Listo para el 9/11! Tren Superior",
+                "🦵 Enfocar en Piernas y Glúteos",
+                "🏖️ Planificar descanso completo / vacaciones",
+                "🧘 Semana de descarga (Deload suave)",
+            ],
+            "recommended_intensity": effective_intensity,
+            "fatigue_detected": False,
+        }
+
+    # 3. Solicitud explícita de Ciclo de Descanso Completo / Vacaciones
+    if _is_full_rest_or_vacation_request(payload.message):
+        cycle_dates = _extract_cycle_dates(payload.message, has_active_plan=payload.has_active_plan, history=payload.history)
+        cycle_range = cycle_dates.get("cycle_range_str") or "09/11 al 15/11"
+        days_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+        vacation_days = []
+        for i, dname in enumerate(days_names):
+            vacation_days.append({
+                "weekday": i,
+                "weekday_name": dname,
+                "is_rest": True,
+                "title": f"Descanso y Recuperación ({dname})",
+                "synergy": "Regeneración neuromuscular completa",
+                "exercises": [],
+                "nutrition": {
+                    "desayuno": "Arepa o avena con huevos revueltos y queso blanco llanero.",
+                    "almuerzo": "Pollo o carne a la plancha con arroz blanco y ensalada fresca.",
+                    "cena": "Avena con leche o tostadas ligeras con proteína moderada.",
+                    "snack": "Fruta fresca (cambur criollo) y abundantes líquidos (2-3 litros de agua)."
+                }
+            })
+
+        struct_plan = {
+            "title": f"Ciclo de Descanso Completo y Vacaciones ({cycle_range})",
+            "duration_weeks": 1,
+            "cycle_start_date": cycle_dates.get("cycle_start_date"),
+            "cycle_end_date": cycle_dates.get("cycle_end_date"),
+            "cycle_range_str": cycle_range,
+            "is_future_cycle": cycle_dates.get("is_future_cycle", True),
+            "is_rest_cycle": True,
+            "days": vacation_days,
+            "nutrition": vacation_days[0]["nutrition"]
+        }
+
+        reply_text = (
+            f"🏖️ ¡Planificado con éxito! He programado tu **Ciclo de Descanso Completo y Vacaciones** para el período del **{cycle_range}**.\n\n"
+            f"Durante este ciclo tu cuerpo entrará en fase de **supercompensación y regeneración neuromuscular**:\n"
+            f"• Cero exigencia de levantamiento de cargas ni fatiga muscular.\n"
+            f"• Mantén una hidratación abundante (2 a 3 litros de agua diarios).\n"
+            f"• Alimentación balanceada y suficiente proteína para preservar masa muscular.\n"
+            f"• Puedes realizar caminatas suaves al aire libre o estiramientos si lo deseas.\n\n"
+            f"¡Disfruta tu tiempo libre y descanso para retomar con máxima fuerza e intensidad en el siguiente ciclo!"
+        )
+        return {
+            "provider": "coach_direct",
+            "reply": reply_text,
+            "category": "Ciclo de Descanso y Vacaciones",
+            "duration_weeks": 1,
+            "rest_between_sets_sec": 0,
+            "progression_rule": "Supercompensación neuromuscular y regeneración articular.",
+            "extracted_equipment": None,
+            "suggest_questionnaire": False,
+            "has_plan": True,
+            "structured_plan": struct_plan,
+            "quick_replies": [
+                "📅 Añadir al Cronograma",
+                "💧 Consejos de hidratación",
+                "🧘 Movilidad suave opcional"
+            ],
+            "recommended_intensity": "Baja",
+            "fatigue_detected": False,
+        }
+
     is_pure_greeting = _is_pure_greeting_or_conversation(payload.message)
     is_routine_request = _is_explicit_routine_request(payload.message, payload.history)
 
@@ -4246,7 +4456,7 @@ def chat_with_coach(payload: ChatMessage):
             focus_req = _detect_requested_focus(payload)
             int_hint = "alta" if ("alta" in eff_int.lower() or "avanzado" in eff_int.lower()) else ("baja" if ("baja" in eff_int.lower() or "principiante" in eff_int.lower()) else "media")
             
-            is_routine = _is_explicit_routine_request(payload.message, payload.history) or (payload.message or "").startswith("🤖") or "plan" in (payload.message or "").lower()
+            is_routine = (_is_explicit_routine_request(payload.message, payload.history) or (payload.message or "").startswith("🤖")) and not _is_today_workout_query(payload.message) and not _is_next_cycle_inquiry(payload.message) and not _is_full_rest_or_vacation_request(payload.message)
 
             if is_routine:
                 diverse_exs = _generate_diverse_session(focus_req or "piernas", int_hint, seed=int(time.time()) % 1000, is_no_equipment=is_no_eq)
@@ -4330,7 +4540,7 @@ def get_coach_history(cedula: str | None = None, user_id: str | None = None, lim
     try:
         from app.services.supabase_service import get_supabase_admin_client
         admin = get_supabase_admin_client()
-        query = admin.table("coach_mensajes").select("*").neq("category", "body_metric")
+        query = admin.table("coach_mensajes").select("*").or_("category.neq.body_metric,category.is.null")
         if user_id and "-" in user_id:
             query = query.eq("user_id", user_id)
         elif cedula:
