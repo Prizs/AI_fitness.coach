@@ -187,6 +187,276 @@ class WeeklyPlanService extends ChangeNotifier {
     } catch (_) {}
   }
 
+
+  /// Cancela la sesión del día de hoy por descanso o molestia física, guardando el respaldo de lo previsto originalmente.
+  Future<void> cancelTodayRoutineForRest({String reason = "Descanso y recuperación por molestia física"}) async {
+    if (week == null || week!['days'] is! List) return;
+    final daysList = List<dynamic>.from(week!['days']);
+    for (int i = 0; i < daysList.length; i++) {
+      if (daysList[i] is Map && daysList[i]['weekday'] == todayIndex) {
+        final current = Map<String, dynamic>.from(daysList[i]);
+        current['original_title'] ??= current['title'];
+        current['original_exercises'] ??= current['exercises'];
+        current['title'] = 'Descanso y Recuperación ($reason)';
+        current['exercises'] = <dynamic>[];
+        current['is_rest'] = true;
+        current['is_cancelled_for_rest'] = true;
+        current['cancel_reason'] = reason;
+        daysList[i] = current;
+        break;
+      }
+    }
+    week!['days'] = daysList;
+    notifyListeners();
+    try {
+      await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
+    } catch (_) {}
+    try {
+      const storage = FlutterSecureStorage();
+      await storage.write(key: 'cached_weekly_plan_v1', value: jsonEncode(week!));
+    } catch (_) {}
+  }
+
+  /// Adapta los días restantes de la semana en curso ante un reporte de molestia articular (tobillo, rodilla, hombro, lumbar, etc.).
+  Future<int> adaptRemainingDaysForInjury(String zoneKey, String zoneLabel) async {
+    if (week == null || week!['days'] is! List) return 0;
+    final daysList = List<dynamic>.from(week!['days']);
+    int adaptedCount = 0;
+
+    final lowerKey = zoneKey.toLowerCase();
+
+    for (int i = 0; i < daysList.length; i++) {
+      if (daysList[i] is! Map) continue;
+      final current = Map<String, dynamic>.from(daysList[i]);
+      final int w = (current['weekday'] is int) ? current['weekday'] as int : 0;
+
+      // Adaptar desde hoy en adelante
+      if (w >= todayIndex) {
+        final rawExs = current['exercises'];
+        if (rawExs is List && rawExs.isNotEmpty) {
+          current['original_title'] ??= current['title'];
+          current['original_exercises'] ??= List<dynamic>.from(rawExs);
+
+          final List<Map<String, dynamic>> safeExercises = [];
+
+          if (lowerKey.contains('tobillo') || lowerKey.contains('pie')) {
+            safeExercises.addAll([
+              {
+                'name': 'Press de pecho con mancuernas sentado con soporte',
+                'sets': 3,
+                'reps': '10-12',
+                'primary_muscle': 'Pectorales',
+                'secondary_muscle': 'Tríceps',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Posición sentada con espalda apoyada firmemente; cero carga sobre el pie o tobillo.',
+              },
+              {
+                'name': 'Remo con mancuernas con soporte en banco inclinado',
+                'sets': 3,
+                'reps': '10-12',
+                'primary_muscle': 'Dorsales',
+                'secondary_muscle': 'Bíceps',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Pecho apoyado en banco; anula cualquier participación de miembros inferiores.',
+              },
+              {
+                'name': 'Dead Bug en colchoneta (Core sin apoyo plantar)',
+                'sets': 3,
+                'reps': '12 por lado',
+                'primary_muscle': 'Core / Recto Abdominal',
+                'secondary_muscle': 'Estabilizadores',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Espalda baja pegada al suelo con pies en el aire sin apoyar en el suelo.',
+              },
+              {
+                'name': 'Curl de bíceps sentado con mancuernas',
+                'sets': 3,
+                'reps': '12-15',
+                'primary_muscle': 'Bíceps Braquial',
+                'secondary_muscle': 'Antebrazos',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Aislamiento estricto de brazos sentado en banco.',
+              },
+            ]);
+            current['title'] = 'Tren Superior y Core Sentado (Adaptado por $zoneLabel)';
+          } else if (lowerKey.contains('rodilla')) {
+            safeExercises.addAll([
+              {
+                'name': 'Puente de glúteos en suelo con control (Glute Bridge)',
+                'sets': 3,
+                'reps': '12-15',
+                'primary_muscle': 'Glúteos',
+                'secondary_muscle': 'Isquiotibiales',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Empuje exclusivo de cadera con ángulo suave de rodilla sin compresión femororrotuliana.',
+              },
+              {
+                'name': 'Elevaciones laterales de pierna acostado en colchoneta',
+                'sets': 3,
+                'reps': '15 por lado',
+                'primary_muscle': 'Glúteo Medio',
+                'secondary_muscle': 'Caderas',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Cadena abierta sin peso corporal sobre la articulación de la rodilla.',
+              },
+              {
+                'name': 'Press de pecho con mancuernas en banco plano',
+                'sets': 3,
+                'reps': '10-12',
+                'primary_muscle': 'Pectorales',
+                'secondary_muscle': 'Tríceps',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Pies apoyados planos sin tensión en rodillas.',
+              },
+              {
+                'name': 'Plancha frontal isométrica en antebrazos',
+                'sets': 3,
+                'reps': '30-45 seg',
+                'primary_muscle': 'Core / Abdomen',
+                'secondary_muscle': 'Estabilizadores',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Cuerpo alineado sin flexión de rodilla.',
+              },
+            ]);
+            current['title'] = 'Torso y Cadena Posterior Suave (Adaptado por $zoneLabel)';
+          } else if (lowerKey.contains('hombro')) {
+            safeExercises.addAll([
+              {
+                'name': 'Sentadilla libre asistida con peso corporal',
+                'sets': 3,
+                'reps': '12-15',
+                'primary_muscle': 'Cuádriceps',
+                'secondary_muscle': 'Glúteos',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Brazos relajados al frente o cruzados al pecho sin tensión en hombros.',
+              },
+              {
+                'name': 'Prensa de piernas inclinada (o Sentadilla en silla)',
+                'sets': 3,
+                'reps': '10-12',
+                'primary_muscle': 'Cuádriceps',
+                'secondary_muscle': 'Isquiotibiales',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Cero participación de la articulación glenohumeral.',
+              },
+              {
+                'name': 'Puente de glúteos en suelo',
+                'sets': 3,
+                'reps': '12-15',
+                'primary_muscle': 'Glúteos',
+                'secondary_muscle': 'Isquiotibiales',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Manos en el suelo a los costados sin empuje.',
+              },
+              {
+                'name': 'Curl de bíceps con mancuernas y codos pegados al cuerpo',
+                'sets': 3,
+                'reps': '12',
+                'primary_muscle': 'Bíceps',
+                'secondary_muscle': 'Antebrazos',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Codos fijados a las costillas; anula cualquier elevación o abducción del hombro.',
+              },
+            ]);
+            current['title'] = 'Piernas y Glúteos (Adaptado por $zoneLabel)';
+          } else if (lowerKey.contains('lumbar') || lowerKey.contains('espalda')) {
+            safeExercises.addAll([
+              {
+                'name': 'Remo con mancuernas con pecho apoyado en banco inclinado',
+                'sets': 3,
+                'reps': '10-12',
+                'primary_muscle': 'Dorsales',
+                'secondary_muscle': 'Bíceps',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Soporte esternal total; cero momento flexor o carga en vértebras lumbares.',
+              },
+              {
+                'name': 'Press de pecho en banco plano con piernas flexionadas',
+                'sets': 3,
+                'reps': '10-12',
+                'primary_muscle': 'Pectorales',
+                'secondary_muscle': 'Tríceps',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Zona lumbar plana sobre el banco sin arqueo excesivo.',
+              },
+              {
+                'name': 'Sentadilla isométrica en pared con espalda apoyada (Wall Sit)',
+                'sets': 3,
+                'reps': '30-40 seg',
+                'primary_muscle': 'Cuádriceps',
+                'secondary_muscle': 'Glúteos',
+                'intensity_level': 'Intermedio (Intensidad Media)',
+                'biomechanics': 'Columna completamente descargada y apoyada contra la pared.',
+              },
+              {
+                'name': 'Bird Dog controlado con pausa isométrica',
+                'sets': 3,
+                'reps': '10 por lado',
+                'primary_muscle': 'Estabilizadores Profundos',
+                'secondary_muscle': 'Glúteos',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Columna en posición neutra estricta sin hiperlordosis.',
+              },
+            ]);
+            current['title'] = 'Ejercicios con Soporte de Espalda (Adaptado por $zoneLabel)';
+          } else {
+            // Adaptación general segura
+            safeExercises.addAll([
+              {
+                'name': 'Press con mancuernas en banco plano con apoyo',
+                'sets': 3,
+                'reps': '10-12',
+                'primary_muscle': 'Pectorales',
+                'secondary_muscle': 'Tríceps',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Movimiento guiado y controlado con apoyo completo.',
+              },
+              {
+                'name': 'Remo sentado con soporte con bandas o mancuernas',
+                'sets': 3,
+                'reps': '10-12',
+                'primary_muscle': 'Dorsales',
+                'secondary_muscle': 'Bíceps',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Soporte firme con cero sobrecarga articular.',
+              },
+              {
+                'name': 'Crunch en colchoneta con control respiratorio',
+                'sets': 3,
+                'reps': '12-15',
+                'primary_muscle': 'Abdomen',
+                'secondary_muscle': 'Core',
+                'intensity_level': 'Básico (Intensidad Baja)',
+                'biomechanics': 'Tensión controlada en flexión suave.',
+              },
+            ]);
+            current['title'] = 'Rutina Segura Adaptada (Molestia en $zoneLabel)';
+          }
+
+          current['exercises'] = safeExercises;
+          current['adaptation_note'] = 'Adaptado por molestia en $zoneLabel (Cero sobrecarga articular)';
+          current['affected_joint'] = zoneLabel;
+          current['is_adapted_injury'] = true;
+          daysList[i] = current;
+          adaptedCount++;
+        }
+      }
+    }
+
+    if (adaptedCount > 0) {
+      week!['days'] = daysList;
+      notifyListeners();
+      try {
+        await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
+      } catch (_) {}
+      try {
+        const storage = FlutterSecureStorage();
+        await storage.write(key: 'cached_weekly_plan_v1', value: jsonEncode(week!));
+      } catch (_) {}
+    }
+    return adaptedCount;
+  }
+
   void notifyUpdate() {
     notifyListeners();
   }

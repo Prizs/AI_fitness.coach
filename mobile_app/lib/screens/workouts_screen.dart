@@ -634,6 +634,148 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     );
   }
 
+
+  void _confirmCancelTodayForRest() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F192B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.bedtime_rounded, color: Color(0xFF8BE0C0), size: 24),
+            SizedBox(width: 8),
+            Text('¿Tomarte descanso hoy?'),
+          ],
+        ),
+        content: const Text(
+          'Se cancelará la sesión programada de hoy y se registrará como "Día de Descanso y Recuperación por molestia física".\n\n'
+          'Tus ejercicios previstos se guardarán como respaldo y tu racha de disciplina se mantendrá protegida.',
+          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.35),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Volver', style: TextStyle(color: Colors.white54)),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF8BE0C0),
+              foregroundColor: const Color(0xFF0B1220),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _service.cancelTodayRoutineForRest(reason: 'Pausa por descanso / molestia física');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Sesión de hoy registrada como descanso y recuperación. ¡Prioriza tu salud!'),
+                    backgroundColor: Color(0xFF1B4332),
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: const Text('Confirmar Descanso Hoy', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInjuryAdaptationSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final injuryOptions = [
+          {'key': 'tobillo', 'label': '🦶 Tobillo / Pie (Esguince o molestia al pisar)'},
+          {'key': 'rodilla', 'label': '🦵 Rodilla (Dolor al flexionar o sobrecarga)'},
+          {'key': 'hombro', 'label': '💪 Hombro (Manguito rotador o dolor al elevar)'},
+          {'key': 'lumbar', 'label': '🛡️ Espalda Baja / Lumbar (Compresión o punzada)'},
+          {'key': 'muneca', 'label': '✋ Muñeca / Antebrazo (Túnel carpiano o dolor de apoyo)'},
+          {'key': 'cuello', 'label': '👤 Cuello / Cervicales (Rigidez o tortícolis)'},
+          {'key': 'codo', 'label': '⚡ Codo (Epicondilitis o molestia de tendón)'},
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB340).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.healing_rounded, color: Color(0xFFFFB340), size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Reportar Molestia y Adaptar Días',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        Text(
+                          'Se calibrarán automáticamente los días restantes de la semana.',
+                          style: TextStyle(fontSize: 11.5, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '¿Qué zona o articulación te está molestando?',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF8BE0C0)),
+              ),
+              const SizedBox(height: 10),
+              ...injuryOptions.map((opt) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    tileColor: const Color(0xFF16233A),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    title: Text(
+                      opt['label']!,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF8BE0C0)),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final count = await _service.adaptRemainingDaysForInjury(opt['key']!, opt['label']!);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('¡Listo! Se adaptaron $count sesiones de tu semana para proteger tu ${opt['label']}.'),
+                            backgroundColor: const Color(0xFF173B45),
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _openCoach() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const CoachScreen()),
@@ -809,6 +951,8 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 isDone: false,
                 onToggle: () => _handleToggleCompletion(day),
                 onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
+                onReportInjury: _showInjuryAdaptationSheet,
+                onCancelForRest: _confirmCancelTodayForRest,
               )),
         ],
         if (doneScheduled.isNotEmpty) ...[
@@ -1397,6 +1541,8 @@ class _DayCard extends StatelessWidget {
     required this.isDone,
     required this.onToggle,
     required this.onExerciseTap,
+    this.onReportInjury,
+    this.onCancelForRest,
   });
 
   final Map<String, dynamic> day;
@@ -1404,6 +1550,8 @@ class _DayCard extends StatelessWidget {
   final bool isDone;
   final VoidCallback onToggle;
   final void Function(Map<String, dynamic> exercise, List<dynamic> all) onExerciseTap;
+  final VoidCallback? onReportInjury;
+  final VoidCallback? onCancelForRest;
 
   @override
   Widget build(BuildContext context) {
@@ -1542,6 +1690,60 @@ class _DayCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 6),
+            if (day['adaptation_note'] != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2B2110),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFFB340).withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.healing_rounded, size: 14, color: Color(0xFFFFB340)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${day['adaptation_note']}',
+                        style: const TextStyle(color: Color(0xFFFFB340), fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (day['original_title'] != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Prevista originalmente: ${day['original_title']}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 10, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ],
+            if (day['is_cancelled_for_rest'] == true) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF102820),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF40916C).withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.bedtime_rounded, size: 16, color: Color(0xFF8BE0C0)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Sesión pausada por descanso justificado (${day['cancel_reason'] ?? 'Recuperación física'}).',
+                        style: const TextStyle(color: Color(0xFFD8F3DC), fontSize: 11.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
             ...exercises.map((exercise) {
               final item = Map<String, dynamic>.from(exercise as Map);
               final intensityLvl =
@@ -1578,6 +1780,38 @@ class _DayCard extends StatelessWidget {
                 ),
               );
             }),
+            if (!isDone && (onReportInjury != null || onCancelForRest != null)) ...[
+              const SizedBox(height: 8),
+              const Divider(color: Colors.white10, height: 1),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (onReportInjury != null)
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFB340),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      ),
+                      onPressed: onReportInjury,
+                      icon: const Icon(Icons.healing_rounded, size: 14),
+                      label: const Text('Reportar molestia', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  if (isToday && onCancelForRest != null) ...[
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      ),
+                      onPressed: onCancelForRest,
+                      icon: const Icon(Icons.bedtime_rounded, size: 14),
+                      label: const Text('Pausar hoy', style: TextStyle(fontSize: 11)),
+                    ),
+                  ],
+                ],
+              ),
+            ],
           ],
         ),
       ),
