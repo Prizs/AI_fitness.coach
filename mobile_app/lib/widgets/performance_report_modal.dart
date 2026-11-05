@@ -228,6 +228,31 @@ class _PerformanceReportModalState extends State<PerformanceReportModal> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          title: 'Grasa Oxidada',
+                          value: '~${((totalCalories * 0.70) / 9.0).toStringAsFixed(1)} g',
+                          subtitle: 'Estimación lipídica',
+                          color: const Color(0xFF8BE0C0),
+                          icon: Icons.water_drop_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _StatCard(
+                          title: 'Ejercicios Omitidos',
+                          value: '${WeeklyPlanService.instance.skippedExercises.length}',
+                          subtitle: 'Dejados por alto',
+                          color: WeeklyPlanService.instance.skippedExercises.isEmpty ? const Color(0xFF8BE0C0) : const Color(0xFFFF6B6B),
+                          icon: WeeklyPlanService.instance.skippedExercises.isEmpty ? Icons.check_circle_rounded : Icons.event_busy_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
 
                   // Marco de Verificación Científica
@@ -260,6 +285,63 @@ class _PerformanceReportModalState extends State<PerformanceReportModal> {
                     ),
                   ),
                   const SizedBox(height: 20),
+
+                  // Sección de Ejercicios Dejados por Alto (si existen)
+                  if (WeeklyPlanService.instance.skippedExercises.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.event_busy_rounded, color: Color(0xFFFF6B6B), size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Ejercicios Dejados por Alto (${WeeklyPlanService.instance.skippedExercises.length})',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFFFF6B6B)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Programados en días anteriores y no realizados. Déficit: -${WeeklyPlanService.instance.estimatedMissedCaloriesTotal} kcal (~${WeeklyPlanService.instance.estimatedMissedFatGramsTotal.toStringAsFixed(1)}g grasa).',
+                      style: const TextStyle(color: Colors.white60, fontSize: 11),
+                    ),
+                    const SizedBox(height: 10),
+                    ...WeeklyPlanService.instance.skippedExercises.map((sk) {
+                      final name = sk['name'] ?? 'Ejercicio';
+                      final day = sk['missed_day'] ?? 'Día pasado';
+                      final sets = sk['sets'] ?? 3;
+                      final reps = sk['reps'] ?? '12';
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22161A),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFF6B6B).withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.close_rounded, color: Color(0xFFFF6B6B), size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$name',
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+                                  ),
+                                  Text(
+                                    'Programado para el $day · $sets series · $reps reps',
+                                    style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Historial de Sesiones Verificables
                   const Text(

@@ -387,16 +387,32 @@ class _OnboardingQuizScreenState extends State<OnboardingQuizScreen> {
         AuthService.instance.loggedInUser!.archetype = _archetypeTitle;
       }
 
-      // 3. Persistir en backend Supabase de forma asíncrona
-      http.post(
-        Uri.parse('${AuthService.apiBaseUrl}/api/auth/profile/archetype'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'cedula': cedula,
-          'archetype': _archetypeTitle,
-          'archetype_data': quizDataJson,
-        }),
-      ).timeout(const Duration(seconds: 10));
+      // 3. Persistir en backend Supabase de forma asíncrona con fallback
+      try {
+        final res = await http.post(
+          Uri.parse('${AuthService.apiBaseUrl}/api/auth/profile/archetype'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'cedula': cedula,
+            'archetype': _archetypeTitle,
+            'archetype_data': quizDataJson,
+          }),
+        ).timeout(const Duration(seconds: 5));
+        if (res.statusCode != 200) {
+          final altUrl = AuthService.apiBaseUrl.contains('localhost')
+              ? 'https://ai-fitness-coach-818a.onrender.com'
+              : 'http://localhost:8000';
+          await http.post(
+            Uri.parse('$altUrl/api/auth/profile/archetype'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'cedula': cedula,
+              'archetype': _archetypeTitle,
+              'archetype_data': quizDataJson,
+            }),
+          ).timeout(const Duration(seconds: 5));
+        }
+      } catch (_) {}
     } catch (_) {}
 
 

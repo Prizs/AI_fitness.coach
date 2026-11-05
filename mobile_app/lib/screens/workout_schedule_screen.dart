@@ -287,6 +287,65 @@ class _WorkoutScheduleScreenState extends State<WorkoutScheduleScreen> {
                             ),
                           ),
                           Text('${ex.sets} series · ${ex.reps} · Primario: ${ex.primaryMuscle}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                          Builder(builder: (ctx) {
+                            final setsNum = ex.sets > 0 ? ex.sets : 3;
+                            final nameLower = ex.name.toLowerCase();
+                            final isCompound = nameLower.contains('sentadilla') ||
+                                nameLower.contains('squat') ||
+                                nameLower.contains('peso muerto') ||
+                                nameLower.contains('deadlift') ||
+                                nameLower.contains('prensa') ||
+                                nameLower.contains('dominada') ||
+                                nameLower.contains('pull-up') ||
+                                nameLower.contains('remo') ||
+                                nameLower.contains('zancada') ||
+                                nameLower.contains('lunge') ||
+                                nameLower.contains('burpee');
+                            final userWeight = AuthService.instance.loggedInUser?.weight ?? 75.0;
+                            final weightFactor = (userWeight / 75.0).clamp(0.7, 1.4);
+                            final estKcal = (setsNum * (isCompound ? 15.0 : 11.5) * weightFactor).round();
+                            final estFat = ((estKcal * 0.70) / 9.0).toStringAsFixed(1);
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 4, bottom: 2),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFB340).withOpacity(0.14),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFFB340).withOpacity(0.3), width: 0.8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.local_fire_department_rounded, size: 12, color: Color(0xFFFFB340)),
+                                        const SizedBox(width: 3),
+                                        Text('~$estKcal kcal', style: const TextStyle(color: Color(0xFFFFB340), fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF8BE0C0).withOpacity(0.14),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.3), width: 0.8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.water_drop_rounded, size: 12, color: Color(0xFF8BE0C0)),
+                                        const SizedBox(width: 3),
+                                        Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                           if (ex.rpe != null)
                             Text('RPE Registrado: ${ex.rpe}/10', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 12, fontWeight: FontWeight.w600)),
                         ],

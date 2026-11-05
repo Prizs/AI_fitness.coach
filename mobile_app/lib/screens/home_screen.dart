@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/screens/auth/onboarding_quiz_screen.dart';
@@ -57,6 +59,24 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       if (arch == null || arch.isEmpty) {
         arch = await _storage.read(key: 'biopsycho_archetype');
+      }
+
+      // 4. Si aun no esta en local, consultar al backend por si ya fue registrado previamente
+      if ((arch == null || arch.isEmpty) && cedula != null && cedula.isNotEmpty) {
+        try {
+          final res = await http.get(
+            Uri.parse('${AuthService.apiBaseUrl}/api/auth/profile/archetype/$cedula'),
+          ).timeout(const Duration(seconds: 4));
+          if (res.statusCode == 200) {
+            final data = jsonDecode(res.body);
+            final serverArch = data['archetype'] as String?;
+            if (serverArch != null && serverArch.isNotEmpty) {
+              arch = serverArch;
+              user?.archetype = serverArch;
+              await DBHelper.instance.saveUserArchetype(cedula, serverArch);
+            }
+          }
+        } catch (_) {}
       }
 
       if (mounted) {

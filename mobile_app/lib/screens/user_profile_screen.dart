@@ -324,7 +324,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 bestStreak: _planService.bestStreak,
                 totalSessions: _planService.totalCompletedSessions,
                 adherence: _planService.adherenceRate,
+                burnedKcal: _planService.estimatedBurnedCaloriesTotal,
+                burnedFatGrams: _planService.estimatedBurnedFatGramsTotal,
               ),
+              const SizedBox(height: 12),
+
+              // Bitacora de Ejercicios Omitidos / Dejados por Alto
+              _SkippedExercisesCard(planService: _planService),
               const SizedBox(height: 12),
 
               // Botón de Reporte Detallado de Rendimiento
@@ -724,12 +730,16 @@ class _StreakCard extends StatelessWidget {
     required this.bestStreak,
     required this.totalSessions,
     required this.adherence,
+    this.burnedKcal = 0,
+    this.burnedFatGrams = 0.0,
   });
 
   final int currentStreak;
   final int bestStreak;
   final int totalSessions;
   final double adherence;
+  final int burnedKcal;
+  final double burnedFatGrams;
 
   @override
   Widget build(BuildContext context) {
@@ -793,6 +803,43 @@ class _StreakCard extends StatelessWidget {
               _metricColumn('Adherencia', '${adherence.toStringAsFixed(0)}%', const Color(0xFF8BE0C0), 'semanal'),
             ],
           ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF142436),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.local_fire_department_rounded, size: 16, color: Color(0xFFFFB340)),
+                    const SizedBox(width: 4),
+                    Text(
+                      '~$burnedKcal kcal quemadas',
+                      style: const TextStyle(color: Color(0xFFFFB340), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                Container(width: 1, height: 16, color: Colors.white12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.water_drop_rounded, size: 16, color: Color(0xFF8BE0C0)),
+                    const SizedBox(width: 4),
+                    Text(
+                      '~${burnedFatGrams.toStringAsFixed(1)} g grasa oxidada',
+                      style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -806,6 +853,166 @@ class _StreakCard extends StatelessWidget {
         Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w600)),
         Text(sub, style: const TextStyle(color: Colors.white38, fontSize: 9.5)),
       ],
+    );
+  }
+}
+
+
+class _SkippedExercisesCard extends StatelessWidget {
+  const _SkippedExercisesCard({required this.planService});
+
+  final WeeklyPlanService planService;
+
+  @override
+  Widget build(BuildContext context) {
+    final skipped = planService.skippedExercises;
+    final missedDays = planService.skippedOrMissedDays;
+    final missedKcal = planService.estimatedMissedCaloriesTotal;
+    final missedFat = planService.estimatedMissedFatGramsTotal;
+
+    if (skipped.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F2228),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.4)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8BE0C0).withOpacity(0.18),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF8BE0C0), size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bitcora al Da: Cero Ejercicios Omitidos',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'No dejaste ejercicios por alto en los das programados.',
+                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF22161A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFF6B6B).withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF6B6B).withOpacity(0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.event_busy_rounded, color: Color(0xFFFF6B6B), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bitcora: ${skipped.length} Ejercicios Dejados por Alto',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.white),
+                    ),
+                    Text(
+                      '${missedDays.length} sesin(es) programada(s) sin completar esta semana',
+                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF141F32),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Impacto calrico no alcanzado:',
+                  style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.8)),
+                ),
+                Text(
+                  '-$missedKcal kcal (~${missedFat.toStringAsFixed(1)}g grasa)',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF6B6B)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Detalle de ejercicios no realizados:',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white60),
+          ),
+          const SizedBox(height: 6),
+          ...skipped.map((item) {
+            final name = item['name'] ?? 'Ejercicio';
+            final day = item['missed_day'] ?? 'Da pasado';
+            final sets = item['sets'] ?? 3;
+            final reps = item['reps'] ?? '12';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16233A),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.close_rounded, size: 16, color: Color(0xFFFF6B6B)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$name',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                        Text(
+                          'Programado el $day  $sets series  $reps reps',
+                          style: const TextStyle(fontSize: 10.5, color: Colors.white60),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 }

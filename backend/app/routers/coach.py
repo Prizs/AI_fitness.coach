@@ -4345,6 +4345,12 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
    - Diversifica los estímulos con variantes biomecánicamente completas y estimulantes para mantener alta la adherencia y la adaptación neuromuscular según el nivel ({effective_level}) e intensidad ({effective_intensity}).
    - Cada día y cada recomendación debe aportar frescura biomecánica y cero repeticiones innecesarias.
 
+7. REGLA DE ESTIMACIÓN CALÓRICA, OXIDACIÓN LIPÍDICA Y BITÁCORA DE EJERCICIOS OMITIDOS:
+   - Al responder preguntas sobre el avance físico, quema de calorías, pérdida de grasa o reportes del atleta:
+     * Explica con claridad científica el gasto calórico de las sesiones (~300-450 kcal por sesión) y su correspondiente oxidación lipídica estimada (~1g de grasa por cada ~13 kcal en esfuerzo de fuerza/hipertrofia, es decir ~23-35g de grasa por sesión completa).
+     * Enfatiza el principio de adherencia: la pérdida de grasa sostenida depende directamente de completar los ejercicios programados.
+     * Si el atleta omitió o dejó ejercicios por alto en días anteriores, menciónalo constructivamente como una oportunidad de recuperación sin culpa y guíalo para retomar su siguiente sesión programada con la técnica correcta.
+
 Retorna EXCLUSIVAMENTE un objeto JSON válido con esta estructura exacta:
 {{
   "reply": "Respuesta conversacional clara acorde a la zona solicitada ({requested_focus or 'general'}) y nivel de intensidad ({effective_intensity})",
@@ -4932,6 +4938,7 @@ def export_bitacora_report(cedula: str, print_auto: bool = True):
         "streak": 0,
         "avg_rpe": 7.5,
         "avg_calories": 340,
+        "fat_grams_oxidized": 26.5,
     }
 
     try:
@@ -4956,6 +4963,12 @@ def export_bitacora_report(cedula: str, print_auto: bool = True):
         stats["streak"] = len(sessions)
         sum_rpe = sum([s.get("rpe", 7) or 7 for s in sessions])
         stats["avg_rpe"] = round(sum_rpe / len(sessions), 1)
+        tot_kcal = len(sessions) * 340
+        stats["avg_calories"] = 340
+        stats["fat_grams_oxidized"] = round((tot_kcal * 0.70) / 9.0, 1)
+    else:
+        tot_kcal = 4 * 340
+        stats["fat_grams_oxidized"] = round((tot_kcal * 0.70) / 9.0, 1)
 
     print_js = "window.onload = function() { window.print(); };" if print_auto else ""
 
@@ -5062,7 +5075,7 @@ def export_bitacora_report(cedula: str, print_auto: bool = True):
     }}
     .kpi-grid {{
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 12px;
       margin-bottom: 28px;
     }}
@@ -5202,6 +5215,10 @@ def export_bitacora_report(cedula: str, print_auto: bool = True):
       <div class="kpi-card">
         <div class="lbl">Gasto Promedio</div>
         <div class="val" style="color: #d97706;">~{stats["avg_calories"]} kcal</div>
+      </div>
+      <div class="kpi-card">
+        <div class="lbl">Grasa Oxidada Est.</div>
+        <div class="val" style="color: #10b981;">~{stats.get("fat_grams_oxidized", 26.5)} g</div>
       </div>
     </div>
 

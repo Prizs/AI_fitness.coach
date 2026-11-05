@@ -1748,6 +1748,25 @@ class _DayCard extends StatelessWidget {
               final item = Map<String, dynamic>.from(exercise as Map);
               final intensityLvl =
                   item['intensity_level'] as String? ?? 'Básico (Intensidad Baja)';
+
+              final setsNum = int.tryParse(item['sets']?.toString() ?? '3') ?? 3;
+              final nameLower = (item['name'] as String? ?? '').toLowerCase();
+              final isCompound = nameLower.contains('sentadilla') ||
+                  nameLower.contains('squat') ||
+                  nameLower.contains('peso muerto') ||
+                  nameLower.contains('deadlift') ||
+                  nameLower.contains('prensa') ||
+                  nameLower.contains('dominada') ||
+                  nameLower.contains('pull-up') ||
+                  nameLower.contains('remo') ||
+                  nameLower.contains('zancada') ||
+                  nameLower.contains('lunge') ||
+                  nameLower.contains('burpee');
+              final userWeight = AuthService.instance.loggedInUser?.weight ?? 75.0;
+              final weightFactor = (userWeight / 75.0).clamp(0.7, 1.4);
+              final estKcal = (setsNum * (isCompound ? 15.0 : 11.5) * weightFactor).round();
+              final estFat = ((estKcal * 0.70) / 9.0).toStringAsFixed(1);
+
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Container(
@@ -1763,9 +1782,53 @@ class _DayCard extends StatelessWidget {
                   item['name'] as String? ?? 'Ejercicio',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                subtitle: Text(
-                  '${item['sets']} series · ${item['reps']} · $intensityLvl',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 2),
+                    Text(
+                      '${item['sets']} series · ${item['reps']} · $intensityLvl',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFB340).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFFFB340).withOpacity(0.3), width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.local_fire_department_rounded, size: 12, color: Color(0xFFFFB340)),
+                              const SizedBox(width: 3),
+                              Text('~$estKcal kcal', style: const TextStyle(color: Color(0xFFFFB340), fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8BE0C0).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.3), width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.water_drop_rounded, size: 12, color: Color(0xFF8BE0C0)),
+                              const SizedBox(width: 3),
+                              Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
                 trailing: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(

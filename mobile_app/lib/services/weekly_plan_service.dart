@@ -59,6 +59,94 @@ class WeeklyPlanService extends ChangeNotifier {
     return ((done / scheduled) * 100).clamp(0.0, 100.0);
   }
 
+  /// Sesiones programadas en das anteriores que el atleta dej por alto (no complet)
+  List<Map<String, dynamic>> get skippedOrMissedDays {
+    final tIndex = todayIndex;
+    final List<Map<String, dynamic>> list = [];
+    for (final d in days) {
+      final w = d['weekday'] as int? ?? 0;
+      final isTraining = (d['exercises'] as List?)?.isNotEmpty == true;
+      final isRest = d['is_rest'] == true;
+      if (isTraining && !isRest && w < tIndex && !_completedDaysSet.contains(w)) {
+        list.add(d);
+      }
+    }
+    return list;
+  }
+
+  /// Lista desagregada de ejercicios que quedaron sin realizar ese da
+  List<Map<String, dynamic>> get skippedExercises {
+    final List<Map<String, dynamic>> list = [];
+    for (final d in skippedOrMissedDays) {
+      final dayName = d['weekday_name'] ?? _weekdayNames[d['weekday'] as int? ?? 0];
+      final exs = d['exercises'] as List? ?? [];
+      for (final ex in exs) {
+        if (ex is Map) {
+          final m = Map<String, dynamic>.from(ex);
+          m['missed_day'] = dayName;
+          m['day_title'] = d['title'] ?? 'Sesin programada';
+          list.add(m);
+        }
+      }
+    }
+    return list;
+  }
+
+  /// Estimacin cientfica de caloras quemadas en base a sesiones realizadas y adherencia
+  int get estimatedBurnedCaloriesTotal {
+    final weight = AuthService.instance.loggedInUser?.weight ?? 75.0;
+    final factor = (weight / 75.0).clamp(0.7, 1.4);
+    int total = 0;
+    for (final d in days) {
+      final w = d['weekday'] as int? ?? 0;
+      if (_completedDaysSet.contains(w)) {
+        final exs = d['exercises'] as List? ?? [];
+        for (final ex in exs) {
+          if (ex is Map) {
+            final sets = int.tryParse(ex['sets']?.toString() ?? '3') ?? 3;
+            final isCompound = (ex['name']?.toString() ?? '').toLowerCase().contains('sentadilla') ||
+                (ex['name']?.toString() ?? '').toLowerCase().contains('peso muerto') ||
+                (ex['name']?.toString() ?? '').toLowerCase().contains('prensa') ||
+                (ex['name']?.toString() ?? '').toLowerCase().contains('remo') ||
+                (ex['name']?.toString() ?? '').toLowerCase().contains('burpee');
+            total += (sets * (isCompound ? 15.0 : 11.5) * factor).round();
+          }
+        }
+      }
+    }
+    if (total == 0 && totalCompletedSessions > 0) {
+      total = (totalCompletedSessions * 320 * factor).round();
+    }
+    return total;
+  }
+
+  /// Estimacin de grasa corporal oxidada en gramos (~9 kcal/g a 70% oxidacin lipdica)
+  double get estimatedBurnedFatGramsTotal {
+    return (estimatedBurnedCaloriesTotal * 0.70) / 9.0;
+  }
+
+  /// Caloras dejadas de quemar por ejercicios omitidos
+  int get estimatedMissedCaloriesTotal {
+    final weight = AuthService.instance.loggedInUser?.weight ?? 75.0;
+    final factor = (weight / 75.0).clamp(0.7, 1.4);
+    int missed = 0;
+    for (final ex in skippedExercises) {
+      final sets = int.tryParse(ex['sets']?.toString() ?? '3') ?? 3;
+      final isCompound = (ex['name']?.toString() ?? '').toLowerCase().contains('sentadilla') ||
+          (ex['name']?.toString() ?? '').toLowerCase().contains('peso muerto') ||
+          (ex['name']?.toString() ?? '').toLowerCase().contains('prensa') ||
+          (ex['name']?.toString() ?? '').toLowerCase().contains('remo') ||
+          (ex['name']?.toString() ?? '').toLowerCase().contains('burpee');
+      missed += (sets * (isCompound ? 15.0 : 11.5) * factor).round();
+    }
+    return missed;
+  }
+
+  /// Grasa que se dej de oxidar debido a ejercicios no completados
+  double get estimatedMissedFatGramsTotal {
+    return (estimatedMissedCaloriesTotal * 0.70) / 9.0;
+  }
+
   int get todayIndex => DateTime.now().weekday - 1;
   String get todayName => _weekdayNames[todayIndex];
 

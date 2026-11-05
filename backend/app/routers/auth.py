@@ -259,9 +259,10 @@ class UpdateArchetypeRequest(BaseModel):
 def save_archetype(payload: UpdateArchetypeRequest):
     admin_client = get_supabase_admin_client()
     try:
+        clean_cedula = payload.cedula.strip()
         users = admin_client.auth.admin.list_users()
         for u in users:
-            if f"cedula.{payload.cedula}@" in u.email:
+            if f"cedula.{clean_cedula}@" in (u.email or ""):
                 meta = dict(u.user_metadata or {})
                 meta["archetype"] = payload.archetype
                 if payload.archetype_data:
@@ -271,6 +272,25 @@ def save_archetype(payload: UpdateArchetypeRequest):
         return {"status": "not_found", "message": "Usuario no encontrado"}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+
+
+@router.get("/profile/archetype/{cedula}")
+def get_archetype(cedula: str):
+    admin_client = get_supabase_admin_client()
+    try:
+        clean_cedula = cedula.strip()
+        users = admin_client.auth.admin.list_users()
+        for u in users:
+            if f"cedula.{clean_cedula}@" in (u.email or ""):
+                meta = dict(u.user_metadata or {})
+                return {
+                    "status": "ok",
+                    "archetype": meta.get("archetype"),
+                    "archetype_data": meta.get("archetype_data"),
+                }
+        return {"status": "not_found", "archetype": None}
+    except Exception as e:
+        return {"status": "error", "detail": str(e), "archetype": None}
 
 
 class UpdatePlanRequest(BaseModel):
