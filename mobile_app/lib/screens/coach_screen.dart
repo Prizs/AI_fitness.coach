@@ -13,7 +13,7 @@ import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:mobile_app/screens/adaptive_workout_screen.dart';
 import 'package:mobile_app/widgets/plan_options_sheet.dart';
 import 'package:mobile_app/widgets/windows_calendar_dialog.dart';
-import 'package:mobile_app/widgets/performance_report_modal.dart';
+import 'package:mobile_app/services/metabolic_calculator.dart';
 
 class CoachScreen extends StatefulWidget {
   const CoachScreen({super.key});
@@ -992,11 +992,6 @@ class _CoachScreenState extends State<CoachScreen> {
             onPressed: () => _openStateSheet(),
           ),
           IconButton(
-            icon: const Icon(Icons.history_edu_rounded, color: Color(0xFF8BE0C0)),
-            tooltip: 'Bitácora de Ejercicios Omitidos y Rendimiento',
-            onPressed: () => PerformanceReportModal.show(context),
-          ),
-          IconButton(
             icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BE0C0)),
             tooltip: 'Calendario Mensual (Estilo Windows)',
             onPressed: () => WindowsCalendarDialog.show(context),
@@ -1559,61 +1554,9 @@ class _CoachScreenState extends State<CoachScreen> {
 
                                     // CONTENIDO CONDICIONAL DEL DÍA (EJERCICIOS O DESCANSO)
                                     if (isTraining && dayExercises.isNotEmpty) ...[
-                                       Row(
-                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                         children: [
-                                           Expanded(
-                                             child: Text(
-                                               '🏋️ Ejercicios Recomendados para el $activeDay:',
-                                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                             ),
-                                           ),
-                                           InkWell(
-                                             borderRadius: BorderRadius.circular(8),
-                                             onTap: () => PerformanceReportModal.show(context),
-                                             child: Container(
-                                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                               decoration: BoxDecoration(
-                                                 color: (WeeklyPlanService.instance.skippedExercises.isEmpty
-                                                     ? const Color(0xFF8BE0C0)
-                                                     : const Color(0xFFFF6B6B)).withValues(alpha: 0.18),
-                                                 borderRadius: BorderRadius.circular(8),
-                                                 border: Border.all(
-                                                   color: (WeeklyPlanService.instance.skippedExercises.isEmpty
-                                                       ? const Color(0xFF8BE0C0)
-                                                       : const Color(0xFFFF6B6B)).withValues(alpha: 0.45),
-                                                 ),
-                                               ),
-                                               child: Row(
-                                                 mainAxisSize: MainAxisSize.min,
-                                                 children: [
-                                                   Icon(
-                                                     WeeklyPlanService.instance.skippedExercises.isEmpty
-                                                         ? Icons.check_circle_outline_rounded
-                                                         : Icons.warning_amber_rounded,
-                                                     size: 13,
-                                                     color: WeeklyPlanService.instance.skippedExercises.isEmpty
-                                                         ? const Color(0xFF8BE0C0)
-                                                         : const Color(0xFFFF6B6B),
-                                                   ),
-                                                   const SizedBox(width: 4),
-                                                   Text(
-                                                     WeeklyPlanService.instance.skippedExercises.isEmpty
-                                                         ? 'Bitácora al día'
-                                                         : 'Bitácora: ${WeeklyPlanService.instance.skippedExercises.length} omitidos',
-                                                     style: TextStyle(
-                                                       color: WeeklyPlanService.instance.skippedExercises.isEmpty
-                                                           ? const Color(0xFF8BE0C0)
-                                                           : const Color(0xFFFF6B6B),
-                                                       fontSize: 10.5,
-                                                       fontWeight: FontWeight.bold,
-                                                     ),
-                                                   ),
-                                                 ],
-                                               ),
-                                             ),
-                                           ),
-                                         ],
+                                       Text(
+                                         '🏋️ Ejercicios Recomendados para el $activeDay:',
+                                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                        ),
                                        const SizedBox(height: 8),
                                        ...dayExercises.take(5).map((ex) {
@@ -1627,28 +1570,14 @@ class _CoachScreenState extends State<CoachScreen> {
                                          final String exName = (ex['name'] ?? 'Ejercicio').toString();
 
                                          final int setsNum = (ex['sets'] is int) ? (ex['sets'] as int) : (int.tryParse('${ex['sets']}') ?? 3);
-                                         final String nameLower = exName.toLowerCase();
-                                         final bool isCompound = nameLower.contains('sentadilla') ||
-                                             nameLower.contains('squat') ||
-                                             nameLower.contains('peso muerto') ||
-                                             nameLower.contains('deadlift') ||
-                                             nameLower.contains('prensa') ||
-                                             nameLower.contains('press') ||
-                                             nameLower.contains('flexion') ||
-                                             nameLower.contains('push-up') ||
-                                             nameLower.contains('dominada') ||
-                                             nameLower.contains('pull-up') ||
-                                             nameLower.contains('remo') ||
-                                             nameLower.contains('zancada') ||
-                                             nameLower.contains('lunge') ||
-                                             nameLower.contains('burpee') ||
-                                             nameLower.contains('talon') ||
-                                             nameLower.contains('elevación de talón') ||
-                                             nameLower.contains('elevacion de talon');
                                          final userWeight = AuthService.instance.loggedInUser?.weight ?? 75.0;
-                                         final weightFactor = (userWeight / 75.0).clamp(0.7, 1.4);
-                                         final estKcal = (setsNum * (isCompound ? 15.0 : 11.5) * weightFactor).round();
-                                         final estFat = ((estKcal * 0.70) / 9.0).toStringAsFixed(1);
+                                         final estKcal = MetabolicCalculator.estimateCalories(
+                                           exerciseName: exName,
+                                           sets: setsNum,
+                                           userWeight: userWeight,
+                                           intensityLevel: intLabel,
+                                         );
+                                         final estFat = MetabolicCalculator.estimateFatGrams(estKcal).toStringAsFixed(1);
 
                                          return InkWell(
                                            borderRadius: BorderRadius.circular(10),

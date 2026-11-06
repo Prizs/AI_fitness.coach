@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/models/user_profile.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/services/metabolic_calculator.dart';
 import 'package:mobile_app/database/db_helper.dart';
 
 class WeeklyPlanService extends ChangeNotifier {
@@ -95,7 +96,6 @@ class WeeklyPlanService extends ChangeNotifier {
   /// Estimacin cientfica de caloras quemadas en base a sesiones realizadas y adherencia
   int get estimatedBurnedCaloriesTotal {
     final weight = AuthService.instance.loggedInUser?.weight ?? 75.0;
-    final factor = (weight / 75.0).clamp(0.7, 1.4);
     int total = 0;
     for (final d in days) {
       final w = d['weekday'] as int? ?? 0;
@@ -104,47 +104,50 @@ class WeeklyPlanService extends ChangeNotifier {
         for (final ex in exs) {
           if (ex is Map) {
             final sets = int.tryParse(ex['sets']?.toString() ?? '3') ?? 3;
-            final isCompound = (ex['name']?.toString() ?? '').toLowerCase().contains('sentadilla') ||
-                (ex['name']?.toString() ?? '').toLowerCase().contains('peso muerto') ||
-                (ex['name']?.toString() ?? '').toLowerCase().contains('prensa') ||
-                (ex['name']?.toString() ?? '').toLowerCase().contains('remo') ||
-                (ex['name']?.toString() ?? '').toLowerCase().contains('burpee');
-            total += (sets * (isCompound ? 15.0 : 11.5) * factor).round();
+            final name = ex['name']?.toString() ?? 'Ejercicio';
+            final intLvl = ex['intensity_level']?.toString() ?? 'Media';
+            total += MetabolicCalculator.estimateCalories(
+              exerciseName: name,
+              sets: sets,
+              userWeight: weight,
+              intensityLevel: intLvl,
+            );
           }
         }
       }
     }
     if (total == 0 && totalCompletedSessions > 0) {
-      total = (totalCompletedSessions * 320 * factor).round();
+      total = (totalCompletedSessions * 65 * (weight / 75.0).clamp(0.7, 1.4)).round();
     }
     return total;
   }
 
-  /// Estimacin de grasa corporal oxidada en gramos (~9 kcal/g a 70% oxidacin lipdica)
+  /// Estimación de grasa corporal oxidada en gramos (~38% oxidación lipídica en recuperación y EPOC)
   double get estimatedBurnedFatGramsTotal {
-    return (estimatedBurnedCaloriesTotal * 0.70) / 9.0;
+    return MetabolicCalculator.estimateFatGrams(estimatedBurnedCaloriesTotal);
   }
 
-  /// Caloras dejadas de quemar por ejercicios omitidos
+  /// Calorías dejadas de quemar por ejercicios omitidos
   int get estimatedMissedCaloriesTotal {
     final weight = AuthService.instance.loggedInUser?.weight ?? 75.0;
-    final factor = (weight / 75.0).clamp(0.7, 1.4);
     int missed = 0;
     for (final ex in skippedExercises) {
       final sets = int.tryParse(ex['sets']?.toString() ?? '3') ?? 3;
-      final isCompound = (ex['name']?.toString() ?? '').toLowerCase().contains('sentadilla') ||
-          (ex['name']?.toString() ?? '').toLowerCase().contains('peso muerto') ||
-          (ex['name']?.toString() ?? '').toLowerCase().contains('prensa') ||
-          (ex['name']?.toString() ?? '').toLowerCase().contains('remo') ||
-          (ex['name']?.toString() ?? '').toLowerCase().contains('burpee');
-      missed += (sets * (isCompound ? 15.0 : 11.5) * factor).round();
+      final name = ex['name']?.toString() ?? 'Ejercicio';
+      final intLvl = ex['intensity_level']?.toString() ?? 'Media';
+      missed += MetabolicCalculator.estimateCalories(
+        exerciseName: name,
+        sets: sets,
+        userWeight: weight,
+        intensityLevel: intLvl,
+      );
     }
     return missed;
   }
 
-  /// Grasa que se dej de oxidar debido a ejercicios no completados
+  /// Estimación de grasa dejada de oxidar en gramos por ejercicios omitidos
   double get estimatedMissedFatGramsTotal {
-    return (estimatedMissedCaloriesTotal * 0.70) / 9.0;
+    return MetabolicCalculator.estimateFatGrams(estimatedMissedCaloriesTotal);
   }
 
   int get todayIndex => DateTime.now().weekday - 1;

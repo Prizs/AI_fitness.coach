@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/coach_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/services/metabolic_calculator.dart';
 import 'package:mobile_app/services/coach_chat_service.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:mobile_app/database/db_helper.dart';
@@ -1750,22 +1751,15 @@ class _DayCard extends StatelessWidget {
                   item['intensity_level'] as String? ?? 'Básico (Intensidad Baja)';
 
               final setsNum = int.tryParse(item['sets']?.toString() ?? '3') ?? 3;
-              final nameLower = (item['name'] as String? ?? '').toLowerCase();
-              final isCompound = nameLower.contains('sentadilla') ||
-                  nameLower.contains('squat') ||
-                  nameLower.contains('peso muerto') ||
-                  nameLower.contains('deadlift') ||
-                  nameLower.contains('prensa') ||
-                  nameLower.contains('dominada') ||
-                  nameLower.contains('pull-up') ||
-                  nameLower.contains('remo') ||
-                  nameLower.contains('zancada') ||
-                  nameLower.contains('lunge') ||
-                  nameLower.contains('burpee');
+              final exName = item['name'] as String? ?? 'Ejercicio';
               final userWeight = AuthService.instance.loggedInUser?.weight ?? 75.0;
-              final weightFactor = (userWeight / 75.0).clamp(0.7, 1.4);
-              final estKcal = (setsNum * (isCompound ? 15.0 : 11.5) * weightFactor).round();
-              final estFat = ((estKcal * 0.70) / 9.0).toStringAsFixed(1);
+              final estKcal = MetabolicCalculator.estimateCalories(
+                exerciseName: exName,
+                sets: setsNum,
+                userWeight: userWeight,
+                intensityLevel: intensityLvl,
+              );
+              final estFat = MetabolicCalculator.estimateFatGrams(estKcal).toStringAsFixed(1);
 
               return ListTile(
                 contentPadding: EdgeInsets.zero,

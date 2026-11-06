@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/models/schedule_models.dart';
 import 'package:mobile_app/widgets/exercise_detail.dart';
 import 'package:mobile_app/services/weekly_plan_service.dart';
+import 'package:mobile_app/services/metabolic_calculator.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -289,22 +290,14 @@ class _WorkoutScheduleScreenState extends State<WorkoutScheduleScreen> {
                           Text('${ex.sets} series · ${ex.reps} · Primario: ${ex.primaryMuscle}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
                           Builder(builder: (ctx) {
                             final setsNum = ex.sets > 0 ? ex.sets : 3;
-                            final nameLower = ex.name.toLowerCase();
-                            final isCompound = nameLower.contains('sentadilla') ||
-                                nameLower.contains('squat') ||
-                                nameLower.contains('peso muerto') ||
-                                nameLower.contains('deadlift') ||
-                                nameLower.contains('prensa') ||
-                                nameLower.contains('dominada') ||
-                                nameLower.contains('pull-up') ||
-                                nameLower.contains('remo') ||
-                                nameLower.contains('zancada') ||
-                                nameLower.contains('lunge') ||
-                                nameLower.contains('burpee');
                             final userWeight = AuthService.instance.loggedInUser?.weight ?? 75.0;
-                            final weightFactor = (userWeight / 75.0).clamp(0.7, 1.4);
-                            final estKcal = (setsNum * (isCompound ? 15.0 : 11.5) * weightFactor).round();
-                            final estFat = ((estKcal * 0.70) / 9.0).toStringAsFixed(1);
+                            final estKcal = MetabolicCalculator.estimateCalories(
+                              exerciseName: ex.name,
+                              sets: setsNum,
+                              userWeight: userWeight,
+                              intensityLevel: ex.intensityLevel,
+                            );
+                            final estFat = MetabolicCalculator.estimateFatGrams(estKcal).toStringAsFixed(1);
                             return Padding(
                               padding: const EdgeInsets.only(top: 4, bottom: 2),
                               child: Row(
