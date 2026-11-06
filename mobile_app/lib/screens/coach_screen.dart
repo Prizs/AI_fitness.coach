@@ -1692,38 +1692,6 @@ class _CoachScreenState extends State<CoachScreen> {
                                                            style: TextStyle(color: badgeColor, fontSize: 10.5, fontWeight: FontWeight.w800),
                                                          ),
                                                        ),
-                                                       Container(
-                                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                         decoration: BoxDecoration(
-                                                           color: const Color(0xFFFFB340).withValues(alpha: 0.16),
-                                                           borderRadius: BorderRadius.circular(5),
-                                                           border: Border.all(color: const Color(0xFFFFB340).withValues(alpha: 0.4), width: 0.8),
-                                                         ),
-                                                         child: Row(
-                                                           mainAxisSize: MainAxisSize.min,
-                                                           children: [
-                                                             const Text('🔥', style: TextStyle(fontSize: 11)),
-                                                             const SizedBox(width: 3),
-                                                             Text('~$estKcal kcal', style: const TextStyle(color: Color(0xFFFFB340), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                           ],
-                                                         ),
-                                                       ),
-                                                       Container(
-                                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                         decoration: BoxDecoration(
-                                                           color: const Color(0xFF64D2FF).withValues(alpha: 0.16),
-                                                           borderRadius: BorderRadius.circular(5),
-                                                           border: Border.all(color: const Color(0xFF64D2FF).withValues(alpha: 0.4), width: 0.8),
-                                                         ),
-                                                         child: Row(
-                                                           mainAxisSize: MainAxisSize.min,
-                                                           children: [
-                                                             const Text('💧', style: TextStyle(fontSize: 11)),
-                                                             const SizedBox(width: 3),
-                                                             Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF64D2FF), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                           ],
-                                                         ),
-                                                       ),
                                                      ],
                                                    ),
                                                  ),
