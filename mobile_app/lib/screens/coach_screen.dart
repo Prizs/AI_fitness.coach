@@ -13,6 +13,7 @@ import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:mobile_app/screens/adaptive_workout_screen.dart';
 import 'package:mobile_app/widgets/plan_options_sheet.dart';
 import 'package:mobile_app/widgets/windows_calendar_dialog.dart';
+import 'package:mobile_app/widgets/performance_report_modal.dart';
 
 class CoachScreen extends StatefulWidget {
   const CoachScreen({super.key});
@@ -991,6 +992,11 @@ class _CoachScreenState extends State<CoachScreen> {
             onPressed: () => _openStateSheet(),
           ),
           IconButton(
+            icon: const Icon(Icons.history_edu_rounded, color: Color(0xFF8BE0C0)),
+            tooltip: 'Bitácora de Ejercicios Omitidos y Rendimiento',
+            onPressed: () => PerformanceReportModal.show(context),
+          ),
+          IconButton(
             icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF8BE0C0)),
             tooltip: 'Calendario Mensual (Estilo Windows)',
             onPressed: () => WindowsCalendarDialog.show(context),
@@ -1553,96 +1559,251 @@ class _CoachScreenState extends State<CoachScreen> {
 
                                     // CONTENIDO CONDICIONAL DEL DÍA (EJERCICIOS O DESCANSO)
                                     if (isTraining && dayExercises.isNotEmpty) ...[
-                                      Text(
-                                        '🏋️ Ejercicios Recomendados para el $activeDay:',
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      ...dayExercises.take(5).map((ex) {
-                                        final String intLabel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
-                                        final String primaryM = (ex['primary_muscle'] ?? 'Músculo principal').toString();
-                                        final bool isLow = intLabel.toLowerCase().contains('baja') || intLabel.toLowerCase().contains('básico');
-                                        final bool isHigh = intLabel.toLowerCase().contains('alta') || intLabel.toLowerCase().contains('avanzado');
-                                        final Color badgeColor = isLow
-                                            ? const Color(0xFF8BE0C0)
-                                            : (isHigh ? const Color(0xFFFF6B6B) : const Color(0xFFFFB340));
-                                        final String exName = (ex['name'] ?? 'Ejercicio').toString();
-                                        return InkWell(
-                                          borderRadius: BorderRadius.circular(10),
-                                          onTap: () => _open3DViewer(plan, targetExerciseName: exName, activeExercises: dayExercises),
-                                          child: Container(
-                                            margin: const EdgeInsets.only(bottom: 6),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF16253B),
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(color: Colors.white10),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    IconButton(
-                                                      padding: EdgeInsets.zero,
-                                                      constraints: const BoxConstraints(),
-                                                      icon: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 22),
-                                                      tooltip: 'Ver Atlas y Técnica',
-                                                      onPressed: () => _open3DViewer(plan, targetExerciseName: exName, activeExercises: dayExercises),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: Text(
-                                                        exName,
-                                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                                                      ),
-                                                    ),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFF1F3A4B),
-                                                        borderRadius: BorderRadius.circular(6),
-                                                      ),
-                                                      child: Text(
-                                                        '${ex['sets'] ?? 3} × ${ex['reps'] ?? '12'}',
-                                                        style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Padding(
-                                                  padding: const EdgeInsets.only(left: 30),
-                                                  child: Wrap(
-                                                    spacing: 8,
-                                                    runSpacing: 4,
-                                                    crossAxisAlignment: WrapCrossAlignment.center,
-                                                    children: [
-                                                      Text(
-                                                        '🎯 $primaryM',
-                                                        style: const TextStyle(color: Colors.white70, fontSize: 11),
-                                                      ),
-                                                      Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                                        decoration: BoxDecoration(
-                                                          color: badgeColor.withValues(alpha: 0.18),
-                                                          borderRadius: BorderRadius.circular(5),
-                                                          border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
-                                                        ),
-                                                        child: Text(
-                                                          '⚡ $intLabel',
-                                                          style: TextStyle(color: badgeColor, fontSize: 10.5, fontWeight: FontWeight.w800),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      }),
-                                    ] else ...[
+                                       Row(
+                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                         children: [
+                                           Expanded(
+                                             child: Text(
+                                               '🏋️ Ejercicios Recomendados para el $activeDay:',
+                                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                             ),
+                                           ),
+                                           InkWell(
+                                             borderRadius: BorderRadius.circular(8),
+                                             onTap: () => PerformanceReportModal.show(context),
+                                             child: Container(
+                                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                               decoration: BoxDecoration(
+                                                 color: (WeeklyPlanService.instance.skippedExercises.isEmpty
+                                                     ? const Color(0xFF8BE0C0)
+                                                     : const Color(0xFFFF6B6B)).withValues(alpha: 0.18),
+                                                 borderRadius: BorderRadius.circular(8),
+                                                 border: Border.all(
+                                                   color: (WeeklyPlanService.instance.skippedExercises.isEmpty
+                                                       ? const Color(0xFF8BE0C0)
+                                                       : const Color(0xFFFF6B6B)).withValues(alpha: 0.45),
+                                                 ),
+                                               ),
+                                               child: Row(
+                                                 mainAxisSize: MainAxisSize.min,
+                                                 children: [
+                                                   Icon(
+                                                     WeeklyPlanService.instance.skippedExercises.isEmpty
+                                                         ? Icons.check_circle_outline_rounded
+                                                         : Icons.warning_amber_rounded,
+                                                     size: 13,
+                                                     color: WeeklyPlanService.instance.skippedExercises.isEmpty
+                                                         ? const Color(0xFF8BE0C0)
+                                                         : const Color(0xFFFF6B6B),
+                                                   ),
+                                                   const SizedBox(width: 4),
+                                                   Text(
+                                                     WeeklyPlanService.instance.skippedExercises.isEmpty
+                                                         ? 'Bitácora al día'
+                                                         : 'Bitácora: ${WeeklyPlanService.instance.skippedExercises.length} omitidos',
+                                                     style: TextStyle(
+                                                       color: WeeklyPlanService.instance.skippedExercises.isEmpty
+                                                           ? const Color(0xFF8BE0C0)
+                                                           : const Color(0xFFFF6B6B),
+                                                       fontSize: 10.5,
+                                                       fontWeight: FontWeight.bold,
+                                                     ),
+                                                   ),
+                                                 ],
+                                               ),
+                                             ),
+                                           ),
+                                         ],
+                                       ),
+                                       const SizedBox(height: 8),
+                                       ...dayExercises.take(5).map((ex) {
+                                         final String intLabel = (ex['intensity_level'] ?? 'Básico (Intensidad Baja)').toString();
+                                         final String primaryM = (ex['primary_muscle'] ?? 'Músculo principal').toString();
+                                         final bool isLow = intLabel.toLowerCase().contains('baja') || intLabel.toLowerCase().contains('básico');
+                                         final bool isHigh = intLabel.toLowerCase().contains('alta') || intLabel.toLowerCase().contains('avanzado');
+                                         final Color badgeColor = isLow
+                                             ? const Color(0xFF8BE0C0)
+                                             : (isHigh ? const Color(0xFFFF6B6B) : const Color(0xFFFFB340));
+                                         final String exName = (ex['name'] ?? 'Ejercicio').toString();
+
+                                         final int setsNum = (ex['sets'] is int) ? (ex['sets'] as int) : (int.tryParse('${ex['sets']}') ?? 3);
+                                         final String nameLower = exName.toLowerCase();
+                                         final bool isCompound = nameLower.contains('sentadilla') ||
+                                             nameLower.contains('squat') ||
+                                             nameLower.contains('peso muerto') ||
+                                             nameLower.contains('deadlift') ||
+                                             nameLower.contains('prensa') ||
+                                             nameLower.contains('press') ||
+                                             nameLower.contains('flexion') ||
+                                             nameLower.contains('push-up') ||
+                                             nameLower.contains('dominada') ||
+                                             nameLower.contains('pull-up') ||
+                                             nameLower.contains('remo') ||
+                                             nameLower.contains('zancada') ||
+                                             nameLower.contains('lunge') ||
+                                             nameLower.contains('burpee') ||
+                                             nameLower.contains('talon') ||
+                                             nameLower.contains('elevación de talón') ||
+                                             nameLower.contains('elevacion de talon');
+                                         final userWeight = AuthService.instance.loggedInUser?.weight ?? 75.0;
+                                         final weightFactor = (userWeight / 75.0).clamp(0.7, 1.4);
+                                         final estKcal = (setsNum * (isCompound ? 15.0 : 11.5) * weightFactor).round();
+                                         final estFat = ((estKcal * 0.70) / 9.0).toStringAsFixed(1);
+
+                                         return InkWell(
+                                           borderRadius: BorderRadius.circular(10),
+                                           onTap: () => _open3DViewer(plan, targetExerciseName: exName, activeExercises: dayExercises),
+                                           child: Container(
+                                             margin: const EdgeInsets.only(bottom: 6),
+                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                             decoration: BoxDecoration(
+                                               color: const Color(0xFF16253B),
+                                               borderRadius: BorderRadius.circular(10),
+                                               border: Border.all(color: Colors.white10),
+                                             ),
+                                             child: Column(
+                                               crossAxisAlignment: CrossAxisAlignment.start,
+                                               children: [
+                                                 Row(
+                                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                                   children: [
+                                                     IconButton(
+                                                       padding: EdgeInsets.zero,
+                                                       constraints: const BoxConstraints(),
+                                                       icon: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFF8BE0C0), size: 22),
+                                                       tooltip: 'Ver Atlas y Técnica',
+                                                       onPressed: () => _open3DViewer(plan, targetExerciseName: exName, activeExercises: dayExercises),
+                                                     ),
+                                                     const SizedBox(width: 8),
+                                                     Expanded(
+                                                       child: Text(
+                                                         exName,
+                                                         style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                                       ),
+                                                     ),
+                                                     const SizedBox(width: 8),
+                                                     Column(
+                                                       crossAxisAlignment: CrossAxisAlignment.end,
+                                                       children: [
+                                                         Container(
+                                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                           decoration: BoxDecoration(
+                                                             color: const Color(0xFF1F3A4B),
+                                                             borderRadius: BorderRadius.circular(6),
+                                                           ),
+                                                           child: Text(
+                                                             '${ex['sets'] ?? 3} × ${ex['reps'] ?? '12'}',
+                                                             style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
+                                                           ),
+                                                         ),
+                                                         const SizedBox(height: 3),
+                                                         Row(
+                                                           mainAxisSize: MainAxisSize.min,
+                                                           children: [
+                                                             Container(
+                                                               padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                                                               decoration: BoxDecoration(
+                                                                 color: const Color(0xFFFFB340).withValues(alpha: 0.15),
+                                                                 borderRadius: BorderRadius.circular(5),
+                                                                 border: Border.all(color: const Color(0xFFFFB340).withValues(alpha: 0.35), width: 0.7),
+                                                               ),
+                                                               child: Row(
+                                                                 mainAxisSize: MainAxisSize.min,
+                                                                 children: [
+                                                                   const Icon(Icons.local_fire_department_rounded, size: 10, color: Color(0xFFFFB340)),
+                                                                   const SizedBox(width: 2),
+                                                                   Text('~$estKcal kcal', style: const TextStyle(color: Color(0xFFFFB340), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                                                                 ],
+                                                               ),
+                                                             ),
+                                                             const SizedBox(width: 3.5),
+                                                             Container(
+                                                               padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                                                               decoration: BoxDecoration(
+                                                                 color: const Color(0xFF8BE0C0).withValues(alpha: 0.15),
+                                                                 borderRadius: BorderRadius.circular(5),
+                                                                 border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.35), width: 0.7),
+                                                               ),
+                                                               child: Row(
+                                                                 mainAxisSize: MainAxisSize.min,
+                                                                 children: [
+                                                                   const Icon(Icons.water_drop_rounded, size: 10, color: Color(0xFF8BE0C0)),
+                                                                   const SizedBox(width: 2),
+                                                                   Text('~$estFat g grasa', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                                                                 ],
+                                                               ),
+                                                             ),
+                                                           ],
+                                                         ),
+                                                       ],
+                                                     ),
+                                                   ],
+                                                 ),
+                                                 const SizedBox(height: 4),
+                                                 Padding(
+                                                   padding: const EdgeInsets.only(left: 30),
+                                                   child: Wrap(
+                                                     spacing: 8,
+                                                     runSpacing: 4,
+                                                     crossAxisAlignment: WrapCrossAlignment.center,
+                                                     children: [
+                                                       Text(
+                                                         '🎯 $primaryM',
+                                                         style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                                       ),
+                                                       Container(
+                                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                         decoration: BoxDecoration(
+                                                           color: badgeColor.withValues(alpha: 0.18),
+                                                           borderRadius: BorderRadius.circular(5),
+                                                           border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
+                                                         ),
+                                                         child: Text(
+                                                           '⚡ $intLabel',
+                                                           style: TextStyle(color: badgeColor, fontSize: 10.5, fontWeight: FontWeight.w800),
+                                                         ),
+                                                       ),
+                                                       Container(
+                                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                         decoration: BoxDecoration(
+                                                           color: const Color(0xFFFFB340).withValues(alpha: 0.15),
+                                                           borderRadius: BorderRadius.circular(5),
+                                                           border: Border.all(color: const Color(0xFFFFB340).withValues(alpha: 0.35), width: 0.7),
+                                                         ),
+                                                         child: Row(
+                                                           mainAxisSize: MainAxisSize.min,
+                                                           children: [
+                                                             const Icon(Icons.local_fire_department_rounded, size: 10.5, color: Color(0xFFFFB340)),
+                                                             const SizedBox(width: 2.5),
+                                                             Text('~$estKcal kcal', style: const TextStyle(color: Color(0xFFFFB340), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                           ],
+                                                         ),
+                                                       ),
+                                                       Container(
+                                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                         decoration: BoxDecoration(
+                                                           color: const Color(0xFF8BE0C0).withValues(alpha: 0.15),
+                                                           borderRadius: BorderRadius.circular(5),
+                                                           border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.35), width: 0.7),
+                                                         ),
+                                                         child: Row(
+                                                           mainAxisSize: MainAxisSize.min,
+                                                           children: [
+                                                             const Icon(Icons.water_drop_rounded, size: 10.5, color: Color(0xFF8BE0C0)),
+                                                             const SizedBox(width: 2.5),
+                                                             Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                           ],
+                                                         ),
+                                                       ),
+                                                     ],
+                                                   ),
+                                                 ),
+                                               ],
+                                             ),
+                                           ),
+                                         );
+                                       }),
+                                     ] else ...[
                                       // TARJETA DE DÍA DE DESCANSO CON MENSAJE INDICATIVO Y CONSEJOS
                                       Container(
                                         width: double.infinity,
