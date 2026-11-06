@@ -1790,14 +1790,14 @@ class _DayCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFB340).withOpacity(0.15),
+                            color: const Color(0xFFFFB340).withOpacity(0.16),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFFFB340).withOpacity(0.3), width: 0.8),
+                            border: Border.all(color: const Color(0xFFFFB340).withOpacity(0.4), width: 0.8),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.local_fire_department_rounded, size: 12, color: Color(0xFFFFB340)),
+                              const Text('🔥', style: TextStyle(fontSize: 12)),
                               const SizedBox(width: 3),
                               Text('~$estKcal kcal', style: const TextStyle(color: Color(0xFFFFB340), fontSize: 11, fontWeight: FontWeight.bold)),
                             ],
@@ -1807,16 +1807,16 @@ class _DayCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF8BE0C0).withOpacity(0.15),
+                            color: const Color(0xFF64D2FF).withOpacity(0.16),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.3), width: 0.8),
+                            border: Border.all(color: const Color(0xFF64D2FF).withOpacity(0.4), width: 0.8),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.water_drop_rounded, size: 12, color: Color(0xFF8BE0C0)),
+                              const Text('💧', style: TextStyle(fontSize: 12)),
                               const SizedBox(width: 3),
-                              Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
+                              Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF64D2FF), fontSize: 11, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),

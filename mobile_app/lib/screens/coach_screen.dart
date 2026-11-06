@@ -1630,35 +1630,35 @@ class _CoachScreenState extends State<CoachScreen> {
                                                            mainAxisSize: MainAxisSize.min,
                                                            children: [
                                                              Container(
-                                                               padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                                                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                                                decoration: BoxDecoration(
-                                                                 color: const Color(0xFFFFB340).withValues(alpha: 0.15),
+                                                                 color: const Color(0xFFFFB340).withValues(alpha: 0.16),
                                                                  borderRadius: BorderRadius.circular(5),
-                                                                 border: Border.all(color: const Color(0xFFFFB340).withValues(alpha: 0.35), width: 0.7),
+                                                                 border: Border.all(color: const Color(0xFFFFB340).withValues(alpha: 0.4), width: 0.8),
                                                                ),
                                                                child: Row(
                                                                  mainAxisSize: MainAxisSize.min,
                                                                  children: [
-                                                                   const Icon(Icons.local_fire_department_rounded, size: 10, color: Color(0xFFFFB340)),
-                                                                   const SizedBox(width: 2),
+                                                                   const Text('🔥', style: TextStyle(fontSize: 10.5)),
+                                                                   const SizedBox(width: 2.5),
                                                                    Text('~$estKcal kcal', style: const TextStyle(color: Color(0xFFFFB340), fontSize: 9.5, fontWeight: FontWeight.bold)),
                                                                  ],
                                                                ),
                                                              ),
                                                              const SizedBox(width: 3.5),
                                                              Container(
-                                                               padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                                                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                                                decoration: BoxDecoration(
-                                                                 color: const Color(0xFF8BE0C0).withValues(alpha: 0.15),
+                                                                 color: const Color(0xFF64D2FF).withValues(alpha: 0.16),
                                                                  borderRadius: BorderRadius.circular(5),
-                                                                 border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.35), width: 0.7),
+                                                                 border: Border.all(color: const Color(0xFF64D2FF).withValues(alpha: 0.4), width: 0.8),
                                                                ),
                                                                child: Row(
                                                                  mainAxisSize: MainAxisSize.min,
                                                                  children: [
-                                                                   const Icon(Icons.water_drop_rounded, size: 10, color: Color(0xFF8BE0C0)),
-                                                                   const SizedBox(width: 2),
-                                                                   Text('~$estFat g grasa', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                                                                   const Text('💧', style: TextStyle(fontSize: 10.5)),
+                                                                   const SizedBox(width: 2.5),
+                                                                   Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF64D2FF), fontSize: 9.5, fontWeight: FontWeight.bold)),
                                                                  ],
                                                                ),
                                                              ),
@@ -1693,34 +1693,34 @@ class _CoachScreenState extends State<CoachScreen> {
                                                          ),
                                                        ),
                                                        Container(
-                                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                          decoration: BoxDecoration(
-                                                           color: const Color(0xFFFFB340).withValues(alpha: 0.15),
+                                                           color: const Color(0xFFFFB340).withValues(alpha: 0.16),
                                                            borderRadius: BorderRadius.circular(5),
-                                                           border: Border.all(color: const Color(0xFFFFB340).withValues(alpha: 0.35), width: 0.7),
+                                                           border: Border.all(color: const Color(0xFFFFB340).withValues(alpha: 0.4), width: 0.8),
                                                          ),
                                                          child: Row(
                                                            mainAxisSize: MainAxisSize.min,
                                                            children: [
-                                                             const Icon(Icons.local_fire_department_rounded, size: 10.5, color: Color(0xFFFFB340)),
-                                                             const SizedBox(width: 2.5),
+                                                             const Text('🔥', style: TextStyle(fontSize: 11)),
+                                                             const SizedBox(width: 3),
                                                              Text('~$estKcal kcal', style: const TextStyle(color: Color(0xFFFFB340), fontSize: 10, fontWeight: FontWeight.bold)),
                                                            ],
                                                          ),
                                                        ),
                                                        Container(
-                                                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                          decoration: BoxDecoration(
-                                                           color: const Color(0xFF8BE0C0).withValues(alpha: 0.15),
+                                                           color: const Color(0xFF64D2FF).withValues(alpha: 0.16),
                                                            borderRadius: BorderRadius.circular(5),
-                                                           border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.35), width: 0.7),
+                                                           border: Border.all(color: const Color(0xFF64D2FF).withValues(alpha: 0.4), width: 0.8),
                                                          ),
                                                          child: Row(
                                                            mainAxisSize: MainAxisSize.min,
                                                            children: [
-                                                             const Icon(Icons.water_drop_rounded, size: 10.5, color: Color(0xFF8BE0C0)),
-                                                             const SizedBox(width: 2.5),
-                                                             Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                             const Text('💧', style: TextStyle(fontSize: 11)),
+                                                             const SizedBox(width: 3),
+                                                             Text('~$estFat g grasa est.', style: const TextStyle(color: Color(0xFF64D2FF), fontSize: 10, fontWeight: FontWeight.bold)),
                                                            ],
                                                          ),
                                                        ),
