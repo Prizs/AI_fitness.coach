@@ -59,13 +59,16 @@ def latest_version() -> dict:
 
 @router.get("/download")
 def download_apk():
-    """Descarga directamente el APK oficial desde el servidor o redirige a la release de GitHub."""
+    """Descarga directamente el APK oficial desde el servidor o redirige al APK en GitHub."""
     apk = _find_apk_file()
     if apk and apk.exists():
         return FileResponse(
             path=str(apk),
             media_type="application/vnd.android.package-archive",
-            filename="AI_Fitness_Coach_v1.0.66.apk",
+            filename="AI_Fitness_Coach.apk",
         )
-    return RedirectResponse(url="https://github.com/miope-hub/AI_FITNESS_COACH_PROYECTO_COMPLETO/releases/download/v1.0.66/app-release.apk", status_code=302)
+    return RedirectResponse(
+        url="https://github.com/Prizs/AI_fitness.coach/raw/main/releases/app-release.apk",
+        status_code=302,
+    )
 
