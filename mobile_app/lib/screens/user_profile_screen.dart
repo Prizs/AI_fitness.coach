@@ -858,17 +858,24 @@ class _StreakCard extends StatelessWidget {
 }
 
 
-class _SkippedExercisesCard extends StatelessWidget {
+class _SkippedExercisesCard extends StatefulWidget {
   const _SkippedExercisesCard({required this.planService});
 
   final WeeklyPlanService planService;
 
   @override
+  State<_SkippedExercisesCard> createState() => _SkippedExercisesCardState();
+}
+
+class _SkippedExercisesCardState extends State<_SkippedExercisesCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final skipped = planService.skippedExercises;
-    final missedDays = planService.skippedOrMissedDays;
-    final missedKcal = planService.estimatedMissedCaloriesTotal;
-    final missedFat = planService.estimatedMissedFatGramsTotal;
+    final skipped = widget.planService.skippedExercises;
+    final missedDays = widget.planService.skippedOrMissedDays;
+    final missedKcal = widget.planService.estimatedMissedCaloriesTotal;
+    final missedFat = widget.planService.estimatedMissedFatGramsTotal;
 
     if (skipped.isEmpty) {
       return Container(
@@ -894,12 +901,12 @@ class _SkippedExercisesCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Bitcora al Da: Cero Ejercicios Omitidos',
+                    'Bitácora al Día: Cero Ejercicios Omitidos',
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'No dejaste ejercicios por alto en los das programados.',
+                    'No dejaste ejercicios por alto en los días programados.',
                     style: TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ],
@@ -936,11 +943,11 @@ class _SkippedExercisesCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Bitcora: ${skipped.length} Ejercicios Dejados por Alto',
+                      'Bitácora: ${skipped.length} Ejercicios Dejados por Alto',
                       style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.white),
                     ),
                     Text(
-                      '${missedDays.length} sesin(es) programada(s) sin completar esta semana',
+                      '${missedDays.length} sesión(es) programada(s) sin completar esta semana',
                       style: const TextStyle(color: Colors.white70, fontSize: 11),
                     ),
                   ],
@@ -959,7 +966,7 @@ class _SkippedExercisesCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Impacto calrico no alcanzado:',
+                  'Impacto calórico no alcanzado:',
                   style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.8)),
                 ),
                 Text(
@@ -969,48 +976,100 @@ class _SkippedExercisesCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'Detalle de ejercicios no realizados:',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white60),
-          ),
-          const SizedBox(height: 6),
-          ...skipped.map((item) {
-            final name = item['name'] ?? 'Ejercicio';
-            final day = item['missed_day'] ?? 'Da pasado';
-            final sets = item['sets'] ?? 3;
-            final reps = item['reps'] ?? '12';
-            return Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          const SizedBox(height: 12),
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
                 color: const Color(0xFF16233A),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white10),
+                border: Border.all(
+                  color: _isExpanded
+                      ? const Color(0xFFFF6B6B).withOpacity(0.5)
+                      : Colors.white12,
+                ),
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.close_rounded, size: 16, color: Color(0xFFFF6B6B)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$name',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                  Row(
+                    children: [
+                      Icon(
+                        _isExpanded
+                            ? Icons.unfold_less_rounded
+                            : Icons.unfold_more_rounded,
+                        size: 16,
+                        color: const Color(0xFF8BE0C0),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isExpanded
+                            ? 'Ocultar detalle de ejercicios'
+                            : 'Ver detalle de ejercicios (${skipped.length})',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF8BE0C0),
                         ),
-                        Text(
-                          'Programado el $day  $sets series  $reps reps',
-                          style: const TextStyle(fontSize: 10.5, color: Colors.white60),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    _isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white70,
+                    size: 18,
                   ),
                 ],
               ),
-            );
-          }),
+            ),
+          ),
+          if (_isExpanded) ...[
+            const SizedBox(height: 10),
+            ...skipped.map((item) {
+              final name = item['name'] ?? 'Ejercicio';
+              final day = item['missed_day'] ?? 'Día pasado';
+              final sets = item['sets'] ?? 3;
+              final reps = item['reps'] ?? '12';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16233A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.close_rounded, size: 16, color: Color(0xFFFF6B6B)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$name',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
+                          Text(
+                            'Programado el $day · $sets series · $reps reps',
+                            style: const TextStyle(fontSize: 10.5, color: Colors.white60),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );
