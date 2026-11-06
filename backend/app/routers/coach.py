@@ -457,6 +457,19 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
     def _match_focus(txt: str) -> str | None:
         t = (txt or "").lower()
 
+        # 0.0 Verificación prioritaria de Pérdida de Grasa / Bajar Masa Corporal / Gasto Metabólico
+        if any(w in t for w in (
+            "bajar masa corporal", "reducir masa corporal", "bajar mi masa corporal",
+            "bajar masa", "bajar peso", "bajar de peso", "perder peso", "perder grasa",
+            "pérdida de grasa", "perdida de grasa", "quemar grasa", "quema de grasa",
+            "oxidar grasa", "oxidación de grasa", "oxidacion de grasa", "reducir grasa",
+            "déficit calórico", "deficit calorico", "déficit", "deficit", "definición muscular",
+            "definicion muscular", "definir", "definición", "definicion", "tonificar",
+            "tonificación", "tonificacion", "quemar calorías", "quemar calorias",
+            "gasto metabólico", "gasto metabolico"
+        )):
+            return "perdida_grasa"
+
         # 0. Verificación prioritaria de Cuerpo Completo / Full Body
         if any(w in t for w in (
             "cuerpo completo", "cuerpo entero", "full body", "fullbody", "full-body",
@@ -633,8 +646,16 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         return focus
 
     for turn in reversed(payload.history[-4:]):
-        if turn.role == "user":
-            f = _match_focus(turn.content.lower())
+        role = ""
+        t_content = ""
+        if isinstance(turn, dict):
+            role = str(turn.get("role", "")).lower()
+            t_content = str(turn.get("content", "")).lower()
+        elif hasattr(turn, "content"):
+            role = str(getattr(turn, "role", "")).lower()
+            t_content = str(turn.content or "").lower()
+        if role == "user":
+            f = _match_focus(t_content)
             if f:
                 return f
     return None
@@ -687,9 +708,10 @@ def _is_pure_greeting_or_conversation(message: str) -> bool:
     is_greeting_start = any(re.search(pat, cleaned) for pat in greeting_patterns)
     if is_greeting_start:
         routine_triggers = (
-            "rutina", "plan", "ejercicio", "entrenar", "entreno", "dieta", "comida",
-            "pierna", "pecho", "espalda", "brazo", "abdomen", "core", "calistenia",
+            "rutina", "rtina", "plan", "ejercicio", "ejercicios", "entrenar", "entreno", "dieta", "comida",
+            "pierna", "piernas", "pecho", "espalda", "brazo", "brazos", "abdomen", "core", "calistenia",
             "pesas", "cardio", "deload", "descarga", "cuestionario", "estado actual",
+            "bajar masa", "masa corporal", "bajar peso", "perder grasa", "quemar grasa", "quema grasa",
             "qué me toca", "que me toca", "qué hago", "que hago", "qué entreno", "que entreno",
             "hazme", "dame", "crear", "arma", "diseña"
         )
@@ -743,12 +765,64 @@ def _is_full_rest_or_vacation_request(message: str) -> bool:
     ))
 
 
+def _is_readiness_reply_to_precheck(message: str, history: list = None) -> tuple[bool, str | None]:
+    """Detecta si el usuario está respondiendo a una pregunta de chequeo de salud/energía del coach."""
+    msg = (message or "").lower()
+    if not history:
+        return False, None
+
+    has_prior_routine_intent = False
+    prior_user_text = None
+    for turn in reversed(history[-4:]):
+        role = ""
+        content = ""
+        if isinstance(turn, dict):
+            role = str(turn.get("role", "")).lower()
+            content = str(turn.get("content", ""))
+        elif hasattr(turn, "content"):
+            role = str(getattr(turn, "role", "")).lower()
+            content = str(turn.content or "")
+
+        if role == "user":
+            c_low = content.lower()
+            if any(k in c_low for k in (
+                "rutina", "rtina", "plan", "ejercicio", "ejercicios", "entren", "entreno",
+                "bajar masa", "masa corporal", "bajar peso", "perder grasa", "quemar grasa",
+                "pierna", "pecho", "espalda", "brazo", "core", "abdomen", "cardio",
+                "sin herramientas", "en casa", "recomiend"
+            )):
+                has_prior_routine_intent = True
+                prior_user_text = content
+                break
+
+    is_readiness = any(k in msg for k in (
+        "me siento bien", "me siento muy bien", "me siento excelente", "me siento genial",
+        "no presento molestia", "no presento ninguna molestia", "sin molestia", "sin molestias",
+        "sin dolor", "cero molestia", "ninguna molestia",
+        "tengo energia", "tengo energía", "suficiente energia", "suficiente energía", "mucha energia", "mucha energía",
+        "a tope", "al 100", "al 100%", "con energia", "con energía", "con toda",
+        "listo para", "listo para entrenar", "para hacer el ejercicio", "hacer el ejercicio de hoy", "hacer el ejercicio", "hacer la rutina",
+        "estoy listo", "estoy bien", "todo bien", "perfecto",
+        "si", "sí", "dale", "ok", "hazlo", "arma", "plan", "semana", "comencemos", "hagámoslo"
+    ))
+
+    if has_prior_routine_intent and is_readiness:
+        return True, prior_user_text
+
+    return False, None
+
+
 def _is_explicit_routine_request(message: str, history: list = None) -> bool:
     """Detecta si el usuario está pidiendo explícitamente generar o ver un plan o rutina."""
     msg = (message or "").lower()
 
     if _is_today_workout_query(msg) or _is_next_cycle_inquiry(msg) or _is_full_rest_or_vacation_request(msg):
         return False
+
+    # Continuidad conversacional: Si responde a un pre-chequeo de salud/energía tras haber solicitado rutina
+    is_readiness_resp, _ = _is_readiness_reply_to_precheck(msg, history)
+    if is_readiness_resp:
+        return True
 
     # Si el usuario menciona molestia pero explícitamente pide que le planifiquen ejercicios adaptados,
     # SÍ es una solicitud de rutina adaptada.
@@ -769,7 +843,7 @@ def _is_explicit_routine_request(message: str, history: list = None) -> bool:
         return True
 
     # 2. Expresiones con tolerancia a tipeos (ej. "recomeidnes ejercicos", "recomiendame ejercicios")
-    exercise_root = r"(ejerci|ejeric|ejercic|rutin|plan|entren|ejer)"
+    exercise_root = r"(ejerci|ejeric|ejercic|rutin|rtin|plan|entren|ejer)"
     if re.search(r"(recom|dame|arma|dise|haz|crea|prepar|gener).*" + exercise_root, msg):
         return True
     if re.search(exercise_root + r".*(cardio|cardiovascular|corazon|corazón|resistencia|aerob|hiit|semana|hoy|casa|gimnasio|dias|días|arriba|pierna|pecho|espalda|brazo|hombro|core|abdomen|glute|descarga|calidad|salud)", msg):
@@ -811,14 +885,14 @@ def _is_explicit_routine_request(message: str, history: list = None) -> bool:
 
     # 3. Si en el historial reciente el usuario pidió una rutina y ahora está respondiendo
     if history:
-        for turn in reversed(history[-2:]):
+        for turn in reversed(history[-4:]):
             content = ""
             if isinstance(turn, dict):
                 content = str(turn.get("content", "")).lower()
             elif hasattr(turn, "content"):
                 content = str(turn.content or "").lower()
-            if any(k in content for k in ("sin herramientas", "en casa", "recomiend", "rutina", "plan")):
-                if any(k in msg for k in ("si", "sí", "dale", "ok", "hazlo", "arma", "plan", "semana")):
+            if any(k in content for k in ("sin herramientas", "en casa", "recomiend", "rutina", "rtina", "plan", "bajar masa", "masa corporal", "perder grasa")):
+                if any(k in msg for k in ("si", "sí", "dale", "ok", "hazlo", "arma", "plan", "semana", "bien", "energia", "energía", "listo")):
                     return True
 
     return False
@@ -2333,6 +2407,19 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
             cr_list[(seed + 3) % len(cr_list)],
             cr_list[(seed + 4) % len(cr_list)],
         ]
+    elif any(k in fk for k in ("perdida_grasa", "bajar_peso", "grasa", "metabolico", "bajar_masa")):
+        q_list = quads_dict[int_k]
+        ch_list = chest_dict[int_k]
+        g_list = glutes_dict[int_k]
+        cr_list = core_dict[int_k]
+        m_list = mobility_dict[int_k]
+        selected_tuples = [
+            q_list[(seed + 0) % len(q_list)],
+            ch_list[(seed + 1) % len(ch_list)],
+            g_list[(seed + 2) % len(g_list)],
+            m_list[(seed + 3) % len(m_list)],
+            cr_list[(seed + 4) % len(cr_list)],
+        ]
     elif any(k in fk for k in ("movilidad", "cardio")):
         m_list = mobility_dict[int_k]
         selected_tuples = [
@@ -3149,6 +3236,32 @@ def _normalize_structured_plan(
                     seen_gifs_global=weekly_seen_gifs,
                 )
 
+            elif requested_focus in ("perdida_grasa", "bajar_peso", "bajar_masa"):
+                day_titles = [
+                    f"Pérdida de Grasa: Circuito Metabólico y Piernas ({badge_lbl})",
+                    f"Pérdida de Grasa: Tren Superior y Gasto Calórico ({badge_lbl})",
+                    f"Pérdida de Grasa: Cardio HIIT y Core Funcional ({badge_lbl})",
+                    f"Pérdida de Grasa: Fuerza Metabólica Full Body ({badge_lbl})",
+                    f"Pérdida de Grasa: Acondicionamiento y Quema Activa ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    legs_quads[:2] + upper_chest_tri[:1] + core_front[:1] + legs_glutes[:1],
+                    upper_back_bi[:2] + upper_chest_tri[:1] + core_obliques[:1] + legs_glutes[:1],
+                    core_front[:2] + core_deep[:1] + legs_hams[:1] + upper_shoulders_post[:1],
+                    legs_quads[:1] + upper_chest_tri[:1] + legs_glutes[:1] + core_front[:1] + upper_back_bi[:1],
+                    legs_unipodal_calves[:1] + upper_shoulders_post[:1] + core_deep[:1] + legs_hams[:1] + upper_arms_torso[:1],
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="perdida_grasa",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
             elif requested_focus == "tren_superior_core":
                 day_titles = [
                     f"Combinado: Pecho + Core Frontal ({badge_lbl})",
@@ -3723,8 +3836,19 @@ Retorna SOLO JSON."""
 
     user_msg_lower = (payload.message or "").lower()
 
-    # Detección y actualización de cambio de meta mensual en el chat
+    # Detección y actualización de meta mensual en el chat (directa o por intención de rutina)
     goal_change_keywords = {
+        "bajar masa corporal": "Pérdida de grasa y definición",
+        "bajar mi masa corporal": "Pérdida de grasa y definición",
+        "reducir masa corporal": "Pérdida de grasa y definición",
+        "bajar masa": "Pérdida de grasa y definición",
+        "bajar peso": "Pérdida de grasa y definición",
+        "perder peso": "Pérdida de grasa y definición",
+        "oxidar grasa": "Pérdida de grasa y definición",
+        "déficit calórico": "Pérdida de grasa y definición",
+        "deficit calorico": "Pérdida de grasa y definición",
+        "déficit": "Pérdida de grasa y definición",
+        "deficit": "Pérdida de grasa y definición",
         "pérdida de grasa y definición": "Pérdida de grasa y definición",
         "perdida de grasa y definicion": "Pérdida de grasa y definición",
         "pérdida de grasa": "Pérdida de grasa y definición",
@@ -3752,11 +3876,27 @@ Retorna SOLO JSON."""
         "acondicionamiento general": "Acondicionamiento físico general",
     }
     updated_user_goal = None
-    if any(k in user_msg_lower for k in ("cambiar meta", "cambiar mi meta", "cambia mi meta", "mi meta es", "mi objetivo es", "cambiar objetivo", "cambia mi objetivo")):
-        for kw, g_name in goal_change_keywords.items():
-            if kw in user_msg_lower:
-                updated_user_goal = g_name
-                payload.user_goal = g_name
+    # 1. Comprobación directa en el mensaje actual
+    for kw, g_name in goal_change_keywords.items():
+        if kw in user_msg_lower:
+            updated_user_goal = g_name
+            payload.user_goal = g_name
+            break
+
+    # 2. Comprobación en historial reciente si se responde a un pre-chequeo
+    if not updated_user_goal and payload.history:
+        for turn in reversed(payload.history[-4:]):
+            c_hist = ""
+            if isinstance(turn, dict) and turn.get("role") == "user":
+                c_hist = str(turn.get("content", "")).lower()
+            elif hasattr(turn, "content") and getattr(turn, "role", "") == "user":
+                c_hist = str(turn.content or "").lower()
+            for kw, g_name in goal_change_keywords.items():
+                if kw in c_hist:
+                    updated_user_goal = g_name
+                    payload.user_goal = g_name
+                    break
+            if updated_user_goal:
                 break
 
 # 1. Consulta directa: "¿Qué me toca entrenar hoy?" o "¿Cuál es mi plan de hoy?"
@@ -4066,6 +4206,7 @@ Devuelve SOLO JSON."""
         )
     else:
         focus_instruction = {
+            "perdida_grasa": "PÉRDIDA DE GRASA Y DEFINICIÓN (BAJAR MASA CORPORAL / ALTO GASTO METABÓLICO): Estructura una sesión enfocada en quema de calorías eficiente, activación metabólica y recomposición corporal. Combina ejercicios multiarticulares funcionales con descansos controlados (45-60s) y series de alta demanda para maximizar la oxidación lipídica (~300-450 kcal y ~25-35g de grasa est.). Preserva la masa muscular magra mientras estimulas la tasa metabólica post-ejercicio (EPOC).",
             "plan_semanal_ia": "PLAN COMPLETO SEMANAL RECOMENDADO POR IA: Estructura una distribución semanal periodizada con descansos de 48-72h. Diseña la rutina de hoy como sesión principal de arranque y detalla los días complementarios de la semana.",
             "solo_piernas": "SEMANA ESPECIALIZADA DE PIERNAS Y GLÚTEOS: El usuario solicitó explícitamente entrenar solo piernas toda la semana. Diseña ejercicios exclusivos de miembros inferiores (Cuádriceps, Isquiotibiales, Glúteos y Pantorrillas) variando el estímulo para que cada día trabaje un vector o subgrupo diferente.",
             "solo_tren_superior": "SEMANA ESPECIALIZADA DE TREN SUPERIOR: El usuario solicitó explícitamente entrenar solo tren superior. Diseña ejercicios de Pecho, Espalda, Hombros y Brazos sin incluir ejercicios de piernas.",
@@ -4291,6 +4432,22 @@ Devuelve SOLO JSON."""
             "updated_user_goal": updated_user_goal,
         }
 
+    is_readiness_resp, prior_routine_topic = _is_readiness_reply_to_precheck(payload.message, payload.history)
+    continuity_instruction = ""
+    if is_readiness_resp:
+        target_goal_lbl = "bajar masa corporal / pérdida de grasa" if requested_focus in ("perdida_grasa", "bajar_peso") else (requested_focus or "su meta de entrenamiento")
+        continuity_instruction = (
+            f"\n9. REGLA OBLIGATORIA DE CONTINUIDAD Y CUMPLIMIENTO TRAS PRE-CHEQUEO DE SALUD/ENERGÍA:\n"
+            f"   - El usuario anteriormente te pidió una rutina enfocada en: **{target_goal_lbl}**.\n"
+            f"   - Tú le preguntaste cómo se sentía hoy y cuál era su nivel de energía para comenzar.\n"
+            f"   - El usuario te acaba de responder confirmando su estado: '{payload.message}'.\n"
+            f"   - OBLIGATORIO:\n"
+            f"     1. Valida y celebra su excelente estado y energía con entusiasmo ('¡Me alegra muchísimo saber que te encuentras al 100% y con tanta energía!').\n"
+            f"     2. Conecta de inmediato su energía con la meta que te solicitó ({target_goal_lbl}).\n"
+            f"     3. ENTREGA DIRECTAMENTE EL PLAN ESTRUCTURADO personalizado para esta sesión ('has_plan': true).\n"
+            f"     4. PROHIBICIÓN ESTRICTA: ESTÁ TERMINANTEMENTE PROHIBIDO decir 'si aún no sabes qué hacer' ni dar recomendaciones genéricas de otras áreas no pedidas. Cumple con la rutina para su meta ya especificada.\n"
+        )
+
     prompt = (
         f"""Eres un Coach de Fitness, Biomecánica y Nutrición altamente interactivo, empático, científico y analítico. Responde en español con tono motivador pero riguroso.
 REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
@@ -4337,7 +4494,7 @@ REGLAS OBLIGATORIAS DE DISEÑO, BIOMECÁNICA Y PERIODIZACIÓN:
      * Si reporta Asma: Pausas ventilatorias adecuadas (60-90s) y calentamiento progresivo; hidratación constante.
      * Si reporta Diabetes: En nutrición, priorizar carbohidratos de bajo índice glucémico (avena, caraotas, batata) y evitar azúcares o exceso de plátano muy maduro.
    - FILTRO BIOMECÁNICO DE LESIONES O DOLOR ({payload.injuries or 'Ninguna'} / ZONAS A EVITAR {payload.areas_to_avoid or 'Ninguna'}):
-     * ESTÁ TERMINANTEMENTE PROHIBIDO prescribir ejercicios que comprometan o impacten las articulaciones o zonas lesionadas (ej. si reporta rodilla, CERO impacto o sentadillas con flexión aguda forzada; si reporta hombro, CERO presses tras nuca; si reporta lumbares, CERO peso muerto pesado con compresión vertebral). Prescribe variantes terapéuticas seguras.{fatigue_instruction}{motor_instruction}{equip_instruction}{injury_clinical_instruction}
+     * ESTÁ TERMINANTEMENTE PROHIBIDO prescribir ejercicios que comprometan o impacten las articulaciones o zonas lesionadas (ej. si reporta rodilla, CERO impacto o sentadillas con flexión aguda forzada; si reporta hombro, CERO presses tras nuca; si reporta lumbares, CERO peso muerto pesado con compresión vertebral). Prescribe variantes terapéuticas seguras.{fatigue_instruction}{motor_instruction}{equip_instruction}{injury_clinical_instruction}{continuity_instruction}
  
 6. REGLA DE ORIGINALIDAD, DIVERSIDAD BIOMECÁNICA Y CERO REPETICIÓN:
    - Está TERMINANTEMENTE PROHIBIDO recomendar siempre los mismos ejercicios monótonos o predecibles (no repitas siempre Sentadilla Goblet, Hip Thrust o Prensa básica).
@@ -4428,6 +4585,8 @@ Devuelve SOLO JSON."""
         focus_key = requested_focus or "semanal_completo"
         if motor_disabled:
             focus_name = "Tren Superior y Torso Sentado (Adaptado)"
+        elif focus_key in ("perdida_grasa", "bajar_peso", "bajar_masa"):
+            focus_name = "Pérdida de Grasa y Definición (Bajar Masa Corporal)"
         elif focus_key in ("pecho", "pectorales"):
             focus_name = "Pecho y Pectorales"
         elif focus_key in ("espalda", "dorsales"):
@@ -4641,12 +4800,20 @@ Devuelve SOLO JSON."""
         llm_quick_replies = None
 
     if has_plan:
-        quick_replies = [
-            "🤝 Combinar con Core / Abdomen",
-            "🤝 Combinar con Tren Superior",
-            "🤝 Combinar con Cardio Suave",
-            "📅 Añadir al Cronograma",
-        ]
+        if requested_focus in ("perdida_grasa", "bajar_peso", "bajar_masa"):
+            quick_replies = [
+                "📅 Añadir al Cronograma",
+                "💧 Pautas de déficit e hidratación",
+                "🔥 Aumentar a Alta Intensidad",
+                "🥗 Nutrición en recomposición corporal",
+            ]
+        else:
+            quick_replies = [
+                "🤝 Combinar con Core / Abdomen",
+                "🤝 Combinar con Tren Superior",
+                "🤝 Combinar con Cardio Suave",
+                "📅 Añadir al Cronograma",
+            ]
     elif fatigue_detected:
         quick_replies = [
             "Ver rutina con intensidad ajustada",
