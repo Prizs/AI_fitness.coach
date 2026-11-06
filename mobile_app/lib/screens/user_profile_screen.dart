@@ -1,3 +1,4 @@
+import 'package:mobile_app/widgets/app_update.dart';
 import 'package:mobile_app/widgets/performance_report_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -684,6 +685,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              const AppUpdatePanel(),
               const SizedBox(height: 24),
               Center(
                 child: GestureDetector(
@@ -694,7 +697,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     child: Column(
                       children: [
                         Text(
-                          'AI Fitness Coach v1.0.58+59',
+                          'AI Fitness Coach v1.0.77 (Oficial)',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.3),
                             fontSize: 11,
