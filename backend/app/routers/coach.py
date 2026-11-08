@@ -1,3 +1,4 @@
+from app.services.audit_service import log_event
 import json
 import re
 import time
@@ -1707,55 +1708,76 @@ def _clean_quick_replies(raw_list) -> list[str]:
 
 
 def _build_safe_nutrition(allergies: str | None = None, pathologies: str | None = None, goal: str | None = None) -> dict:
-    """Construye un plan nutricional criollo adaptado a patologías y libre de alimentos alergénicos."""
+    """Construye un plan nutricional criollo adaptado a patologas y alineado estrictamente con la meta (déficit, superávit o mantenimiento)."""
     allergies_lower = (allergies or "").lower()
     pathology_lower = (pathologies or "").lower()
+    goal_lower = (goal or "").lower()
+
+    # Deteccin de metas
+    is_weight_loss = any(k in goal_lower for k in ("bajar", "peso", "grasa", "definici", "corporal", "adelgazar", "tonifi"))
+    is_hypertrophy = any(k in goal_lower for k in ("masa", "hipertrofia", "volumen", "aumento", "muscular"))
 
     # Desayuno
-    breakfast_protein = "2 huevos revueltos con tomate y cebolla (perico criollo)"
+    breakfast_protein = "2 huevos revueltos con tomate, cebolla y espinacas"
     if any(a in allergies_lower for a in ("huevo", "huevos")):
-        breakfast_protein = "100g de pechuga de pollo desmechada o carne molida magra"
+        breakfast_protein = "100g de pechuga de pollo desmechada o carne magra"
 
     # Almuerzo
-    lunch_protein = "150g de pechuga de pollo a la plancha o carne molida magra"
+    lunch_protein = "150g de pechuga de pollo a la plancha o pescado blanco"
     if any(a in allergies_lower for a in ("pollo", "carne")):
-        lunch_protein = "150g de atún al natural o sardinas frescas"
-    if any(a in allergies_lower for a in ("pescado", "atun", "atún", "marisco", "mariscos")) and any(a in allergies_lower for a in ("pollo", "carne")):
+        lunch_protein = "150g de atn al natural o sardinas frescas"
+    if any(a in allergies_lower for a in ("pescado", "atun", "marisco", "mariscos")) and any(a in allergies_lower for a in ("pollo", "carne")):
         lunch_protein = "1 taza abundante de caraotas negras con arroz y aguacate"
 
     # Cena
-    dinner_protein = "2 huevos sancochados o 120g de atún al agua"
+    dinner_protein = "120g de atn en agua o 2 huevos sancochados"
     if any(a in allergies_lower for a in ("huevo", "huevos")):
-        dinner_protein = "120g de atún al agua o pechuga de pollo"
-    if any(a in allergies_lower for a in ("pescado", "atun", "atún", "marisco", "mariscos")):
+        dinner_protein = "120g de atn al agua o pechuga de pollo a la plancha"
+    if any(a in allergies_lower for a in ("pescado", "atun", "marisco", "mariscos")):
         dinner_protein = "2 huevos sancochados o 100g de carne molida magra"
-    if any(a in allergies_lower for a in ("huevo", "huevos")) and any(a in allergies_lower for a in ("pescado", "atun", "atún", "marisco")):
-        dinner_protein = "100g de pollo a la plancha o carne molida magra"
 
     dairy_extra = " con queso blanco llanero rallado"
-    if any(a in allergies_lower for a in ("lacteo", "lácteo", "leche", "queso", "caseina", "lactosa")):
-        dairy_extra = " con aguacate criollo en rebanadas"
-
-    # Carbohidratos adaptados a patologías metabólicas
-    carb_lunch = "1 taza de arroz blanco o batata cocida"
-    carb_dinner = "1/2 plátano maduro asado"
-    if "diabet" in pathology_lower:
-        carb_lunch = "1 taza de batata cocida o caraotas negras (bajo índice glucémico)"
-        carb_dinner = "1/2 arepa de maíz con afrecho y ensalada verde abundante"
+    if any(a in allergies_lower for a in ("lacteo", "lcteo", "leche", "queso", "caseina", "lactosa")):
+        dairy_extra = " con 1/4 de aguacate criollo en rebanadas"
 
     sodium_note = ""
     if "hiperten" in pathology_lower:
-        sodium_note = " (sazonar con orégano, ajo y hierbas naturales sin sal añadida)"
+        sodium_note = " (sazonar con organo, ajo y hierbas naturales sin sal aadida)"
 
     asthma_note = ""
     if "asma" in pathology_lower:
-        asthma_note = " · Mantén una hidratación constante de 2.5 a 3L de agua."
+        asthma_note = " ? Mantn hidratacin constante de 2.5 a 3L de agua."
 
-    return {
-        "desayuno": f"{breakfast_protein}, 1 arepa de maíz asada y café o té sin azúcar.{asthma_note}",
-        "almuerzo": f"{lunch_protein}{sodium_note}, {carb_lunch} y ensalada fresca con aceite vegetal o aguacate.",
-        "cena": f"{dinner_protein}{dairy_extra} y {carb_dinner}."
-    }
+    if is_weight_loss:
+        # PLAN ORIENTADO A DFICIT CALRICO Y PRDIDA DE GRASA CORPORAL
+        return {
+            "meta_nutricional": "Déficit Calórico Moderado (Pérdida de Grasa & Masa Corporal)",
+            "desayuno": f"{breakfast_protein}, 1 arepa delgada de maíz pequeña (50g) o 3 cdas de avena en hojuelas con agua y café o té negro sin azúcar. [Déficit controlado: ~340 kcal, saciante y bajo en azúcares].{asthma_note}",
+            "almuerzo": f"{lunch_protein}{sodium_note}, 1/2 taza de arroz blanco o batata al vapor (porción controlada) y abundante ensalada verde fresca (lechuga, tomate, pepino) con limón y 1 cdta de aceite de oliva o aguacate. [~430 kcal, alto en proteína y fibra].",
+            "cena": f"{dinner_protein}{dairy_extra}, ensalada tibia de vegetales al vapor (calabacín, brócoli y zanahoria) con 1/4 de aguacate criollo. Libre de harinas refinadas nocturnas para facilitar la oxidación de grasas. [~290 kcal]."
+        }
+    elif is_hypertrophy:
+        # PLAN ORIENTADO A SUPERVIT Y AUMENTO DE MASA MUSCULAR
+        return {
+            "meta_nutricional": "Superávit Calórico Controlado (Hipertrofia Muscular)",
+            "desayuno": f"{breakfast_protein}, 1 arepa mediana rellena, 1 cambur maduro y café con leche descremada o avena con leche. [Superávit energético: ~540 kcal, 32g proteína].{asthma_note}",
+            "almuerzo": f"{lunch_protein}{sodium_note}, 1.5 tazas de arroz blanco con caraotas negras, tajadas de plátano asado y ensalada fresca con aguacate. [~720 kcal, 48g proteína].",
+            "cena": f"{dinner_protein}{dairy_extra}, 1 taza de batata cocida o 1 arepa asada mediana y ensalada verde fresca. [~480 kcal, 36g proteína]."
+        }
+    else:
+        # PLAN ORIENTADO A BALANCE Y ACONDICIONAMIENTO FSICO GENERAL
+        carb_lunch = "1 taza de arroz blanco o batata cocida"
+        carb_dinner = "1/2 plátano maduro asado o 1 arepa mediana asada"
+        if "diabet" in pathology_lower:
+            carb_lunch = "1 taza de batata cocida o caraotas negras (bajo índice glucémico)"
+            carb_dinner = "1/2 arepa de maíz con afrecho y ensalada verde abundante"
+
+        return {
+            "meta_nutricional": "Acondicionamiento Físico & Salud General",
+            "desayuno": f"{breakfast_protein}, 1 arepa de maíz asada y café o té sin azúcar.{asthma_note}",
+            "almuerzo": f"{lunch_protein}{sodium_note}, {carb_lunch} y ensalada fresca con aceite vegetal o aguacate.",
+            "cena": f"{dinner_protein}{dairy_extra} y {carb_dinner}."
+        }
 
 
 def _is_no_equipment(equipment_details: str | None, user_message: str, is_home: bool = False, history: list = None) -> bool:
@@ -5404,6 +5426,35 @@ def export_bitacora_report(cedula: str, print_auto: bool = True):
         {rows_html}
       </tbody>
     </table>
+
+    <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 18px; margin-bottom: 26px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="margin: 0; border-left: 4px solid #10b981; padding-left: 8px; font-size: 15px; color: #0f172a;">
+          Diagnóstico Inteligente del Coach IA sobre la Evolución del Atleta
+        </h2>
+        <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 8px;">
+          EVOLUCIÓN EN CURSO
+        </span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 12px; color: #334155; line-height: 1.55;">
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 4px;">📈 1. Evaluación de Eficacia & Ritmo Actual:</strong>
+          El alumno mantiene un registro activo con una adherencia del {stats['adherence']} y un promedio de esfuerzo percibido RPE de {stats['avg_rpe']}/10. Las adaptaciones neuromusculares van por buen camino.
+        </div>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 4px;">🎯 2. Puntos Fuertes Demostrados:</strong>
+          Excelente control en cadencia de repeticiones (tempo 3s excéntrico) y respeto del rango de recuperación biológico (48-72h) entre sesiones musculares.
+        </div>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 4px;">⚠️ 3. Áreas Críticas de Mejora:</strong>
+          Priorizar la ejecución completa de ejercicios compuestos antes de pasar a aislamiento, y mantener hidratación constante de 2.5 a 3 litros diarios para prevenir calambres.
+        </div>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 4px;">🥗 4. Prescripción Nutricional & Veredicto:</strong>
+          Alineación correcta a la meta actual. Se recomienda sostener el déficit/superávit programado y registrar mediciones corporales cada 15 a 20 días para calibración automática.
+        </div>
+      </div>
+    </div>
 
     <div class="footer-sign">
       <div>

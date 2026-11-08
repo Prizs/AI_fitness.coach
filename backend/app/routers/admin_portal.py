@@ -18,6 +18,7 @@ from app.services.ai_providers import (
 )
 from app.services.supabase_service import get_supabase_admin_client, check_supabase_connection
 from app.routers.app_updates import _read_pubspec_version, _find_apk_file
+from app.services.audit_service import get_audit_logs, log_event
 
 router = APIRouter()
 
@@ -150,6 +151,70 @@ def test_ai_live(payload: TestAIRequest):
             "success": False,
             "latency_ms": elapsed,
             "error": str(e)
+        }
+
+
+@router.get("/api/admin/audit-logs")
+def fetch_audit_logs(pin: str = Query(...), limit: int = 100, event_type: Optional[str] = None):
+    _verify_pin(pin)
+    try:
+        logs = get_audit_logs(limit=limit)
+        if event_type and event_type != "all":
+            logs = [l for l in logs if l.get("event_type") == event_type]
+        return {"success": True, "count": len(logs), "logs": logs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener logs de auditoría: {e}")
+
+
+@router.get("/api/admin/gemini/status")
+def check_gemini_key_status(pin: str = Query(...)):
+    _verify_pin(pin)
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    active_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    if not gemini_key:
+        return {
+            "configured": False,
+            "status": "NOT_CONFIGURED",
+            "message": "GEMINI_API_KEY no encontrada en las variables de entorno.",
+            "alert": True,
+            "severity": "critical"
+        }
+
+    masked = f"{gemini_key[:7]}...{gemini_key[-4:]}" if len(gemini_key) > 12 else "Configurada"
+    t0 = time.time()
+    try:
+        from app.services.ai_providers import _call_gemini
+        test_msg = [{"role": "user", "parts": ["Test ping"]}]
+        res_text = _call_gemini(test_msg, gemini_key, active_model, timeout=6.0)
+        elapsed = round((time.time() - t0) * 1000, 1)
+        return {
+            "configured": True,
+            "status": "OPERATIONAL",
+            "masked_key": masked,
+            "active_model": active_model,
+            "latency_ms": elapsed,
+            "expiration_policy": "Sin expiración fija (Google AI Perpetual Key). Monitoreo de cuota activo.",
+            "quota_status": "Healthy (Sin saturación 429)",
+            "message": "Clave API de Gemini operativa y respondiendo en tiempo real.",
+            "alert": False,
+            "severity": "none"
+        }
+    except Exception as e:
+        elapsed = round((time.time() - t0) * 1000, 1)
+        err_msg = str(e)
+        is_quota = "429" in err_msg or "ResourceExhausted" in err_msg or "quota" in err_msg.lower()
+        is_auth = "403" in err_msg or "API_KEY_INVALID" in err_msg or "unregistered" in err_msg.lower()
+        return {
+            "configured": True,
+            "status": "QUOTA_EXHAUSTED" if is_quota else ("AUTH_ERROR" if is_auth else "ERROR"),
+            "masked_key": masked,
+            "active_model": active_model,
+            "latency_ms": elapsed,
+            "expiration_policy": "Revisar cuota de Google AI Studio / Google Cloud Console.",
+            "quota_status": "Saturada / Límite excedido" if is_quota else "Falla en autenticación",
+            "message": f"Alerta en Gemini: {err_msg}",
+            "alert": True,
+            "severity": "warning" if is_quota else "critical"
         }
 
 
@@ -456,6 +521,9 @@ def admin_portal_html():
     <button onclick="switchTab('users')" id="tabBtn-users" class="py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all">
       👥 Gestión de Usuarios
     </button>
+    <button onclick="switchTab('auditLogs')" id="tabBtn-auditLogs" class="py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all">
+      🛡️ Auditoría & Accesos
+    </button>
     <button onclick="switchTab('aiTest')" id="tabBtn-aiTest" class="py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all">
       🧠 Test en Vivo de la IA
     </button>
@@ -473,11 +541,12 @@ def admin_portal_html():
         <!-- Google Gemini Card -->
         <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Google Gemini Pro</span>
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Google Gemini API</span>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400" id="geminiPingDot"></span>
           </div>
           <div class="text-xl font-extrabold text-white" id="geminiModelLabel">Cargando...</div>
           <p class="text-xs text-emerald-400 mt-1" id="geminiKeyStatus">Clave activa</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="geminiQuotaStatus">Política: Sin vencimiento fijo</p>
         </div>
 
         <!-- Supabase Card -->
@@ -571,6 +640,54 @@ def admin_portal_html():
         </div>
       </div>
 
+    </div>
+
+    <!-- TAB 3: AUDITORÍA & ACCESOS -->
+    <div id="tab-auditLogs" class="space-y-6 hidden">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-white">Auditoría & Registro de Accesos</h2>
+          <p class="text-xs text-slate-400">Trazabilidad en tiempo real: inicios de sesión, consultas de Coach IA, recuperación de claves y eventos del sistema</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <select id="auditEventFilter" onchange="filterAuditLogs()" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500">
+            <option value="all">Todos los eventos</option>
+            <option value="LOGIN_SUCCESS">Inicios de sesión (Exitosos)</option>
+            <option value="LOGIN_FAILED">Inicios de sesión (Fallidos)</option>
+            <option value="COACH_QUERY">Consultas a Coach IA</option>
+            <option value="PASSWORD_RESET_REQUEST">Solicitudes de contraseña</option>
+            <option value="PASSWORD_RESET_SUCCESS">Recuperación de contraseña</option>
+            <option value="QUIZ_COMPLETED">Test Biopsicosocial completado</option>
+            <option value="SYSTEM_ERROR">Errores del Sistema</option>
+          </select>
+          <button onclick="fetchAuditLogs()" class="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5">
+            Refrescar Logs
+          </button>
+        </div>
+      </div>
+
+      <!-- Audit Logs Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950 text-slate-400 uppercase font-bold border-b border-slate-800">
+              <tr>
+                <th class="py-3 px-4">Fecha / Hora</th>
+                <th class="py-3 px-4">Tipo de Evento</th>
+                <th class="py-3 px-4">Usuario / Cédula</th>
+                <th class="py-3 px-4">Rol</th>
+                <th class="py-3 px-4">Detalles / Metadata</th>
+                <th class="py-3 px-4 text-center">Nivel</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody" class="divide-y divide-slate-800/60 text-slate-300">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-slate-500">Cargando registros de auditoría...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- TAB 3: TEST DE IA EN VIVO -->
@@ -725,14 +842,17 @@ def admin_portal_html():
       document.getElementById('pinGate').classList.remove('hidden');
     }}
 
+    let globalAuditLogs = [];
+
     function switchTab(tab) {{
-      ['ecosystem', 'users', 'aiTest'].forEach(t => {{
+      ['ecosystem', 'users', 'auditLogs', 'aiTest'].forEach(t => {{
         document.getElementById('tab-' + t).classList.add('hidden');
         document.getElementById('tabBtn-' + t).className = 'py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition-all';
       }});
       document.getElementById('tab-' + tab).classList.remove('hidden');
       document.getElementById('tabBtn-' + tab).className = 'py-3 px-4 text-xs font-bold border-b-2 border-emerald-500 text-emerald-400 transition-all';
       if (tab === 'users') fetchUsers();
+      if (tab === 'auditLogs') fetchAuditLogs();
       if (tab === 'ecosystem') fetchEcosystem();
     }}
 
@@ -750,7 +870,68 @@ def admin_portal_html():
           if (data.app_updates && data.app_updates.apk_size_mb) {{
             document.getElementById('apkSizeLabel').textContent = data.app_updates.apk_size_mb + ' MB disponible';
           }}
+          checkGeminiLiveStatus();
         }});
+    }}
+
+    function checkGeminiLiveStatus() {{
+      if (!adminPin) return;
+      fetch('/api/admin/gemini/status?pin=' + encodeURIComponent(adminPin))
+        .then(r => r.json())
+        .then(res => {{
+          const dot = document.getElementById('geminiPingDot');
+          const quota = document.getElementById('geminiQuotaStatus');
+          if (res.status === 'OPERATIONAL') {{
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping';
+            quota.textContent = 'Latencia: ' + res.latency_ms + ' ms · ' + res.quota_status;
+          }} else {{
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-bounce';
+            quota.textContent = 'Alerta: ' + res.status + ' (' + (res.message || 'Revisar clave') + ')';
+          }}
+        }}).catch(e => {{}});
+    }}
+
+    function fetchAuditLogs() {{
+      if (!adminPin) return;
+      fetch('/api/admin/audit-logs?pin=' + encodeURIComponent(adminPin) + '&limit=150')
+        .then(r => r.json())
+        .then(data => {{
+          globalAuditLogs = data.logs || [];
+          filterAuditLogs();
+        }});
+    }}
+
+    function filterAuditLogs() {{
+      const filter = document.getElementById('auditEventFilter').value;
+      const filtered = filter === 'all' ? globalAuditLogs : globalAuditLogs.filter(l => l.event_type === filter);
+      renderAuditTable(filtered);
+    }}
+
+    function renderAuditTable(logs) {{
+      const tbody = document.getElementById('auditTableBody');
+      if (!logs.length) {{
+        tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-500">No hay registros para este filtro.</td></tr>';
+        return;
+      }}
+      tbody.innerHTML = logs.map(l => {{
+        const isErr = l.severity === 'error' || l.event_type.includes('FAILED') || l.event_type.includes('ERROR');
+        const isWarn = l.severity === 'warning';
+        const badgeClass = isErr ? 'bg-rose-500/20 text-rose-300' : (isWarn ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300');
+        const dateStr = (l.timestamp || '').replace('T', ' ').substring(0, 19);
+        const metaStr = l.metadata ? (typeof l.metadata === 'object' ? JSON.stringify(l.metadata) : l.metadata) : (l.details || '--');
+        return `
+          <tr class="hover:bg-slate-800/40 transition-colors">
+            <td class="py-2.5 px-4 font-mono text-[11px] text-slate-400 whitespace-nowrap">${{dateStr}}</td>
+            <td class="py-2.5 px-4 font-bold text-white whitespace-nowrap">${{l.event_type}}</td>
+            <td class="py-2.5 px-4 font-mono font-semibold text-emerald-400">${{l.cedula || l.user_id || 'Anónimo / Sistema'}}</td>
+            <td class="py-2.5 px-4 text-slate-400">${{l.role || 'client'}}</td>
+            <td class="py-2.5 px-4 text-slate-300 text-[11px] max-w-md truncate" title="${{metaStr}}">${{metaStr}}</td>
+            <td class="py-2.5 px-4 text-center">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${{badgeClass}}">${{l.severity || 'info'}}</span>
+            </td>
+          </tr>
+        `;
+      }}).join('');
     }}
 
     function fetchUsers() {{

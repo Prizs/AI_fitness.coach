@@ -1,3 +1,4 @@
+from app.services.audit_service import log_event
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -46,17 +47,34 @@ def _session_response(auth_response, profile: dict | None = None) -> dict:
     session = getattr(auth_response, "session", None)
     user = auth_response.user
     meta = getattr(user, "user_metadata", {}) or {}
+    profile_dict = profile or {}
+    
+    resolved_archetype = meta.get("archetype") or profile_dict.get("archetype")
+    resolved_archetype_data = meta.get("archetype_data") or profile_dict.get("archetype_data")
+    u_cedula = meta.get("cedula") or profile_dict.get("cedula")
+    
+    # Bǧsqueda de seguridad en usuarios si no estǭ en meta
+    if not resolved_archetype and u_cedula:
+        try:
+            admin_client = get_supabase_admin_client()
+            res_db = admin_client.table("usuarios").select("archetype").eq("cedula", str(u_cedula).strip()).execute()
+            if res_db.data and res_db.data[0].get("archetype"):
+                resolved_archetype = res_db.data[0]["archetype"]
+        except Exception:
+            pass
+
     return {
         "access_token": session.access_token if session else None,
         "refresh_token": session.refresh_token if session else None,
         "requires_confirmation": session is None,
         "user": {
             "id": user.id,
-            "cedula": meta.get("cedula"),
-            "archetype": meta.get("archetype"),
-            "archetype_data": meta.get("archetype_data"),
-            "active_plan": meta.get("active_plan"),
-            **(profile or {}),
+            "cedula": u_cedula,
+            "archetype": resolved_archetype,
+            "archetype_data": resolved_archetype_data,
+            "has_completed_quiz": bool(resolved_archetype and len(str(resolved_archetype).strip()) > 0),
+            "active_plan": meta.get("active_plan") or profile_dict.get("active_plan"),
+            **profile_dict,
         },
     }
 
@@ -184,16 +202,20 @@ def login(payload: LoginRequest):
             .execute()
         )
         user_data = profile_result.data or {}
-        role_str = str(user_data.get("role", "")).lower()
+                role_str = str(user_data.get("role", "")).lower()
         if "suspended" in role_str or user_data.get("is_suspended") is True:
+            log_event("LOGIN_FAILED", cedula=clean_cedula, status="suspended", detail="Intento de acceso en cuenta suspendida")
             raise HTTPException(
                 status_code=403,
                 detail="Esta cuenta ha sido temporalmente suspendida por el administrador. Contacta a soporte."
             )
+        u_name = f"{user_data.get('nombre', '')} {user_data.get('apellido', '')}".strip()
+        log_event("LOGIN_SUCCESS", cedula=clean_cedula, user_name=u_name, detail="Inicio de sesión exitoso en la app")
         return _session_response(auth_response, user_data)
     except HTTPException:
         raise
     except Exception as error:
+        log_event("LOGIN_FAILED", cedula=clean_cedula, status="error", detail=f"Credenciales inválidas: {error}")
         raise HTTPException(status_code=401, detail="Cédula o contraseña incorrectos.") from error
 
 @router.get("/reset_password/{cedula}")
@@ -268,7 +290,7 @@ def save_archetype(payload: UpdateArchetypeRequest):
                 if payload.archetype_data:
                     meta["archetype_data"] = payload.archetype_data
                 admin_client.auth.admin.update_user_by_id(u.id, {"user_metadata": meta})
-                return {"status": "ok", "archetype": payload.archetype}
+                log_event("QUIZ_COMPLETED", cedula=clean_cedula, detail=f"Test completado: {payload.archetype}"); return {"status": "ok", "archetype": payload.archetype}
         return {"status": "not_found", "message": "Usuario no encontrado"}
     except Exception as e:
         return {"status": "error", "detail": str(e)}

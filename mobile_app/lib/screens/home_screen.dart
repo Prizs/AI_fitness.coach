@@ -409,6 +409,110 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
+                )
+              else if (_archetype != null)
+                Builder(
+                  builder: (context) {
+                    final int s = planService.currentStreak;
+                    final bool isOptimal = s >= 3;
+                    final bool isActive = s >= 1;
+                    final Color mentalColor = isOptimal
+                        ? const Color(0xFF8BE0C0)
+                        : (isActive ? const Color(0xFFFFB340) : const Color(0xFF60A5FA));
+                    final String stateTitle = isOptimal
+                        ? 'Enfocado y en Racha'
+                        : (isActive ? 'Construcción Activa' : 'Pausa Estratégica (Recalibrando)');
+                    final String stateMsg = isOptimal
+                        ? 'Tu disciplina física y neural está en su punto más alto. ¡El hábito está consolidado!'
+                        : (isActive
+                            ? 'Avanzando paso a paso con constancia. Mantén el ritmo de entrenamiento.'
+                            : 'Tranquilo, la adherencia se construye día a día. Una sesión suave hoy reactiva tu energía.');
+                    final double progressVal = isOptimal ? 0.95 : (isActive ? 0.75 : 0.55);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF142436), Color(0xFF0D1726)],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: mentalColor.withOpacity(0.35)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: mentalColor.withOpacity(0.08),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: mentalColor.withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(Icons.psychology_rounded, color: mentalColor, size: 22),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          _archetype!,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13.5),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: mentalColor.withOpacity(0.18),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: mentalColor.withOpacity(0.5), width: 0.8),
+                                          ),
+                                          child: Text(
+                                            stateTitle,
+                                            style: TextStyle(color: mentalColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      stateMsg,
+                                      style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.tune_rounded, color: Colors.white38, size: 18),
+                                tooltip: 'Ver arquetipo',
+                                onPressed: _openQuiz,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: progressVal,
+                              backgroundColor: Colors.white10,
+                              valueColor: AlwaysStoppedAnimation<Color>(mentalColor),
+                              minHeight: 5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               FutureBuilder<bool>(
                 future: DailyNotificationService.instance.isFollowupCheckinDue(DateTime.now()),

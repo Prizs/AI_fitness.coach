@@ -506,7 +506,7 @@ async def upload_progress_photo(
 def get_progress_photos(user_id: str):
     admin = get_supabase_admin_client()
     try:
-        u_id, u_cedula, _, _, _ = resolve_user_context(user_id, admin)
+        u_id, u_cedula, u_name, u_weight, u_goal = resolve_user_context(user_id, admin)
 
         photos = []
         if "-" in str(u_id) and len(str(u_id)) >= 32:
@@ -746,8 +746,12 @@ class BodyMetricReq(BaseModel):
     user_id: str  # Cédula o UUID del usuario
     weight: float
     body_fat: Optional[float] = None
+    muscle_mass: Optional[float] = None
     chest: Optional[float] = None
     waist: Optional[float] = None
+    neck: Optional[float] = None
+    hip: Optional[float] = None
+    height: Optional[float] = None
     arm: Optional[float] = None
     thigh: Optional[float] = None
     notes: Optional[str] = None
@@ -777,8 +781,12 @@ def record_body_metric(req: BodyMetricReq):
     metric_record = {
         "weight": round(float(req.weight), 2),
         "body_fat": round(float(req.body_fat), 1) if req.body_fat is not None else None,
+        "muscle_mass": round(float(req.muscle_mass), 1) if req.muscle_mass is not None else None,
         "chest": round(float(req.chest), 1) if req.chest is not None else None,
         "waist": round(float(req.waist), 1) if req.waist is not None else None,
+        "neck": round(float(req.neck), 1) if req.neck is not None else None,
+        "hip": round(float(req.hip), 1) if req.hip is not None else None,
+        "height": round(float(req.height), 1) if req.height is not None else None,
         "arm": round(float(req.arm), 1) if req.arm is not None else None,
         "thigh": round(float(req.thigh), 1) if req.thigh is not None else None,
         "notes": req.notes or "",

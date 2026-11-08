@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:mobile_app/services/auth_service.dart';
 
 class ProgressScreen extends StatefulWidget {
@@ -551,10 +552,518 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     },
                   ),
                 ),
+                const SizedBox(height: 10),
+
+                // OPCIÓN 4: Encuesta y Medición Corporal (Sin Fotos - U.S. Navy Formula)
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF162338),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.35)),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.straighten_rounded, color: Color(0xFF8BE0C0), size: 20),
+                    ),
+                    title: const Row(
+                      children: [
+                        Text('Encuesta y Cinta Métrica (Sin Fotos)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5)),
+                        SizedBox(width: 6),
+                        Text('U.S. Navy', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    subtitle: const Text('Registro periódico sin cámara. Estimación de % grasa y masa muscular magra', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    trailing: const Icon(Icons.chevron_right, color: Color(0xFF8BE0C0)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showMeasurementsSurveySheet();
+                    },
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  
+  void _showMeasurementsSurveySheet() {
+    final user = AuthService.instance.loggedInUser;
+    final bool isFemale = (user?.gender ?? '').toLowerCase().contains('fem');
+    final double defaultWeight = user?.weight ?? 75.0;
+
+    final weightCtrl = TextEditingController(text: defaultWeight.toStringAsFixed(1));
+    final heightCtrl = TextEditingController(text: '175.0');
+    final waistCtrl = TextEditingController(text: '85.0');
+    final neckCtrl = TextEditingController(text: '38.0');
+    final hipCtrl = TextEditingController(text: isFemale ? '95.0' : '');
+    final chestCtrl = TextEditingController(text: '');
+    final armCtrl = TextEditingController(text: '');
+
+    String selectedPeriod = 'Quincenal (Recomendado)';
+    bool isSavingMetric = false;
+    bool showGuide = false;
+
+    double calcBodyFat(double w, double h, double waist, double neck, double hip, bool female) {
+      try {
+        if (h <= 50 || waist <= 30 || neck <= 15) return 0.0;
+        final log10 = (num v) => math.log(v) / math.ln10;
+        if (!female) {
+          final diff = waist - neck;
+          if (diff <= 0) return 0.0;
+          final denom = 1.0324 - (0.19077 * log10(diff)) + (0.15456 * log10(h));
+          final bf = (495.0 / denom) - 450.0;
+          return bf.clamp(3.0, 55.0);
+        } else {
+          final sum = waist + hip - neck;
+          if (sum <= 0) return 0.0;
+          final denom = 1.29579 - (0.35004 * log10(sum)) + (0.22100 * log10(h));
+          final bf = (495.0 / denom) - 450.0;
+          return bf.clamp(8.0, 60.0);
+        }
+      } catch (_) {
+        return 0.0;
+      }
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F192B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final currentWeight = double.tryParse(weightCtrl.text.trim()) ?? defaultWeight;
+          final currentHeight = double.tryParse(heightCtrl.text.trim()) ?? 175.0;
+          final currentWaist = double.tryParse(waistCtrl.text.trim()) ?? 85.0;
+          final currentNeck = double.tryParse(neckCtrl.text.trim()) ?? 38.0;
+          final currentHip = double.tryParse(hipCtrl.text.trim()) ?? (isFemale ? 95.0 : 0.0);
+
+          final calculatedFat = calcBodyFat(currentWeight, currentHeight, currentWaist, currentNeck, currentHip, isFemale);
+          final calculatedLean = calculatedFat > 0 ? (currentWeight * (1.0 - (calculatedFat / 100.0))) : 0.0;
+          final calculatedFatKg = calculatedFat > 0 ? (currentWeight * (calculatedFat / 100.0)) : 0.0;
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              top: 16,
+              left: 20,
+              right: 20,
+            ),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8BE0C0).withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.straighten_rounded, color: Color(0xFF8BE0C0), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Encuesta de Medición Corporal',
+                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                'Cálculo clínico oficial de % grasa (Fórmula U.S. Navy)',
+                                style: TextStyle(color: Colors.white60, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Selector de Frecuencia
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF162338),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Frecuencia del Registro:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          DropdownButton<String>(
+                            value: selectedPeriod,
+                            dropdownColor: const Color(0xFF162338),
+                            underline: const SizedBox(),
+                            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF8BE0C0)),
+                            items: const [
+                              DropdownMenuItem(value: 'Semanal', child: Text('Semanal', style: TextStyle(color: Colors.white, fontSize: 12))),
+                              DropdownMenuItem(value: 'Quincenal (Recomendado)', child: Text('Quincenal (Recomendado)', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 12, fontWeight: FontWeight.bold))),
+                              DropdownMenuItem(value: 'Mensual', child: Text('Mensual', style: TextStyle(color: Colors.white, fontSize: 12))),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => selectedPeriod = val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Tarjeta de Cálculo En Vivo
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF162A38), Color(0xFF101E2E)]),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.insights_rounded, color: Color(0xFF8BE0C0), size: 16),
+                              SizedBox(width: 6),
+                              Text('Resultados Calculados por U.S. Navy:', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                children: [
+                                  Text(
+                                    calculatedFat > 0 ? '${calculatedFat.toStringAsFixed(1)}%' : '--%',
+                                    style: const TextStyle(color: Color(0xFFFFB340), fontSize: 20, fontWeight: FontWeight.w900),
+                                  ),
+                                  const Text('Grasa Corporal', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                                ],
+                              ),
+                              Container(width: 1, height: 32, color: Colors.white12),
+                              Column(
+                                children: [
+                                  Text(
+                                    calculatedLean > 0 ? '${calculatedLean.toStringAsFixed(1)} kg' : '-- kg',
+                                    style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 20, fontWeight: FontWeight.w900),
+                                  ),
+                                  const Text('Masa Muscular Magra', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                                ],
+                              ),
+                              Container(width: 1, height: 32, color: Colors.white12),
+                              Column(
+                                children: [
+                                  Text(
+                                    calculatedFatKg > 0 ? '${calculatedFatKg.toStringAsFixed(1)} kg' : '-- kg',
+                                    style: const TextStyle(color: Color(0xFF64D2FF), fontSize: 20, fontWeight: FontWeight.w900),
+                                  ),
+                                  const Text('Grasa en Peso', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Botón para desplegar Guía de Cómo Medirse
+                    InkWell(
+                      onTap: () => setModalState(() => showGuide = !showGuide),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF132033),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.help_outline_rounded, color: Color(0xFF38BDF8), size: 16),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text('¿Cómo tomar tus medidas correctamente? (Guía)', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11.5, fontWeight: FontWeight.w600)),
+                            ),
+                            Icon(showGuide ? Icons.expand_less : Icons.expand_more, color: const Color(0xFF38BDF8), size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (showGuide) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D1B2A),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('📏 Cuello: Mide horizontalmente justo debajo de la nuez de Adán (o parte media del cuello), con la cinta firme pero sin apretar.', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            SizedBox(height: 4),
+                            Text('📏 Cintura: En hombres al nivel del ombligo; en mujeres en la parte más estrecha del torso (relajado, sin meter el abdomen).', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            SizedBox(height: 4),
+                            Text('📏 Cadera (Mujeres): Mide en el punto de mayor circunferencia de los glúteos de pie con pies juntos.', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                            SizedBox(height: 4),
+                            Text('⚖️ Peso: Pésate en ayunas por la mañana tras ir al baño para máxima precisión.', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+
+                    // Campos de Entrada Numéricos
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: weightCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            onChanged: (_) => setModalState(() {}),
+                            decoration: InputDecoration(
+                              labelText: 'Peso (kg) *',
+                              labelStyle: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 12),
+                              prefixIcon: const Icon(Icons.monitor_weight_outlined, color: Color(0xFF8BE0C0), size: 18),
+                              filled: true,
+                              fillColor: const Color(0xFF162338),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: heightCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            onChanged: (_) => setModalState(() {}),
+                            decoration: InputDecoration(
+                              labelText: 'Altura (cm) *',
+                              labelStyle: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 12),
+                              prefixIcon: const Icon(Icons.height_rounded, color: Color(0xFF8BE0C0), size: 18),
+                              filled: true,
+                              fillColor: const Color(0xFF162338),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: waistCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            onChanged: (_) => setModalState(() {}),
+                            decoration: InputDecoration(
+                              labelText: 'Cintura (cm) *',
+                              labelStyle: const TextStyle(color: Color(0xFFFFB340), fontSize: 12),
+                              prefixIcon: const Icon(Icons.fitness_center_rounded, color: Color(0xFFFFB340), size: 18),
+                              filled: true,
+                              fillColor: const Color(0xFF162338),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: neckCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            onChanged: (_) => setModalState(() {}),
+                            decoration: InputDecoration(
+                              labelText: 'Cuello (cm) *',
+                              labelStyle: const TextStyle(color: Color(0xFF64D2FF), fontSize: 12),
+                              prefixIcon: const Icon(Icons.accessibility_rounded, color: Color(0xFF64D2FF), size: 18),
+                              filled: true,
+                              fillColor: const Color(0xFF162338),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    if (isFemale) ...[
+                      TextFormField(
+                        controller: hipCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        onChanged: (_) => setModalState(() {}),
+                        decoration: InputDecoration(
+                          labelText: 'Cadera (cm) * (requerido para mujeres)',
+                          labelStyle: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 12),
+                          prefixIcon: const Icon(Icons.female_rounded, color: Color(0xFFFF6B6B), size: 18),
+                          filled: true,
+                          fillColor: const Color(0xFF162338),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: chestCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            decoration: InputDecoration(
+                              labelText: 'Pecho (cm) (opcional)',
+                              labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                              filled: true,
+                              fillColor: const Color(0xFF162338),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: armCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            decoration: InputDecoration(
+                              labelText: 'Brazo (cm) (opcional)',
+                              labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+                              filled: true,
+                              fillColor: const Color(0xFF162338),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Botón de Enviar Encuesta
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: isSavingMetric
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                            : const Icon(Icons.check_circle_rounded, color: Color(0xFF0A0F1D)),
+                        label: Text(
+                          isSavingMetric ? 'Guardando Registro...' : 'Guardar Encuesta de Progreso',
+                          style: const TextStyle(color: Color(0xFF0A0F1D), fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8BE0C0),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: isSavingMetric ? null : () async {
+                          final w = double.tryParse(weightCtrl.text.trim()) ?? 0.0;
+                          final h = double.tryParse(heightCtrl.text.trim()) ?? 0.0;
+                          final waist = double.tryParse(waistCtrl.text.trim()) ?? 0.0;
+                          final neck = double.tryParse(neckCtrl.text.trim()) ?? 0.0;
+                          final hip = double.tryParse(hipCtrl.text.trim());
+                          final chest = double.tryParse(chestCtrl.text.trim());
+                          final arm = double.tryParse(armCtrl.text.trim());
+
+                          if (w <= 30 || h <= 50 || waist <= 30 || neck <= 15) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Por favor completa peso, altura, cintura y cuello válidos.')),
+                            );
+                            return;
+                          }
+
+                          setModalState(() => isSavingMetric = true);
+                          try {
+                            final uid = user?.cedula ?? AuthService.instance.loggedInUser?.cedula ?? '';
+                            final payload = {
+                              'user_id': uid,
+                              'weight': w,
+                              'body_fat': calculatedFat > 0 ? double.parse(calculatedFat.toStringAsFixed(1)) : null,
+                              'muscle_mass': calculatedLean > 0 ? double.parse(calculatedLean.toStringAsFixed(1)) : null,
+                              'waist': waist,
+                              'neck': neck,
+                              'hip': hip,
+                              'height': h,
+                              'chest': chest,
+                              'arm': arm,
+                              'notes': 'Encuesta periódica ($selectedPeriod) - Fórmula U.S. Navy',
+                            };
+
+                            final res = await http.post(
+                              Uri.parse('${AuthService.apiBaseUrl}/api/progress/metrics'),
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode(payload),
+                            ).timeout(const Duration(seconds: 10));
+
+                            if (res.statusCode == 200 || res.statusCode == 201) {
+// weight updated on backend
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: const Color(0xFF132B36),
+                                  content: Text(
+                                    '✅ Encuesta guardada: ${w}kg · ${calculatedFat > 0 ? "${calculatedFat.toStringAsFixed(1)}% grasa" : ""}',
+                                    style: const TextStyle(color: Color(0xFF8BE0C0), fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              );
+                              _fetchPhotos();
+                            } else {
+                              throw Exception('Servidor respondió con código ${res.statusCode}');
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error guardando encuesta: $e')),
+                            );
+                          } finally {
+                            if (mounted) setModalState(() => isSavingMetric = false);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
