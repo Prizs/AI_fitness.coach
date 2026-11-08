@@ -1183,6 +1183,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
         backgroundColor: const Color(0xFF0F192B),
         elevation: 0,
         actions: [
+          TextButton.icon(
+            onPressed: _showMeasurementsSurveySheet,
+            icon: const Icon(Icons.straighten_rounded, color: Color(0xFF8BE0C0), size: 16),
+            label: const Text('Encuesta Medidas', style: TextStyle(color: Color(0xFF8BE0C0), fontWeight: FontWeight.bold, fontSize: 11.5)),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFF8BE0C0).withOpacity(0.12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
             tooltip: 'Actualizar',
@@ -1248,7 +1259,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               )
             : const Icon(Icons.add_a_photo_rounded, size: 20),
         label: Text(
-          _isUploading ? 'Analizando con IA...' : 'Subir Foto',
+          _isUploading ? 'Analizando...' : 'Registrar Progreso',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
       ),
@@ -1669,6 +1680,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _showMeasurementsSurveySheet,
+              icon: const Icon(Icons.straighten_rounded, color: Color(0xFF8BE0C0), size: 20),
+              label: const Text('O Iniciar con Encuesta y Cinta Métrica (Sin Fotos)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF8BE0C0))),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
