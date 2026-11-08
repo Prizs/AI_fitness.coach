@@ -27,11 +27,53 @@ class _ProgressScreenState extends State<ProgressScreen> {
   List<Map<String, dynamic>> _evolutionChart = [];
   bool _isLoading = true;
   int _activeChartMetric = 0; // 0: Definición Muscular, 1: % Grasa Corporal
+  int _galleryIndex = 0;
+  final PageController _galleryPageController = PageController();
 
   @override
   void initState() {
     super.initState();
     _fetchPhotos();
+  }
+
+  @override
+  void dispose() {
+    _galleryPageController.dispose();
+    super.dispose();
+  }
+
+  List<dynamic> get _chronologicalPhotos {
+    if (_photos.isEmpty) return [];
+    final list = List<dynamic>.from(_photos);
+    list.sort((a, b) {
+      if (a is! Map || b is! Map) return 0;
+      final aBase = a['is_baseline'] == true ? 1 : 0;
+      final bBase = b['is_baseline'] == true ? 1 : 0;
+      if (aBase != bBase) return bBase.compareTo(aBase); // baseline (Día 1) primero
+      final aDate = a['created_at']?.toString() ?? '';
+      final bDate = b['created_at']?.toString() ?? '';
+      if (aDate.isNotEmpty && bDate.isNotEmpty) {
+        return aDate.compareTo(bDate);
+      }
+      final aId = a['id'] is num ? a['id'] as num : 0;
+      final bId = b['id'] is num ? b['id'] as num : 0;
+      return aId.compareTo(bId);
+    });
+    return list;
+  }
+
+  void _goToGalleryPage(int index) {
+    final list = _chronologicalPhotos;
+    if (index >= 0 && index < list.length) {
+      setState(() => _galleryIndex = index);
+      if (_galleryPageController.hasClients) {
+        _galleryPageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
   }
 
   double _safeDouble(dynamic val, [double fallback = 0.0]) {
@@ -1332,34 +1374,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         const SizedBox(height: 16),
                       ],
 
-                      // Lista de fotos
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Historial de Registros Visuales',
-                            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1FAE87).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${_photos.length} fotos',
-                              style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      ..._photos.asMap().entries.map((entry) {
-                        final idx = entry.key;
-                        final item = entry.value;
-                        return _buildPhotoCard(item, idx);
-                      }),
+                      // Galería de Evolución Cronológica (Día 1 en adelante con swipe lateral táctil)
+                      _buildPhotoEvolutionGallery(_chronologicalPhotos),
                     ],
                   ],
                 ),
@@ -1955,8 +1971,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
   // COMPARADOR ANTES / DESPUÉS (LÍNEA BASE VS ACTUALIDAD)
   // -------------------------------------------------------------
   Widget _buildBeforeAfterCard() {
-    final oldest = _photos.last;
-    final latest = _photos.first;
+    final chrono = _chronologicalPhotos;
+    final oldest = chrono.first;
+    final latest = chrono.last;
     final oldestAnalysis = _parseStructuredAnalysis(oldest);
     final latestAnalysis = _parseStructuredAnalysis(latest);
 
@@ -2297,16 +2314,415 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   // -------------------------------------------------------------
-  // TARJETA DE FOTO INDIVIDUAL CON ANÁLISIS ESTRUCTURADO
+  // GALERÍA HORIZONTAL DE EVOLUCIÓN (SWIPE DÍA 1 -> DÍA 30)
   // -------------------------------------------------------------
-  Widget _buildPhotoCard(dynamic item, int index) {
-    final analysis = _parseStructuredAnalysis(item);
-    final photoUrl = item['photo_url'] ?? '';
-    final createdAt = item['created_at'] != null ? item['created_at'].toString().substring(0, 10) : '';
+  Widget _buildPhotoEvolutionGallery(List<dynamic> photos) {
+    if (photos.isEmpty) return const SizedBox.shrink();
 
-    final stage = analysis['photo_stage'] ?? (index == _photos.length - 1 ? 'Foto Inicial (Día 1)' : 'Foto de Seguimiento');
-    final isBaseline = index == _photos.length - 1;
-    final headline = analysis['headline'] ?? 'Evaluación de condición física';
+    final safeIdx = _galleryIndex.clamp(0, photos.length - 1);
+    final activeItem = photos[safeIdx];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Encabezado de la galería con contador
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.auto_awesome_motion_rounded, color: Color(0xFF8BE0C0), size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Galería de Evolución',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1FAE87).withOpacity(0.18),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF1FAE87).withOpacity(0.4)),
+              ),
+              child: Text(
+                'Foto ${safeIdx + 1} de ${photos.length}',
+                style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Desliza horizontalmente (o usa las flechas) para recorrer cronológicamente tu transformación desde el Día 1.',
+          style: TextStyle(color: Colors.white60, fontSize: 11.5, height: 1.3),
+        ),
+        const SizedBox(height: 12),
+
+        // Chips interactivos para saltar a cualquier día/foto directamente
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: List.generate(photos.length, (i) {
+              final isSel = i == safeIdx;
+              final p = photos[i];
+              final isBase = i == 0 || (p is Map && p['is_baseline'] == true);
+              final pAnalysis = _parseStructuredAnalysis(p);
+              final rawStage = (p is Map ? p['stage'] : null) ?? pAnalysis['photo_stage'];
+              final label = isBase
+                  ? '🌱 Día 1 (Inicial)'
+                  : (rawStage != null && rawStage.toString().isNotEmpty
+                      ? rawStage.toString()
+                      : 'Foto #${i + 1}');
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InkWell(
+                  onTap: () => _goToGalleryPage(i),
+                  borderRadius: BorderRadius.circular(10),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: isSel
+                          ? (isBase ? const Color(0xFF1FAE87) : const Color(0xFF38BDF8))
+                          : const Color(0xFF162338),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSel
+                            ? Colors.transparent
+                            : (isBase
+                                ? const Color(0xFF8BE0C0).withOpacity(0.35)
+                                : const Color(0xFF38BDF8).withOpacity(0.35)),
+                        width: isSel ? 1.5 : 1,
+                      ),
+                      boxShadow: isSel
+                          ? [
+                              BoxShadow(
+                                color: (isBase ? const Color(0xFF1FAE87) : const Color(0xFF38BDF8)).withOpacity(0.35),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: isSel ? Colors.black : Colors.white70,
+                        fontSize: 12,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Carrusel visual de fotos con swipe horizontal y flechas de navegación
+        Container(
+          height: 330,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F1A2B),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Stack(
+              children: [
+                // PageView deslizable horizontalmente (Día 1 -> Final)
+                PageView.builder(
+                  controller: _galleryPageController,
+                  itemCount: photos.length,
+                  onPageChanged: (idx) {
+                    setState(() => _galleryIndex = idx);
+                  },
+                  itemBuilder: (context, idx) {
+                    final item = photos[idx];
+                    final photoUrl = item is Map ? (item['photo_url'] ?? '') : '';
+                    final createdAt = item is Map && item['created_at'] != null
+                        ? item['created_at'].toString().substring(0, 10)
+                        : '';
+                    final isBase = idx == 0 || (item is Map && item['is_baseline'] == true);
+                    final analysis = _parseStructuredAnalysis(item);
+                    final stage = (item is Map ? item['stage'] : null) ??
+                        analysis['photo_stage'] ??
+                        (isBase ? 'Fotografía Inicial (Día 1)' : 'Foto #${idx + 1}');
+
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Imagen con soporte de red y fallback de carga
+                        if (photoUrl.isNotEmpty)
+                          GestureDetector(
+                            onTap: () => _showImageZoom(photoUrl, stage),
+                            child: Image.network(
+                              photoUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFF162338),
+                                child: const Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.broken_image_rounded, color: Colors.white24, size: 48),
+                                      SizedBox(height: 8),
+                                      Text('Error cargando fotografía', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            color: const Color(0xFF162338),
+                            child: const Center(
+                              child: Icon(Icons.image_not_supported_rounded, color: Colors.white24, size: 48),
+                            ),
+                          ),
+
+                        // Gradiente superior para visibilidad de badges
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 60,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.black.withOpacity(0.75), Colors.transparent],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Gradiente inferior para controles
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: 60,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Overlay Superior Izquierdo: Etapa
+                        Positioned(
+                          top: 12,
+                          left: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isBase
+                                  ? const Color(0xFF1FAE87).withOpacity(0.9)
+                                  : const Color(0xFF0284C7).withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(isBase ? Icons.flag_rounded : Icons.trending_up_rounded, size: 13, color: Colors.white),
+                                const SizedBox(width: 5),
+                                Text(
+                                  stage,
+                                  style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Overlay Superior Derecho: Fecha
+                        if (createdAt.isNotEmpty)
+                          Positioned(
+                            top: 12,
+                            right: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.calendar_today_rounded, size: 11, color: Colors.white70),
+                                  const SizedBox(width: 4),
+                                  Text(createdAt, style: const TextStyle(color: Colors.white, fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        // Overlay Inferior Izquierdo: Guía de gesto
+                        Positioned(
+                          bottom: 12,
+                          left: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.swipe_rounded, size: 12, color: Colors.white70),
+                                SizedBox(width: 4),
+                                Text('Desliza ◄ ►', style: TextStyle(color: Colors.white70, fontSize: 10.5)),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Overlay Inferior Derecho: Botón Zoom
+                        if (photoUrl.isNotEmpty)
+                          Positioned(
+                            bottom: 12,
+                            right: 12,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () => _showImageZoom(photoUrl, stage),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.75),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.zoom_in_rounded, color: Colors.white, size: 14),
+                                      SizedBox(width: 4),
+                                      Text('Zoom', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+
+                // Flecha Izquierda de Navegación
+                if (safeIdx > 0)
+                  Positioned(
+                    left: 8,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _goToGalleryPage(safeIdx - 1),
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white30),
+                            ),
+                            child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Flecha Derecha de Navegación
+                if (safeIdx < photos.length - 1)
+                  Positioned(
+                    right: 8,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _goToGalleryPage(safeIdx + 1),
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white30),
+                            ),
+                            child: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Indicador de Paginación (Dots)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(photos.length, (i) {
+            final isSel = i == safeIdx;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: isSel ? 22 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: isSel ? const Color(0xFF8BE0C0) : Colors.white24,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 16),
+
+        // Tarjeta con TODAS las Descripciones Fisiológicas y Clínicas Correspondientes a la Foto Activa
+        _buildActivePhotoDetails(activeItem, safeIdx, photos.length),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------
+  // DESCRIPCIONES CLÍNICAS Y FISIOLÓGICAS DE LA FOTO SELECCIONADA
+  // -------------------------------------------------------------
+  Widget _buildActivePhotoDetails(dynamic item, int index, int totalPhotos) {
+    final analysis = _parseStructuredAnalysis(item);
+    final createdAt = item is Map && item['created_at'] != null
+        ? item['created_at'].toString().substring(0, 10)
+        : '';
+    final isBaseline = index == 0 || (item is Map && item['is_baseline'] == true);
+    final stage = (item is Map ? item['stage'] : null) ??
+        analysis['photo_stage'] ??
+        (isBaseline ? 'Fotografía Inicial (Día 1)' : 'Foto #${index + 1}');
+
+    final headline = analysis['headline'] ??
+        (isBaseline ? 'Fase Inicial: Baseline anatómico y punto de partida' : 'Evaluación de condición física');
     final estFat = _safeDouble(analysis['estimated_body_fat'], 22.0);
     final muscleDef = _safeDouble(analysis['muscle_definition_score'], 6.0);
     final posture = _safeDouble(analysis['posture_score'], 7.5);
@@ -2333,7 +2749,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(
-          color: isBaseline ? const Color(0xFF8BE0C0).withOpacity(0.4) : Colors.white10,
+          color: isBaseline ? const Color(0xFF8BE0C0).withOpacity(0.4) : Colors.white12,
           width: isBaseline ? 1.5 : 1,
         ),
       ),
@@ -2343,7 +2759,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Cabecera de la tarjeta: Etapa + Fecha
+            // Título de la etapa activa y fecha
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -2391,52 +2807,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ],
             ),
             const SizedBox(height: 12),
-
-            // Imagen con overlay de toque para zoom
-            if (photoUrl.isNotEmpty) ...[
-              GestureDetector(
-                onTap: () => _showImageZoom(photoUrl, stage),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        photoUrl,
-                        height: 280,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          height: 180,
-                          color: const Color(0xFF1E293B),
-                          child: const Center(
-                            child: Icon(Icons.broken_image, color: Colors.white24, size: 40),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      right: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.zoom_in_rounded, color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Text('Zoom', style: TextStyle(color: Colors.white, fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
 
             // Headline de la IA
             Container(
@@ -2517,7 +2887,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 14),
 
-            // Bloque Comparativo con Registro Anterior (si existe)
+            // Bloque Comparativo con Registro Anterior (si existe y no es baseline)
             if (comp != null && !isBaseline) ...[
               Container(
                 padding: const EdgeInsets.all(12),
@@ -2626,14 +2996,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ),
                     const SizedBox(height: 6),
                     ...positiveChanges.map(
-                      (item) => Padding(
+                      (it) => Padding(
                         padding: const EdgeInsets.only(bottom: 4),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text('• ', style: TextStyle(color: Color(0xFF8BE0C0), fontWeight: FontWeight.bold)),
                             Expanded(
-                              child: Text(item, style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.3)),
+                              child: Text(it, style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.3)),
                             ),
                           ],
                         ),
@@ -2669,14 +3039,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ),
                     const SizedBox(height: 6),
                     ...areasToImprove.map(
-                      (item) => Padding(
+                      (it) => Padding(
                         padding: const EdgeInsets.only(bottom: 4),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text('• ', style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold)),
                             Expanded(
-                              child: Text(item, style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.3)),
+                              child: Text(it, style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.3)),
                             ),
                           ],
                         ),
