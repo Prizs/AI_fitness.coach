@@ -5,6 +5,13 @@ import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:mobile_app/widgets/performance_report_modal.dart';
+import 'package:mobile_app/screens/auth/onboarding_quiz_screen.dart';
+import 'package:mobile_app/screens/adaptive_workout_screen.dart';
+import 'package:mobile_app/screens/body_metrics_screen.dart';
+import 'package:mobile_app/models/user_profile.dart';
+
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -1312,6 +1319,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     _buildCompactEvolutionCard(),
                     const SizedBox(height: 16),
 
+                    // Suite Completa de Informes & Evaluación de Progreso
+                    _buildProgressSuiteCards(),
+
                     // Empty state vs Cards
                     if (_photos.isEmpty)
                       _buildDayOneGuidanceEmptyState()
@@ -1361,6 +1371,205 @@ class _ProgressScreenState extends State<ProgressScreen> {
   // -------------------------------------------------------------
   // MINI GRÁFICO COMPACTO DE RECOMPOSICIÓN
   // -------------------------------------------------------------
+
+  Future<void> _downloadBitacoraPdf() async {
+    final user = AuthService.instance.loggedInUser;
+    final cedula = user?.cedula ?? 'default';
+    final baseUrl = AuthService.apiBaseUrl;
+    final url = '$baseUrl/api/coach/bitacora/export?cedula=$cedula&print_auto=true';
+    final uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al abrir la bitácora: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildProgressSuiteCards() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1B2C),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white10),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8BE0C0).withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.assessment_rounded, color: Color(0xFF8BE0C0), size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Informes & Evaluación de Progreso',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    Text(
+                      'Reportes de rendimiento, bitácora descargable y métricas',
+                      style: TextStyle(color: Colors.white60, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 1. Ver Reporte Detallado de Rendimiento
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF173B45),
+              foregroundColor: const Color(0xFF8BE0C0),
+              side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.assessment_rounded, size: 20),
+            label: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Ver Reporte Detallado de Rendimiento', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                Icon(Icons.arrow_forward_ios_rounded, size: 13),
+              ],
+            ),
+            onPressed: () => PerformanceReportModal.show(context),
+          ),
+          const SizedBox(height: 8),
+
+          // 2. Descargar Bitácora Oficial (PDF)
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF102820),
+              foregroundColor: const Color(0xFF8BE0C0),
+              side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.2),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.picture_as_pdf_rounded, size: 20, color: Color(0xFF8BE0C0)),
+            label: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Descargar Bitácora Oficial (PDF)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                Icon(Icons.open_in_new_rounded, size: 13),
+              ],
+            ),
+            onPressed: _downloadBitacoraPdf,
+          ),
+          const SizedBox(height: 8),
+
+          // 3. Evolución Corporal, Peso & Medidas
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F192B),
+              foregroundColor: const Color(0xFF1FAE87),
+              side: const BorderSide(color: Color(0xFF1FAE87), width: 1.2),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.show_chart_rounded, size: 20),
+            label: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Evolución Corporal, Peso & Medidas', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                Icon(Icons.arrow_forward_ios_rounded, size: 13),
+              ],
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BodyMetricsScreen()),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 4. Test Biopsicosocial & Adherencia (FitCraft)
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF142436),
+              foregroundColor: const Color(0xFF8BE0C0),
+              side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.1),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.psychology_rounded, size: 20, color: Color(0xFF8BE0C0)),
+            label: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Test Biopsicosocial & Adherencia (FitCraft)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                Icon(Icons.arrow_forward_ios_rounded, size: 13),
+              ],
+            ),
+            onPressed: () {
+              final u = AuthService.instance.loggedInUser ??
+                  UserProfile(
+                    cedula: '0000000',
+                    name: 'Usuario',
+                    lastName: '',
+                    age: 25,
+                    weight: 70,
+                  );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OnboardingQuizScreen(
+                    userProfile: u,
+                    onComplete: () {
+                      Navigator.pop(context);
+                      setState(() {});
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+
+          // 5. Test Módulo Adaptado (Torso Sentado & Inclusivo)
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF132034),
+              foregroundColor: const Color(0xFF8BE0C0),
+              side: const BorderSide(color: Color(0xFF8BE0C0), width: 1.1),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.accessible_forward_rounded, size: 20, color: Color(0xFF8BE0C0)),
+            label: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Test Módulo Adaptado (Torso Sentado)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+                Icon(Icons.arrow_forward_ios_rounded, size: 13),
+              ],
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdaptiveWorkoutScreen()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCompactEvolutionCard() {
     final hasData = _evolutionChart.length >= 2;
     final totalPoints = _evolutionChart.length;
