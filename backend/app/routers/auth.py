@@ -202,7 +202,7 @@ def login(payload: LoginRequest):
             .execute()
         )
         user_data = profile_result.data or {}
-                role_str = str(user_data.get("role", "")).lower()
+        role_str = str(user_data.get("role", "")).lower()
         if "suspended" in role_str or user_data.get("is_suspended") is True:
             log_event("LOGIN_FAILED", cedula=clean_cedula, status="suspended", detail="Intento de acceso en cuenta suspendida")
             raise HTTPException(
