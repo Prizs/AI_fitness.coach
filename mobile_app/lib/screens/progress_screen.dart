@@ -1357,26 +1357,27 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         ),
                       ),
 
-                    // Mini Gráfico Superior de Evolución
+                    // -------------------------------------------------------------
+                    // 1. PROTAGONISTA: GALERÍA DE EVOLUCIÓN CRONOLÓGICA (DÍA 1 ➔ FIN)
+                    // -------------------------------------------------------------
+                    if (_photos.isEmpty) ...[
+                      _buildDayOneGuidanceEmptyState(),
+                      const SizedBox(height: 20),
+                    ] else ...[
+                      _buildPhotoEvolutionGallery(_chronologicalPhotos),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // -------------------------------------------------------------
+                    // 2. MINI GRÁFICO DE RECOMPOSICIÓN CORPORAL
+                    // -------------------------------------------------------------
                     _buildCompactEvolutionCard(),
                     const SizedBox(height: 16),
 
-                    // Suite Completa de Informes & Evaluación de Progreso
+                    // -------------------------------------------------------------
+                    // 3. SUITE DE INFORMES, BITÁCORA PDF & EVALUACIONES (DESPLEGABLE)
+                    // -------------------------------------------------------------
                     _buildProgressSuiteCards(),
-
-                    // Empty state vs Cards
-                    if (_photos.isEmpty)
-                      _buildDayOneGuidanceEmptyState()
-                    else ...[
-                      // Comparador Antes y Ahora si hay 2 o más fotos
-                      if (_photos.length >= 2) ...[
-                        _buildBeforeAfterCard(),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Galería de Evolución Cronológica (Día 1 en adelante con swipe lateral táctil)
-                      _buildPhotoEvolutionGallery(_chronologicalPhotos),
-                    ],
                   ],
                 ),
               ),
@@ -1417,39 +1418,29 @@ class _ProgressScreenState extends State<ProgressScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white10),
       ),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF8BE0C0).withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.assessment_rounded, color: Color(0xFF8BE0C0), size: 18),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Informes & Evaluación de Progreso',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    Text(
-                      'Reportes de rendimiento, bitácora descargable y métricas',
-                      style: TextStyle(color: Colors.white60, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: const Color(0xFF8BE0C0).withOpacity(0.18),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.assessment_rounded, color: Color(0xFF8BE0C0), size: 18),
           ),
-          const SizedBox(height: 14),
+          title: const Text(
+            'Informes & Evaluación de Progreso',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+          ),
+          subtitle: const Text(
+            'Bitácora PDF, reportes y métricas avanzadas (toca para ver)',
+            style: TextStyle(color: Colors.white60, fontSize: 10.5),
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          children: [
 
           // 1. Ver Reporte Detallado de Rendimiento
           ElevatedButton.icon(
@@ -1583,8 +1574,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCompactEvolutionCard() {
     final hasData = _evolutionChart.length >= 2;
@@ -1964,352 +1956,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  // -------------------------------------------------------------
-  // COMPARADOR ANTES / DESPUÉS (LÍNEA BASE VS ACTUALIDAD)
-  // -------------------------------------------------------------
-  Widget _buildBeforeAfterCard() {
-    final chrono = _chronologicalPhotos;
-    final oldest = chrono.first;
-    final latest = chrono.last;
-    final oldestAnalysis = _parseStructuredAnalysis(oldest);
-    final latestAnalysis = _parseStructuredAnalysis(latest);
-
-    final fat1 = _safeDouble(oldestAnalysis['estimated_body_fat'], 26.0);
-    final fat2 = _safeDouble(latestAnalysis['estimated_body_fat'], 24.0);
-    final fatDelta = fat2 - fat1;
-
-    final def1 = _safeDouble(oldestAnalysis['muscle_definition_score'], 3.5);
-    final def2 = _safeDouble(latestAnalysis['muscle_definition_score'], 4.5);
-    final defDelta = def2 - def1;
-
-    final posture1 = _safeDouble(oldestAnalysis['posture_score'], 6.5);
-    final posture2 = _safeDouble(latestAnalysis['posture_score'], 7.0);
-    final postureDelta = posture2 - posture1;
-
-    final comp = latestAnalysis['comparison_with_previous'] is Map
-        ? Map<String, dynamic>.from(latestAnalysis['comparison_with_previous'])
-        : null;
-    final clinicalNotes = comp?['clinical_comparison']?.toString() ?? '';
-    final anatomicalChanges = (comp?['specific_anatomical_changes'] as List?)?.cast<String>() ?? [];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F192B),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1FAE87).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.compare_arrows_rounded, color: Color(0xFF8BE0C0), size: 18),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Comparativa de Recomposición (Línea Base vs Actual)',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF162338),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '${_photos.length} Jornadas',
-                  style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Fotos lado a lado
-          Row(
-            children: [
-              // Foto Inicial
-              Expanded(
-                child: Column(
-                  children: [
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: GestureDetector(
-                            onTap: () => _showImageZoom(oldest['photo_url'] ?? '', 'Línea Base · Día 1'),
-                            child: Image.network(
-                              oldest['photo_url'] ?? '',
-                              height: 140,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                height: 140,
-                                color: const Color(0xFF1E293B),
-                                child: const Icon(Icons.image, color: Colors.white24),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 6,
-                          left: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.75),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text('Línea Base (Día 1)', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 6,
-                          right: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.zoom_in, color: Colors.white, size: 12),
-                                SizedBox(width: 2),
-                                Text('Zoom', style: TextStyle(color: Colors.white, fontSize: 9.5)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${fat1.toStringAsFixed(1)}% Grasa · ${def1.toStringAsFixed(1)} Def',
-                      style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Foto Actual
-              Expanded(
-                child: Column(
-                  children: [
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: GestureDetector(
-                            onTap: () => _showImageZoom(latest['photo_url'] ?? '', 'Jornada Actual'),
-                            child: Image.network(
-                              latest['photo_url'] ?? '',
-                              height: 140,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                height: 140,
-                                color: const Color(0xFF1E293B),
-                                child: const Icon(Icons.image, color: Colors.white24),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 6,
-                          left: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1FAE87),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text('Jornada Actual', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 6,
-                          right: 6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.zoom_in, color: Colors.white, size: 12),
-                                SizedBox(width: 2),
-                                Text('Zoom', style: TextStyle(color: Colors.white, fontSize: 9.5)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${fat2.toStringAsFixed(1)}% Grasa · ${def2.toStringAsFixed(1)} Def',
-                      style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Scoreboard de variación métrica
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF162338),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildScoreboardItem(
-                  label: '% Grasa Corporal',
-                  fromVal: '${fat1.toStringAsFixed(1)}%',
-                  toVal: '${fat2.toStringAsFixed(1)}%',
-                  delta: '${fatDelta <= 0 ? "" : "+"}${fatDelta.toStringAsFixed(1)}%',
-                  isPositive: fatDelta <= 0,
-                  icon: Icons.pie_chart_rounded,
-                ),
-                Container(width: 1, height: 35, color: Colors.white12),
-                _buildScoreboardItem(
-                  label: 'Definición Muscular',
-                  fromVal: def1.toStringAsFixed(1),
-                  toVal: def2.toStringAsFixed(1),
-                  delta: '${defDelta >= 0 ? "+" : ""}${defDelta.toStringAsFixed(1)} pts',
-                  isPositive: defDelta >= 0,
-                  icon: Icons.bolt_rounded,
-                ),
-                Container(width: 1, height: 35, color: Colors.white12),
-                _buildScoreboardItem(
-                  label: 'Postura & Simetría',
-                  fromVal: posture1.toStringAsFixed(1),
-                  toVal: posture2.toStringAsFixed(1),
-                  delta: '${postureDelta >= 0 ? "+" : ""}${postureDelta.toStringAsFixed(1)} pts',
-                  isPositive: postureDelta >= 0,
-                  icon: Icons.accessibility_rounded,
-                ),
-              ],
-            ),
-          ),
-
-          if (clinicalNotes.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF132238),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.biotech_rounded, color: Color(0xFF38BDF8), size: 16),
-                      SizedBox(width: 6),
-                      Text(
-                        'Evaluación Anatómica Contrastada (IA Vision):',
-                        style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 11.5),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(clinicalNotes, style: const TextStyle(color: Colors.white, fontSize: 11.5, height: 1.35)),
-                  if (anatomicalChanges.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: anatomicalChanges.map((change) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0D2E24),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF1FAE87).withOpacity(0.4)),
-                        ),
-                        child: Text('✓ $change', style: const TextStyle(color: Color(0xFF8BE0C0), fontSize: 10.5, fontWeight: FontWeight.w600)),
-                      )).toList(),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScoreboardItem({
-    required String label,
-    required String fromVal,
-    required String toVal,
-    required String delta,
-    required bool isPositive,
-    required IconData icon,
-  }) {
-    return Column(
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: Colors.white54),
-            const SizedBox(width: 4),
-            Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9.5)),
-          ],
-        ),
-        const SizedBox(height: 3),
-        Text(
-          '$fromVal ➔ $toVal',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11),
-        ),
-        const SizedBox(height: 2),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-          decoration: BoxDecoration(
-            color: (isPositive ? const Color(0xFF1FAE87) : Colors.orangeAccent).withOpacity(0.2),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            delta,
-            style: TextStyle(
-              color: isPositive ? const Color(0xFF8BE0C0) : Colors.orangeAccent,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
     );
   }
 
