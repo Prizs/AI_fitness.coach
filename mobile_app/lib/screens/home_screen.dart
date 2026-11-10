@@ -6,6 +6,7 @@ import 'package:mobile_app/screens/auth/onboarding_quiz_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
 import 'package:mobile_app/services/daily_notification_service.dart';
 import 'package:mobile_app/widgets/fatigue_checkin_dialog.dart';
+import 'package:mobile_app/widgets/app_update.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_app/screens/anatomy_workout_screen.dart';
 import 'package:mobile_app/screens/user_profile_screen.dart';
@@ -276,6 +277,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 builder: (_) => const AnatomyWorkoutScreen(),
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.system_update_rounded,
+              color: Color(0xFF8BE0C0),
+              size: 26,
+            ),
+            tooltip: 'Actualizar App (APK Oficial)',
+            onPressed: () => checkForAppUpdate(context, force: true),
           ),
           IconButton(
             icon: const Icon(

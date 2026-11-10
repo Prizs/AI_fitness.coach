@@ -20,8 +20,8 @@ def _read_pubspec_version() -> tuple[str, int]:
                 if "+" in raw_ver:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
-                return raw_ver, 106
-    return "1.0.76", 116
+                return raw_ver, 117
+    return "1.0.77", 117
 
 def _find_apk_file() -> Path | None:
     candidates = [
@@ -49,10 +49,11 @@ def latest_version() -> dict:
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            f"Actualización oficial de AI Fitness Coach v{ver_name}:\n"
-            "1. Corrección visual en respuestas rápidas del Coach IA: eliminación del formato de diccionario crudo {content_type: text, title: ...}.\n"
-            "2. Validación estricta en registro: cédula y edad numéricas, nombres y apellidos solo alfabéticos, contraseñas con caracteres especiales.\n"
-            "3. Filtro Clínico & Seguridad en segundo plano: personalización automática de planes de nutrición y ejercicio según patologías (asma, hipertensión, diabetes) y alergias alimentarias."
+            f"AI Fitness Coach v{ver_name} (Compilación Oficial):\n"
+            "• Nueva Galería Horizontal de Evolución Corporal: Desplazamiento táctil (swipe) cronológico desde el Día 1 con comparativa visual inmediata.\n"
+            "• Ficha Clínica & Fisiológica IA Dinámica: Actualización en vivo de KPIs (definición, grasa estimada, postura), biotipo y recomendaciones anatómicas bajo cada foto.\n"
+            "• Suite de Bitácora Oficial (PDF) & Rendimiento: Exportación directa y test biomecánicos adaptados.\n"
+            "• Actualización y Descarga Instantánea: Nuevo centro de sincronización directa desde el Perfil y Pantalla Principal."
         ),
         "download_url": "/api/app/download",
     }

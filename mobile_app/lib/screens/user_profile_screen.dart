@@ -261,6 +261,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.system_update_rounded, color: Color(0xFF8BE0C0)),
+            tooltip: 'Actualizar App (APK Oficial)',
+            onPressed: () => checkForAppUpdate(context, force: true),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout, color: Colors.redAccent),
             tooltip: 'Cerrar sesión',
             onPressed: () {
@@ -317,6 +322,51 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 14),
+
+              // Banner Destacado de Actualización Directa
+              InkWell(
+                onTap: () => checkForAppUpdate(context, force: true),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1FAE87).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF8BE0C0).withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.download_for_offline_rounded, color: Color(0xFF8BE0C0), size: 22),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Actualización Oficial v1.0.77 Lista',
+                              style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              'Nueva galería de fotos Día 1 y mejoras de IA',
+                              style: TextStyle(color: Colors.white60, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1FAE87),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text('Actualizar', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11.5)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 16),
 
               // Tarjeta de Racha de Entrenamiento (Streak) - Incentivo Atlético
