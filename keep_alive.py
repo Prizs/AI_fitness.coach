@@ -2,7 +2,7 @@
 import urllib.request
 from datetime import datetime
 
-URL = 'https://ai-fitness-coach-818a.onrender.com/docs'
+URL = 'https://ai-fitness-coach-wlg3.onrender.com/docs'
 
 while True:
     try:

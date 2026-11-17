@@ -15,7 +15,7 @@ class AuthService {
   /// Valor incluido al compilar con `--dart-define=API_BASE_URL=...`.
   static const String compiledApiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://ai-fitness-coach-818a.onrender.com',
+    defaultValue: 'https://ai-fitness-coach-wlg3.onrender.com',
   );
 
   static const String _serverKey = 'api_base_url';
@@ -178,7 +178,7 @@ class AuthService {
     // 2. Si falla, intentar automaticamente con el servidor alterno (Local o Render)
     if (response == null || response.statusCode == 502 || response.statusCode == 503) {
       final alternateUrl = apiBaseUrl.contains('localhost') || apiBaseUrl.contains('127.0.0.1')
-          ? 'https://ai-fitness-coach-818a.onrender.com'
+          ? 'https://ai-fitness-coach-wlg3.onrender.com'
           : 'http://localhost:8000';
       try {
         final altResponse = await http.post(

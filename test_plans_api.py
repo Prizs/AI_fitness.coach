@@ -3,7 +3,7 @@
 try:
     print("Sending request to backend...")
     resp = requests.post(
-        "https://ai-fitness-coach-818a.onrender.com/api/plans/weekly",
+        "https://ai-fitness-coach-wlg3.onrender.com/api/plans/weekly",
         json={
           'goal': 'mejorar condicion fisica',
           'level': 'principiante',
