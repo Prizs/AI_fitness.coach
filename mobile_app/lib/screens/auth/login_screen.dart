@@ -232,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 label: const Text('☁️ Nube Render', style: TextStyle(fontSize: 11, color: Colors.white)),
                 onPressed: () async {
-                  await AuthService.instance.saveServerConfig('https://ai-fitness-coach-818a.onrender.com');
+                  await AuthService.instance.saveServerConfig('https://ai-fitness-coach-wlg3.onrender.com');
                   setState(() {});
                 },
               ),

@@ -400,7 +400,7 @@ class _OnboardingQuizScreenState extends State<OnboardingQuizScreen> {
         ).timeout(const Duration(seconds: 5));
         if (res.statusCode != 200) {
           final altUrl = AuthService.apiBaseUrl.contains('localhost')
-              ? 'https://ai-fitness-coach-818a.onrender.com'
+              ? 'https://ai-fitness-coach-wlg3.onrender.com'
               : 'http://localhost:8000';
           await http.post(
             Uri.parse('$altUrl/api/auth/profile/archetype'),
