@@ -1,4 +1,8 @@
 import os
+import threading
+import time
+from datetime import datetime, timezone, timedelta
+import requests
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,9 +57,50 @@ app.include_router(voice.router, prefix="/api/voice", tags=["voice"])
 app.include_router(admin_portal.router, tags=["admin_portal"])
 
 
+def is_within_business_hours_vet() -> bool:
+    """Checks if current time in Venezuela (UTC-4) is between 07:00 and 19:00 (7:00 AM to 7:00 PM)."""
+    vet = timezone(timedelta(hours=-4))
+    now_vet = datetime.now(vet)
+    return 7 <= now_vet.hour < 19
+
+
+def keep_alive_worker():
+    """
+    Background worker that pings this service every 9 minutes during operating hours
+    (7:00 AM - 7:00 PM Venezuela time) to prevent Render from sleeping.
+    At 7:00 PM VET, it stops pinging, allowing Render to sleep peacefully during the night
+    (saving free tier hours) with standard 30s cold start when accessed outside hours.
+    """
+    time.sleep(20)
+    while True:
+        try:
+            if is_within_business_hours_vet():
+                url = os.environ.get("RENDER_EXTERNAL_URL", "https://ai-fitness-coach-wlg3.onrender.com")
+                if url:
+                    target = f"{url.rstrip('/')}/health"
+                    r = requests.get(target, timeout=10)
+                    print(f"[KeepAlive] Self ping exitoso ({datetime.now().strftime('%H:%M:%S')}): {target} -> {r.status_code}")
+            else:
+                print("[KeepAlive] Modo nocturno activo (7:00 PM a 7:00 AM VET). Reposando para ahorrar horas Render...")
+        except Exception as e:
+            print(f"[KeepAlive] Aviso autoping: {e}")
+
+        time.sleep(540)  # Cada 9 minutos
+
+
+@app.on_event("startup")
+def start_keep_alive():
+    t = threading.Thread(target=keep_alive_worker, daemon=True)
+    t.start()
+
+
 @app.get("/health")
 def health_check() -> dict:
-    return {"status": "ok", "service": "ai_fitness_coach_backend"}
+    return {
+        "status": "ok",
+        "service": "ai_fitness_coach_backend",
+        "business_hours_active": is_within_business_hours_vet(),
+    }
 
 
 @app.get("/health/supabase")
