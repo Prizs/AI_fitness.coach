@@ -78,15 +78,29 @@ def get_ecosystem_status(pin: str = Query(...)):
     users_count = 0
     trainers_count = 0
     suspended_count = 0
-    try:
-        admin = get_supabase_admin_client()
-        res = admin.table("usuarios").select("id, role").execute()
-        raw_users = res.data or []
-        users_count = len(raw_users)
-        trainers_count = len([u for u in raw_users if str(u.get("role", "")).lower() == "trainer"])
-        suspended_count = len([u for u in raw_users if "suspended" in str(u.get("role", "")).lower()])
-    except Exception:
-        pass
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        try:
+            import psycopg2
+            with psycopg2.connect(db_url, connect_timeout=5) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT count(*), count(*) FILTER (WHERE lower(role) = 'trainer'), count(*) FILTER (WHERE lower(role) LIKE '%suspended%') FROM usuarios;")
+                    row = cur.fetchone()
+                    if row:
+                        users_count, trainers_count, suspended_count = int(row[0]), int(row[1]), int(row[2])
+        except Exception:
+            pass
+
+    if users_count == 0:
+        try:
+            admin = get_supabase_admin_client()
+            res = admin.table("usuarios").select("id, role").execute()
+            raw_users = res.data or []
+            users_count = len(raw_users)
+            trainers_count = len([u for u in raw_users if str(u.get("role", "")).lower() == "trainer"])
+            suspended_count = len([u for u in raw_users if "suspended" in str(u.get("role", "")).lower()])
+        except Exception:
+            pass
 
     # Versión de APK
     ver_name, ver_code = _read_pubspec_version()
@@ -184,8 +198,8 @@ def check_gemini_key_status(pin: str = Query(...)):
     t0 = time.time()
     try:
         from app.services.ai_providers import _call_gemini
-        test_msg = [{"role": "user", "parts": ["Test ping"]}]
-        res_text = _call_gemini(test_msg, gemini_key, active_model, timeout=6.0)
+        test_msg = '{"ping": "test"}'
+        res_text = _call_gemini(test_msg, timeout=8.0, api_key=gemini_key, model_override=active_model)
         elapsed = round((time.time() - t0) * 1000, 1)
         return {
             "configured": True,
@@ -221,6 +235,25 @@ def check_gemini_key_status(pin: str = Query(...)):
 @router.get("/api/admin/users")
 def list_users(pin: str = Query(...)):
     _verify_pin(pin)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        try:
+            import psycopg2
+            import psycopg2.extras
+            with psycopg2.connect(db_url, connect_timeout=5) as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT id, cedula, nombre, apellido, edad, peso, genero, role,
+                               patologia_o_alergias, alergias_alimentarias, lesiones_actuales,
+                               discapacidad_motora, zonas_a_evitar
+                        FROM usuarios
+                        ORDER BY cedula;
+                    """)
+                    rows = cur.fetchall()
+                    return {"users": [dict(r) for r in rows]}
+        except Exception:
+            pass
+
     admin = get_supabase_admin_client()
     try:
         res = admin.table("usuarios").select(
@@ -280,6 +313,23 @@ def create_user_admin(payload: CreateUserRequest):
 @router.post("/api/admin/users/{user_id}/toggle-suspend")
 def toggle_suspend_user(user_id: str, payload: ToggleSuspendRequest):
     _verify_pin(payload.pin)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        try:
+            import psycopg2
+            with psycopg2.connect(db_url, connect_timeout=5) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT role FROM usuarios WHERE id = %s;", (user_id,))
+                    row = cur.fetchone()
+                    current_role = str(row[0]) if row and row[0] else "client"
+                    new_role = "suspended" if payload.suspend else ("client" if current_role == "suspended" else current_role.replace("suspended_", ""))
+                    cur.execute("UPDATE usuarios SET role = %s WHERE id = %s;", (new_role, user_id))
+                conn.commit()
+            action_str = "suspendido" if payload.suspend else "reactivado"
+            return {"success": True, "new_role": new_role, "message": f"Usuario {action_str} exitosamente."}
+        except Exception:
+            pass
+
     admin = get_supabase_admin_client()
     try:
         user_res = admin.table("usuarios").select("role").eq("id", user_id).single().execute()
@@ -297,6 +347,19 @@ def toggle_suspend_user(user_id: str, payload: ToggleSuspendRequest):
 @router.delete("/api/admin/users/{user_id}")
 def delete_user_admin(user_id: str, pin: str = Query(...)):
     _verify_pin(pin)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        try:
+            import psycopg2
+            with psycopg2.connect(db_url, connect_timeout=5) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM usuarios WHERE id = %s;", (user_id,))
+                    cur.execute("DELETE FROM auth.users WHERE id = %s;", (user_id,))
+                conn.commit()
+            return {"success": True, "message": f"Usuario {user_id} eliminado exitosamente."}
+        except Exception:
+            pass
+
     admin = get_supabase_admin_client()
     errors = []
     

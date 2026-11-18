@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import os
 import re
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from dotenv import load_dotenv
 
 import httpx
@@ -121,34 +123,92 @@ def _strip_code_fences(text: str) -> str:
     return cleaned
 
 
-def _call_gemini(prompt: str, timeout: float) -> str:
-    import google.generativeai as genai
+def _call_gemini(
+    prompt: Any,
+    timeout_or_key: float | str | None = None,
+    model_override: str | None = None,
+    *,
+    timeout: float | None = None,
+    api_key: str | None = None,
+    **kwargs: Any,
+) -> str:
+    resolved_timeout = 15.0
+    resolved_key = None
 
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
-    configured_model = (os.getenv("GEMINI_MODEL", "") or "").strip()
-    raw_candidates = [configured_model] if (configured_model and "2.5-flash" not in configured_model) else []
-    raw_candidates.extend(["gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-3.8-flash"])
+    if isinstance(timeout_or_key, (int, float)):
+        resolved_timeout = float(timeout_or_key)
+    elif isinstance(timeout_or_key, str) and timeout_or_key:
+        resolved_key = timeout_or_key
+
+    if timeout is not None:
+        resolved_timeout = float(timeout)
+    if api_key is not None:
+        resolved_key = api_key
+
+    key = (resolved_key or os.getenv("GEMINI_API_KEY", "")).strip()
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY no configurada.")
+
+    configured_model = (model_override or os.getenv("GEMINI_MODEL", "") or "").strip()
+    raw_candidates = []
+    if configured_model and not any(obsolete in configured_model for obsolete in ["2.5-flash", "2.0-flash"]):
+        raw_candidates.append(configured_model)
+    raw_candidates.extend([
+        "gemini-3.5-flash-lite",
+        "gemini-flash-lite-latest",
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash-lite",
+    ])
     candidates = list(dict.fromkeys(raw_candidates))
-    last_err = None
+
+    if isinstance(prompt, list):
+        formatted = []
+        for item in prompt:
+            if isinstance(item, dict) and "parts" in item:
+                parts = item["parts"]
+                clean_parts = [{"text": str(p)} if isinstance(p, str) else p for p in parts]
+                formatted.append({"role": item.get("role", "user"), "parts": clean_parts})
+            else:
+                formatted.append({"parts": [{"text": str(item)}]})
+        contents = formatted
+    elif isinstance(prompt, dict):
+        contents = [{"parts": [{"text": json.dumps(prompt, ensure_ascii=False)}]}]
+    else:
+        contents = [{"parts": [{"text": str(prompt)}]}]
+
+    payload = {
+        "contents": contents,
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.4,
+        },
+    }
+
+    last_err: Exception | None = None
+    per_model_timeout = min(max(resolved_timeout / len(candidates), 4.0), 8.0)
+
     for model_name in candidates:
-        if not model_name:
-            continue
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
         try:
-            model = genai.GenerativeModel(
-                model_name,
-                generation_config={"response_mime_type": "application/json"},
-            )
-            response = model.generate_content(
-                prompt,
-                request_options={"timeout": timeout},
-            )
-            return _strip_code_fences(response.text or "")
+            with httpx.Client(timeout=per_model_timeout) as client:
+                resp = client.post(url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates_res = data.get("candidates") or []
+                    if candidates_res:
+                        parts = candidates_res[0].get("content", {}).get("parts", [])
+                        if parts and "text" in parts[0]:
+                            return _strip_code_fences(parts[0]["text"])
+                else:
+                    last_err = RuntimeError(f"Google Gemini HTTP {resp.status_code}: {resp.text[:120]}")
+                    continue
         except Exception as e:
             last_err = e
             continue
+
     if last_err:
         raise last_err
-    raise RuntimeError("No se pudo contactar a Gemini con ningun modelo.")
+    raise RuntimeError("No se pudo contactar a Gemini con ningún modelo.")
 
 
 def _call_openai_compatible(provider: str, prompt: str, timeout: float) -> str:
