@@ -796,16 +796,28 @@ def _is_readiness_reply_to_precheck(message: str, history: list = None) -> tuple
                 prior_user_text = content
                 break
 
-    is_readiness = any(k in msg for k in (
+    # 1. Si es una pregunta o condicional, NO es una confirmación de readiness
+    if "?" in msg or "¿" in msg:
+        return False, None
+    if re.search(r"\bsi\s+(te|me|le|nos|hago|haces|puedo|puedes|tengo|tienes|hay|no|fuera|fuese)\b", msg):
+        return False, None
+
+    explicit_readiness_phrases = (
         "me siento bien", "me siento muy bien", "me siento excelente", "me siento genial",
         "no presento molestia", "no presento ninguna molestia", "sin molestia", "sin molestias",
         "sin dolor", "cero molestia", "ninguna molestia",
         "tengo energia", "tengo energía", "suficiente energia", "suficiente energía", "mucha energia", "mucha energía",
         "a tope", "al 100", "al 100%", "con energia", "con energía", "con toda",
         "listo para", "listo para entrenar", "para hacer el ejercicio", "hacer el ejercicio de hoy", "hacer el ejercicio", "hacer la rutina",
-        "estoy listo", "estoy bien", "todo bien", "perfecto",
-        "si", "sí", "dale", "ok", "hazlo", "arma", "plan", "semana", "comencemos", "hagámoslo"
-    ))
+        "estoy listo", "estoy bien", "todo bien"
+    )
+    is_readiness = any(p in msg for p in explicit_readiness_phrases)
+
+    if not is_readiness:
+        tokens = re.findall(r"\b\w+\b", msg)
+        short_affirmatives = {"si", "sí", "dale", "ok", "hazlo", "arma", "comencemos", "hagámoslo", "perfecto", "listo"}
+        if len(tokens) <= 5 and any(t in short_affirmatives for t in tokens):
+            is_readiness = True
 
     if has_prior_routine_intent and is_readiness:
         return True, prior_user_text
