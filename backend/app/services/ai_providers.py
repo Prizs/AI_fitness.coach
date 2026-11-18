@@ -29,7 +29,7 @@ import httpx
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 load_dotenv()
 
-GEMINI_TIMEOUT_SEC = 25.0
+GEMINI_TIMEOUT_SEC = 30.0
 
 OPENAI_COMPATIBLE_BASE_URLS = {
     "groq": "https://api.groq.com/openai/v1",
@@ -151,13 +151,12 @@ def _call_gemini(
 
     configured_model = (model_override or os.getenv("GEMINI_MODEL", "") or "").strip()
     raw_candidates = []
-    if configured_model and not any(obsolete in configured_model for obsolete in ["2.5-flash", "2.0-flash"]):
+    if configured_model and not any(obsolete in configured_model for obsolete in ["2.5-flash", "2.0-flash", "flash-latest"]):
         raw_candidates.append(configured_model)
     raw_candidates.extend([
+        "gemini-3.1-flash-lite",
         "gemini-3.5-flash-lite",
         "gemini-flash-lite-latest",
-        "gemini-3.1-flash-lite",
-        "gemini-2.5-flash-lite",
     ])
     candidates = list(dict.fromkeys(raw_candidates))
 
@@ -185,7 +184,7 @@ def _call_gemini(
     }
 
     last_err: Exception | None = None
-    per_model_timeout = min(max(resolved_timeout / len(candidates), 4.0), 8.0)
+    per_model_timeout = min(max(resolved_timeout / len(candidates), 6.0), 12.0)
 
     for model_name in candidates:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
