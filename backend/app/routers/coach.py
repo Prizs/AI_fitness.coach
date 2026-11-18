@@ -896,17 +896,19 @@ def _is_explicit_routine_request(message: str, history: list = None) -> bool:
     if any(p in msg for p in explicit_phrases):
         return True
 
-    # 3. Si en el historial reciente el usuario pidió una rutina y ahora está respondiendo
+    # 3. Si en el historial reciente el usuario pidió una rutina y ahora está respondiendo afirmativamente
     if history:
-        for turn in reversed(history[-4:]):
-            content = ""
-            if isinstance(turn, dict):
-                content = str(turn.get("content", "")).lower()
-            elif hasattr(turn, "content"):
-                content = str(turn.content or "").lower()
-            if any(k in content for k in ("sin herramientas", "en casa", "recomiend", "rutina", "rtina", "plan", "bajar masa", "masa corporal", "perder grasa")):
-                if any(k in msg for k in ("si", "sí", "dale", "ok", "hazlo", "arma", "plan", "semana", "bien", "energia", "energía", "listo")):
-                    return True
+        if "?" not in msg and "¿" not in msg and not re.search(r"\bsi\s+(te|me|le|nos|hago|haces|puedo|puedes|tengo|tienes|hay|no)\b", msg):
+            for turn in reversed(history[-4:]):
+                content = ""
+                if isinstance(turn, dict):
+                    content = str(turn.get("content", "")).lower()
+                elif hasattr(turn, "content"):
+                    content = str(turn.content or "").lower()
+                if any(k in content for k in ("sin herramientas", "en casa", "recomiend", "rutina", "rtina", "plan", "bajar masa", "masa corporal", "perder grasa")):
+                    tokens = set(re.findall(r"\b\w+\b", msg))
+                    if len(tokens) <= 6 and tokens.intersection({"si", "sí", "dale", "ok", "hazlo", "arma", "plan", "semana", "bien", "listo"}):
+                        return True
 
     return False
 
