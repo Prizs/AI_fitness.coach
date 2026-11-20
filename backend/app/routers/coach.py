@@ -1949,7 +1949,7 @@ def _sanitize_exercise_by_equipment(name: str, primary: str, animation_key: str,
         return "Flexiones en pica en suelo para hombros (Pike Push-ups) (Intermedio)", "Deltoides", "shoulder-press"
 
     # Press de banca / con mancuernas para pecho
-    if "press" in lower and ("banca" in lower or "pecho" in lower or "mancuerna" in lower or "barra" in lower) and not any(w in lower for w in ("militar", "arnold", "hombro", "hombros", "deltoide", "deltoides")):
+    if "press" in lower and ("banca" in lower or "mancuerna" in lower or "barra" in lower or "en maquina" in lower or "en máquina" in lower) and not any(w in lower for w in ("militar", "arnold", "hombro", "hombros", "deltoide", "deltoides", "prayer", "palmas", "isométric", "isometric")):
         if "inclinado" in lower:
             return "Flexiones declinadas con pies en cama o sofá (Intermedio)", "Pectoral Clavicular", "pushup"
         return "Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "Pectoral Mayor", "pushup"
@@ -2904,6 +2904,77 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
         })
     return res
 
+
+CALISTHENIC_CHEST_POOL = [
+    {"name": "Flexiones inclinadas con manos en pared o mesa alta (Básico)", "primary_muscle": "Pectorales", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Flexiones en suelo con rodillas apoyadas (Básico)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Deltoides", "animation_key": "pushup"},
+    {"name": "Empujes isométricos de palmas frente al pecho (Prayer Press) (Básico)", "primary_muscle": "Pectorales", "secondary_muscle": "Hombros", "animation_key": "pushup"},
+    {"name": "Flexiones excéntricas lentas bajando en 4s con apoyo (Básico)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Aperturas de brazos en suelo con toallas deslizantes (Básico)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Deltoides", "animation_key": "fly"},
+    {"name": "Press plano en suelo con toalla isométrica (Básico)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Deltoides anterior", "animation_key": "pushup"},
+    {"name": "Flexiones con manos en banco o silla firme (Básico)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Core", "animation_key": "pushup"},
+    {"name": "Flexiones en pared con agarre amplio para estiramiento pectoral (Básico)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Hombros", "animation_key": "pushup"},
+    {"name": "Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Flexiones declinadas con pies en cama o sofá (Intermedio)", "primary_muscle": "Pectoral Clavicular", "secondary_muscle": "Deltoides anterior", "animation_key": "pushup"},
+    {"name": "Flexiones con agarre ancho en suelo (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Core", "animation_key": "pushup"},
+    {"name": "Fondos de pecho y tríceps en silla firme (Intermedio)", "primary_muscle": "Pectoral inferior", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Flexiones diamante con rodillas apoyadas para pecho cerrado (Intermedio)", "primary_muscle": "Pectoral interior", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Flexiones con pausa isométrica de 2s a 3cm del suelo (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Core", "animation_key": "pushup"},
+    {"name": "Flexiones arquero asistidas alternadas en suelo (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Flexiones escapulares en suelo (Push-up plus) (Intermedio)", "primary_muscle": "Serrato anterior, Pectoral", "secondary_muscle": "Escápula", "animation_key": "pushup"},
+]
+
+CALISTHENIC_BACK_POOL = [
+    {"name": "Remo invertido bajo mesa firme con rodillas flexionadas (Básico)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Tracción dorsal con toalla en marco de puerta (Básico)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides", "animation_key": "row"},
+    {"name": "Retracción escapular en suelo boca abajo (Básico)", "primary_muscle": "Espalda media", "secondary_muscle": "Trapecio", "animation_key": "mobility"},
+    {"name": "Superman con pausa isométrica de 3s en suelo (Básico)", "primary_muscle": "Erectores, Dorsal", "secondary_muscle": "Glúteos", "animation_key": "mobility"},
+    {"name": "Remo en suelo con toalla deslizante sobre piso liso (Básico)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Deslizamiento dorsal escapular en suelo boca arriba (Back Slides) (Básico)", "primary_muscle": "Dorsal Ancho, Romboides", "secondary_muscle": "Core", "animation_key": "mobility"},
+    {"name": "Pájaros escapulares en decúbito prono sin carga (Básico)", "primary_muscle": "Romboides, Trapecio", "secondary_muscle": "Deltoides", "animation_key": "fly"},
+    {"name": "Natación estática en suelo boca abajo (Swimmers) (Básico)", "primary_muscle": "Dorsal Ancho, Erectores", "secondary_muscle": "Glúteos", "animation_key": "mobility"},
+    {"name": "Remo invertido bajo mesa firme con talones apoyados (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps, Core", "animation_key": "row"},
+    {"name": "Tracción dorsal isométrica unilateral en puerta (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides", "animation_key": "row"},
+    {"name": "Remo en suelo con toalla deslizante (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Deslizamientos dorsales en pared con control escapular (Intermedio)", "primary_muscle": "Dorsal, Romboides", "secondary_muscle": "Hombros", "animation_key": "mobility"},
+    {"name": "Remo unilateral con mochila o garrafa firme (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Pájaros en decúbito prono con pausa de 2s arriba (Intermedio)", "primary_muscle": "Romboides, Trapecio", "secondary_muscle": "Deltoides posterior", "animation_key": "fly"},
+    {"name": "Elevación escapular en suelo con brazos en Y (Intermedio)", "primary_muscle": "Trapecio inferior, Dorsal", "secondary_muscle": "Core", "animation_key": "mobility"},
+]
+
+CALISTHENIC_SHOULDERS_POOL = [
+    {"name": "Elevaciones laterales isométricas contra marco de puerta (Básico)", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio", "animation_key": "lateral-raise"},
+    {"name": "Círculos de brazos controlados con pausa isométrica (Básico)", "primary_muscle": "Deltoides Completo", "secondary_muscle": "Manguito Rotador", "animation_key": "mobility"},
+    {"name": "Deslizamientos en pared para hombros (Wall Slides) (Básico)", "primary_muscle": "Deltoides, Escápula", "secondary_muscle": "Manguito Rotador", "animation_key": "mobility"},
+    {"name": "Retracción y elevación escapular Prone Y-T-W en suelo (Básico)", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta", "animation_key": "lateral-raise"},
+    {"name": "Elevaciones frontales suaves con contracción voluntaria (Básico)", "primary_muscle": "Deltoides Anterior", "secondary_muscle": "Trapecio", "animation_key": "lateral-raise"},
+    {"name": "Elevaciones en T con toalla generando tensión isométrica (Básico)", "primary_muscle": "Deltoides Posterior", "secondary_muscle": "Romboides", "animation_key": "lateral-raise"},
+    {"name": "Pájaros posteriores sin peso en posición de bisagra (Básico)", "primary_muscle": "Deltoides Posterior", "secondary_muscle": "Trapecio", "animation_key": "fly"},
+    {"name": "Flexiones en pica en suelo para hombros (Pike Push-ups) (Intermedio)", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps, Trapecio", "animation_key": "shoulder-press"},
+    {"name": "Pájaros posteriores con garrafas ligeras o toalla en bisagra (Intermedio)", "primary_muscle": "Deltoides Posterior", "secondary_muscle": "Romboides", "animation_key": "fly"},
+    {"name": "Elevaciones laterales con mochila o garrafa suave (Intermedio)", "primary_muscle": "Deltoides Lateral", "secondary_muscle": "Trapecio", "animation_key": "lateral-raise"},
+    {"name": "Elevaciones frontales con toalla generando tensión hacia afuera (Intermedio)", "primary_muscle": "Deltoides Anterior", "secondary_muscle": "Trapecio", "animation_key": "lateral-raise"},
+    {"name": "Plancha escapular con empuje anterior (Dolphin Push-ups) (Intermedio)", "primary_muscle": "Deltoides", "secondary_muscle": "Core", "animation_key": "shoulder-press"},
+]
+
+GYM_CHEST_POOL = [
+    {"name": "Flexiones inclinadas con manos en banco (Básico)", "primary_muscle": "Pectorales", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Press plano con mancuernas ligeras (Básico)", "primary_muscle": "Pectorales", "secondary_muscle": "Deltoides", "animation_key": "bench-press"},
+    {"name": "Aperturas con banda elástica en banco (Básico)", "primary_muscle": "Pectorales", "secondary_muscle": "Hombros", "animation_key": "fly"},
+    {"name": "Press en máquina de pecho sentado con peso mínimo (Básico)", "primary_muscle": "Pectorales", "secondary_muscle": "Tríceps", "animation_key": "bench-press"},
+    {"name": "Cruces suaves en polea a la altura del pecho (Básico)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Deltoides", "animation_key": "fly"},
+    {"name": "Press inclinado con mancuernas ligeras de 4kg (Básico)", "primary_muscle": "Pectoral Clavicular", "secondary_muscle": "Tríceps", "animation_key": "bench-press"},
+    {"name": "Press de pecho con mancuernas en banco plano (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps", "animation_key": "bench-press"},
+    {"name": "Press inclinado con mancuernas en banco 30° (Intermedio)", "primary_muscle": "Pectoral Clavicular", "secondary_muscle": "Deltoides anterior", "animation_key": "bench-press"},
+    {"name": "Aperturas con mancuernas en banco plano (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Hombros", "animation_key": "fly"},
+    {"name": "Cruces en polea alta para pectoral (Intermedio)", "primary_muscle": "Pectoral Esternal", "secondary_muscle": "Bíceps", "animation_key": "fly"},
+    {"name": "Fondos de pecho en paralelas (Intermedio)", "primary_muscle": "Pectoral inferior", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Press de banca plano con barra olímpica (Avanzado)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps", "animation_key": "bench-press"},
+    {"name": "Press inclinado con barra olímpica pesada (Avanzado)", "primary_muscle": "Pectoral Clavicular", "secondary_muscle": "Deltoides", "animation_key": "bench-press"},
+    {"name": "Press declinado con mancuernas pesadas (Avanzado)", "primary_muscle": "Pectoral inferior", "secondary_muscle": "Tríceps", "animation_key": "bench-press"},
+]
+
+
 def _normalize_exercises(
     raw_exercises,
     intensity: str = "Media",
@@ -3180,69 +3251,33 @@ def _normalize_exercises(
 
         # Deduplication Guard Radical: CERO repetición de nombre Y CERO repetición de GIF URL
         has_dup_squat = ("sentadilla" in base_norm or "squat" in base_norm) and any("sentadilla" in str(ex.get("name", "")).lower() or "squat" in str(ex.get("name", "")).lower() for ex in exercises)
-        has_dup_pushup = ("flexion" in base_norm or "pushup" in base_norm) and any(("flexion" in str(ex.get("name", "")).lower() or "pushup" in str(ex.get("name", "")).lower()) for ex in exercises)
+        has_dup_squat = False
 
-        if (base_norm in seen_names) or (gif_url and gif_url in seen_gifs) or has_dup_squat or has_dup_pushup:
-            all_deep_cands = (
-                upper_pool + leg_pool + core_pool + mobility_pool +
-                CALVES_FEET_POOLS.get(intensity_hint, []) +
-                TRICEPS_LEGS_POOLS.get(intensity_hint, []) +
-                LEGS_DAY_A_POOLS.get(intensity_hint, []) +
-                LEGS_DAY_B_POOLS.get(intensity_hint, []) +
-                CORE_POOLS.get("baja", []) + CORE_POOLS.get("alta", []) +
-                UPPER_BODY_POOLS.get("baja", []) + UPPER_BODY_POOLS.get("alta", []) +
-                MOBILITY_CARDIO_POOLS.get("baja", []) + MOBILITY_CARDIO_POOLS.get("alta", []) +
-                BEGINNER_LOW_LEG_EXERCISES + ADVANCED_HIGH_LEG_EXERCISES
-            )
-            req_parts = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
-            if requested_focus == "cuerpo_completo":
-                cand_pool = all_deep_cands
-            elif len(req_parts) >= 3 or (len(req_parts) == 2 and requested_focus not in ("piernas_hombros", "pecho_femorales")):
-                cand_pool = []
-                for p in req_parts:
-                    if p == "pecho": cand_pool += [e for e in all_upper if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
-                    elif p == "espalda": cand_pool += [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
-                    elif p == "hombros": cand_pool += [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
-                    elif p == "biceps": cand_pool += [e for e in all_upper if _is_biceps_exercise(e["name"], e.get("primary_muscle", ""))]
-                    elif p == "triceps": cand_pool += [e for e in all_upper if _is_triceps_exercise(e["name"], e.get("primary_muscle", ""))]
-                    elif p in ("piernas", "femorales"): cand_pool += leg_pool
-                    elif p == "core": cand_pool += core_pool
-                    elif p == "cardio": cand_pool += mobility_pool
-                if not cand_pool:
-                    cand_pool = all_deep_cands
-            elif requested_focus in ("piernas_hombros", "hombros_piernas") or ("pierna" in (requested_focus or "") and "hombro" in (requested_focus or "")):
-                if _is_shoulder_exercise(clean_name, primary):
+        if (base_norm in seen_names) or (gif_url and gif_url in seen_gifs) or has_dup_squat:
+            if is_no_equipment:
+                if any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
+                    cand_pool = CALISTHENIC_CHEST_POOL
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("espalda", "dorsal", "remo")):
+                    cand_pool = CALISTHENIC_BACK_POOL
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("hombro", "deltoid")):
+                    cand_pool = CALISTHENIC_SHOULDERS_POOL
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pierna", "cuadriceps", "femoral", "gluteo")):
+                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
+                else:
+                    cand_pool = CALISTHENIC_CHEST_POOL + CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL + leg_pool
+            else:
+                if any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
+                    cand_pool = GYM_CHEST_POOL
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("espalda", "dorsal", "remo")):
+                    cand_pool = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("hombro", "deltoid")):
                     cand_pool = [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
                 else:
-                    cand_pool = [e for e in leg_pool if not any(k in e["name"].lower() for k in ("gluteo", "glúteo", "glute", "pelvica", "pélvica", "hip thrust", "puente"))]
-                if not cand_pool:
-                    cand_pool = leg_pool + [e for e in upper_pool if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif requested_focus in ("pecho_femorales", "femorales_pecho"):
-                cand_pool = [e for e in upper_pool if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))] + [e for e in leg_pool if _is_femoral_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif requested_focus in ("aerobicos", "solo_cardio", "cardio", "movilidad_cardio"):
-                cand_pool = mobility_pool + MOBILITY_CARDIO_POOLS.get("baja", []) + MOBILITY_CARDIO_POOLS.get("alta", [])
-            elif requested_focus in ("hombros",):
-                cand_pool = [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif requested_focus in ("pecho", "pectorales"):
-                cand_pool = [e for e in all_upper if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif requested_focus in ("espalda", "dorsales"):
-                cand_pool = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif requested_focus in ("biceps", "solo_biceps"):
-                cand_pool = [e for e in all_upper if _is_biceps_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif requested_focus in ("triceps", "solo_triceps"):
-                cand_pool = [e for e in all_upper if _is_triceps_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif requested_focus in ("core", "solo_core"):
-                cand_pool = core_pool
-            elif requested_focus in ("piernas", "solo_piernas") or _is_leg_exercise(clean_name, primary):
-                cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, [])
-            elif requested_focus in ("tren_superior", "brazos_hombros"):
-                cand_pool = upper_pool + UPPER_BODY_POOLS.get("baja", []) + UPPER_BODY_POOLS.get("alta", [])
-            else:
-                cand_pool = all_deep_cands
+                    cand_pool = upper_pool + leg_pool + core_pool
 
             for cand in cand_pool:
                 cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
-                    cand["name"], cand["primary_muscle"], cand["animation_key"], is_no_equipment
+                    cand["name"], cand["primary_muscle"], cand.get("animation_key", "pushup"), is_no_equipment
                 )
                 cand_base = re.sub(r"\(.*?\)", "", cand_clean).strip().lower()
                 cand_gif = get_exercise_gif(cand_clean, muscle=cand_prim, intensity=intensity_hint, is_no_equipment=is_no_equipment)
@@ -3256,8 +3291,46 @@ def _normalize_exercises(
                     gif_meta = cand_gif
                     gif_url = cand_url
                     replaced_from_pool = True
-                    replacement_found = True
                     break
+
+        # HARD SAFETY: UNDER ZERO CIRCUMSTANCES ALLOW DUPLICATE BASE NAME IN THE WORKOUT
+        if base_norm in seen_names:
+            # Emergency search for any un-seen exercise from the subpool matching this exercise's muscle group
+            cand_p = (clean_name + " " + primary + " " + (requested_focus or "")).lower()
+            if any(k in cand_p for k in ("pecho", "pectoral")):
+                fallback_search = CALISTHENIC_CHEST_POOL if is_no_equipment else GYM_CHEST_POOL
+            elif any(k in cand_p for k in ("espalda", "dorsal", "remo")):
+                fallback_search = CALISTHENIC_BACK_POOL if is_no_equipment else [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
+            elif any(k in cand_p for k in ("hombro", "deltoid")):
+                fallback_search = CALISTHENIC_SHOULDERS_POOL if is_no_equipment else [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+            elif any(k in cand_p for k in ("pierna", "cuadriceps", "femoral", "gluteo", "pantorrilla", "gemelo", "soleo")):
+                fallback_search = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
+            elif any(k in cand_p for k in ("core", "abdomen", "plank", "crunch")):
+                fallback_search = core_pool
+            elif any(k in cand_p for k in ("cardio", "aerobico", "aeróbico")):
+                fallback_search = mobility_pool
+            else:
+                fallback_search = (CALISTHENIC_CHEST_POOL + CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL + leg_pool) if is_no_equipment else (upper_pool + leg_pool + core_pool)
+            found_unique = False
+            for cand in fallback_search:
+                cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
+                    cand["name"], cand["primary_muscle"], cand.get("animation_key", "pushup"), is_no_equipment
+                )
+                cand_base = re.sub(r"\(.*?\)", "", cand_clean).strip().lower()
+                cand_gif = get_exercise_gif(cand_clean, muscle=cand_prim, intensity=intensity_hint, is_no_equipment=is_no_equipment)
+                cand_url = (cand_gif.get("url") or "").strip()
+                if cand_base not in seen_names and (not cand_url or cand_url not in seen_gifs):
+                    clean_name = cand_clean
+                    primary = cand_prim
+                    anim_key = cand_anim
+                    base_norm = cand_base
+                    gif_meta = cand_gif
+                    gif_url = cand_url
+                    found_unique = True
+                    break
+            if not found_unique:
+                # Discard duplicate exercise completely
+                continue
 
         seen_names.add(base_norm)
         if gif_url:
@@ -3272,23 +3345,7 @@ def _normalize_exercises(
                 "primary_muscle": primary,
                 "secondary_muscle": secondary,
                 "intensity_level": forced_label,
-                "gif_url": gif_url,
-                "biomechanics": str(
-                    (gif_meta.get("biomechanics") if replaced_from_pool else (exercise.get("biomechanics") or gif_meta.get("biomechanics")))
-                    or "Movimiento controlado respetando el rango articular."
-                ),
-                "tempo": str(
-                    (gif_meta.get("tempo") if replaced_from_pool else (exercise.get("tempo") or gif_meta.get("tempo")))
-                    or "3-1-1"
-                ),
-                "posture": str(
-                    (gif_meta.get("posture") if replaced_from_pool else (exercise.get("posture") or gif_meta.get("posture")))
-                    or "Mantén la columna neutra y abdomen activo."
-                ),
-                "warning": str(
-                    (gif_meta.get("warning") if replaced_from_pool else (exercise.get("warning") or gif_meta.get("warning")))
-                    or "Detén el ejercicio si sientes dolor articular."
-                ),
+                "biomechanics": gif_meta.get("biomechanics", "Movimiento controlado respetando el rango articular."),
             }
         )
     return exercises
@@ -3502,6 +3559,11 @@ def _normalize_structured_plan(
             {"name": "Peso muerto rumano unilateral con peso corporal y equilibrio", "sets": 3, "reps": "10 por pierna", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Estabilidad"},
             {"name": "Curl femoral de pie sin peso con contracción isométrica", "sets": 3, "reps": "12 por pierna", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
             {"name": "Deslizamiento de talones alternado en suelo con toalla", "sets": 3, "reps": "10 por pierna", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Bíceps Femoral"},
+            {"name": "Puente de cadera con talones alejados 10cm en suelo", "sets": 3, "reps": "12-15", "animation_key": "glute-bridge", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Glúteos"},
+            {"name": "Bisagra de cadera de pie contra la pared", "sets": 3, "reps": "12", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Lumbar"},
+            {"name": "Contracción isométrica de isquios en decúbito prono", "sets": 3, "reps": "15 por pierna", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Poplíteo"},
+            {"name": "Puente de isquiotibiales con elevación de puntas de pie", "sets": 3, "reps": "12", "animation_key": "glute-bridge", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Sóleo"},
+            {"name": "Marcha de puente con talones caminando en suelo", "sets": 3, "reps": "8 pasos", "animation_key": "glute-bridge", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Core"},
         ]
         legs_glutes = [
             {"name": "Puente de glúteos en suelo con pausa de 2s" if int_hint == "baja" else "Elevación de cadera (Hip Thrust) en borde de sofá o silla", "sets": 4, "reps": "12-15", "animation_key": "hip-thrust", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales"},
@@ -3828,7 +3890,7 @@ def _normalize_structured_plan(
                     [legs_quads[1], upper_shoulders_post[2], legs_unipodal_calves[0], upper_shoulders_post[3]],
                     [legs_hams[1], upper_shoulders_post[7] if len(upper_shoulders_post) > 7 else upper_shoulders_post[1], legs_quads[2], upper_shoulders_post[4] if len(upper_shoulders_post) > 4 else upper_shoulders_post[2]],
                     [legs_unipodal_calves[1], upper_shoulders_post[6] if len(upper_shoulders_post) > 6 else upper_shoulders_post[0], legs_quads[3], upper_shoulders_post[5] if len(upper_shoulders_post) > 5 else upper_shoulders_post[1]],
-                    [legs_quads[4] if len(legs_quads) > 4 else legs_quads[0], upper_shoulders_post[3], legs_hams[2] if len(legs_hams) > 2 else legs_hams[0], upper_shoulders_post[0]],
+                    [legs_power_mob[0] if len(legs_power_mob) > 0 else legs_quads[0], CALISTHENIC_SHOULDERS_POOL[8] if is_no_equipment else (upper_shoulders_post[2] if len(upper_shoulders_post) > 2 else upper_shoulders_post[0]), legs_glutes[1] if len(legs_glutes) > 1 else legs_glutes[0], CALISTHENIC_SHOULDERS_POOL[10] if is_no_equipment else (upper_shoulders_post[3] if len(upper_shoulders_post) > 3 else upper_shoulders_post[1])],
                 ]
                 idx = day_idx % len(day_titles)
                 return day_titles[idx], _normalize_exercises(
@@ -3849,15 +3911,13 @@ def _normalize_structured_plan(
                     f"Combinado: Pecho (Empujes en Suelo) + Femorales (Cadena Posterior) ({badge_lbl})",
                     f"Combinado: Pecho (Control y Tensión) + Femorales (Excéntrico Lento) ({badge_lbl})",
                 ]
-                pure_chest = [e for e in upper_chest_tri if any(k in e["name"].lower() for k in ("flexion", "flexión", "pushup", "pecho", "pectoral", "press", "apertura"))]
-                if len(pure_chest) < 2:
-                    pure_chest = upper_chest_tri[:2]
+                chest_cands = CALISTHENIC_CHEST_POOL if is_no_equipment else GYM_CHEST_POOL
                 day_exs_map = [
-                    pure_chest[:2] + legs_hams[:2],
-                    pure_chest[:2] + legs_hams[1:3],
-                    pure_chest[:2] + legs_hams[:2],
-                    pure_chest[:2] + legs_hams[1:3],
-                    pure_chest[:2] + legs_hams[:2],
+                    [chest_cands[0], legs_hams[0], chest_cands[1], legs_hams[1]],
+                    [chest_cands[2], legs_hams[2], chest_cands[3], legs_hams[3]],
+                    [chest_cands[4], legs_hams[4], chest_cands[5], legs_hams[5]],
+                    [chest_cands[6], legs_hams[6], chest_cands[7], legs_hams[7]],
+                    [chest_cands[13], legs_hams[8], chest_cands[14], legs_hams[9]],
                 ]
                 idx = day_idx % len(day_titles)
                 return day_titles[idx], _normalize_exercises(
@@ -5519,11 +5579,14 @@ Devuelve SOLO JSON."""
                     f"cero ejercicios repetidos y respetando 48-72h de recuperación fisiológica."
                 )
         elif requested_focus in ("piernas_hombros", "hombros_piernas"):
-            if "hombros" not in lower_reply:
-                reply_str += (
-                    f"\n\n🎯 **Plan Especializado en Piernas y Hombros:** Tu sesión y distribución semanal han sido diseñadas "
-                    f"exclusivamente con ejercicios de miembros inferiores (cuádriceps, femorales, glúteos y pantorrillas) "
-                    f"y deltoides (hombros), garantizando cero interferencia con otros grupos musculares."
+            has_refusal = any(p in lower_reply for p in ("sin incluir hombros", "sin incluir piernas", "no incluir hombros", "no incluir piernas", "evitar solapamiento", "enfocaremos en piernas y glúteos", "enfocaremos en **piernas", "seguridad biomecánica: hoy nos enfocaremos", "seguridad biomecánica"))
+            if has_refusal or ("hombros" not in lower_reply) or ("piernas" not in lower_reply):
+                reply_str = (
+                    f"¡Hola, atleta! He procesado con absoluta precisión tu solicitud para entrenar **Piernas y Hombros**.\n\n"
+                    f"🎯 **Rutina Especializada en Piernas y Hombros ({badge_lbl}):**\n"
+                    f"Diseñé tu plan combinando armónicamente ejercicios de miembros inferiores (cuádriceps, femorales, glúteos y pantorrillas) "
+                    f"con ejercicios específicos para deltoides (hombros), estructurados en bloques alternados "
+                    f"para maximizar el estímulo sin fatiga neuromuscular prematura y con cero interferencia de otros grupos musculares. ¡Vamos con todo!"
                 )
         elif requested_focus in ("pecho_femorales", "femorales_pecho"):
             if "femorales" not in lower_reply:
