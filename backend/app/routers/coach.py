@@ -479,134 +479,7 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         )):
             return "cuerpo_completo"
 
-        # 0.1 Verificación explícita de solicitud COMPLETA de Pierna o Tren Inferior
-        # Previene que 'piernas' active por error sub-áreas como pantorrillas/pie
-        is_full_leg_request = any(w in t for w in (
-            "completo de pierna", "completo de piernas", "entrenamiento completo de piernas",
-            "completa de pierna", "completa de piernas", "piernas completas", "pierna completa",
-            "piernas completa", "pierna completo", "rutina completa de pierna", "rutina completa de piernas",
-            "toda la pierna", "todas las piernas", "toda el area de la pierna", "toda el área de la pierna",
-            "todo el area del a pierna", "todo el area de la pierna", "todo el área de la pierna",
-            "todo el área de las piernas", "todo el area de las piernas",
-            "todo lo que viene siendo las especificaciones de las áreas de mi pierna",
-            "todo lo que viene siendo las especificaciones de las areas de mi pierna",
-            "todo lo que viene siendo el área de las piernas", "todo lo que viene siendo el area de las piernas",
-            "todo lo que corresponde al area de las piernas", "todo lo que corresponde al área de las piernas",
-            "especificaciones de las áreas de mi pierna", "especificaciones de las areas de mi pierna",
-            "especificaciones de las áreas", "especificaciones de las areas",
-            "areas de mi pierna", "áreas de mi pierna", "area de mi pierna", "área de mi pierna",
-            "composicion de la pierna", "composición de la pierna", "todas las areas de la pierna",
-            "todas las áreas de la pierna", "todo el tren inferior", "tren inferior completo",
-            "entrenamiento de piernas", "entrenamiento de pierna", "rutina de piernas", "rutina de pierna",
-            "ejercicios de piernas", "ejercicios de pierna", "entrenamiento para piernas", "ejercicios para pierna",
-        ))
-
-        # 1. Combinaciones explícitas de múltiples áreas musculares o sub-zonas anatómicas
-        # Tríceps braquial (brazo) vs Tríceps sural (pantorrilla/batata):
-        is_triceps_sural = ("triceps sural" in t or "tríceps sural" in t)
-        has_arm_triceps_word = (("triceps" in t or "tríceps" in t) and not is_triceps_sural)
-
-        # Usar regex para 'pie' y 'pies' para que NUNCA coincidan con 'pierna', 'piernas', etc.
-        has_calves_word = is_triceps_sural or any(w in t for w in (
-            "batata", "batatas", "pantorrilla", "pantorrillas",
-            "gemelo", "gemelos", "soleo", "sóleo", "gastrocnemio"
-        )) or bool(re.search(r"\b(pie|pies|tobillo|tobillos)\b", t))
-
-        has_quads_word = any(w in t for w in ("cuadriceps", "cuádriceps", "vasto"))
-        has_hams_word = any(w in t for w in ("isquiotibial", "isquiotibiales", "isquio", "isquios", "femoral", "femorales"))
-        has_glutes_word = any(w in t for w in ("gluteo", "glúteo", "gluteos", "glúteos", "cadera", "hip thrust"))
-
-        # Si el usuario solicitó entrenamiento COMPLETO de pierna / especificaciones de las áreas:
-        if is_full_leg_request:
-            if any(w in t for w in ("semana", "semanal", "lunes a viernes", "lunes a", "dias", "días", "dias de la semana")):
-                return "solo_piernas"
-            return "piernas"
-
-        # Combinación explícita de Tríceps Braquial con Piernas / Toda la Pierna
-        if has_arm_triceps_word and any(w in t for w in ("pierna", "piernas", "tren inferior", "composición de la pierna", "composicion de la pierna")):
-            return "triceps_piernas"
-
-        # Sub-área anatómica AISLADA de Pierna: Pantorrillas, Batatas, Sóleo, Pies y Tobillos
-        # SOLO si NO es un reporte de dolor o molestia que desea evitar
-        is_pain_report = any(w in t for w in ("molestia", "dolor", "lesion", "lesión", "inflama", "no demanden", "evitar", "sin demandar"))
-        if has_calves_word and not is_pain_report and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen")):
-            return "pantorrillas_pies"
-        if has_calves_word and is_pain_report:
-            # Si le duele el tobillo/pie y pide ejercitarse sin demandar esa zona, asignar Tren Superior
-            return "tren_superior"
-
-        # Sub-áreas aisladas de pierna si se piden de forma específica
-        if has_quads_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
-            return "cuadriceps"
-        if has_hams_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
-            return "femorales_isquios"
-        if has_glutes_word and not any(w in t for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
-            return "gluteos"
-
-        if any(w in t for w in (
-            "piernas y hombros", "pierna y hombro", "piernas + hombros", "hombros y piernas",
-            "hombro y pierna", "hombros + piernas", "piernas con hombros", "hombros con piernas",
-            "pierna y hombros", "piernas y hombro"
-        )):
-            return "piernas_hombros"
-        if any(w in t for w in (
-            "pecho y femorales", "pecho y femoral", "pecho + femorales", "pecho + femoral",
-            "femorales y pecho", "femoral y pecho", "pecho e isquios", "pecho e isquiotibiales",
-            "pecho con femorales", "femorales con pecho"
-        )):
-            return "pecho_femorales"
-
-        if any(w in t for w in (
-            "piernas + tren superior", "piernas y tren superior", "piernas con tren superior",
-            "combinar piernas con tren superior", "combinar piernas y tren superior",
-            "piernas y torso", "piernas con torso", "tren superior y piernas"
-        )):
-            return "piernas_tren_superior"
-        if any(w in t for w in (
-            "piernas + core", "piernas y core", "piernas + abdomen", "piernas y abdomen",
-            "combinar piernas con core", "combinar piernas y core", "piernas y abdominales",
-            "core y piernas", "abdomen y piernas"
-        )):
-            return "piernas_core"
-        if any(w in t for w in (
-            "tren superior + core", "tren superior y core", "pecho y core", "espalda y core",
-            "torso y abdomen", "torso y core", "core y tren superior"
-        )):
-            return "tren_superior_core"
-        if any(w in t for w in (
-            "piernas + cardio", "piernas y cardio", "cardio y piernas"
-        )):
-            return "piernas_cardio"
-
-        # 2. Solicitudes explícitas de SOLO una zona para toda la semana
-        if any(w in t for w in (
-            "solo hombros", "solo de hombros", "solo hombro", "rutina de solo hombros",
-            "semana de hombros", "rutina solo de hombros", "únicamente hombros", "unicamente hombros"
-        )):
-            return "hombros"
-        if any(w in t for w in (
-            "solo piernas", "solo de piernas", "pura pierna", "puras piernas",
-            "toda la semana de piernas", "solo tren inferior", "semana solo de piernas",
-            "semana de piernas", "enfocarme solo en piernas", "rutina solo de piernas"
-        )):
-            return "solo_piernas"
-        if any(w in t for w in (
-            "solo tren superior", "solo torso", "toda la semana tren superior",
-            "semana de tren superior", "solo pecho", "solo espalda", "solo brazos"
-        )):
-            return "solo_tren_superior"
-        if any(w in t for w in (
-            "solo core", "solo abdomen", "toda la semana abdomen", "semana de abdomen"
-        )):
-            return "solo_core"
-        if any(w in t for w in (
-            "solo cardio", "toda la semana cardio", "solo movilidad", "solo aeróbicos",
-            "solo aerobicos", "ejercicios aeróbicos", "ejercicios aerobicos", "solo ejercicios aeróbicos",
-            "solo ejercicios aerobicos"
-        )):
-            return "aerobicos"
-
-        # Limpiar quejas y menciones de descarte para evitar falsos positivos
+        # Limpieza previa de quejas y menciones de descarte para evitar falsos positivos
         # (ej. "me está dando ejercicios como bíceps o pecho", "sin pecho", "cero bíceps")
         t_clean = t
         for pat in (
@@ -615,23 +488,31 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         ):
             t_clean = re.sub(pat, " ", t_clean)
 
-        # 3. Zonas y combinaciones específicas de alta precisión anatómica
+        # Tríceps braquial (brazo) vs Tríceps sural (pantorrilla/batata):
+        is_triceps_sural = ("triceps sural" in t_clean or "tríceps sural" in t_clean)
+        has_arm_triceps_word = (("triceps" in t_clean or "tríceps" in t_clean or "fondos" in t_clean) and not is_triceps_sural)
+
+        has_calves = is_triceps_sural or any(w in t_clean for w in (
+            "batata", "batatas", "pantorrilla", "pantorrillas",
+            "gemelo", "gemelos", "soleo", "sóleo", "gastrocnemio"
+        )) or bool(re.search(r"\b(pie|pies|tobillo|tobillos)\b", t_clean))
+
         has_femorales = any(w in t_clean for w in ("femoral", "femorales", "isquio", "isquios", "isquiotibial", "isquiotibiales"))
         has_quads = any(w in t_clean for w in ("cuadriceps", "cuádriceps", "vasto"))
         has_glutes = any(w in t_clean for w in ("gluteo", "glúteo", "gluteos", "glúteos", "cadera", "hip thrust"))
-        has_calves = is_triceps_sural or any(w in t_clean for w in ("batata", "batatas", "pantorrilla", "pantorrillas", "gemelo", "gemelos", "soleo", "sóleo")) or bool(re.search(r"\b(pie|pies|tobillo|tobillos)\b", t_clean))
         has_legs = any(w in t_clean for w in ("pierna", "piernas", "tren inferior")) or has_femorales or has_quads or has_glutes or has_calves
 
         has_hombros = any(w in t_clean for w in ("hombro", "hombros", "deltoide", "deltoides", "press militar"))
         has_pecho = any(w in t_clean for w in ("pecho", "pechos", "pectoral", "pectorales", "flexiones de pecho", "banca", "apertura"))
         has_espalda = any(w in t_clean for w in ("espalda", "espaldas", "dorsal", "dorsales", "traccion", "tracción", "remo", "remos", "jalon", "jalón", "dominada", "dominadas"))
         has_biceps = any(w in t_clean for w in ("bicep", "biceps", "bíceps", "curl de biceps", "curl martillo"))
-        has_triceps = (("tricep" in t_clean or "triceps" in t_clean or "tríceps" in t_clean or "fondos" in t_clean) and not is_triceps_sural)
+        has_triceps = has_arm_triceps_word
         has_brazos = any(w in t_clean for w in ("brazo", "brazos")) or has_biceps or has_triceps
         has_core = any(w in t_clean for w in ("abdomen", "abdominal", "abdominales", "core", "estabilidad lumbar", "plancha"))
         has_cardio = any(w in t_clean for w in ("aerobico", "aeróbico", "aerobicos", "aeróbicos", "movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa", "cardio", "cardiovascular", "calidad cardiovascular", "resistencia", "corazon", "corazón"))
+        has_upper = any(w in t_clean for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso")) or (has_pecho and has_espalda)
 
-        # COMBINACIONES ANATÓMICAS DE ALTA PRECISIÓN:
+        # 1. COMBINACIONES ANATÓMICAS DE ALTA PRECISIÓN (PRIORIDAD MÁXIMA):
         # A) Piernas y Hombros (CERO pecho, CERO espalda/remo, CERO bíceps, CERO tríceps)
         if has_legs and has_hombros and not (has_pecho or has_espalda):
             return "piernas_hombros"
@@ -660,37 +541,61 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         if has_hombros and has_brazos and not (has_legs or has_pecho or has_espalda):
             return "brazos_hombros"
 
-        # H) Piernas y Core
+        # H) Tríceps y Piernas
+        if has_arm_triceps_word and has_legs and not (has_pecho or has_espalda or has_hombros):
+            return "triceps_piernas"
+
+        # I) Piernas y Core
         if has_legs and has_core and not (has_pecho or has_espalda or has_hombros or has_brazos):
             return "piernas_core"
 
-        # I) Piernas y Cardio
+        # J) Piernas y Cardio
         if has_legs and has_cardio and not (has_pecho or has_espalda or has_hombros):
             return "piernas_cardio"
 
-        # J) Pecho y Espalda / Tren Superior general con Piernas
-        has_upper = any(w in t_clean for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso")) or (has_pecho and has_espalda)
+        # K) Piernas y Tren Superior
         if has_legs and (has_pecho or has_espalda or has_upper):
             return "piernas_tren_superior"
 
-        if has_upper and has_core:
+        # L) Tren Superior y Core
+        if (has_upper or has_pecho or has_espalda or has_brazos) and has_core and not has_legs:
             return "tren_superior_core"
 
-        # ZONAS AISLADAS EXCLUSIVAS:
+        # 2. SOLICITUDES EXCLUSIVAS DE ZONA O GRUPO AISLADO
+        # Sub-área anatómica AISLADA de Pierna: Pantorrillas, Batatas, Sóleo, Pies y Tobillos
+        is_pain_report = any(w in t for w in ("molestia", "dolor", "lesion", "lesión", "inflama", "no demanden", "evitar", "sin demandar"))
+        if has_calves and not is_pain_report and not any(w in t_clean for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen")):
+            return "pantorrillas_pies"
+        if has_calves and is_pain_report:
+            return "tren_superior"
+
+        # Sub-áreas aisladas de pierna
+        if has_quads and not any(w in t_clean for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
+            return "cuadriceps"
+        if has_femorales and not any(w in t_clean for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
+            return "femorales_isquios"
+        if has_glutes and not any(w in t_clean for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
+            return "gluteos"
+
+        # Solicitud de solo hombros
         if has_hombros and not (has_legs or has_pecho or has_espalda or has_brazos or has_core):
             return "hombros"
 
+        # Solicitud de solo pecho
         if has_pecho and not (has_espalda or has_brazos or has_legs or has_hombros):
             return "pecho"
 
+        # Solicitud de solo espalda
         if has_espalda and not (has_pecho or has_brazos or has_legs or has_hombros):
             return "espalda"
 
+        # Solicitud aeróbica / cardio
         if has_cardio and not (has_legs or has_pecho or has_espalda or has_hombros or has_brazos):
             return "aerobicos"
 
+        # Solicitud de piernas
         if has_legs:
-            if any(w in t for w in ("semana", "semanal", "lunes a viernes", "lunes a", "dias", "días")):
+            if any(w in t for w in ("semana", "semanal", "lunes a viernes", "lunes a", "dias", "días", "dias de la semana")):
                 return "solo_piernas"
             return "piernas"
 
@@ -706,9 +611,6 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
             if any(w in t for w in ("semana", "semanal", "lunes a viernes", "dias", "días")):
                 return "solo_core"
             return "core"
-
-        if has_cardio:
-            return "solo_cardio"
 
         # 4. Plan Semanal General / Recomendado por IA (cuando no pide una zona específica)
         if any(w in t for w in (
@@ -4619,7 +4521,8 @@ Devuelve SOLO JSON."""
             "piernas_hombros": (
                 "ESPECIALIZACIÓN ESTRICTA EN PIERNAS Y HOMBROS: El usuario solicitó EXCLUSIVAMENTE ejercicios para PIERNAS (Cuádriceps, Isquiotibiales/Femorales, Glúteos, Gemelos/Sóleo) y HOMBROS (Deltoides anterior, lateral, posterior, press militar, elevaciones laterales, flexiones en pica). "
                 "¡ESTÁ TERMINANTEMENTE PROHIBIDO incluir ejercicios de Pecho (cero flexiones comunes, cero aperturas), Espalda (cero dominadas, cero remos), Bíceps (cero curls) y Tríceps (cero fondos en silla)! "
-                "CADA EJERCICIO DEBE PERTENECER RIGUROSAMENTE A PIERNAS O A HOMBROS. CERO EJERCICIOS DE OTRAS ZONAS."
+                "CADA EJERCICIO DEBE PERTENECER RIGUROSAMENTE A PIERNAS O A HOMBROS. CERO EJERCICIOS DE OTRAS ZONAS. "
+                "¡OBLIGATORIO: Debes incluir ejercicios de piernas y ejercicios de hombros en la misma rutina, combinándolos armónicamente! NUNCA te niegues ni excuses a entrenar hombros con pretextos de fatiga, principiante o microciclo."
             ),
             "pecho_femorales": (
                 "ESPECIALIZACIÓN ESTRICTA EN PECHO Y FEMORALES (ISQUIOTIBIALES): El usuario solicitó EXCLUSIVAMENTE ejercicios para PECHO (Flexiones, Pectoral) y FEMORALES/ISQUIOTIBIALES (Curl femoral en suelo, Peso muerto rumano, Buenos días). "
