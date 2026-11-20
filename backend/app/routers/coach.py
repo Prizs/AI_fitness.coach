@@ -144,10 +144,11 @@ CLINICAL_INJURY_PROFILES = {
         ),
         "prohibited_exercise_terms": (
             "press militar", "shoulder press", "press tras nuca", "fondos en paralelas",
-            "dips", "elevacion lateral pesada", "elevación lateral pesada",
+            "dips", "elevacion lateral", "elevación lateral", "elevaciones lateral",
+            "pica", "pike", "press de hombros",
             "press de banca con agarre ancho", "dominadas pronas anchas", "face pull pesado"
         ),
-        "prohibited_prompt_text": "Cero press militar vertical sobre la cabeza, press tras nuca, fondos en paralelas o abducciones forzadas de hombro.",
+        "prohibited_prompt_text": "Cero press militar vertical sobre la cabeza, press tras nuca, flexiones en pica, fondos en paralelas o elevaciones laterales de hombro.",
         "safe_prompt_text": "Prioriza RUTINA COMPLETA DE PIERNAS Y GLÚTEOS (sentadillas, prensa, zancadas, puentes de glúteo) o trabajo de brazos con codos pegados al cuerpo (curl de bíceps pegado, extensiones de tríceps en polea baja, core en colchoneta). Cero carga sobre el manguito rotador.",
         "replacements": {
             "Press militar": "Sentadilla libre asistida con peso corporal",
@@ -155,6 +156,9 @@ CLINICAL_INJURY_PROFILES = {
             "Fondos en paralelas": "Puente de glúteos en suelo",
             "Press de banca": "Remo con mancuernas con codos pegados a las costillas",
             "Elevaciones laterales": "Curl de bíceps con codos firmes pegados al torso",
+            "Elevación lateral": "Curl de bíceps con codos firmes pegados al torso",
+            "Flexiones en pica": "Puente de glúteos en suelo con control",
+            "Pike": "Puente de glúteos en suelo con control",
         },
         "quick_replies": [
             "🦵 Rutina de Piernas y Glúteos (Cero hombro)",
