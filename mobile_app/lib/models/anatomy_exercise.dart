@@ -92,7 +92,13 @@ String resolveGuaranteedGifUrl({
         // 11. Sentadilla en pared mostrando sentadilla estándar
         ((nameLower.contains('wall sit') || nameLower.contains('en pared')) && !cleanExisting.contains('wall')) ||
         // 12. Jumping Jacks mostrando burpees
-        ((nameLower.contains('jumping jack') || nameLower.contains('saltos en tijera')) && !cleanExisting.contains('jack'));
+        ((nameLower.contains('jumping jack') || nameLower.contains('saltos en tijera')) && !cleanExisting.contains('jack')) ||
+        // 13. Espalda / Swimmers / Pájaros / Retracción mostrando Press de Hombros o Sentadilla o Gemelos
+        ((nameLower.contains('swimmer') || nameLower.contains('natacion') || nameLower.contains('natación') || nameLower.contains('pajaro') || nameLower.contains('pájaros') || nameLower.contains('pajaros') || nameLower.contains('retraccion') || nameLower.contains('retracción') || nameLower.contains('back slide') || nameLower.contains('espalda') || nameLower.contains('dorsal') || nameLower.contains('remo')) && (cleanExisting.contains('shoulder-press') || cleanExisting.contains('seated-overhead') || cleanExisting.contains('potty') || cleanExisting.contains('squat') || cleanExisting.contains('calf') || cleanExisting.contains('leg-curl') || cleanExisting.contains('bench-press'))) ||
+        // 14. Piernas / Talones / Femorales mostrando Remo con Toalla o Hombros
+        ((nameLower.contains('pierna') || nameLower.contains('talon') || nameLower.contains('talón') || nameLower.contains('sentadilla') || nameLower.contains('cuadricep') || nameLower.contains('femoral') || nameLower.contains('isquio') || nameLower.contains('gluteo') || nameLower.contains('glúteo')) && (cleanExisting.contains('row-with-towel') || cleanExisting.contains('upper-back') || cleanExisting.contains('shoulder-press') || cleanExisting.contains('seated-overhead'))) ||
+        // 15. Hombros mostrando Remo Invertido o Gemelos o Sentadillas
+        ((nameLower.contains('hombro') || nameLower.contains('deltoid') || nameLower.contains('militar') || nameLower.contains('lateral raise') || nameLower.contains('pike') || nameLower.contains('pica')) && (cleanExisting.contains('row-bent-knees') || cleanExisting.contains('calf') || cleanExisting.contains('potty') || cleanExisting.contains('standing-calf')));
 
     if (!hasMismatch) {
       return cleanExisting;
@@ -334,12 +340,15 @@ String resolveGuaranteedGifUrl({
 
   // 26a. Remo / Tracción con Toalla en Marco de Puerta o Calistenia
   if (nameLower.contains('toalla') || nameLower.contains('towel')) {
+    if (nameLower.contains('pie') || nameLower.contains('pierna') || nameLower.contains('talon') || nameLower.contains('talón') || nameLower.contains('femoral') || nameLower.contains('isquio')) {
+      return _kGifBase + 'hamstrings/single-leg-platform-slide.gif';
+    }
     return _kGifBase + 'upper-back/bodyweight-standing-row-with-towel.gif';
   }
 
   // 26b. Natación Estática en Suelo / Swimmers (Espalda Media / Dorsal / Erectores)
   if (nameLower.contains('swimmer') || nameLower.contains('natacion') || nameLower.contains('natación')) {
-    return _kGifBase + 'lats/band-close-grip-pulldown.gif';
+    return _kGifBase + 'glutes/swimmer-kicks-v-2-male.gif';
   }
 
   // 26c. Pájaros Escapulares / Decúbito Prono / Deltoides Posterior / Romboides
@@ -349,12 +358,12 @@ String resolveGuaranteedGifUrl({
 
   // 26d. Back Slides / Deslizamiento Dorsal Escapular en Suelo
   if (nameLower.contains('back slide') || nameLower.contains('deslizamiento dorsal')) {
-    return _kGifBase + 'upper-back/band-one-arm-twisting-seated-row.gif';
+    return _kGifBase + 'upper-back/bodyweight-standing-row.gif';
   }
 
   // 26e. Retracción Escapular / Prone Y-T-W en Suelo
   if (nameLower.contains('retraccion escapular') || nameLower.contains('retracción escapular') || nameLower.contains('y-t-w') || nameLower.contains('escapular')) {
-    return _kGifBase + 'upper-back/band-one-arm-twisting-seated-row.gif';
+    return _kGifBase + 'delts/band-y-raise.gif';
   }
 
   // 26. Remos / Jalones / Dominadas

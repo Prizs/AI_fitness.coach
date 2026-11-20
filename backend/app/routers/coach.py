@@ -2184,6 +2184,18 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
                 ("Press plano en suelo con toalla isométrica (Básico)", "Pectoral Mayor", "Deltoides anterior", "pushup"),
                 ("Flexiones con manos en banco o silla firme (Básico)", "Pectoral Mayor", "Core", "pushup"),
                 ("Flexiones en pared con agarre amplio para estiramiento pectoral (Básico)", "Pectoral Mayor", "Hombros", "pushup"),
+                ("Flexiones con apoyo en escalón bajo (Básico)", "Pectorales", "Tríceps", "pushup"),
+                ("Aperturas isométricas contra marco de puerta (Básico)", "Pectoral Mayor", "Hombros", "fly"),
+                ("Flexiones lentas con parada isométrica de 2s a mitad (Básico)", "Pectoral Mayor", "Tríceps", "pushup"),
+                ("Empuje pectoral unilateral contra pared (Básico)", "Pectoral Mayor", "Deltoides", "pushup"),
+                ("Flexiones asistidas con cojín bajo el pecho (Básico)", "Pectorales", "Tríceps", "pushup"),
+                ("Aperturas en suelo boca arriba con botellas suaves (Básico)", "Pectoral Mayor", "Deltoides", "fly"),
+                ("Flexiones en esquina de pared con rango corto seguro (Básico)", "Pectorales", "Hombros", "pushup"),
+                ("Press de pecho en suelo sin carga con contracción máxima (Básico)", "Pectoral Mayor", "Tríceps", "pushup"),
+                ("Flexiones de rodillas con agarre neutro en libros (Básico)", "Pectorales", "Tríceps", "pushup"),
+                ("Cruce de brazos isométrico frente al esternón (Básico)", "Pectoral Mayor", "Serrato", "fly"),
+                ("Flexiones inclinadas lentas con tempo 3-1-2 (Básico)", "Pectoral Clavicular", "Tríceps", "pushup"),
+                ("Aperturas en decúbito supino con brazos en cruz (Básico)", "Pectoral Mayor", "Escápula", "fly"),
             ],
             "media": [
                 ("Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "Pectoral Mayor", "Tríceps", "pushup"),
@@ -2194,6 +2206,18 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
                 ("Flexiones con pausa isométrica de 2s a 3cm del suelo (Intermedio)", "Pectoral Mayor", "Core", "pushup"),
                 ("Flexiones arquero asistidas alternadas en suelo (Intermedio)", "Pectoral Mayor", "Tríceps", "pushup"),
                 ("Flexiones escapulares en suelo (Push-up plus) (Intermedio)", "Serrato anterior, Pectoral", "Escápula", "pushup"),
+                ("Flexiones con despegue alterno de manos en suelo (Intermedio)", "Pectoral Mayor", "Tríceps", "pushup"),
+                ("Fondos profundos entre dos sillas estables (Intermedio)", "Pectoral inferior", "Tríceps", "pushup"),
+                ("Flexiones con desplazamiento lateral de manos (Intermedio)", "Pectoral Mayor", "Deltoides", "pushup"),
+                ("Flexiones con elevación de un pie para mayor carga (Intermedio)", "Pectoral Mayor", "Core", "pushup"),
+                ("Flexiones diamante estrictas en suelo (Intermedio)", "Pectoral cerrado, Tríceps", "Hombros", "pushup"),
+                ("Flexiones declinadas con manos sobre libros (Intermedio)", "Pectoral Clavicular", "Tríceps", "pushup"),
+                ("Flexiones esfinge intermedias con codos cerrados (Intermedio)", "Pectoral, Tríceps", "Core", "pushup"),
+                ("Flexiones con toque al hombro cruzado al subir (Intermedio)", "Pectoral Mayor", "Estabilizadores", "pushup"),
+                ("Flexiones con tempo excéntrico de 4s (Intermedio)", "Pectoral Mayor", "Tríceps", "pushup"),
+                ("Aperturas profundas en suelo con toallas y control excéntrico (Intermedio)", "Pectoral Mayor", "Hombros", "fly"),
+                ("Flexiones con pies en sofá y pausa abajo (Intermedio)", "Pectoral Clavicular", "Deltoides", "pushup"),
+                ("Flexiones en T con rotación torácica al subir (Intermedio)", "Pectoral Mayor", "Oblicuos", "pushup"),
             ],
             "alta": [
                 ("Flexiones con palmada o salto pliométrico (Avanzado)", "Pectoral Mayor", "Tríceps, Potencia", "pushup"),
@@ -2216,6 +2240,18 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
                 ("Deslizamiento dorsal escapular en suelo boca arriba (Back Slides) (Básico)", "Dorsal Ancho, Romboides", "Core", "mobility"),
                 ("Pájaros escapulares en decúbito prono sin carga (Básico)", "Romboides, Trapecio", "Deltoides", "fly"),
                 ("Natación estática en suelo boca abajo (Swimmers) (Básico)", "Dorsal Ancho, Erectores", "Glúteos", "mobility"),
+                ("Remo de pie con toalla y tensión isométrica (Básico)", "Dorsal Ancho", "Bíceps", "row"),
+                ("Elevación escapular en suelo con brazos en Y (Básico)", "Trapecio inferior, Dorsal", "Core", "mobility"),
+                ("Jalón dorsal hacia el pecho con toalla tensa en decúbito (Básico)", "Dorsal Ancho", "Romboides", "row"),
+                ("Tracción horizontal en suelo con deslizador de brazos (Básico)", "Dorsal Ancho", "Core", "row"),
+                ("Superman alternado en X con elevación contralateral (Básico)", "Erectores, Dorsal", "Glúteos", "mobility"),
+                ("Retracción escapular contra pared con codos pegados (Básico)", "Espalda media", "Romboides", "mobility"),
+                ("Remo sentado en suelo con toalla bajo los pies (Básico)", "Dorsal Ancho", "Bíceps", "row"),
+                ("Deslizamiento dorsal en pared con brazos en W (Básico)", "Dorsal, Trapecio", "Hombros", "mobility"),
+                ("Pájaros en suelo con pulgares hacia arriba (Básico)", "Romboides", "Deltoides posterior", "fly"),
+                ("Tracción dorsal suave con brazos flexionados en decúbito (Básico)", "Dorsal Ancho", "Erectores", "row"),
+                ("Extensiones lumbares suaves en suelo con manos en nuca (Básico)", "Erectores Espinales", "Glúteos", "mobility"),
+                ("Isometría dorsal en suelo con codos clavados (Básico)", "Dorsal Ancho", "Romboides", "row"),
             ],
             "media": [
                 ("Remo invertido bajo mesa firme con talones apoyados (Intermedio)", "Dorsal Ancho", "Bíceps, Core", "row"),
@@ -2226,6 +2262,18 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
                 ("Remo unilateral con mochila o garrafa firme (Intermedio)", "Dorsal Ancho", "Bíceps", "row"),
                 ("Pájaros en decúbito prono con pausa de 2s arriba (Intermedio)", "Romboides, Trapecio", "Deltoides posterior", "fly"),
                 ("Elevación escapular en suelo con brazos en Y (Intermedio)", "Trapecio inferior, Dorsal", "Core", "mobility"),
+                ("Dominadas asistidas con apoyo de pies en silla (Intermedio)", "Dorsal Ancho", "Bíceps", "row"),
+                ("Remo invertido con agarre supino bajo mesa (Intermedio)", "Dorsal Ancho, Bíceps", "Antebrazo", "row"),
+                ("Tracción dorsal con pausa isométrica de 3s en el pecho (Intermedio)", "Dorsal Ancho", "Romboides", "row"),
+                ("Pájaros con mochila ligera en posición de bisagra (Intermedio)", "Deltoides posterior, Romboides", "Trapecio", "fly"),
+                ("Remo unilateral de pie con toalla tensada con el pie (Intermedio)", "Dorsal Ancho", "Bíceps", "row"),
+                ("Deslizamiento escapular en suelo con toalla y resistencia activa (Intermedio)", "Dorsal Ancho", "Core", "mobility"),
+                ("Superman con nado dinámico de brazos hacia los costados (Intermedio)", "Erectores, Dorsal", "Glúteos", "mobility"),
+                ("Remo invertido con pausa de 2s en la contracción alta (Intermedio)", "Dorsal Ancho", "Escápula", "row"),
+                ("Jalón en suelo con deslizador y extensión completa (Intermedio)", "Dorsal Ancho", "Bíceps", "row"),
+                ("Retracción escapular en plancha inclinada sobre mesa (Intermedio)", "Romboides, Serrato", "Core", "mobility"),
+                ("Remo en pronación con mochila firme a dos manos (Intermedio)", "Espalda Media, Dorsal", "Bíceps", "row"),
+                ("Pájaros escapulares en T con pausa isométrica de 3s (Intermedio)", "Romboides", "Trapecio medio", "fly"),
             ],
             "alta": [
                 ("Remo invertido a una sola mano bajo mesa (Avanzado)", "Dorsal Ancho", "Core, Bíceps", "row"),
@@ -2248,6 +2296,18 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
                 ("Elevaciones en T con toalla generando tensión isométrica (Básico)", "Deltoides Posterior", "Romboides", "lateral-raise"),
                 ("Pájaros posteriores sin peso en posición de bisagra (Básico)", "Deltoides Posterior", "Trapecio", "fly"),
                 ("Press de hombros isométrico hacia arriba contra marco (Básico)", "Deltoides Anterior", "Tríceps", "shoulder-press"),
+                ("Elevaciones laterales con botellas de agua ligeras (Básico)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+                ("Rotaciones externas de hombro con toalla bajo el codo (Básico)", "Manguito Rotador", "Deltoides", "mobility"),
+                ("Elevaciones frontales con toalla y tensión hacia afuera (Básico)", "Deltoides Anterior", "Trapecio", "lateral-raise"),
+                ("Deslizamientos en pared en posición de W (Básico)", "Deltoides, Escápula", "Trapecio inferior", "mobility"),
+                ("Isometría de abducción contra pared con brazo a 90° (Básico)", "Deltoides Lateral", "Estabilizadores", "lateral-raise"),
+                ("Círculos de brazos en reversa con tempo controlado (Básico)", "Deltoides Completo", "Escápula", "mobility"),
+                ("Pájaros posteriores apoyado en marco inclinado (Básico)", "Deltoides Posterior", "Romboides", "fly"),
+                ("Press de hombros sentado con resistencia corporal voluntaria (Básico)", "Deltoides", "Tríceps", "shoulder-press"),
+                ("Elevaciones escapulares en Y boca arriba (Básico)", "Deltoides Posterior", "Trapecio", "lateral-raise"),
+                ("Abducción de hombros con banda suave o toalla tensa (Básico)", "Deltoides Lateral", "Manguito", "lateral-raise"),
+                ("Rotaciones internas y externas de pie sin peso (Básico)", "Manguito Rotador", "Hombros", "mobility"),
+                ("Elevaciones en V frontal con pausa de 2s arriba (Básico)", "Deltoides Anterior", "Trapecio", "lateral-raise"),
             ],
             "media": [
                 ("Flexiones en pica en suelo para hombros (Pike Push-ups) (Intermedio)", "Deltoides", "Tríceps, Trapecio", "shoulder-press"),
@@ -2258,6 +2318,18 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
                 ("Plancha escapular con empuje anterior (Dolphin Push-ups) (Intermedio)", "Deltoides", "Core", "shoulder-press"),
                 ("Elevaciones en Y-W-T en suelo con elevación torácica (Intermedio)", "Deltoides posterior", "Trapecio medio", "mobility"),
                 ("Pike hold estático en posición invertida 30s (Intermedio)", "Deltoides", "Core", "shoulder-press"),
+                ("Flexiones en pica con pies elevados en escalón (Intermedio)", "Deltoides", "Tríceps", "shoulder-press"),
+                ("Paseo de oso con empuje escapular continuo (Bear Crawl) (Intermedio)", "Deltoides", "Core", "shoulder-press"),
+                ("Elevaciones laterales con pausa isométrica de 2s arriba (Intermedio)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+                ("Elevaciones frontales alternadas con garrafa o mochila (Intermedio)", "Deltoides Anterior", "Trapecio", "lateral-raise"),
+                ("Press de hombros unilateral con garrafa cargada (Intermedio)", "Deltoides Anterior", "Tríceps", "shoulder-press"),
+                ("Pájaros en decúbito prono con brazos en cruz y pausa (Intermedio)", "Deltoides Posterior", "Romboides", "fly"),
+                ("Plancha alta con toques alternos al hombro contrario (Intermedio)", "Deltoides", "Core", "shoulder-press"),
+                ("Rotaciones externas de hombro con libro o peso ligero (Intermedio)", "Manguito Rotador", "Deltoides Posterior", "mobility"),
+                ("Elevaciones laterales excéntricas bajando en 4 segundos (Intermedio)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+                ("Press Arnold casero con garrafas ligeras sentado (Intermedio)", "Deltoides Completo", "Tríceps", "shoulder-press"),
+                ("Dolphin push-up dinámico con transición a plancha (Intermedio)", "Deltoides", "Serrato anterior", "shoulder-press"),
+                ("Deslizamientos en pared unilaterales con toalla (Intermedio)", "Deltoides", "Manguito", "mobility"),
             ],
             "alta": [
                 ("Flexiones en pica con pies elevados en silla firme (Avanzado)", "Deltoides Anterior y Lateral", "Tríceps, Core", "shoulder-press"),
@@ -2922,6 +2994,11 @@ CALISTHENIC_CHEST_POOL = [
     {"name": "Flexiones con pausa isométrica de 2s a 3cm del suelo (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Core", "animation_key": "pushup"},
     {"name": "Flexiones arquero asistidas alternadas en suelo (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
     {"name": "Flexiones escapulares en suelo (Push-up plus) (Intermedio)", "primary_muscle": "Serrato anterior, Pectoral", "secondary_muscle": "Escápula", "animation_key": "pushup"},
+    {"name": "Flexiones con palmada o despegue pliométrico (Avanzado)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps, Potencia", "animation_key": "pushup"},
+    {"name": "Flexiones pseudo-planche con inclinación anterior (Avanzado)", "primary_muscle": "Pectoral, Deltoides", "secondary_muscle": "Core", "animation_key": "pushup"},
+    {"name": "Fondos en paralelas o dos sillas firmes (Avanzado)", "primary_muscle": "Pectoral inferior", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Flexiones declinadas con pies elevados a 45° (Avanzado)", "primary_muscle": "Pectoral Clavicular", "secondary_muscle": "Hombros", "animation_key": "pushup"},
+    {"name": "Flexiones a una mano asistidas con brazo extendido (Avanzado)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Core", "animation_key": "pushup"},
 ]
 
 CALISTHENIC_BACK_POOL = [
@@ -2935,11 +3012,18 @@ CALISTHENIC_BACK_POOL = [
     {"name": "Natación estática en suelo boca abajo (Swimmers) (Básico)", "primary_muscle": "Dorsal Ancho, Erectores", "secondary_muscle": "Glúteos", "animation_key": "mobility"},
     {"name": "Remo invertido bajo mesa firme con talones apoyados (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps, Core", "animation_key": "row"},
     {"name": "Tracción dorsal isométrica unilateral en puerta (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides", "animation_key": "row"},
-    {"name": "Remo en suelo con toalla deslizante (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
-    {"name": "Deslizamientos dorsales en pared con control escapular (Intermedio)", "primary_muscle": "Dorsal, Romboides", "secondary_muscle": "Hombros", "animation_key": "mobility"},
-    {"name": "Remo unilateral con mochila o garrafa firme (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Remo de pie con toalla y tensión isométrica (Básico)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Elevación escapular en suelo con brazos en Y (Básico)", "primary_muscle": "Trapecio inferior, Dorsal", "secondary_muscle": "Core", "animation_key": "mobility"},
+    {"name": "Remo unilateral con mochila firme (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Dominadas asistidas con apoyo de pies en silla (Intermedio)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Jalón dorsal hacia el pecho con toalla tensa en decúbito (Básico)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides", "animation_key": "row"},
+    {"name": "Tracción horizontal en suelo con deslizador de brazos (Básico)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Core", "animation_key": "row"},
     {"name": "Pájaros en decúbito prono con pausa de 2s arriba (Intermedio)", "primary_muscle": "Romboides, Trapecio", "secondary_muscle": "Deltoides posterior", "animation_key": "fly"},
-    {"name": "Elevación escapular en suelo con brazos en Y (Intermedio)", "primary_muscle": "Trapecio inferior, Dorsal", "secondary_muscle": "Core", "animation_key": "mobility"},
+    {"name": "Remo invertido con agarre supino bajo mesa (Intermedio)", "primary_muscle": "Dorsal Ancho, Bíceps", "secondary_muscle": "Antebrazo", "animation_key": "row"},
+    {"name": "Dominadas estrictas en barra o saliente firme (Avanzado)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Bíceps", "animation_key": "row"},
+    {"name": "Dominadas con agarre supino (Chin-ups) (Avanzado)", "primary_muscle": "Dorsal Ancho, Bíceps", "secondary_muscle": "Core", "animation_key": "row"},
+    {"name": "Remo invertido a una sola mano bajo mesa (Avanzado)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Core", "animation_key": "row"},
+    {"name": "Dominadas con agarre neutro cerrado (Avanzado)", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Braquial", "animation_key": "row"},
 ]
 
 CALISTHENIC_SHOULDERS_POOL = [
@@ -2950,11 +3034,19 @@ CALISTHENIC_SHOULDERS_POOL = [
     {"name": "Elevaciones frontales suaves con contracción voluntaria (Básico)", "primary_muscle": "Deltoides Anterior", "secondary_muscle": "Trapecio", "animation_key": "lateral-raise"},
     {"name": "Elevaciones en T con toalla generando tensión isométrica (Básico)", "primary_muscle": "Deltoides Posterior", "secondary_muscle": "Romboides", "animation_key": "lateral-raise"},
     {"name": "Pájaros posteriores sin peso en posición de bisagra (Básico)", "primary_muscle": "Deltoides Posterior", "secondary_muscle": "Trapecio", "animation_key": "fly"},
+    {"name": "Press de hombros isométrico hacia arriba contra marco (Básico)", "primary_muscle": "Deltoides Anterior", "secondary_muscle": "Tríceps", "animation_key": "shoulder-press"},
     {"name": "Flexiones en pica en suelo para hombros (Pike Push-ups) (Intermedio)", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps, Trapecio", "animation_key": "shoulder-press"},
     {"name": "Pájaros posteriores con garrafas ligeras o toalla en bisagra (Intermedio)", "primary_muscle": "Deltoides Posterior", "secondary_muscle": "Romboides", "animation_key": "fly"},
     {"name": "Elevaciones laterales con mochila o garrafa suave (Intermedio)", "primary_muscle": "Deltoides Lateral", "secondary_muscle": "Trapecio", "animation_key": "lateral-raise"},
+    {"name": "Deslizamientos en pared con toalla (Wall Slides con fricción) (Intermedio)", "primary_muscle": "Deltoides", "secondary_muscle": "Serrato anterior", "animation_key": "mobility"},
     {"name": "Elevaciones frontales con toalla generando tensión hacia afuera (Intermedio)", "primary_muscle": "Deltoides Anterior", "secondary_muscle": "Trapecio", "animation_key": "lateral-raise"},
     {"name": "Plancha escapular con empuje anterior (Dolphin Push-ups) (Intermedio)", "primary_muscle": "Deltoides", "secondary_muscle": "Core", "animation_key": "shoulder-press"},
+    {"name": "Elevaciones en Y-W-T en suelo con elevación torácica (Intermedio)", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Trapecio medio", "animation_key": "mobility"},
+    {"name": "Pike hold estático en posición invertida 30s (Intermedio)", "primary_muscle": "Deltoides", "secondary_muscle": "Core", "animation_key": "shoulder-press"},
+    {"name": "Flexiones en pica con pies elevados en silla (Avanzado)", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps", "animation_key": "shoulder-press"},
+    {"name": "Paseo de oso con empuje escapular continuo (Bear Crawl) (Intermedio)", "primary_muscle": "Deltoides", "secondary_muscle": "Core", "animation_key": "shoulder-press"},
+    {"name": "Handstand hold estático asistido contra pared (Avanzado)", "primary_muscle": "Deltoides", "secondary_muscle": "Core, Tríceps", "animation_key": "shoulder-press"},
+    {"name": "Flexiones de hombros en pared invertidas asistidas (Avanzado)", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps", "animation_key": "shoulder-press"},
 ]
 
 GYM_CHEST_POOL = [
@@ -3008,6 +3100,8 @@ def _normalize_exercises(
     core_pool = CORE_POOLS[intensity_hint]
     mobility_pool = MOBILITY_CARDIO_POOLS[intensity_hint]
 
+    seen_names_today: set[str] = set()
+    seen_gifs_today: set[str] = set()
     seen_names = seen_names_global if seen_names_global is not None else set()
     seen_gifs = seen_gifs_global if seen_gifs_global is not None else set()
 
@@ -3251,9 +3345,12 @@ def _normalize_exercises(
 
         # Deduplication Guard Radical: CERO repetición de nombre Y CERO repetición de GIF URL
         has_dup_squat = ("sentadilla" in base_norm or "squat" in base_norm) and any("sentadilla" in str(ex.get("name", "")).lower() or "squat" in str(ex.get("name", "")).lower() for ex in exercises)
-        has_dup_squat = False
 
-        if (base_norm in seen_names) or (gif_url and gif_url in seen_gifs) or has_dup_squat:
+        is_dup_global_name = base_norm in seen_names
+        is_dup_today_name = base_norm in seen_names_today
+        is_dup_gif = bool(gif_url and ((gif_url in seen_gifs) or (gif_url in seen_gifs_today)))
+
+        if is_dup_global_name or is_dup_today_name or is_dup_gif or has_dup_squat:
             if is_no_equipment:
                 if any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
                     cand_pool = CALISTHENIC_CHEST_POOL
@@ -3275,6 +3372,8 @@ def _normalize_exercises(
                 else:
                     cand_pool = upper_pool + leg_pool + core_pool
 
+            # Prioridad 1: Candidato no visto globalmente en toda la semana ni hoy
+            found_unique = False
             for cand in cand_pool:
                 cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
                     cand["name"], cand["primary_muscle"], cand.get("animation_key", "pushup"), is_no_equipment
@@ -3283,43 +3382,7 @@ def _normalize_exercises(
                 cand_gif = get_exercise_gif(cand_clean, muscle=cand_prim, intensity=intensity_hint, is_no_equipment=is_no_equipment)
                 cand_url = (cand_gif.get("url") or "").strip()
 
-                if (cand_base not in seen_names) and (not cand_url or cand_url not in seen_gifs):
-                    clean_name = cand_clean
-                    primary = cand_prim
-                    anim_key = cand_anim
-                    base_norm = cand_base
-                    gif_meta = cand_gif
-                    gif_url = cand_url
-                    replaced_from_pool = True
-                    break
-
-        # HARD SAFETY: UNDER ZERO CIRCUMSTANCES ALLOW DUPLICATE BASE NAME IN THE WORKOUT
-        if base_norm in seen_names:
-            # Emergency search for any un-seen exercise from the subpool matching this exercise's muscle group
-            cand_p = (clean_name + " " + primary + " " + (requested_focus or "")).lower()
-            if any(k in cand_p for k in ("pecho", "pectoral")):
-                fallback_search = CALISTHENIC_CHEST_POOL if is_no_equipment else GYM_CHEST_POOL
-            elif any(k in cand_p for k in ("espalda", "dorsal", "remo")):
-                fallback_search = CALISTHENIC_BACK_POOL if is_no_equipment else [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif any(k in cand_p for k in ("hombro", "deltoid")):
-                fallback_search = CALISTHENIC_SHOULDERS_POOL if is_no_equipment else [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
-            elif any(k in cand_p for k in ("pierna", "cuadriceps", "femoral", "gluteo", "pantorrilla", "gemelo", "soleo")):
-                fallback_search = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
-            elif any(k in cand_p for k in ("core", "abdomen", "plank", "crunch")):
-                fallback_search = core_pool
-            elif any(k in cand_p for k in ("cardio", "aerobico", "aeróbico")):
-                fallback_search = mobility_pool
-            else:
-                fallback_search = (CALISTHENIC_CHEST_POOL + CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL + leg_pool) if is_no_equipment else (upper_pool + leg_pool + core_pool)
-            found_unique = False
-            for cand in fallback_search:
-                cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
-                    cand["name"], cand["primary_muscle"], cand.get("animation_key", "pushup"), is_no_equipment
-                )
-                cand_base = re.sub(r"\(.*?\)", "", cand_clean).strip().lower()
-                cand_gif = get_exercise_gif(cand_clean, muscle=cand_prim, intensity=intensity_hint, is_no_equipment=is_no_equipment)
-                cand_url = (cand_gif.get("url") or "").strip()
-                if cand_base not in seen_names and (not cand_url or cand_url not in seen_gifs):
+                if (cand_base not in seen_names and cand_base not in seen_names_today) and (not cand_url or (cand_url not in seen_gifs and cand_url not in seen_gifs_today)):
                     clean_name = cand_clean
                     primary = cand_prim
                     anim_key = cand_anim
@@ -3328,12 +3391,34 @@ def _normalize_exercises(
                     gif_url = cand_url
                     found_unique = True
                     break
+
+            # Prioridad 2: Si el pool semanal se agotó por especialización de 5 días, usar no visto HOY (CERO duplicados intra-día)
             if not found_unique:
-                # Discard duplicate exercise completely
+                for cand in cand_pool:
+                    cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
+                        cand["name"], cand["primary_muscle"], cand.get("animation_key", "pushup"), is_no_equipment
+                    )
+                    cand_base = re.sub(r"\(.*?\)", "", cand_clean).strip().lower()
+                    cand_gif = get_exercise_gif(cand_clean, muscle=cand_prim, intensity=intensity_hint, is_no_equipment=is_no_equipment)
+                    cand_url = (cand_gif.get("url") or "").strip()
+
+                    if (cand_base not in seen_names_today) and (not cand_url or cand_url not in seen_gifs_today):
+                        clean_name = cand_clean
+                        primary = cand_prim
+                        anim_key = cand_anim
+                        base_norm = cand_base
+                        gif_meta = cand_gif
+                        gif_url = cand_url
+                        found_unique = True
+                        break
+
+            if not found_unique:
                 continue
 
+        seen_names_today.add(base_norm)
         seen_names.add(base_norm)
         if gif_url:
+            seen_gifs_today.add(gif_url)
             seen_gifs.add(gif_url)
 
         exercises.append(
@@ -3962,7 +4047,7 @@ def _normalize_structured_plan(
                     f"Hombros: Deltoides 360° y Retracción ({badge_lbl})",
                 ]
                 idx = day_idx % len(day_titles)
-                diverse_day_exs = _generate_diverse_session("hombros", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)
+                diverse_day_exs = _generate_diverse_session("hombros", int_hint, seed=day_idx * 4, is_no_equipment=is_no_equipment)[:4]
                 return day_titles[idx], _normalize_exercises(
                     diverse_day_exs,
                     intensity=intensity,
@@ -4142,7 +4227,7 @@ def _normalize_structured_plan(
                     f"Pecho: Bombeo y Congestión Pectoral ({badge_lbl})",
                 ]
                 idx = day_idx % len(day_titles)
-                diverse_day_exs = _generate_diverse_session("pecho", int_hint, seed=dynamic_base_seed + day_idx * 19, is_no_equipment=is_no_equipment)
+                diverse_day_exs = _generate_diverse_session("pecho", int_hint, seed=day_idx * 4, is_no_equipment=is_no_equipment)[:4]
                 return day_titles[idx], _normalize_exercises(
                     diverse_day_exs,
                     intensity=intensity,
@@ -4162,7 +4247,7 @@ def _normalize_structured_plan(
                     f"Espalda: Postura Escapular y Romboides ({badge_lbl})",
                 ]
                 idx = day_idx % len(day_titles)
-                diverse_day_exs = _generate_diverse_session("espalda", int_hint, seed=dynamic_base_seed + day_idx * 19, is_no_equipment=is_no_equipment)
+                diverse_day_exs = _generate_diverse_session("espalda", int_hint, seed=day_idx * 4, is_no_equipment=is_no_equipment)[:4]
                 return day_titles[idx], _normalize_exercises(
                     diverse_day_exs,
                     intensity=intensity,

@@ -238,11 +238,11 @@ CURATED_BY_INTENSITY = [
     # 4a. Curl Femoral en Suelo con Deslizador / Toalla (Hamstring Slide)
     {
         "match_any": ("deslizador", "toalla en piso", "toalla en suelo", "piso liso", "curl femoral en suelo", "femoral en suelo", "slide curl", "deslizante", "curl de piernas deslizante"),
-        "exclude_any": ("maquina", "máquina", "lever"),
+        "exclude_any": ("maquina", "máquina", "lever", "remo", "dorsal", "espalda", "row", "brazo", "pecho"),
         "gifs": {
-            "baja": "https://ai-fitness-coach-wlg3.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
-            "media": "https://ai-fitness-coach-wlg3.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
-            "alta": "https://ai-fitness-coach-wlg3.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
+            "baja": "hamstrings/single-leg-platform-slide.gif",
+            "media": "hamstrings/single-leg-platform-slide.gif",
+            "alta": "hamstrings/self-assisted-inverse-leg-curl-on-floor.gif",
         },
         "biomechanics": "Flexión activa de rodillas en decúbito supino elevando la cadera en puente y deslizando los talones sobre la toalla hacia los glúteos.",
         "posture": "Pelvis en retroversión manteniendo el puente glúteo elevado sin arquear la zona lumbar, glúteos e isquiotibiales contraídos en el punto máximo.",
@@ -292,8 +292,8 @@ CURATED_BY_INTENSITY = [
         "match_any": ("sentadilla con salto", "jump squat", "salto controlado", "sentadillas con salto"),
         "exclude_any": (),
         "gifs": {
-            "baja": "quads/split-squats.gif",
-            "media": "glutes/jump-squat.gif",
+            "baja": "cardio/semi-squat-jump-male.gif",
+            "media": "cardio/semi-squat-jump-male.gif",
             "alta": "glutes/bodyweight-drop-jump-squat.gif",
         },
         "biomechanics": "Triple extensión explosiva de tobillos, rodillas y cadera con aterrizaje suave.",
@@ -331,8 +331,8 @@ CURATED_BY_INTENSITY = [
         "match_any": ("zancada con salto", "zancadas con salto", "zancadas dinamicas con salto", "zancadas dinámicas con salto", "jumping lunge", "split jump"),
         "exclude_any": (),
         "gifs": {
-            "baja": "cardio/jack-jump-male.gif",
-            "media": "cardio/jack-jump-male.gif",
+            "baja": "cardio/scissor-jumps-male.gif",
+            "media": "cardio/scissor-jumps-male.gif",
             "alta": "cardio/burpee.gif",
         },
         "biomechanics": "Salto pliométrico alternando piernas en el aire para recepción elástica en zancada, elevando la frecuencia cardíaca.",
@@ -422,8 +422,8 @@ CURATED_BY_INTENSITY = [
         "match_any": ("flexiones en pica", "flexion en pica", "pike push", "pike-push", "pino asistidas", "handstand"),
         "exclude_any": (),
         "gifs": {
-            "baja": "delts/band-shoulder-press.gif",
-            "media": "delts/band-shoulder-press.gif",
+            "baja": "triceps/handstand-push-up.gif",
+            "media": "triceps/handstand-push-up.gif",
             "alta": "triceps/handstand-push-up.gif",
         },
         "biomechanics": "Empuje vertical en inversión con peso corporal estimulando deltoides anterior, superior y tríceps.",
@@ -487,7 +487,7 @@ CURATED_BY_INTENSITY = [
         "match_any": ("extension de triceps", "extensiones de triceps", "press frances", "patada de triceps", "triceps tras nuca", "tricep extension"),
         "exclude_any": ("fondo", "dip"),
         "gifs": {
-            "baja": "triceps/bench-dip-knees-bent.gif",
+            "baja": "triceps/assisted-standing-triceps-extension-with-towel.gif",
             "media": "triceps/cable-alternate-triceps-extension.gif",
             "alta": "triceps/barbell-lying-triceps-extension.gif",
         },
@@ -643,9 +643,9 @@ CURATED_BY_INTENSITY = [
         "match_any": ("swimmers", "swimmer", "natacion estatica", "natacion en suelo", "nadador en suelo"),
         "exclude_any": (),
         "gifs": {
-            "baja": "lats/band-close-grip-pulldown.gif",
-            "media": "upper-back/band-one-arm-twisting-seated-row.gif",
-            "alta": "lats/pull-up.gif",
+            "baja": "glutes/swimmer-kicks-v-2-male.gif",
+            "media": "glutes/swimmer-kicks-v-2-male.gif",
+            "alta": "glutes/swimmer-kicks-v-2-male.gif",
         },
         "biomechanics": "Extensión torácica en decúbito prono activando erectores espinales, dorsal ancho y cadena posterior.",
         "posture": "Mirada hacia el suelo, cuello neutro, movimiento alternado de brazos y piernas sin arquear la zona lumbar.",
@@ -669,7 +669,7 @@ CURATED_BY_INTENSITY = [
         "match_any": ("back slide", "back slides", "deslizamiento dorsal"),
         "exclude_any": (),
         "gifs": {
-            "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
+            "baja": "upper-back/bodyweight-standing-row.gif",
             "media": "upper-back/cable-low-seated-row.gif",
             "alta": "upper-back/inverted-row.gif",
         },
@@ -708,9 +708,9 @@ CURATED_BY_INTENSITY = [
         "match_any": ("paso del oso", "bear crawl", "caminata de oso"),
         "exclude_any": (),
         "gifs": {
-            "baja": "abs/dead-bug.gif",
-            "media": "cardio/jack-jump-male.gif",
-            "alta": "cardio/burpee.gif",
+            "baja": "cardio/bear-crawl.gif",
+            "media": "cardio/bear-crawl.gif",
+            "alta": "cardio/bear-crawl.gif",
         },
         "biomechanics": "Desplazamiento dinámico en cuadrupedia activando core lumbopélvico y estabilidad escapular.",
         "posture": "Espalda plana como una mesa, rodillas a 2cm del suelo y cuello neutro.",
@@ -812,7 +812,7 @@ CURATED_BY_INTENSITY = [
         "match_any": ("patada de gluteo", "patada de gluteos", "glute kickback", "patada en cuadrupedia", "patada cuadrupedia"),
         "exclude_any": ("barra", "bench press"),
         "gifs": {
-            "baja": "glutes/low-glute-bridge-on-floor.gif",
+            "baja": "glutes/bench-hip-extension.gif",
             "media": "glutes/bench-hip-extension.gif",
             "alta": "glutes/twist-hip-lift.gif",
         },
@@ -864,7 +864,7 @@ CURATED_BY_INTENSITY = [
         "match_any": ("step-up", "step up", "step-ups", "subida al escalon", "subida al cajon", "escalon bajo", "escalón bajo"),
         "exclude_any": ("bicep", "curl", "overhead"),
         "gifs": {
-            "baja": "quads/split-squats.gif",
+            "baja": "quads/dumbbell-step-up-lunge.gif",
             "media": "glutes/dumbbell-step-up.gif",
             "alta": "glutes/barbell-step-up.gif",
         },
@@ -872,12 +872,90 @@ CURATED_BY_INTENSITY = [
         "posture": "Torso erguido con ligera inclinación, rodilla alineada con el empeine y empuje desde el talón.",
         "warning": "No permitas que la rodilla colapse hacia adentro (valgo) ni te dejes caer sin control excéntrico.",
     },
+    # 22. Remo en suelo con toalla deslizante (Back Towel Floor Row)
+    {
+        "match_any": ("remo en suelo", "remo con toalla deslizante", "remo deslizante"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
+            "media": "upper-back/band-one-arm-twisting-seated-row.gif",
+            "alta": "upper-back/band-one-arm-standing-low-row.gif",
+        },
+        "biomechanics": "Tracción dorsal en decúbito generando tensión mediante fricción controlada con toalla en suelo liso.",
+        "posture": "Core firme, codos pegados a las costillas en el tirón y depresión escapular completa.",
+        "warning": "Mantén el cuello neutro alineado con la columna dorsal sin hiperextensión.",
+    },
+    # 23. Marcha de puente con talones caminando (Glute Bridge March)
+    {
+        "match_any": ("marcha de puente", "puente con marcha", "glute bridge march", "talones caminando"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "glutes/glute-bridge-march.gif",
+            "media": "glutes/glute-bridge-march.gif",
+            "alta": "glutes/glute-bridge-march.gif",
+        },
+        "biomechanics": "Extensión pélvica isométrica con marcha alternada de talones activando glúteo mayor, isquiotibiales y core profundo.",
+        "posture": "Pelvis fija a la misma altura sin balanceo pélvico al despegar un pie del suelo.",
+        "warning": "No dejes que la pelvis caiga hacia el lado de la pierna en el aire.",
+    },
+    # 24. Puente de isquiotibiales con elevación de puntas de pie
+    {
+        "match_any": ("elevacion de puntas", "elevación de puntas", "puente con puntas", "puente de isquiotibiales"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "glutes/pelvic-tilt-into-bridge.gif",
+            "media": "glutes/single-leg-bridge-with-outstretched-leg.gif",
+            "alta": "glutes/single-leg-bridge-with-outstretched-leg.gif",
+        },
+        "biomechanics": "Variación de puente glúteo con dorsiflexión de tobillos incrementando la activación del bíceps femoral y semitendinoso.",
+        "posture": "Apoyo exclusivamente en los talones con dedos apuntando hacia arriba, empuje pélvico continuo.",
+        "warning": "Evita calambres manteniendo un rango cómodo y respiración fluida.",
+    },
+    # 25. Contracción isométrica de isquios en decúbito prono
+    {
+        "match_any": ("contraccion isometrica de isquios", "contracción isométrica de isquios", "isquios en decubito", "isquios en decúbito"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "hamstrings/assisted-prone-hamstring.gif",
+            "media": "hamstrings/standing-single-leg-curl.gif",
+            "alta": "hamstrings/lever-lying-leg-curl.gif",
+        },
+        "biomechanics": "Activación isométrica voluntaria de la corva posterior en decúbito prono protegiendo la cápsula articular de la rodilla.",
+        "posture": "Pelvis neutra pegada al suelo, flexión activa de rodilla manteniendo tensión durante 5 segundos por repetición.",
+        "warning": "No compenses arqueando la zona lumbar.",
+    },
+    # 26. Deslizamiento de talones alternado en suelo con toalla
+    {
+        "match_any": ("deslizamiento de talones", "deslizamiento de talón", "talones alternado"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "hamstrings/single-leg-platform-slide.gif",
+            "media": "hamstrings/single-leg-platform-slide.gif",
+            "alta": "hamstrings/self-assisted-inverse-leg-curl-on-floor.gif",
+        },
+        "biomechanics": "Flexión unilateral excéntrica de isquiotibiales deslizando el talón sobre toalla en suelo liso.",
+        "posture": "Cadera elevada en puente con una pierna mientras la otra desliza con control excéntrico continuo.",
+        "warning": "Controla el retorno para no generar sobretensión brusca en la inserción isquiática.",
+    },
+    # 27. Flexiones en suelo con rodillas apoyadas
+    {
+        "match_any": ("flexiones en suelo con rodillas", "flexion con rodillas", "flexiones con rodillas apoyadas", "rodillas apoyadas para pecho"),
+        "exclude_any": ("plancha", "plank"),
+        "gifs": {
+            "baja": "triceps/close-grip-push-up-on-knees.gif",
+            "media": "triceps/close-grip-push-up-on-knees.gif",
+            "alta": "triceps/close-grip-push-up-on-knees.gif",
+        },
+        "biomechanics": "Regresión biomecánica de flexión horizontal apoyando rodillas para reducir el porcentaje de peso corporal levantado.",
+        "posture": "Línea recta de rodillas a hombros, core apretado y descenso del pecho a 5cm del suelo.",
+        "warning": "No dejes la cadera arriba en ángulo de 90°; el torso debe bajar completo.",
+    },
 ]
 
 # Fallbacks garantizados por carpeta muscular e intensidad (CERO guías textuales)
 FOLDER_DEFAULT_GIFS = {
     "quads": {
-        "baja": "quads/split-squats.gif",
+        "baja": "quads/dumbbell-supported-squat.gif",
         "media": "quads/dumbbell-goblet-squat.gif",
         "alta": "glutes/barbell-full-squat.gif",
     },
@@ -917,7 +995,7 @@ FOLDER_DEFAULT_GIFS = {
         "alta": "lats/pull-up.gif",
     },
     "upper-back": {
-        "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
+        "baja": "upper-back/bodyweight-standing-row-with-towel.gif",
         "media": "upper-back/cable-low-seated-row.gif",
         "alta": "upper-back/barbell-bent-over-row.gif",
     },
@@ -942,7 +1020,7 @@ FOLDER_DEFAULT_GIFS = {
         "alta": "abs/hanging-leg-raise.gif",
     },
     "cardio": {
-        "baja": "cardio/stationary-bike-walk.gif",
+        "baja": "cardio/jack-jump-male.gif",
         "media": "cardio/jack-jump-male.gif",
         "alta": "cardio/burpee.gif",
     },
