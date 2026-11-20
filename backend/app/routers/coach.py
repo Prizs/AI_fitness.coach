@@ -527,7 +527,10 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         if has_core: multi_targets.append("core")
         if has_cardio: multi_targets.append("cardio")
 
-        if len(multi_targets) >= 3:
+        if has_pecho and has_femorales and not (has_espalda or has_hombros or has_core):
+            return "pecho_femorales"
+
+        if len(multi_targets) >= 2:
             return "_".join(multi_targets[:3])
 
         # 1. COMBINACIONES ANATÓMICAS DE ALTA PRECISIÓN (2 GRUPOS):
@@ -2435,7 +2438,7 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
 
     # 0. Manejador Universal Dinámico para 3 o más grupos (o combinaciones multi-objetivo)
     fk_parts = [p for p in fk.split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
-    if len(fk_parts) >= 3 or (len(fk_parts) == 2 and fk in ("pecho_hombros", "espalda_hombros", "piernas_core", "piernas_cardio")):
+    if len(fk_parts) >= 3 or (len(fk_parts) == 2 and fk not in ("piernas_hombros", "pecho_femorales")):
         pool_map = {
             "pecho": chest_dict[int_k],
             "espalda": back_dict[int_k],
