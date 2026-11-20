@@ -512,7 +512,21 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         has_cardio = any(w in t_clean for w in ("aerobico", "aeróbico", "aerobicos", "aeróbicos", "movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa", "cardio", "cardiovascular", "calidad cardiovascular", "resistencia", "corazon", "corazón"))
         has_upper = any(w in t_clean for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso")) or (has_pecho and has_espalda)
 
-        # 1. COMBINACIONES ANATÓMICAS DE ALTA PRECISIÓN (PRIORIDAD MÁXIMA):
+        # 1.0 Detección Universal de 3 o más Grupos Musculares:
+        multi_targets = []
+        if has_legs: multi_targets.append("piernas")
+        if has_pecho: multi_targets.append("pecho")
+        if has_espalda: multi_targets.append("espalda")
+        if has_hombros: multi_targets.append("hombros")
+        if has_biceps: multi_targets.append("biceps")
+        if has_triceps: multi_targets.append("triceps")
+        if has_core: multi_targets.append("core")
+        if has_cardio: multi_targets.append("cardio")
+
+        if len(multi_targets) >= 3:
+            return "_".join(multi_targets[:3])
+
+        # 1. COMBINACIONES ANATÓMICAS DE ALTA PRECISIÓN (2 GRUPOS):
         # A) Piernas y Hombros (CERO pecho, CERO espalda/remo, CERO bíceps, CERO tríceps)
         if has_legs and has_hombros and not (has_pecho or has_espalda):
             return "piernas_hombros"
@@ -537,27 +551,35 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         if has_espalda and has_triceps and not (has_pecho or has_legs):
             return "espalda_triceps"
 
-        # G) Hombros y Brazos
+        # G) Pecho y Hombros
+        if has_pecho and has_hombros and not (has_espalda or has_legs):
+            return "pecho_hombros"
+
+        # H) Espalda y Hombros
+        if has_espalda and has_hombros and not (has_pecho or has_legs):
+            return "espalda_hombros"
+
+        # I) Hombros y Brazos
         if has_hombros and has_brazos and not (has_legs or has_pecho or has_espalda):
             return "brazos_hombros"
 
-        # H) Tríceps y Piernas
+        # J) Tríceps y Piernas
         if has_arm_triceps_word and has_legs and not (has_pecho or has_espalda or has_hombros):
             return "triceps_piernas"
 
-        # I) Piernas y Core
+        # K) Piernas y Core
         if has_legs and has_core and not (has_pecho or has_espalda or has_hombros or has_brazos):
             return "piernas_core"
 
-        # J) Piernas y Cardio
+        # L) Piernas y Cardio
         if has_legs and has_cardio and not (has_pecho or has_espalda or has_hombros):
             return "piernas_cardio"
 
-        # K) Piernas y Tren Superior
+        # M) Piernas y Tren Superior
         if has_legs and (has_pecho or has_espalda or has_upper):
             return "piernas_tren_superior"
 
-        # L) Tren Superior y Core
+        # N) Tren Superior y Core
         if (has_upper or has_pecho or has_espalda or has_brazos) and has_core and not has_legs:
             return "tren_superior_core"
 
@@ -1658,10 +1680,16 @@ def _is_leg_exercise(name: str, primary_muscle: str) -> bool:
 
 def _is_shoulder_exercise(name: str, primary_muscle: str) -> bool:
     text = f"{name} {primary_muscle}".lower()
+    if any(k in text for k in ("bicep", "bícep", "curl", "dorsal", "remo", "row", "jalon", "jalón", "cuadriceps", "cuádriceps", "gluteo", "glúteo")):
+        return False
+    if any(k in text for k in ("flexion", "flexión", "pushup", "push-up")) and not any(k in text for k in ("en pica", "pike", "handstand", "pino")):
+        return False
+    if "pectoral" in primary_muscle.lower() and not any(k in text for k in ("en pica", "pike")):
+        return False
     return any(k in text for k in (
         "hombro", "deltoid", "militar", "lateral-raise", "shoulder-press",
         "elevacion lateral", "elevación lateral", "elevaciones lateral",
-        "pájaro", "pajaro", "face pull", "pike", "pica", "press frontal",
+        "pájaro", "pajaro", "face pull", "pike", "en pica", "press frontal",
         "y-t-w", "handstand", "pino"
     ))
 
@@ -1697,6 +1725,20 @@ def _is_cardio_aerobic_exercise(name: str, primary_muscle: str) -> bool:
         "cardio", "aerob", "aerób", "burpee", "mountain climber", "escalador",
         "salto", "jump", "saltos", "caminata", "bear crawl", "hiit", "movilidad"
     ))
+
+
+def _is_biceps_exercise(name: str, primary_muscle: str) -> bool:
+    text = f"{name} {primary_muscle}".lower()
+    return any(k in text for k in (
+        "bicep", "bícep", "curl"
+    )) and not any(k in text for k in ("curl femoral", "femoral", "isquio", "tricep", "trícep"))
+
+
+def _is_triceps_exercise(name: str, primary_muscle: str) -> bool:
+    text = f"{name} {primary_muscle}".lower()
+    return any(k in text for k in (
+        "tricep", "trícep", "fondo", "dips", "extension de codo", "extensión de codo", "frances", "francés", "patada de tríceps", "patada de triceps"
+    )) and not any(k in text for k in ("bícep", "bicep", "curl", "sentadilla", "pierna"))
 
 
 def _sanitize_exercise_by_intensity(name: str, intensity_hint: str) -> str:
@@ -2371,8 +2413,28 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
     fk = (focus_key or "piernas").lower()
     selected_tuples = []
 
+    # 0. Manejador Universal Dinámico para 3 o más grupos (o combinaciones multi-objetivo)
+    fk_parts = [p for p in fk.split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
+    if len(fk_parts) >= 3 or (len(fk_parts) == 2 and fk in ("pecho_hombros", "espalda_hombros", "piernas_core", "piernas_cardio")):
+        pool_map = {
+            "pecho": chest_dict[int_k],
+            "espalda": back_dict[int_k],
+            "hombros": shoulders_dict[int_k],
+            "biceps": [a for a in arms_dict[int_k] if _is_biceps_exercise(a[0], a[1])] or arms_dict[int_k],
+            "triceps": [a for a in arms_dict[int_k] if _is_triceps_exercise(a[0], a[1])] or arms_dict[int_k],
+            "piernas": quads_dict[int_k] + hams_dict[int_k] + glutes_dict[int_k],
+            "femorales": hams_dict[int_k],
+            "core": core_dict[int_k],
+            "cardio": mobility_dict[int_k],
+        }
+        total_slots = 6 if len(fk_parts) >= 3 else 5
+        for s in range(total_slots):
+            part = fk_parts[s % len(fk_parts)]
+            p_list = pool_map.get(part, quads_dict[int_k])
+            selected_tuples.append(p_list[(seed + s) % len(p_list)])
+
     # 1. Combinaciones anatómicas prioritarias de alta precisión
-    if "piernas_hombros" in fk or ("pierna" in fk and "hombro" in fk):
+    elif "piernas_hombros" in fk or ("pierna" in fk and "hombro" in fk):
         q_list = quads_dict[int_k]
         sh_list = shoulders_dict[int_k]
         h_list = hams_dict[int_k]
@@ -2412,7 +2474,7 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
         ]
     elif "pecho_biceps" in fk:
         ch_list = chest_dict[int_k]
-        bi_cands = [a for a in arms_dict[int_k] if "bicep" in (a[0] + " " + a[1]).lower()] or arms_dict[int_k]
+        bi_cands = [a for a in arms_dict[int_k] if _is_biceps_exercise(a[0], a[1])] or arms_dict[int_k]
         selected_tuples = [
             ch_list[(seed + 0) % len(ch_list)],
             bi_cands[(seed + 1) % len(bi_cands)],
@@ -2421,7 +2483,7 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
         ]
     elif "pecho_triceps" in fk:
         ch_list = chest_dict[int_k]
-        tri_cands = [a for a in arms_dict[int_k] if "tricep" in (a[0] + " " + a[1]).lower() or "fondo" in a[0].lower()] or arms_dict[int_k]
+        tri_cands = [a for a in arms_dict[int_k] if _is_triceps_exercise(a[0], a[1])] or arms_dict[int_k]
         selected_tuples = [
             ch_list[(seed + 0) % len(ch_list)],
             tri_cands[(seed + 1) % len(tri_cands)],
@@ -2430,7 +2492,7 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
         ]
     elif "espalda_biceps" in fk:
         bk_list = back_dict[int_k]
-        bi_cands = [a for a in arms_dict[int_k] if "bicep" in (a[0] + " " + a[1]).lower()] or arms_dict[int_k]
+        bi_cands = [a for a in arms_dict[int_k] if _is_biceps_exercise(a[0], a[1])] or arms_dict[int_k]
         selected_tuples = [
             bk_list[(seed + 0) % len(bk_list)],
             bi_cands[(seed + 1) % len(bi_cands)],
@@ -2638,6 +2700,7 @@ def _normalize_exercises(
         else (ADVANCED_HIGH_LEG_EXERCISES if intensity_hint == "alta" else INTERMEDIATE_MID_LEG_EXERCISES)
     )
     upper_pool = UPPER_BODY_POOLS[intensity_hint]
+    all_upper = UPPER_BODY_POOLS.get("baja", []) + UPPER_BODY_POOLS.get("media", []) + UPPER_BODY_POOLS.get("alta", [])
     core_pool = CORE_POOLS[intensity_hint]
     mobility_pool = MOBILITY_CARDIO_POOLS[intensity_hint]
 
@@ -2661,9 +2724,55 @@ def _normalize_exercises(
                 raw_name, primary, secondary, anim_key, affected_zone
             )
 
+        # 0. Guardián Universal para 3 o más Grupos Musculares (o combinaciones multi-objetivo)
+        req_parts = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
+        if len(req_parts) >= 3 or (len(req_parts) == 2 and requested_focus not in ("piernas_hombros", "pecho_femorales")):
+            is_valid_group = False
+            for part in req_parts:
+                if part == "pecho" and _is_chest_exercise(raw_name, primary): is_valid_group = True
+                elif part == "espalda" and _is_back_exercise(raw_name, primary): is_valid_group = True
+                elif part == "hombros" and _is_shoulder_exercise(raw_name, primary): is_valid_group = True
+                elif part == "biceps" and _is_biceps_exercise(raw_name, primary): is_valid_group = True
+                elif part == "triceps" and _is_triceps_exercise(raw_name, primary): is_valid_group = True
+                elif part == "piernas" and _is_leg_exercise(raw_name, primary): is_valid_group = True
+                elif part == "femorales" and _is_femoral_exercise(raw_name, primary): is_valid_group = True
+                elif part == "core" and ("core" in primary.lower() or "abdominal" in primary.lower() or "plank" in anim_key or "crunch" in anim_key): is_valid_group = True
+                elif part == "cardio" and _is_cardio_aerobic_exercise(raw_name, primary): is_valid_group = True
+
+            if not is_valid_group:
+                needed = req_parts[idx % len(req_parts)]
+                if needed == "pecho":
+                    ch_p = [e for e in all_upper if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
+                    fb = ch_p[idx % len(ch_p)] if ch_p else upper_pool[0]
+                elif needed == "espalda":
+                    bk_p = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
+                    fb = bk_p[idx % len(bk_p)] if bk_p else upper_pool[0]
+                elif needed == "hombros":
+                    sh_p = [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+                    fb = sh_p[idx % len(sh_p)] if sh_p else upper_pool[0]
+                elif needed == "biceps":
+                    bi_p = [e for e in all_upper if _is_biceps_exercise(e["name"], e.get("primary_muscle", ""))]
+                    fb = bi_p[idx % len(bi_p)] if bi_p else upper_pool[0]
+                elif needed == "triceps":
+                    tri_p = [e for e in all_upper if _is_triceps_exercise(e["name"], e.get("primary_muscle", ""))]
+                    fb = tri_p[idx % len(tri_p)] if tri_p else upper_pool[0]
+                elif needed in ("piernas", "femorales"):
+                    fb = leg_pool[idx % len(leg_pool)]
+                elif needed == "core":
+                    fb = core_pool[idx % len(core_pool)]
+                else:
+                    fb = mobility_pool[idx % len(mobility_pool)]
+                raw_name = fb["name"]
+                primary = fb["primary_muscle"]
+                secondary = fb.get("secondary_muscle", "Estabilizadores")
+                sets_val = fb.get("sets", 3)
+                reps_val = fb.get("reps", "10-12")
+                anim_key = fb.get("animation_key", "squat")
+                replaced_from_pool = True
+
         # 1. Filtros de Exclusividad Estricta por Zona Solicitada:
         # A) Si el usuario pidió Piernas y Hombros (CERO pecho, CERO espalda/remo, CERO tríceps, CERO bíceps)
-        if requested_focus in ("piernas_hombros", "hombros_piernas") or ("pierna" in (requested_focus or "") and "hombro" in (requested_focus or "")):
+        elif requested_focus in ("piernas_hombros", "hombros_piernas") or ("pierna" in (requested_focus or "") and "hombro" in (requested_focus or "")):
             is_leg = _is_leg_exercise(raw_name, primary)
             is_sh = _is_shoulder_exercise(raw_name, primary)
             is_prohibited = any(k in (raw_name + " " + primary).lower() for k in ("remo", "dorsal", "biceps", "bíceps", "flexiones de pecho", "banca", "bench", "espalda"))
@@ -2745,10 +2854,8 @@ def _normalize_exercises(
             replaced_from_pool = True
 
         # F) Si el usuario pidió Pecho
-        elif requested_focus in ("pecho", "pectorales") and (_is_leg_exercise(raw_name, primary) or not any(k in (raw_name + " " + primary).lower() for k in ("pecho", "pectoral", "pushup", "press", "flexion", "flexión", "apertura", "fondo", "banca"))):
-            chest_pool = [e for e in upper_pool if any(k in (e["name"] + " " + e.get("primary_muscle", "")).lower() for k in ("pecho", "pectoral", "press", "flexion", "flexión", "apertura", "fondo", "banca"))]
-            if not chest_pool:
-                chest_pool = upper_pool
+        elif requested_focus in ("pecho", "pectorales") and not _is_chest_exercise(raw_name, primary):
+            chest_pool = [e for e in all_upper if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
             fallback_ex = chest_pool[idx % len(chest_pool)]
             raw_name = fallback_ex["name"]
             primary = fallback_ex["primary_muscle"]
@@ -2758,10 +2865,8 @@ def _normalize_exercises(
             anim_key = fallback_ex.get("animation_key", "pushup")
             replaced_from_pool = True
 
-        elif requested_focus in ("espalda", "dorsales") and (_is_leg_exercise(raw_name, primary) or not any(k in (raw_name + " " + primary).lower() for k in ("espalda", "dorsal", "remo", "jalon", "jalón", "dominada", "pullover"))):
-            back_pool = [e for e in upper_pool if any(k in (e["name"] + " " + e.get("primary_muscle", "")).lower() for k in ("espalda", "dorsal", "remo", "jalon", "jalón", "dominada", "pullover"))]
-            if not back_pool:
-                back_pool = upper_pool
+        elif requested_focus in ("espalda", "dorsales") and not _is_back_exercise(raw_name, primary):
+            back_pool = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
             fallback_ex = back_pool[idx % len(back_pool)]
             raw_name = fallback_ex["name"]
             primary = fallback_ex["primary_muscle"]
@@ -2821,8 +2926,22 @@ def _normalize_exercises(
                 MOBILITY_CARDIO_POOLS.get("baja", []) + MOBILITY_CARDIO_POOLS.get("alta", []) +
                 BEGINNER_LOW_LEG_EXERCISES + ADVANCED_HIGH_LEG_EXERCISES
             )
+            req_parts = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
             if requested_focus == "cuerpo_completo":
                 cand_pool = all_deep_cands
+            elif len(req_parts) >= 3 or (len(req_parts) == 2 and requested_focus not in ("piernas_hombros", "pecho_femorales")):
+                cand_pool = []
+                for p in req_parts:
+                    if p == "pecho": cand_pool += [e for e in all_upper if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
+                    elif p == "espalda": cand_pool += [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
+                    elif p == "hombros": cand_pool += [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+                    elif p == "biceps": cand_pool += [e for e in all_upper if _is_biceps_exercise(e["name"], e.get("primary_muscle", ""))]
+                    elif p == "triceps": cand_pool += [e for e in all_upper if _is_triceps_exercise(e["name"], e.get("primary_muscle", ""))]
+                    elif p in ("piernas", "femorales"): cand_pool += leg_pool
+                    elif p == "core": cand_pool += core_pool
+                    elif p == "cardio": cand_pool += mobility_pool
+                if not cand_pool:
+                    cand_pool = all_deep_cands
             elif requested_focus in ("piernas_hombros", "hombros_piernas") or ("pierna" in (requested_focus or "") and "hombro" in (requested_focus or "")):
                 cand_pool = leg_pool + [e for e in upper_pool if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
             elif requested_focus in ("pecho_femorales", "femorales_pecho"):
@@ -2830,11 +2949,11 @@ def _normalize_exercises(
             elif requested_focus in ("aerobicos", "solo_cardio", "cardio", "movilidad_cardio"):
                 cand_pool = mobility_pool + MOBILITY_CARDIO_POOLS.get("baja", []) + MOBILITY_CARDIO_POOLS.get("alta", [])
             elif requested_focus in ("hombros",):
-                cand_pool = [e for e in upper_pool if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+                cand_pool = [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
             elif requested_focus in ("pecho", "pectorales"):
-                cand_pool = [e for e in upper_pool if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
+                cand_pool = [e for e in all_upper if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
             elif requested_focus in ("espalda", "dorsales"):
-                cand_pool = [e for e in upper_pool if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
+                cand_pool = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
             elif requested_focus in ("piernas", "solo_piernas") or _is_leg_exercise(clean_name, primary):
                 cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, [])
             elif requested_focus in ("tren_superior", "brazos_hombros"):
@@ -3302,6 +3421,7 @@ def _normalize_structured_plan(
         recommended_days = target_days
 
         def _get_day_content(day_idx: int) -> tuple[str, list]:
+            req_parts = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
             if requested_focus == "cuerpo_completo":
                 day_titles = [
                     f"Cuerpo Completo: Piernas (Cuádriceps) + Pecho + Core ({badge_lbl})",
@@ -3722,6 +3842,20 @@ def _normalize_structured_plan(
                     seen_gifs_global=weekly_seen_gifs,
                 )
 
+            elif len(req_parts) >= 3 or (len(req_parts) == 2 and requested_focus not in ("piernas_hombros", "pecho_femorales", "piernas_core", "piernas_tren_superior", "triceps_piernas", "tren_superior_core")):
+                lbl_parts = " + ".join([p.capitalize() for p in req_parts])
+                day_title = f"Combinado Multigrupo: {lbl_parts} (Día {day_idx + 1}) ({badge_lbl})"
+                diverse_day = _generate_diverse_session(requested_focus, int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)
+                return day_title, _normalize_exercises(
+                    diverse_day,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus=requested_focus,
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
             else:
                 default_titles = [
                     f"Piernas y Glúteos (Cuádriceps y Glúteos) · {badge_lbl}",
@@ -3770,7 +3904,11 @@ def _normalize_structured_plan(
 
     cycle_dates = _extract_cycle_dates(user_message, has_active_plan=has_active_plan, history=history)
 
-    if requested_focus == "cuerpo_completo":
+    req_parts_title = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
+    if len(req_parts_title) >= 3:
+        lbl_parts = " + ".join([p.capitalize() for p in req_parts_title])
+        raw_title = f"Plan Combinado Multigrupo: {lbl_parts} ({badge_lbl})"
+    elif requested_focus == "cuerpo_completo":
         raw_title = f"Plan Integral de Cuerpo Completo (Full Body) ({badge_lbl})"
     elif requested_focus in ("piernas_hombros", "hombros_piernas"):
         raw_title = f"Especialización en Piernas y Hombros ({badge_lbl})"
@@ -3812,6 +3950,9 @@ def _normalize_structured_plan(
         raw_title = f"Combinado Tren Superior + Core ({badge_lbl})"
     elif requested_focus == "piernas":
         raw_title = f"Rutina de Piernas y Glúteos ({badge_lbl})"
+    elif len(req_parts_title) == 2:
+        lbl_parts = " + ".join([p.capitalize() for p in req_parts_title])
+        raw_title = f"Combinado {lbl_parts} ({badge_lbl})"
     else:
         clean_t = str(raw_plan.get("title") or "Entrenamiento Completo")
         for prefix in ("Plan Semanal (Lun - Vie):", "Plan Semanal:", "Plan Diario:", "Plan Mensual:", "Plan Combinado/Complementario:"):
@@ -4517,7 +4658,7 @@ Devuelve SOLO JSON."""
             "Todos los ejercicios deben ser 100% realizados en posición sentada o con soporte de espalda estable y seguro."
         )
     else:
-        focus_instruction = {
+        focus_dict = {
             "piernas_hombros": (
                 "ESPECIALIZACIÓN ESTRICTA EN PIERNAS Y HOMBROS: El usuario solicitó EXCLUSIVAMENTE ejercicios para PIERNAS (Cuádriceps, Isquiotibiales/Femorales, Glúteos, Gemelos/Sóleo) y HOMBROS (Deltoides anterior, lateral, posterior, press militar, elevaciones laterales, flexiones en pica). "
                 "¡ESTÁ TERMINANTEMENTE PROHIBIDO incluir ejercicios de Pecho (cero flexiones comunes, cero aperturas), Espalda (cero dominadas, cero remos), Bíceps (cero curls) y Tríceps (cero fondos en silla)! "
@@ -4556,7 +4697,19 @@ Devuelve SOLO JSON."""
             "brazos_hombros": "BRAZOS Y HOMBROS (Bíceps, Tríceps, Deltoides).",
             "core": "CORE, ABDOMEN Y ESTABILIDAD LUMBAR (Dead Bug, Plancha, Crunch, Control Postural).",
             "movilidad_cardio": "MOVILIDAD ARTICULAR, ESTABILIDAD Y CARDIO DE BAJO IMPACTO / HIIT MODERADO.",
-        }.get(requested_focus or "", "el grupo muscular solicitado por el usuario en su último mensaje.")
+        }
+        req_parts_f = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
+        if len(req_parts_f) >= 2 and requested_focus not in focus_dict:
+            lbl_parts = ", ".join([p.upper() for p in req_parts_f[:-1]]) + " Y " + req_parts_f[-1].upper()
+            focus_instruction = (
+                f"RUTINA COMBINADA MULTIGRUPO ESTRICTA ({lbl_parts}): "
+                f"El usuario solicitó EXCLUSIVAMENTE ejercicios para los grupos musculares: {lbl_parts}. "
+                f"Debes incluir ejercicios pertenecientes a CADA UNO de estos grupos de manera equitativa y balanceada. "
+                f"¡ESTÁ TERMINANTEMENTE PROHIBIDO incluir ejercicios de cualquier otro grupo muscular no solicitado! "
+                f"NUNCA te niegues ni excuses a entrenar ninguno de los grupos solicitados bajo ningún pretexto."
+            )
+        else:
+            focus_instruction = focus_dict.get(requested_focus or "", "el grupo muscular solicitado por el usuario en su último mensaje.")
 
     motor_instruction = ""
     if motor_disabled:
@@ -4967,7 +5120,12 @@ Devuelve SOLO JSON."""
         elif focus_key in ("plan_semanal_ia", "semanal_completo"):
             focus_name = "Plan Semanal Integral Personalizado"
         else:
-            focus_name = "Rutina Personalizada"
+            req_parts_fn = [p for p in focus_key.split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
+            if len(req_parts_fn) >= 2:
+                lbl_parts = " + ".join([p.capitalize() for p in req_parts_fn])
+                focus_name = f"Combinado Multigrupo ({lbl_parts})"
+            else:
+                focus_name = "Rutina Personalizada"
 
         dynamic_seed = abs(hash((payload.message or "") + str(int(time.time() / 5)))) % 1000
         diverse_raw = _generate_diverse_session(focus_key, intensity_hint, seed=dynamic_seed, is_no_equipment=is_no_equipment)
