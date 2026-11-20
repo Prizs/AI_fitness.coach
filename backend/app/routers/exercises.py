@@ -326,6 +326,19 @@ CURATED_BY_INTENSITY = [
         "posture": "Pecho erguido, mirada al frente y rodillas alineadas con las puntas de los pies.",
         "warning": "Prioriza el control y la alineación antes que la profundidad.",
     },
+    # 8B. Zancadas con Salto (Jumping Lunges / Split Jumps)
+    {
+        "match_any": ("zancada con salto", "zancadas con salto", "zancadas dinamicas con salto", "zancadas dinámicas con salto", "jumping lunge", "split jump"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "cardio/jack-jump-male.gif",
+            "media": "cardio/jack-jump-male.gif",
+            "alta": "cardio/burpee.gif",
+        },
+        "biomechanics": "Salto pliométrico alternando piernas en el aire para recepción elástica en zancada, elevando la frecuencia cardíaca.",
+        "posture": "Aterrizaje suave sobre antepié y talón con absorción muscular de rodillas flexionadas.",
+        "warning": "Evita el impacto si tienes antecedentes de dolor de rodilla o ligamentos.",
+    },
     # 9. Zancadas / Lunges
     {
         "match_any": ("zancada", "desplante", "lunge", "estocada"),
@@ -572,6 +585,19 @@ CURATED_BY_INTENSITY = [
         "biomechanics": "Anti-extensión del core extendiendo brazo y pierna contraria con control lumbopélvico.",
         "posture": "Zona lumbar 100% pegada contra el suelo en todo momento.",
         "warning": "Si la espalda baja se despega del suelo, reduce el rango de extensión.",
+    },
+    # 25B. Paso del Oso / Bear Crawl
+    {
+        "match_any": ("paso del oso", "bear crawl", "caminata de oso"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "abs/dead-bug.gif",
+            "media": "cardio/jack-jump-male.gif",
+            "alta": "cardio/burpee.gif",
+        },
+        "biomechanics": "Desplazamiento dinámico en cuadrupedia activando core lumbopélvico y estabilidad escapular.",
+        "posture": "Espalda plana como una mesa, rodillas a 2cm del suelo y cuello neutro.",
+        "warning": "No eleves la cadera en exceso ni balancees el torso.",
     },
     # 26. Plancha Lateral (Side Plank)
     {

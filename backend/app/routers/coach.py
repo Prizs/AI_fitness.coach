@@ -607,6 +607,14 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         if has_hombros and not (has_legs or has_pecho or has_espalda or has_brazos or has_core):
             return "hombros"
 
+        # Solicitud de solo biceps
+        if has_biceps and not (has_legs or has_pecho or has_espalda or has_hombros or has_triceps or has_core):
+            return "biceps"
+
+        # Solicitud de solo triceps
+        if has_triceps and not (has_legs or has_pecho or has_espalda or has_hombros or has_biceps or has_core):
+            return "triceps"
+
         # Solicitud de solo pecho
         if has_pecho and not (has_espalda or has_brazos or has_legs or has_hombros):
             return "pecho"
@@ -618,6 +626,10 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         # Solicitud aeróbica / cardio
         if has_cardio and not (has_legs or has_pecho or has_espalda or has_hombros or has_brazos):
             return "aerobicos"
+
+        # Solicitud de solo core
+        if has_core and not (has_legs or has_pecho or has_espalda or has_hombros or has_brazos):
+            return "core"
 
         # Solicitud de piernas
         if has_legs:
@@ -1740,9 +1752,13 @@ def _is_biceps_exercise(name: str, primary_muscle: str) -> bool:
 
 def _is_triceps_exercise(name: str, primary_muscle: str) -> bool:
     text = f"{name} {primary_muscle}".lower()
+    if any(k in text for k in ("pecho", "pectoral", "militar", "hombro", "deltoid", "banca", "bench")):
+        return False
+    if any(k in text for k in ("bícep", "bicep", "curl", "sentadilla", "pierna", "prensa", "zancada")):
+        return False
     return any(k in text for k in (
         "tricep", "trícep", "fondo", "dips", "extension de codo", "extensión de codo", "frances", "francés", "patada de tríceps", "patada de triceps"
-    )) and not any(k in text for k in ("bícep", "bicep", "curl", "sentadilla", "pierna"))
+    ))
 
 
 def _sanitize_exercise_by_intensity(name: str, intensity_hint: str) -> str:
@@ -2528,29 +2544,34 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
             ch_list[(seed + 3) % len(ch_list)],
             cr_list[(seed + 4) % len(cr_list)],
         ]
+    elif fk in ("biceps", "bicep", "solo_biceps"):
+        bi_cands = [a for a in arms_dict[int_k] if _is_biceps_exercise(a[0], a[1])] or arms_dict[int_k]
+        selected_tuples = [bi_cands[(seed + i) % len(bi_cands)] for i in range(4)]
+    elif fk in ("triceps", "tricep", "solo_triceps"):
+        tri_cands = [a for a in arms_dict[int_k] if _is_triceps_exercise(a[0], a[1])] or arms_dict[int_k]
+        selected_tuples = [tri_cands[(seed + i) % len(tri_cands)] for i in range(4)]
+    elif fk in ("core", "solo_core", "abdomen", "abdominal"):
+        cr_list = core_dict[int_k]
+        selected_tuples = [cr_list[(seed + i) % len(cr_list)] for i in range(4)]
     elif any(k in fk for k in ("pecho", "pectoral")):
         c_list = chest_dict[int_k]
-        a_list = arms_dict[int_k]
-        cr_list = core_dict[int_k]
         selected_tuples = [
             c_list[(seed + 0) % len(c_list)],
             c_list[(seed + 1) % len(c_list)],
             c_list[(seed + 2) % len(c_list)],
-            c_list[(seed + 3) % len(c_list)] if len(c_list) > 3 else a_list[(seed + 0) % len(a_list)],
-            a_list[(seed + 1) % len(a_list)] if (seed % 2 == 0) else cr_list[(seed + 2) % len(cr_list)],
+            c_list[(seed + 3) % len(c_list)],
+            c_list[(seed + 4) % len(c_list)],
         ]
     elif any(k in fk for k in ("espalda", "dorsal")):
         b_list = back_dict[int_k]
-        a_list = arms_dict[int_k]
-        cr_list = core_dict[int_k]
         selected_tuples = [
             b_list[(seed + 0) % len(b_list)],
             b_list[(seed + 1) % len(b_list)],
             b_list[(seed + 2) % len(b_list)],
-            b_list[(seed + 3) % len(b_list)] if len(b_list) > 3 else a_list[(seed + 0) % len(a_list)],
-            a_list[(seed + 1) % len(a_list)] if (seed % 2 == 0) else cr_list[(seed + 2) % len(cr_list)],
+            b_list[(seed + 3) % len(b_list)],
+            b_list[(seed + 4) % len(b_list)],
         ]
-    elif any(k in fk for k in ("brazo", "brazos", "biceps", "triceps")):
+    elif any(k in fk for k in ("brazo", "brazos")):
         ar_list = arms_dict[int_k]
         sh_list = shoulders_dict[int_k]
         cr_list = core_dict[int_k]
@@ -2880,6 +2901,38 @@ def _normalize_exercises(
             anim_key = fallback_ex.get("animation_key", "row")
             replaced_from_pool = True
 
+        elif requested_focus in ("biceps", "solo_biceps") and not _is_biceps_exercise(raw_name, primary):
+            bi_pool = [e for e in all_upper if _is_biceps_exercise(e["name"], e.get("primary_muscle", ""))]
+            fallback_ex = bi_pool[idx % len(bi_pool)] if bi_pool else upper_pool[0]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex.get("secondary_muscle", "Antebrazo")
+            sets_val = fallback_ex.get("sets", 3)
+            reps_val = fallback_ex.get("reps", "10-12")
+            anim_key = fallback_ex.get("animation_key", "bicep-curl")
+            replaced_from_pool = True
+
+        elif requested_focus in ("triceps", "solo_triceps") and not _is_triceps_exercise(raw_name, primary):
+            tri_pool = [e for e in all_upper if _is_triceps_exercise(e["name"], e.get("primary_muscle", ""))]
+            fallback_ex = tri_pool[idx % len(tri_pool)] if tri_pool else upper_pool[0]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex.get("secondary_muscle", "Codo")
+            sets_val = fallback_ex.get("sets", 3)
+            reps_val = fallback_ex.get("reps", "10-12")
+            anim_key = fallback_ex.get("animation_key", "pushup")
+            replaced_from_pool = True
+
+        elif requested_focus in ("core", "solo_core") and not ("core" in primary.lower() or "abdominal" in primary.lower() or "plank" in anim_key or "crunch" in anim_key):
+            fallback_ex = core_pool[idx % len(core_pool)]
+            raw_name = fallback_ex["name"]
+            primary = fallback_ex["primary_muscle"]
+            secondary = fallback_ex.get("secondary_muscle", "Estabilizadores")
+            sets_val = fallback_ex.get("sets", 3)
+            reps_val = fallback_ex.get("reps", "10-12")
+            anim_key = fallback_ex.get("animation_key", "plank")
+            replaced_from_pool = True
+
         elif requested_focus in ("tren_superior", "brazos_hombros") and _is_leg_exercise(raw_name, primary):
             fallback_ex = upper_pool[idx % len(upper_pool)]
             raw_name = fallback_ex["name"]
@@ -2958,6 +3011,12 @@ def _normalize_exercises(
                 cand_pool = [e for e in all_upper if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
             elif requested_focus in ("espalda", "dorsales"):
                 cand_pool = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
+            elif requested_focus in ("biceps", "solo_biceps"):
+                cand_pool = [e for e in all_upper if _is_biceps_exercise(e["name"], e.get("primary_muscle", ""))]
+            elif requested_focus in ("triceps", "solo_triceps"):
+                cand_pool = [e for e in all_upper if _is_triceps_exercise(e["name"], e.get("primary_muscle", ""))]
+            elif requested_focus in ("core", "solo_core"):
+                cand_pool = core_pool
             elif requested_focus in ("piernas", "solo_piernas") or _is_leg_exercise(clean_name, primary):
                 cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, [])
             elif requested_focus in ("tren_superior", "brazos_hombros"):
