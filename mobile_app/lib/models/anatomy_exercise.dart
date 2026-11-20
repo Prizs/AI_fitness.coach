@@ -343,6 +343,15 @@ String resolveGuaranteedGifUrl({
     if (nameLower.contains('pie') || nameLower.contains('pierna') || nameLower.contains('talon') || nameLower.contains('talón') || nameLower.contains('femoral') || nameLower.contains('isquio')) {
       return _kGifBase + 'hamstrings/single-leg-platform-slide.gif';
     }
+    if (nameLower.contains('remo de pie') || nameLower.contains('squatting')) {
+      return _kGifBase + 'upper-back/bodyweight-squatting-row-with-towel.gif';
+    }
+    if (nameLower.contains('jalon') || nameLower.contains('jalón') || nameLower.contains('decubito') || nameLower.contains('decúbito')) {
+      return _kGifBase + 'lats/band-kneeling-one-arm-pulldown.gif';
+    }
+    if (nameLower.contains('suelo') || nameLower.contains('deslizante') || nameLower.contains('piso')) {
+      return _kGifBase + 'upper-back/band-one-arm-standing-low-row.gif';
+    }
     return _kGifBase + 'upper-back/bodyweight-standing-row-with-towel.gif';
   }
 
@@ -352,7 +361,10 @@ String resolveGuaranteedGifUrl({
   }
 
   // 26c. Pájaros Escapulares / Decúbito Prono / Deltoides Posterior / Romboides
-  if (nameLower.contains('pajaro') || nameLower.contains('pájaros') || nameLower.contains('pajaros') || nameLower.contains('prono') || nameLower.contains('reverse fly') || nameLower.contains('rear delt')) {
+  if (nameLower.contains('pajaro') || nameLower.contains('pájaros') || nameLower.contains('pajaros') || nameLower.contains('reverse fly') || nameLower.contains('rear delt')) {
+    if (nameLower.contains('mochila') || nameLower.contains('garrafa') || nameLower.contains('pausa de 2s')) {
+      return _kGifBase + 'delts/dumbbell-rear-delt-raise.gif';
+    }
     return _kGifBase + 'delts/band-reverse-fly.gif';
   }
 
@@ -366,13 +378,31 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + 'delts/band-y-raise.gif';
   }
 
-  // 26. Remos / Jalones / Dominadas
-  if (nameLower.contains('remo') || nameLower.contains('row') || nameLower.contains('jalon') || nameLower.contains('jalón') || nameLower.contains('dominada') || nameLower.contains('pulldown') || nameLower.contains('espalda') || nameLower.contains('dorsal')) {
-    if (nameLower.contains('invertido') || nameLower.contains('inverted row') || nameLower.contains('bajo mesa')) {
-      return _kGifBase + (isLow ? 'upper-back/inverted-row-bent-knees.gif' : 'upper-back/inverted-row.gif');
+  // 26f. Dominadas / Pull-ups / Chin-ups
+  if (nameLower.contains('chin-up') || nameLower.contains('chin up') || nameLower.contains('supino') || nameLower.contains('supina')) {
+    return _kGifBase + 'lats/chin-up.gif';
+  }
+  if (nameLower.contains('neutro') || nameLower.contains('neutra') || nameLower.contains('parallel')) {
+    return _kGifBase + 'lats/pull-up-neutral-grip.gif';
+  }
+  if (nameLower.contains('asistida') || nameLower.contains('asistidas') || nameLower.contains('silla')) {
+    return _kGifBase + 'lats/band-assisted-pull-up.gif';
+  }
+  if (nameLower.contains('dominada') || nameLower.contains('pull up') || nameLower.contains('pull-up')) {
+    return _kGifBase + 'lats/pull-up.gif';
+  }
+
+  // 26. Remos / Jalones
+  if (nameLower.contains('remo') || nameLower.contains('row') || nameLower.contains('jalon') || nameLower.contains('jalón') || nameLower.contains('espalda') || nameLower.contains('dorsal')) {
+    if (nameLower.contains('mochila')) {
+      return _kGifBase + 'upper-back/one-arm-towel-row.gif';
     }
-    if (nameLower.contains('dominada') || nameLower.contains('pull up') || nameLower.contains('pull-up')) {
-      return _kGifBase + 'lats/pull-up.gif';
+    if (nameLower.contains('a una mano') || nameLower.contains('una sola mano')) {
+      return _kGifBase + 'upper-back/bodyweight-standing-one-arm-row-with-towel.gif';
+    }
+    if (nameLower.contains('invertido') || nameLower.contains('inverted row') || nameLower.contains('bajo mesa')) {
+      if (nameLower.contains('supino')) return _kGifBase + 'upper-back/inverted-row-v-2.gif';
+      return _kGifBase + (isLow ? 'upper-back/inverted-row-bent-knees.gif' : 'upper-back/inverted-row.gif');
     }
     if (nameLower.contains('barra')) {
       return _kGifBase + 'upper-back/barbell-bent-over-row.gif';

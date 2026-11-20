@@ -459,7 +459,7 @@ CURATED_BY_INTENSITY = [
     # 17. Flexiones de Pecho Estándar (Push-ups)
     {
         "match_any": ("flexiones de pecho", "flexion de pecho", "push up", "push-up", "pushup", "lagartija", "flexiones en suelo", "flexiones inclinadas"),
-        "exclude_any": ("pica", "pike", "diamante", "declinada", "declinadas", "decline", "pies en"),
+        "exclude_any": ("pica", "pike", "diamante", "declinada", "declinadas", "decline", "pies en", "rodillas", "rodilla", "ancho", "palmada", "pliometric", "pliométrico", "una mano", "pared", "toque", "profund", "pseudo", "plus", "arquero"),
         "gifs": {
             "baja": "pectorals/incline-push-up.gif",
             "media": "pectorals/push-up.gif",
@@ -537,7 +537,7 @@ CURATED_BY_INTENSITY = [
     # 23a. Pájaros Posteriores / Reverse Fly / Rear Delt
     {
         "match_any": ("pajaro", "pajaros", "reverse fly", "rear delt", "deltoides posterior", "pajaro posterior", "pajaros posteriores"),
-        "exclude_any": (),
+        "exclude_any": ("garrafa", "mochila", "peso ligero", "pausa de 2s"),
         "gifs": {
             "baja": "delts/band-reverse-fly.gif",
             "media": "delts/dumbbell-rear-delt-raise.gif",
@@ -546,6 +546,71 @@ CURATED_BY_INTENSITY = [
         "biomechanics": "Abducción horizontal del hombro focalizada en deltoides posterior, romboides y trapecio medio.",
         "posture": "Torso inclinado en bisagra con columna neutra; codos con ligera flexión fija guiando el ascenso.",
         "warning": "No encojas los hombros hacia el cuello ni uses balanceo del torso.",
+    },
+    # 23a2. Pájaros con Mochila / Garrafa / Carga Ligera
+    {
+        "match_any": ("pajaros posteriores con garrafa", "garrafas ligeras", "con mochila ligera", "pausa de 2s arriba"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/dumbbell-rear-delt-raise.gif",
+            "media": "delts/dumbbell-rear-delt-raise.gif",
+            "alta": "delts/dumbbell-rear-fly.gif",
+        },
+        "biomechanics": "Abducción horizontal con sobrecarga moderada improvisada o mancuerna ligera aislando deltoides posterior.",
+        "posture": "Espalda plana, retracción escapular sincronizada con la abducción de hombros.",
+        "warning": "No flexiones los codos en exceso para convertirlo en un remo.",
+    },
+    # 23a3. Elevaciones Laterales con Mochila o Garrafa
+    {
+        "match_any": ("elevaciones laterales con mochila", "laterales con mochila", "garrafa suave"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/dumbbell-lateral-raise.gif",
+            "media": "delts/dumbbell-lateral-raise.gif",
+            "alta": "delts/dumbbell-lateral-raise.gif",
+        },
+        "biomechanics": "Abducción escapular lateral con resistencia improvisada estimulando fibras medias del deltoides.",
+        "posture": "Codos ligeramente por delante del plano coronal, muñeca neutra sin rotación interna exagerada.",
+        "warning": "No utilices balanceo lumbar para iniciar el despegue de la carga.",
+    },
+    # 23a4. Elevaciones Frontales con Toalla
+    {
+        "match_any": ("elevaciones frontales con toalla", "tension hacia afuera"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/dumbbell-front-raise.gif",
+            "media": "delts/dumbbell-front-raise.gif",
+            "alta": "delts/barbell-front-raise.gif",
+        },
+        "biomechanics": "Flexión anterior contra resistencia isométrica continua hacia los extremos reclutando deltoides anterior.",
+        "posture": "Brazos extendidos hasta el nivel de los ojos, tronco erguido y abdomen contraído.",
+        "warning": "Evita balancearte hacia atrás para levantar la toalla.",
+    },
+    # 23a5. Plancha Escapular / Dolphin Push-ups
+    {
+        "match_any": ("plancha escapular", "dolphin push", "empuje anterior"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "serratus-anterior/scapula-push-up.gif",
+            "media": "serratus-anterior/scapula-push-up.gif",
+            "alta": "serratus-anterior/scapula-push-up.gif",
+        },
+        "biomechanics": "Protracción y retracción escapular pura sin flexión de codos estimulando intensamente serrato anterior.",
+        "posture": "Posición de plancha en antebrazos, empujando activamente el suelo para separar las escápulas.",
+        "warning": "No dejes colapsar la zona lumbar hacia el suelo.",
+    },
+    # 23a6. Handstand Hold / Pino Estático en Pared
+    {
+        "match_any": ("handstand hold", "pino estatico", "pino asistido contra pared"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/band-twisting-overhead-press.gif",
+            "media": "delts/band-twisting-overhead-press.gif",
+            "alta": "triceps/handstand-push-up.gif",
+        },
+        "biomechanics": "Soporte isométrico invertido total de hombros, serrato y core contra la gravedad.",
+        "posture": "Empuje activo de hombros hacia las orejas (bloqueo escapular alto), core apretado.",
+        "warning": "Ten una salida segura y no aguantes la respiración.",
     },
     # 23b. Retracción Escapular / Prone Y-T-W / Elevaciones en Y
     {
@@ -615,7 +680,7 @@ CURATED_BY_INTENSITY = [
     # 24a. Tracción Dorsal / Remo con Toalla en Marco de Puerta (Towel Door Row)
     {
         "match_any": ("toalla en marco", "remo con toalla", "traccion dorsal con toalla", "traccion con toalla", "towel row", "bodyweight row with towel", "toalla en puerta", "con toalla"),
-        "exclude_any": ("polea", "cable", "maquina"),
+        "exclude_any": ("polea", "cable", "maquina", "remo en suelo", "deslizante", "remo de pie", "jalon dorsal", "jalón dorsal", "toalla tensa"),
         "gifs": {
             "baja": "upper-back/bodyweight-standing-row-with-towel.gif",
             "media": "upper-back/bodyweight-standing-one-arm-row-with-towel.gif",
@@ -628,7 +693,7 @@ CURATED_BY_INTENSITY = [
     # 24_inv. Remo Invertido (Inverted Row bajo mesa o barra)
     {
         "match_any": ("remo invertido", "inverted row", "bajo mesa"),
-        "exclude_any": (),
+        "exclude_any": ("supino", "supina", "a una sola mano", "a una mano", "una mano"),
         "gifs": {
             "baja": "upper-back/inverted-row-bent-knees.gif",
             "media": "upper-back/inverted-row.gif",
@@ -679,8 +744,8 @@ CURATED_BY_INTENSITY = [
     },
     # 24. Remos / Jalón Dorsal (Rows / Pulls)
     {
-        "match_any": ("remo", "row", "jalon", "jalón", "pulldown", "dominada", "pull up", "pull-up", "traccion dorsal"),
-        "exclude_any": ("toalla", "towel"),
+        "match_any": ("remo", "row", "jalon", "jalón", "pulldown", "traccion dorsal"),
+        "exclude_any": ("toalla", "towel", "dominada", "pull up", "pull-up", "chin-up", "chin up", "supino", "supina", "a una sola mano", "a una mano", "mochila"),
         "gifs": {
             "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
             "media": "upper-back/cable-low-seated-row.gif",
@@ -849,7 +914,7 @@ CURATED_BY_INTENSITY = [
     # 33. Dominadas / Pull-ups
     {
         "match_any": ("dominada", "dominadas", "pull up", "pull-up", "pullups"),
-        "exclude_any": ("toalla",),
+        "exclude_any": ("toalla", "supino", "supina", "chin-up", "chin up", "neutro", "neutra", "asistid"),
         "gifs": {
             "baja": "lats/band-close-grip-pulldown.gif",
             "media": "lats/pull-up.gif",
@@ -858,6 +923,227 @@ CURATED_BY_INTENSITY = [
         "biomechanics": "Tracción vertical de cadena cerrada con agarre pronado activando dorsal ancho y bíceps.",
         "posture": "Pecho proyectado hacia la barra, escápulas deprimidas y tracción desde los codos.",
         "warning": "Evita el balanceo o kipping descontrolado.",
+    },
+    # 33b. Dominadas Supinas / Chin-ups
+    {
+        "match_any": ("chin-up", "chin up", "chin-ups", "chinups", "dominada supina", "dominadas supinas", "agarre supino"),
+        "exclude_any": ("invertido", "inverted", "remo"),
+        "gifs": {
+            "baja": "lats/chin-up.gif",
+            "media": "lats/chin-up.gif",
+            "alta": "lats/chin-up.gif",
+        },
+        "biomechanics": "Tracción vertical con agarre supino reclutando intensamente bíceps braquial y dorsal ancho.",
+        "posture": "Agarre al ancho de los hombros, palmas mirando hacia ti, pecho alto hasta la barra.",
+        "warning": "No curves los hombros hacia adelante en el punto alto.",
+    },
+    # 33c. Dominadas Neutras / Paralelas
+    {
+        "match_any": ("agarre neutro", "parallel grip pull", "neutral grip"),
+        "exclude_any": ("remo",),
+        "gifs": {
+            "baja": "lats/pull-up-neutral-grip.gif",
+            "media": "lats/pull-up-neutral-grip.gif",
+            "alta": "lats/pull-up-neutral-grip.gif",
+        },
+        "biomechanics": "Tracción vertical en plano sagital con palmas enfrentadas, protegiendo la articulación glenohumeral.",
+        "posture": "Codos pegados al cuerpo traccionando hacia abajo, retracción escapular activa.",
+        "warning": "Evita redondear la espalda alta.",
+    },
+    # 33d. Dominadas Asistidas (Silla o Banda)
+    {
+        "match_any": ("dominadas asistidas", "dominada asistida", "apoyo de pies en silla", "assisted pull-up"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "lats/band-assisted-pull-up.gif",
+            "media": "lats/band-assisted-pull-up.gif",
+            "alta": "lats/assisted-pull-up.gif",
+        },
+        "biomechanics": "Tracción vertical con reducción de carga corporal para dominar el patrón motor y retracción escapular.",
+        "posture": "Pies apoyados sutilmente descargando peso sin empujar con las piernas de forma predominante.",
+        "warning": "Mantén la tensión en la espalda y no des saltos con los pies.",
+    },
+    # 33e. Jalón Dorsal hacia el Pecho con Toalla en Decúbito
+    {
+        "match_any": ("jalon dorsal hacia el pecho", "jalón dorsal hacia el pecho", "toalla tensa en decubito", "toalla tensa en decúbito"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "lats/band-kneeling-one-arm-pulldown.gif",
+            "media": "lats/band-kneeling-one-arm-pulldown.gif",
+            "alta": "lats/band-kneeling-one-arm-pulldown.gif",
+        },
+        "biomechanics": "Aducción y tracción de toalla generando tensión hacia afuera estimulando dorsal ancho y romboides en decúbito.",
+        "posture": "Frente hacia el suelo, tracción de la toalla hacia la clavícula manteniendo los codos bajos.",
+        "warning": "Mantén los brazos elevados del suelo en todo el trayecto concéntrico.",
+    },
+    # 33f. Remo de Pie con Toalla y Tensión Isométrica
+    {
+        "match_any": ("remo de pie con toalla", "tension isometrica", "tensión isométrica"),
+        "exclude_any": ("pecho", "hombro"),
+        "gifs": {
+            "baja": "upper-back/bodyweight-squatting-row-with-towel.gif",
+            "media": "upper-back/bodyweight-squatting-row-with-towel.gif",
+            "alta": "upper-back/bodyweight-squatting-row-with-towel.gif",
+        },
+        "biomechanics": "Tracción y tensión isométrica controlada contra toalla anclada en postura de bisagra de cadera.",
+        "posture": "Columna recta a 45°, rodillas ligeramente flexionadas, codos dirigidos hacia la cadera.",
+        "warning": "No pierdas la curvatura neutra lumbar.",
+    },
+    # 33g. Remo Invertido Supino
+    {
+        "match_any": ("remo invertido con agarre supino", "agarre supino bajo mesa"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "upper-back/inverted-row-v-2.gif",
+            "media": "upper-back/inverted-row-v-2.gif",
+            "alta": "upper-back/inverted-row-v-2.gif",
+        },
+        "biomechanics": "Remo invertido con palmas hacia el rostro aumentando el estímulo sobre bíceps y dorsal inferior.",
+        "posture": "Cuerpo recto, codos pegados al tronco, contacto suave del pecho con el borde.",
+        "warning": "No dejes caer la cadera al final de las repeticiones.",
+    },
+    # 33h. Remo Invertido Unilateral (A Una Mano)
+    {
+        "match_any": ("remo invertido a una sola mano", "remo invertido a una mano", "remo a 1 mano bajo mesa"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "upper-back/bodyweight-standing-one-arm-row-with-towel.gif",
+            "media": "upper-back/bodyweight-standing-one-arm-row-with-towel.gif",
+            "alta": "upper-back/bodyweight-standing-one-arm-row-with-towel.gif",
+        },
+        "biomechanics": "Tracción horizontal unilateral de alta demanda sobre dorsal, romboides y estabilizadores antirrotacionales del core.",
+        "posture": "Pelvis y hombros perfectamente paralelos sin torsión excesiva del tronco.",
+        "warning": "Evita rotaciones violentas para alcanzar la barra o mesa.",
+    },
+    # 33i. Remo Unilateral con Mochila Firme
+    {
+        "match_any": ("remo unilateral con mochila", "mochila firme", "mochila cargada"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "upper-back/one-arm-towel-row.gif",
+            "media": "upper-back/one-arm-towel-row.gif",
+            "alta": "upper-back/dumbbell-one-arm-row.gif",
+        },
+        "biomechanics": "Tracción unilateral con carga improvisada emulando remo con mancuerna, traccionando el codo hacia el bolsillo.",
+        "posture": "Mano libre apoyada en silla o mesa, espalda plana paralela al suelo.",
+        "warning": "No gires el torso al levantar la carga.",
+    },
+    # 33j. Flexiones con Rodillas Apoyadas
+    {
+        "match_any": ("flexiones en suelo con rodillas apoyadas", "rodillas apoyadas", "knee push up", "kneeling push up"),
+        "exclude_any": ("diamante", "diamond"),
+        "gifs": {
+            "baja": "pectorals/kneeling-push-up-male.gif",
+            "media": "pectorals/kneeling-push-up-male.gif",
+            "alta": "pectorals/kneeling-push-up-male.gif",
+        },
+        "biomechanics": "Empuje horizontal de cadena cinética cerrada con reducción de palanca activando pectoral mayor y tríceps.",
+        "posture": "Línea recta de rodillas a hombros, glúteos apretados, codos a 45 grados del torso.",
+        "warning": "No dejes que la cadera se quede atrás formando una V invertida.",
+    },
+    # 33k. Flexiones con Agarre Ancho en Suelo
+    {
+        "match_any": ("flexiones con agarre ancho", "agarre ancho en suelo", "wide push up", "wide hand push"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "pectorals/wide-hand-push-up.gif",
+            "media": "pectorals/wide-hand-push-up.gif",
+            "alta": "pectorals/wide-hand-push-up.gif",
+        },
+        "biomechanics": "Empuje horizontal con separación mayor al ancho de hombros incrementando el estiramiento y torque pectoral.",
+        "posture": "Manos 1.5 veces el ancho de los hombros, descenso controlado sintiendo apertura pectoral.",
+        "warning": "No bajes más allá del rango de confort articular del hombro.",
+    },
+    # 33l. Flexiones con Palmada o Pliométricas
+    {
+        "match_any": ("flexiones con palmada", "despegue pliometrico", "despegue pliométrico", "clap push up", "plyo push up"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "pectorals/clap-push-up.gif",
+            "media": "pectorals/clap-push-up.gif",
+            "alta": "pectorals/clap-push-up.gif",
+        },
+        "biomechanics": "Empuje explosivo de alta tasa de desarrollo de fuerza (RFD) con fase de vuelo y amortiguación elástica.",
+        "posture": "Aterrizaje suave con flexión inmediata de codos para disipar la carga de impacto.",
+        "warning": "No bloquees los codos al aterrizar.",
+    },
+    # 33m. Flexiones a Una Mano Asistidas
+    {
+        "match_any": ("flexiones a una mano", "una mano asistidas", "single arm push up", "one arm push up"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "pectorals/single-arm-push-up.gif",
+            "media": "pectorals/single-arm-push-up.gif",
+            "alta": "pectorals/single-arm-push-up.gif",
+        },
+        "biomechanics": "Empuje unilateral avanzado con alta demanda de estabilidad antirrotacional del core y fuerza máxima pectoral.",
+        "posture": "Pies separados para base amplia, brazo de apoyo centrado bajo el pecho.",
+        "warning": "Evita torsionar violentamente la pelvis al descender.",
+    },
+    # 33n. Flexiones en Pared (Wall Push-ups)
+    {
+        "match_any": ("flexiones en pared", "flexion en pared", "wall push up", "contra la pared"),
+        "exclude_any": ("hombro", "deltoid", "slide"),
+        "gifs": {
+            "baja": "pectorals/push-up-wall.gif",
+            "media": "pectorals/push-up-wall.gif",
+            "alta": "pectorals/push-up-wall.gif",
+        },
+        "biomechanics": "Patrón de empuje en bipedestación con mínimo impacto articular, ideal para readaptación o calentamiento.",
+        "posture": "Cuerpo en plancha firme, talones ligeramente levantados, manos al ancho y altura del pecho.",
+        "warning": "Mantén el abdomen firme para evitar hiperlordosis lumbar.",
+    },
+    # 33o. Flexiones con Toque al Hombro (Shoulder Taps)
+    {
+        "match_any": ("toque al hombro", "shoulder tap", "shoulder taps", "toques alternos al hombro"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "pectorals/shoulder-tap-push-up.gif",
+            "media": "pectorals/shoulder-tap-push-up.gif",
+            "alta": "pectorals/shoulder-tap-push-up.gif",
+        },
+        "biomechanics": "Integración de empuje y estabilidad dinámica unilateral transfiriendo carga entre miembros superiores.",
+        "posture": "Pelvis fija evitando el balanceo lateral mientras una mano toca el hombro contralateral.",
+        "warning": "Abre los pies ligeramente si sientes que la cadera baila de lado a lado.",
+    },
+    # 33p. Flexiones Profundas (Deep Push-ups)
+    {
+        "match_any": ("flexiones profundas", "deep push up", "deep push-up", "rango profundo"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "pectorals/deep-push-up.gif",
+            "media": "pectorals/deep-push-up.gif",
+            "alta": "pectorals/deep-push-up.gif",
+        },
+        "biomechanics": "Empuje con rango de movimiento extendido maximizando el estiramiento de las fibras del pectoral mayor.",
+        "posture": "Manos elevadas en soportes o libros, descenso hasta que el esternón sobrepase las palmas.",
+        "warning": "Controla el rango si existe molestia en la cápsula articular anterior del hombro.",
+    },
+    # 33q. Flexiones Pseudo-Planche
+    {
+        "match_any": ("pseudo-planche", "pseudo planche", "inclinacion anterior", "inclinación anterior"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "pectorals/full-planche-push-up.gif",
+            "media": "pectorals/full-planche-push-up.gif",
+            "alta": "pectorals/full-planche-push-up.gif",
+        },
+        "biomechanics": "Empuje con centro de masa adelantado y manos a la altura de la cintura, sobrecargando deltoides anterior y pectoral superior.",
+        "posture": "Prótasis escapular activa en el bloqueo alto, inclinación constante hacia adelante durante todo el recorrido.",
+        "warning": "Requiere buena flexibilidad de muñecas; rota ligeramente las manos hacia afuera si es necesario.",
+    },
+    # 33r. Rotaciones Externas de Hombro (Manguito Rotador)
+    {
+        "match_any": ("rotacion externa de hombro", "rotaciones externas", "manguito rotador", "external rotation"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/dumbbell-lying-external-shoulder-rotation.gif",
+            "media": "delts/dumbbell-lying-external-shoulder-rotation.gif",
+            "alta": "delts/cable-standing-shoulder-external-rotation.gif",
+        },
+        "biomechanics": "Rotación externa del húmero activando infraespinoso y redondo menor para estabilidad escapular.",
+        "posture": "Codo pegado al costado en ángulo de 90 grados, rotación controlada sin despegar el codo.",
+        "warning": "Utiliza cargas muy ligeras para no reclutar deltoides posterior de forma tramposa.",
     },
     # 21. Step-ups / Subidas al escalón o cajón
     {
@@ -877,8 +1163,8 @@ CURATED_BY_INTENSITY = [
         "match_any": ("remo en suelo", "remo con toalla deslizante", "remo deslizante"),
         "exclude_any": (),
         "gifs": {
-            "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
-            "media": "upper-back/band-one-arm-twisting-seated-row.gif",
+            "baja": "upper-back/band-one-arm-standing-low-row.gif",
+            "media": "upper-back/band-one-arm-standing-low-row.gif",
             "alta": "upper-back/band-one-arm-standing-low-row.gif",
         },
         "biomechanics": "Tracción dorsal en decúbito generando tensión mediante fricción controlada con toalla en suelo liso.",
