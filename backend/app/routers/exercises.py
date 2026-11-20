@@ -807,6 +807,19 @@ CURATED_BY_INTENSITY = [
         "posture": "Pecho proyectado hacia la barra, escápulas deprimidas y tracción desde los codos.",
         "warning": "Evita el balanceo o kipping descontrolado.",
     },
+    # 21. Step-ups / Subidas al escalón o cajón
+    {
+        "match_any": ("step-up", "step up", "step-ups", "subida al escalon", "subida al cajon", "escalon bajo", "escalón bajo"),
+        "exclude_any": ("bicep", "curl", "overhead"),
+        "gifs": {
+            "baja": "quads/split-squats.gif",
+            "media": "glutes/dumbbell-step-up.gif",
+            "alta": "glutes/barbell-step-up.gif",
+        },
+        "biomechanics": "Subida unilateral controlada sobre escalón o banco empujando desde el talón activando cuádriceps y glúteos.",
+        "posture": "Torso erguido con ligera inclinación, rodilla alineada con el empeine y empuje desde el talón.",
+        "warning": "No permitas que la rodilla colapse hacia adentro (valgo) ni te dejes caer sin control excéntrico.",
+    },
 ]
 
 # Fallbacks garantizados por carpeta muscular e intensidad (CERO guías textuales)
