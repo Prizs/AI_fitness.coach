@@ -2014,12 +2014,15 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
         quads_dict = {
             "baja": [
                 ("Sentadilla libre asistida en silla con peso corporal (Básico)", "Cuádriceps", "Glúteos", "squat"),
-                ("Sentadilla isométrica apoyado en pared (Wall Sit 25s) (Básico)", "Cuádriceps", "Rótula", "squat"),
-                ("Extensión de rodilla en silla sin peso con control (Básico)", "Cuádriceps", "Rótula", "leg-extension"),
+                ("Step-ups en escalón bajo con control excéntrico (Básico)", "Cuádriceps, Piernas", "Estabilidad", "lunge"),
                 ("Zancada estática asistida con apoyo en pared (Básico)", "Cuádriceps", "Isquiotibiales", "lunge"),
+                ("Extensión de rodilla en silla sin peso con control (Básico)", "Cuádriceps", "Rótula", "leg-extension"),
+                ("Sentadilla cosaca suave con apoyo para movilidad frontal (Básico)", "Cuádriceps, Aductores", "Cadera", "squat"),
+                ("Sentadilla isométrica apoyado en pared (Wall Sit 25s) (Básico)", "Cuádriceps", "Rótula", "squat"),
             ],
             "media": [
                 ("Sentadilla libre profunda con peso corporal (Intermedio)", "Cuádriceps", "Glúteos, Core", "squat"),
+                ("Step-ups dinámicos en silla o banco (Intermedio)", "Cuádriceps, Piernas", "Estabilidad", "lunge"),
                 ("Sentadilla búlgara con pie en silla o cama (Intermedio)", "Cuádriceps", "Glúteos, Estabilizadores", "split-squat"),
                 ("Sentadilla isométrica en pared (Wall Sit 45s) (Intermedio)", "Cuádriceps", "Vasto medial", "squat"),
                 ("Zancadas frontales alternas con peso corporal (Intermedio)", "Cuádriceps", "Isquiotibiales", "lunge"),
@@ -2034,9 +2037,11 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
         }
         hams_dict = {
             "baja": [
-                ("Puente de glúteos e isquios en suelo con pausa (Básico)", "Isquiotibiales", "Glúteos", "glute-bridge"),
+                ("Curl femoral deslizante en suelo con toalla en piso liso (Básico)", "Isquiotibiales", "Cadena posterior", "leg-curl"),
                 ("Buenos días con manos tras nuca y control motor (Básico)", "Isquiotibiales", "Erectores espinales", "deadlift"),
-                ("Curl femoral en suelo con talones apoyados (Básico)", "Isquiotibiales", "Cadena posterior", "leg-curl"),
+                ("Peso muerto rumano unilateral con peso corporal y equilibrio (Básico)", "Isquiotibiales", "Estabilidad", "deadlift"),
+                ("Curl femoral de pie sin peso con contracción isométrica (Básico)", "Isquiotibiales", "Gemelos", "leg-curl"),
+                ("Deslizamiento de talones alternado en suelo con toalla (Básico)", "Isquiotibiales", "Bíceps Femoral", "leg-curl"),
             ],
             "media": [
                 ("Curl femoral en suelo con deslizador o toalla en piso liso (Intermedio)", "Isquiotibiales", "Glúteos", "leg-curl"),
@@ -2136,13 +2141,20 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
         shoulders_dict = {
             "baja": [
                 ("Elevaciones laterales isométricas contra marco de puerta (Básico)", "Deltoides lateral", "Trapecio", "lateral-raise"),
+                ("Círculos de brazos controlados con pausa isométrica (Básico)", "Deltoides Completo", "Manguito Rotador", "mobility"),
+                ("Deslizamientos en pared para hombros (Wall Slides) (Básico)", "Deltoides, Escápula", "Manguito Rotador", "mobility"),
                 ("Retracción y elevación escapular Prone Y-T-W en suelo (Básico)", "Deltoides posterior", "Espalda alta", "lateral-raise"),
-                ("Empuje en pared para serrato anterior (Básico)", "Serrato, Hombros", "Core", "pushup"),
+                ("Elevaciones frontales suaves con contracción voluntaria (Básico)", "Deltoides Anterior", "Trapecio", "lateral-raise"),
+                ("Pájaros posteriores sin peso en posición bisagra (Básico)", "Deltoides posterior", "Romboides", "fly"),
+                ("Elevaciones en T con toalla generando tensión isométrica (Básico)", "Deltoides Lateral y Posterior", "Romboides", "lateral-raise"),
             ],
             "media": [
                 ("Flexiones en pica en suelo (Pike Push-ups) (Intermedio)", "Deltoides", "Tríceps, Trapecio", "shoulder-press"),
                 ("Elevaciones laterales isométricas contra marco de puerta (Intermedio)", "Deltoides Lateral", "Trapecio", "lateral-raise"),
+                ("Círculos de brazos controlados con pausa isométrica (Intermedio)", "Deltoides", "Manguito Rotador", "mobility"),
+                ("Pájaros posteriores sin peso con contracción isométrica (Intermedio)", "Deltoides posterior", "Romboides", "lateral-raise"),
                 ("Retracción escapular en suelo boca abajo Prone Y-T-W (Intermedio)", "Deltoides posterior", "Romboides", "lateral-raise"),
+                ("Deslizamientos en pared para hombros (Wall Slides) (Intermedio)", "Deltoides", "Serrato", "mobility"),
                 ("Flexiones en pica con pies en escalón (Intermedio)", "Deltoides anterior y lateral", "Tríceps", "shoulder-press"),
             ],
             "alta": [
@@ -2974,7 +2986,10 @@ def _normalize_exercises(
         gif_url = (gif_meta.get("url") or "").strip()
 
         # Deduplication Guard Radical: CERO repetición de nombre Y CERO repetición de GIF URL
-        if (base_norm in seen_names) or (gif_url and gif_url in seen_gifs):
+        has_dup_squat = ("sentadilla" in base_norm or "squat" in base_norm) and any("sentadilla" in str(ex.get("name", "")).lower() or "squat" in str(ex.get("name", "")).lower() for ex in exercises)
+        has_dup_pushup = ("flexion" in base_norm or "pushup" in base_norm) and any(("flexion" in str(ex.get("name", "")).lower() or "pushup" in str(ex.get("name", "")).lower()) for ex in exercises)
+
+        if (base_norm in seen_names) or (gif_url and gif_url in seen_gifs) or has_dup_squat or has_dup_pushup:
             all_deep_cands = (
                 upper_pool + leg_pool + core_pool + mobility_pool +
                 CALVES_FEET_POOLS.get(intensity_hint, []) +
@@ -3003,7 +3018,12 @@ def _normalize_exercises(
                 if not cand_pool:
                     cand_pool = all_deep_cands
             elif requested_focus in ("piernas_hombros", "hombros_piernas") or ("pierna" in (requested_focus or "") and "hombro" in (requested_focus or "")):
-                cand_pool = leg_pool + [e for e in upper_pool if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+                if _is_shoulder_exercise(clean_name, primary):
+                    cand_pool = [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+                else:
+                    cand_pool = [e for e in leg_pool if not any(k in e["name"].lower() for k in ("gluteo", "glúteo", "glute", "pelvica", "pélvica", "hip thrust", "puente"))]
+                if not cand_pool:
+                    cand_pool = leg_pool + [e for e in upper_pool if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
             elif requested_focus in ("pecho_femorales", "femorales_pecho"):
                 cand_pool = [e for e in upper_pool if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))] + [e for e in leg_pool if _is_femoral_exercise(e["name"], e.get("primary_muscle", ""))]
             elif requested_focus in ("aerobicos", "solo_cardio", "cardio", "movilidad_cardio"):
@@ -3277,14 +3297,18 @@ def _normalize_structured_plan(
     # Sub-pools especializados para máxima variación sin repeticiones adaptados a equipamiento:
     if is_no_equipment:
         legs_quads = [
-            {"name": "Sentadilla asistida en silla" if int_hint == "baja" else ("Sentadilla libre profunda con peso corporal" if int_hint == "media" else "Sentadilla búlgara con salto controlado"), "sets": 4, "reps": "10-12", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
-            {"name": "Sentadilla isométrica en pared (Wall Sit)" if int_hint != "alta" else "Sentadilla sissy con control corporal", "sets": 3, "reps": "45s", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Vasto medial"},
-            {"name": "Zancadas estáticas asistidas" if int_hint == "baja" else "Sentadilla búlgara con pie en silla o cama", "sets": 3, "reps": "10 por pierna", "animation_key": "split-squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Isquiotibiales"},
+            {"name": "Sentadilla asistida en silla" if int_hint == "baja" else ("Sentadilla libre profunda con peso corporal" if int_hint == "media" else "Sentadilla búlgara con salto controlado"), "sets": 4, "reps": "10-12", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Estabilizadores"},
+            {"name": "Step-ups en escalón bajo con control excéntrico" if int_hint == "baja" else "Step-ups dinámicos en silla o banco", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps, Piernas", "secondary_muscle": "Estabilidad"},
+            {"name": "Zancada estática asistida con apoyo en pared" if int_hint == "baja" else "Sentadilla búlgara con pie en silla o cama", "sets": 3, "reps": "10 por pierna", "animation_key": "split-squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Isquiotibiales"},
+            {"name": "Extensión de rodilla en silla sin peso con control" if int_hint == "baja" else "Sentadilla isométrica en pared (Wall Sit)", "sets": 3, "reps": "12" if int_hint == "baja" else "45s", "animation_key": "leg-extension" if int_hint == "baja" else "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Vasto medial"},
+            {"name": "Sentadilla cosaca suave con apoyo para movilidad frontal" if int_hint == "baja" else "Sentadilla pausada en el fondo (2s)", "sets": 3, "reps": "8 por lado" if int_hint == "baja" else "10", "animation_key": "squat", "primary_muscle": "Cuádriceps, Aductores", "secondary_muscle": "Cadera"},
         ]
         legs_hams = [
-            {"name": "Puente de glúteos e isquios en suelo" if int_hint == "baja" else "Peso muerto rumano unilateral con peso corporal", "sets": 4, "reps": "10-12", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Glúteos"},
-            {"name": "Curl femoral en suelo con talones" if int_hint == "baja" else "Curl femoral en suelo con deslizador o toalla en piso liso", "sets": 3, "reps": "12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
-            {"name": "Buenos días con control motor y manos tras nuca", "sets": 3, "reps": "10", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Espalda baja"},
+            {"name": "Curl femoral deslizante en suelo con toalla en piso liso", "sets": 3, "reps": "10-12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Cadena posterior"},
+            {"name": "Buenos días con manos tras nuca y control motor", "sets": 3, "reps": "10", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Erectores espinales"},
+            {"name": "Peso muerto rumano unilateral con peso corporal y equilibrio", "sets": 3, "reps": "10 por pierna", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Estabilidad"},
+            {"name": "Curl femoral de pie sin peso con contracción isométrica", "sets": 3, "reps": "12 por pierna", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
+            {"name": "Deslizamiento de talones alternado en suelo con toalla", "sets": 3, "reps": "10 por pierna", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Bíceps Femoral"},
         ]
         legs_glutes = [
             {"name": "Puente de glúteos en suelo con pausa de 2s" if int_hint == "baja" else "Elevación de cadera (Hip Thrust) en borde de sofá o silla", "sets": 4, "reps": "12-15", "animation_key": "hip-thrust", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales"},
@@ -3292,9 +3316,11 @@ def _normalize_structured_plan(
             {"name": "Patada de glúteos en cuadrupedia con pausa isométrica", "sets": 3, "reps": "12 por pierna", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Core"},
         ]
         legs_unipodal_calves = [
-            {"name": "Step-ups en escalón bajo" if int_hint == "baja" else "Sentadilla búlgara con apoyo en silla", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps, Glúteos", "secondary_muscle": "Estabilizadores"},
-            {"name": "Elevación de talones de pie en suelo con pausa de 2s" if int_hint == "baja" else "Elevación de talones unipodal en escalón o libro grueso", "sets": 4, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Gemelos", "secondary_muscle": "Tobillos"},
-            {"name": "Elevación de talones sentado en silla con presión manual (Sóleo)", "sets": 3, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Sóleo", "secondary_muscle": "Gemelos"},
+            {"name": "Elevación de talones de pie con apoyo en pared", "sets": 4, "reps": "15-20", "animation_key": "calf-raise", "primary_muscle": "Gemelos (Gastrocnemio)", "secondary_muscle": "Tobillos"},
+            {"name": "Elevación de talones sentado en silla con presión manual (Sóleo)", "sets": 3, "reps": "15-20", "animation_key": "calf-raise", "primary_muscle": "Sóleo (Batata profunda)", "secondary_muscle": "Tendón de Aquiles"},
+            {"name": "Caminata controlada de talones y de puntillas en casa", "sets": 3, "reps": "30s", "animation_key": "mobility", "primary_muscle": "Tríceps Sural, Pies", "secondary_muscle": "Arco Plantar"},
+            {"name": "Dorsiflexión de tobillos en suelo levantando puntas", "sets": 3, "reps": "15", "animation_key": "mobility", "primary_muscle": "Tibial Anterior", "secondary_muscle": "Tobillo"},
+            {"name": "Elevación de talones unipodal en escalón o libro grueso", "sets": 3, "reps": "12 por pierna", "animation_key": "calf-raise", "primary_muscle": "Tríceps Sural", "secondary_muscle": "Equilibrio"},
         ]
         legs_power_mob = [
             {"name": "Sentadilla pausada en el fondo (3s)", "sets": 3, "reps": "10", "animation_key": "squat", "primary_muscle": "Cuádriceps, Potencia", "secondary_muscle": "Glúteos"},
@@ -3312,9 +3338,14 @@ def _normalize_structured_plan(
             {"name": "Curl de bíceps isométrico con toalla bajo pie generando tensión", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
         ]
         upper_shoulders_post = [
-            {"name": "Flexiones en pica en suelo (Pike Push-ups)", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps"},
+            {"name": "Flexiones en pica en suelo (Pike Push-ups)" if int_hint != "baja" else "Press de hombros sentado con resistencia corporal", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps"},
             {"name": "Elevaciones laterales isométricas contra marco de puerta", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
             {"name": "Retracción escapular en suelo boca abajo (Prone Y-T-W)", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+            {"name": "Círculos de brazos controlados con pausa isométrica", "sets": 3, "reps": "15 giros", "animation_key": "mobility", "primary_muscle": "Deltoides Completo", "secondary_muscle": "Manguito Rotador"},
+            {"name": "Deslizamientos en pared para hombros (Wall Slides)", "sets": 3, "reps": "10-12", "animation_key": "mobility", "primary_muscle": "Deltoides, Escápula", "secondary_muscle": "Serrato"},
+            {"name": "Pájaros posteriores sin peso en posición bisagra", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Romboides"},
+            {"name": "Elevaciones frontales suaves con contracción voluntaria", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides Anterior", "secondary_muscle": "Trapecio"},
+            {"name": "Elevaciones en T con toalla generando tensión isométrica", "sets": 3, "reps": "12", "animation_key": "lateral-raise", "primary_muscle": "Deltoides Lateral y Posterior", "secondary_muscle": "Romboides"},
         ]
         upper_arms_torso = [
             {"name": "Fondos de tríceps en silla con piernas estiradas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Tríceps", "secondary_muscle": "Pectoral"},
@@ -3323,14 +3354,18 @@ def _normalize_structured_plan(
         ]
     else:
         legs_quads = [
-            {"name": "Sentadilla profunda asistida" if int_hint == "baja" else ("Sentadilla Goblet con mancuerna" if int_hint == "media" else "Sentadilla profunda con barra libre"), "sets": 4, "reps": "10-12", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
-            {"name": "Extensión de cuádriceps isométrica" if int_hint == "baja" else "Prensa de piernas inclinada 45°", "sets": 3, "reps": "12", "animation_key": "leg-press", "primary_muscle": "Cuádriceps", "secondary_muscle": "Glúteos"},
-            {"name": "Zancadas estáticas asistidas" if int_hint == "baja" else "Zancadas frontales alternas con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps", "secondary_muscle": "Isquiotibiales"},
+            {"name": "Sentadilla profunda asistida" if int_hint == "baja" else ("Sentadilla Goblet con mancuerna" if int_hint == "media" else "Sentadilla profunda con barra libre"), "sets": 4, "reps": "10-12", "animation_key": "squat", "primary_muscle": "Cuádriceps", "secondary_muscle": "Estabilizadores"},
+            {"name": "Step-ups con mancuernas en banco o escalón", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps, Piernas", "secondary_muscle": "Estabilidad"},
+            {"name": "Zancadas frontales alternas con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps", "secondary_muscle": "Isquiotibiales"},
+            {"name": "Extensión de cuádriceps en máquina" if int_hint != "baja" else "Extensión de cuádriceps isométrica con carga ligera", "sets": 3, "reps": "12", "animation_key": "leg-extension", "primary_muscle": "Cuádriceps", "secondary_muscle": "Vasto medial"},
+            {"name": "Prensa de piernas inclinada 45°", "sets": 4, "reps": "10-12", "animation_key": "leg-press", "primary_muscle": "Cuádriceps", "secondary_muscle": "Cadena anterior"},
         ]
         legs_hams = [
-            {"name": "Peso muerto rumano con mancuernas" if int_hint != "alta" else "Peso muerto rumano con barra", "sets": 4, "reps": "10-12", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Glúteos"},
-            {"name": "Curl femoral de pie sin peso" if int_hint == "baja" else "Curl de isquiotibiales en máquina", "sets": 3, "reps": "12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
-            {"name": "Buenos días con control motor", "sets": 3, "reps": "10", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Espalda baja"},
+            {"name": "Peso muerto rumano con mancuernas", "sets": 4, "reps": "10-12", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Cadena posterior"},
+            {"name": "Curl de isquiotibiales / femoral en máquina", "sets": 3, "reps": "12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Gemelos"},
+            {"name": "Buenos días con mancuernas o barra guiada", "sets": 3, "reps": "10", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Erectores"},
+            {"name": "Peso muerto unilateral con mancuerna", "sets": 3, "reps": "10 por pierna", "animation_key": "deadlift", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Estabilidad"},
+            {"name": "Curl femoral sentado en máquina", "sets": 3, "reps": "12", "animation_key": "leg-curl", "primary_muscle": "Isquiotibiales", "secondary_muscle": "Bíceps Femoral"},
         ]
         legs_glutes = [
             {"name": "Puente de glúteos en suelo" if int_hint == "baja" else "Hip Thrust con mancuerna en banco", "sets": 4, "reps": "12-15", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Isquiotibiales"},
@@ -3338,9 +3373,11 @@ def _normalize_structured_plan(
             {"name": "Patada de glúteos en cuadrupedia" if int_hint == "baja" else "Patada de glúteos en polea o con banda", "sets": 3, "reps": "12 por pierna", "animation_key": "glute-bridge", "primary_muscle": "Glúteos", "secondary_muscle": "Core"},
         ]
         legs_unipodal_calves = [
-            {"name": "Step-ups en escalón bajo" if int_hint == "baja" else "Sentadilla búlgara con mancuernas", "sets": 3, "reps": "10 por pierna", "animation_key": "lunge", "primary_muscle": "Cuádriceps, Glúteos", "secondary_muscle": "Estabilizadores"},
-            {"name": "Elevación de talones de pie con peso corporal" if int_hint == "baja" else "Elevación de talones de pie con carga", "sets": 4, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Gemelos", "secondary_muscle": "Tobillos"},
-            {"name": "Elevación de talones sentado en máquina (Sóleo)", "sets": 3, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Sóleo", "secondary_muscle": "Gemelos"},
+            {"name": "Elevación de talones de pie con mancuernas en escalón", "sets": 4, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Gemelos (Gastrocnemio)", "secondary_muscle": "Tobillos"},
+            {"name": "Elevación de talones sentado en máquina (Sóleo)", "sets": 3, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Sóleo (Batatas)", "secondary_muscle": "Gemelos"},
+            {"name": "Elevación de talones unipodal en escalón con mancuerna", "sets": 3, "reps": "12 por pierna", "animation_key": "calf-raise", "primary_muscle": "Tríceps Sural", "secondary_muscle": "Estabilidad"},
+            {"name": "Dorsiflexión tibial con banda elástica resistida", "sets": 3, "reps": "15", "animation_key": "mobility", "primary_muscle": "Tibial Anterior", "secondary_muscle": "Pies"},
+            {"name": "Elevación de talones en prensa 45°", "sets": 4, "reps": "15", "animation_key": "calf-raise", "primary_muscle": "Gemelos", "secondary_muscle": "Sóleo"},
         ]
         legs_power_mob = [
             {"name": "Sentadilla pausada en el fondo (3s)" if int_hint == "baja" else "Sentadillas con salto controlado (Jump Squat)", "sets": 3, "reps": "10", "animation_key": "squat", "primary_muscle": "Cuádriceps, Potencia", "secondary_muscle": "Glúteos"},
@@ -3359,9 +3396,19 @@ def _normalize_structured_plan(
             {"name": "Curl de bíceps alterno con mancuernas", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
         ]
         upper_shoulders_post = [
-            {"name": "Press militar con mancuernas sentado", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides", "secondary_muscle": "Tríceps"},
+            {"name": "Press militar con mancuernas sentado", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides Anterior y Medio", "secondary_muscle": "Tríceps"},
             {"name": "Elevaciones laterales de hombros con mancuernas", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
-            {"name": "Face pulls con cuerda o pájaros posteriores", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+            {"name": "Pájaros posteriores con mancuernas en banco inclinado", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+            {"name": "Press Arnold con mancuernas sentado", "sets": 3, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides Completo", "secondary_muscle": "Tríceps"},
+            {"name": "Face pulls con cuerda en polea o banda", "sets": 3, "reps": "12-15", "animation_key": "row", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Manguito Rotador"},
+            {"name": "Elevaciones frontales alternas con mancuernas", "sets": 3, "reps": "10-12", "animation_key": "lateral-raise", "primary_muscle": "Deltoides Anterior", "secondary_muscle": "Trapecio"},
+            {"name": "Elevaciones laterales en polea baja a una mano", "sets": 3, "reps": "12 por lado", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
+            {"name": "Círculos de brazos controlados con mancuernas muy ligeras", "sets": 3, "reps": "12 por sentido", "animation_key": "mobility", "primary_muscle": "Deltoides", "secondary_muscle": "Manguito Rotador"},
+        ]
+        upper_arms_torso = [
+            {"name": "Curl de bíceps tipo martillo", "sets": 3, "reps": "10-12", "animation_key": "bicep-curl", "primary_muscle": "Braquial, Bíceps", "secondary_muscle": "Antebrazo"},
+            {"name": "Fondos entre bancos o en paralelas asistidas", "sets": 3, "reps": "10", "animation_key": "pushup", "primary_muscle": "Tríceps, Pectoral", "secondary_muscle": "Hombros"},
+            {"name": "Remo invertido o tracción horizontal controlada", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Espalda media", "secondary_muscle": "Bíceps"},
         ]
         upper_arms_torso = [
             {"name": "Curl de bíceps tipo martillo", "sets": 3, "reps": "10-12", "animation_key": "bicep-curl", "primary_muscle": "Braquial, Bíceps", "secondary_muscle": "Antebrazo"},
@@ -3577,18 +3624,18 @@ def _normalize_structured_plan(
 
             elif requested_focus in ("piernas_hombros", "hombros_piernas") or ("pierna" in (requested_focus or "") and "hombro" in (requested_focus or "")):
                 day_titles = [
-                    f"Combinado: Piernas (Cuádriceps) + Hombros (Deltoides Anterior/Lateral) ({badge_lbl})",
-                    f"Combinado: Piernas (Femorales e Isquios) + Hombros (Deltoides Posterior) ({badge_lbl})",
-                    f"Combinado: Piernas (Glúteos y Cadera) + Hombros (Press Militar / Pike) ({badge_lbl})",
-                    f"Combinado: Piernas (Pantorrillas y Sóleo) + Hombros (Elevaciones Laterales) ({badge_lbl})",
-                    f"Combinado: Piernas (Fuerza Unipodal) + Hombros (Estabilidad Escapular) ({badge_lbl})",
+                    f"Combinado: Piernas (Cuádriceps) + Hombros (Deltoides Anterior/Pike) ({badge_lbl})",
+                    f"Combinado: Piernas (Unilateral y Gemelos) + Hombros (Deltoides Posterior y Escápula) ({badge_lbl})",
+                    f"Combinado: Piernas (Femorales e Isquios) + Hombros (Deltoides Lateral / Tensión) ({badge_lbl})",
+                    f"Combinado: Piernas (Sóleo y Rango Articular) + Hombros (Movilidad y Deltoides Anterior) ({badge_lbl})",
+                    f"Combinado: Circuito Piernas Completas + Hombros Global ({badge_lbl})",
                 ]
                 day_exs_map = [
-                    legs_quads[:2] + upper_shoulders_post[:2],
-                    legs_hams[:2] + upper_shoulders_post[1:3],
-                    legs_glutes[:2] + upper_shoulders_post[:2],
-                    legs_unipodal_calves[:2] + upper_shoulders_post[1:3],
-                    legs_power_mob[:2] + upper_shoulders_post[:2],
+                    [legs_quads[0], upper_shoulders_post[0], legs_hams[0], upper_shoulders_post[1]],
+                    [legs_quads[1], upper_shoulders_post[2], legs_unipodal_calves[0], upper_shoulders_post[3]],
+                    [legs_hams[1], upper_shoulders_post[7] if len(upper_shoulders_post) > 7 else upper_shoulders_post[1], legs_quads[2], upper_shoulders_post[4] if len(upper_shoulders_post) > 4 else upper_shoulders_post[2]],
+                    [legs_unipodal_calves[1], upper_shoulders_post[6] if len(upper_shoulders_post) > 6 else upper_shoulders_post[0], legs_quads[3], upper_shoulders_post[5] if len(upper_shoulders_post) > 5 else upper_shoulders_post[1]],
+                    [legs_quads[4] if len(legs_quads) > 4 else legs_quads[0], upper_shoulders_post[3], legs_hams[2] if len(legs_hams) > 2 else legs_hams[0], upper_shoulders_post[0]],
                 ]
                 idx = day_idx % len(day_titles)
                 return day_titles[idx], _normalize_exercises(

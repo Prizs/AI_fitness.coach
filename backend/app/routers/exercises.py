@@ -534,18 +534,83 @@ CURATED_BY_INTENSITY = [
         "posture": "Core comprimido y glúteos firmes para evitar arquear la columna lumbar.",
         "warning": "Evita hiperextender el cuello o arquear excesivamente la espalda.",
     },
-    # 23. Retracción Escapular / Y-T-W / Pájaros / Face Pulls
+    # 23a. Pájaros Posteriores / Reverse Fly / Rear Delt
     {
-        "match_any": ("retraccion escapular", "prone y-t-w", "y-t-w", "pajaro", "pajaros", "face pull", "face pulls"),
+        "match_any": ("pajaro", "pajaros", "reverse fly", "rear delt", "deltoides posterior", "pajaro posterior", "pajaros posteriores"),
         "exclude_any": (),
         "gifs": {
-            "baja": "delts/band-shoulder-press.gif",
-            "media": "delts/dumbbell-seated-shoulder-press.gif",
-            "alta": "delts/lever-lateral-raise.gif",
+            "baja": "delts/band-reverse-fly.gif",
+            "media": "delts/dumbbell-rear-delt-raise.gif",
+            "alta": "delts/dumbbell-rear-fly.gif",
         },
-        "biomechanics": "Aducción y rotación externa escapular estimulando deltoides posterior y romboides.",
-        "posture": "Junta las escápulas atrás y mantén el mentón hacia adentro.",
-        "warning": "No tenses el cuello excesivamente.",
+        "biomechanics": "Abducción horizontal del hombro focalizada en deltoides posterior, romboides y trapecio medio.",
+        "posture": "Torso inclinado en bisagra con columna neutra; codos con ligera flexión fija guiando el ascenso.",
+        "warning": "No encojas los hombros hacia el cuello ni uses balanceo del torso.",
+    },
+    # 23b. Retracción Escapular / Prone Y-T-W / Elevaciones en Y
+    {
+        "match_any": ("retraccion escapular", "prone y-t-w", "y-t-w", "y raise", "elevaciones en y", "prone w", "prone y"),
+        "exclude_any": ("elevacion en t", "elevaciones en t"),
+        "gifs": {
+            "baja": "delts/band-y-raise.gif",
+            "media": "delts/band-y-raise.gif",
+            "alta": "delts/band-y-raise.gif",
+        },
+        "biomechanics": "Rotación externa y depresión escapular en el plano escapular estimulando deltoides posterior y trapecio inferior.",
+        "posture": "Boca abajo o de pie con tronco erguido, pulgares apuntando hacia arriba al elevar los brazos.",
+        "warning": "Mantén el mentón retraído y el cuello relajado sin hiperextensión cervical.",
+    },
+    # 23b2. Elevaciones en T (T-Raises / Tensión Isométrica)
+    {
+        "match_any": ("elevacion en t", "elevaciones en t", "t raise", "t-raise", "t con toalla"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/dumbbell-incline-t-raise.gif",
+            "media": "delts/dumbbell-incline-t-raise.gif",
+            "alta": "delts/dumbbell-incline-t-raise.gif",
+        },
+        "biomechanics": "Abducción horizontal isométrica en línea T estimulando deltoides lateral, deltoides posterior y romboides.",
+        "posture": "Brazos alineados a la horizontal perpendicular al torso, escápulas conectadas y cuello neutro.",
+        "warning": "No arquees la espalda baja al mantener la tensión.",
+    },
+    # 23c. Círculos de Brazos / Rotaciones de Hombros (Arm Circles)
+    {
+        "match_any": ("circulo de brazo", "circulos de brazos", "arm circle", "arm circles", "rotacion de hombro", "rotaciones de hombros", "circulos controlados"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/weighted-round-arm.gif",
+            "media": "delts/weighted-round-arm.gif",
+            "alta": "delts/weighted-round-arm.gif",
+        },
+        "biomechanics": "Circunducción continua de la articulación glenohumeral activando las tres cabezas del deltoides y manguito rotador sin sobrecarga articular.",
+        "posture": "Brazos estirados a la altura de los hombros formando pequeños círculos controlados con escápulas estables.",
+        "warning": "Evita balancear el torso o arquear la zona lumbar; mantén el abdomen activo.",
+    },
+    # 23d. Deslizamientos en Pared / Wall Slides / Movilidad de Hombro
+    {
+        "match_any": ("deslizamiento en pared", "deslizamientos en pared", "wall slide", "wall slides", "movilidad de hombro", "movilidad de hombros", "estiramiento de hombro", "deslizamiento de brazos"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/rear-deltoid-stretch.gif",
+            "media": "delts/rear-deltoid-stretch.gif",
+            "alta": "delts/rear-deltoid-stretch.gif",
+        },
+        "biomechanics": "Deslizamiento ascendente en pared desde posición W a Y reclutando deltoides y serrato anterior, optimizando el ritmo escapulohumeral.",
+        "posture": "Espalda y antebrazos en contacto firme contra la pared, manteniendo la pelvis neutra.",
+        "warning": "Detén la subida si los antebrazos se despegan de la pared o si sientes pellizco en el hombro.",
+    },
+    # 23e. Elevaciones Frontales (Front Raise)
+    {
+        "match_any": ("elevacion frontal", "elevaciones frontales", "front raise", "elevaciones frontales suaves"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/band-front-raise.gif",
+            "media": "delts/dumbbell-front-raise.gif",
+            "alta": "delts/barbell-front-raise.gif",
+        },
+        "biomechanics": "Flexión anterior del hombro reclutando directamente el fascículo clavicular del deltoides.",
+        "posture": "Tronco vertical, ascenso controlado hasta la horizontal visual y descenso en 3 segundos.",
+        "warning": "No arquees la zona lumbar al elevar los brazos.",
     },
     # 24a. Tracción Dorsal / Remo con Toalla en Marco de Puerta (Towel Door Row)
     {
