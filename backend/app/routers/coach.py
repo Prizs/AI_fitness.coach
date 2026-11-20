@@ -3345,7 +3345,11 @@ def _normalize_exercises(
                 "primary_muscle": primary,
                 "secondary_muscle": secondary,
                 "intensity_level": forced_label,
+                "gif_url": gif_url,
                 "biomechanics": gif_meta.get("biomechanics", "Movimiento controlado respetando el rango articular."),
+                "tempo": gif_meta.get("tempo", "3s bajada controlada · 1s pausa · 2s subida suave"),
+                "posture": gif_meta.get("posture", "Columna neutra y core activo durante todo el ejercicio."),
+                "warning": gif_meta.get("warning", "Detén el ejercicio si sientes molestia articular o dolor punzante."),
             }
         )
     return exercises

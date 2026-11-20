@@ -406,8 +406,8 @@ CURATED_BY_INTENSITY = [
     },
     # 14. Elevación de Talones de Pie / Gemelos General
     {
-        "match_any": ("talon", "talones", "gemelo", "gemelos", "pantorrilla", "pantorrillas", "calf raise", "batata", "soleo"),
-        "exclude_any": ("sentadilla", "squat", "prensa", "lunge"),
+        "match_any": ("elevacion de talones", "elevaciones de talones", "talon de pie", "talones de pie", "gemelo", "gemelos", "pantorrilla", "pantorrillas", "calf raise", "batata", "soleo"),
+        "exclude_any": ("sentadilla", "squat", "prensa", "lunge", "remo", "invertido", "mesa", "toalla", "deslizador", "curl", "banca", "pushup"),
         "gifs": {
             "baja": "calves/bodyweight-standing-calf-raise.gif",
             "media": "calves/dumbbell-standing-calf-raise.gif",
@@ -624,6 +624,58 @@ CURATED_BY_INTENSITY = [
         "biomechanics": "Tracción horizontal con peso corporal usando una toalla anclada al marco de puerta, activando dorsal ancho y romboides sin herramientas de gimnasio.",
         "posture": "Torso inclinado en línea recta, empuje firme de talones contra el suelo y retracción escapular activa.",
         "warning": "Asegúrate de que la toalla o anclaje esté firme y la puerta asegurada para evitar deslizamientos.",
+    },
+    # 24_inv. Remo Invertido (Inverted Row bajo mesa o barra)
+    {
+        "match_any": ("remo invertido", "inverted row", "bajo mesa"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "upper-back/inverted-row-bent-knees.gif",
+            "media": "upper-back/inverted-row.gif",
+            "alta": "upper-back/front-lever-reps.gif",
+        },
+        "biomechanics": "Tracción horizontal de cadena cerrada activando dorsal ancho, romboides, trapecio medio y bíceps.",
+        "posture": "Cuerpo en plancha firme, core activo y retracción escapular al subir el pecho hacia la superficie.",
+        "warning": "Asegura la firmeza del apoyo o agarre y mantén columna neutra.",
+    },
+    # 24_swim. Natación Estática en Suelo / Swimmers
+    {
+        "match_any": ("swimmers", "swimmer", "natacion estatica", "natacion en suelo", "nadador en suelo"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "lats/band-close-grip-pulldown.gif",
+            "media": "upper-back/band-one-arm-twisting-seated-row.gif",
+            "alta": "lats/pull-up.gif",
+        },
+        "biomechanics": "Extensión torácica en decúbito prono activando erectores espinales, dorsal ancho y cadena posterior.",
+        "posture": "Mirada hacia el suelo, cuello neutro, movimiento alternado de brazos y piernas sin arquear la zona lumbar.",
+        "warning": "No hiperextiendas el cuello; la contracción proviene de la musculatura dorsal.",
+    },
+    # 24_paj. Pájaros Escapulares en Decúbito Prono
+    {
+        "match_any": ("pajaro escapular", "pajaros escapulares", "pajaro en decubito", "pajaros en decubito"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "delts/band-reverse-fly.gif",
+            "media": "delts/dumbbell-rear-delt-raise.gif",
+            "alta": "delts/dumbbell-rear-fly.gif",
+        },
+        "biomechanics": "Abducción horizontal focalizada en deltoides posterior, romboides y trapecio medio.",
+        "posture": "Torso estable en suelo boca abajo, elevación controlada juntando escápulas sin tensión cervical.",
+        "warning": "Evita elevar los hombros hacia las orejas; enfoca el esfuerzo en la retracción escapular.",
+    },
+    # 24_slide. Back Slides / Deslizamiento Dorsal Escapular
+    {
+        "match_any": ("back slide", "back slides", "deslizamiento dorsal"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "upper-back/band-one-arm-twisting-seated-row.gif",
+            "media": "upper-back/cable-low-seated-row.gif",
+            "alta": "upper-back/inverted-row.gif",
+        },
+        "biomechanics": "Aducción y depresión escapular en suelo reclutando dorsal ancho y serrato.",
+        "posture": "Espalda plana contra el suelo, codos flexionados deslizándose controladamente.",
+        "warning": "Mantén la zona lumbar en contacto con el suelo sin arquearte.",
     },
     # 24. Remos / Jalón Dorsal (Rows / Pulls)
     {

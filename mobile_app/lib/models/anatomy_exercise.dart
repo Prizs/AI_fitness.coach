@@ -337,8 +337,31 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + 'upper-back/bodyweight-standing-row-with-towel.gif';
   }
 
+  // 26b. Natación Estática en Suelo / Swimmers (Espalda Media / Dorsal / Erectores)
+  if (nameLower.contains('swimmer') || nameLower.contains('natacion') || nameLower.contains('natación')) {
+    return _kGifBase + 'lats/band-close-grip-pulldown.gif';
+  }
+
+  // 26c. Pájaros Escapulares / Decúbito Prono / Deltoides Posterior / Romboides
+  if (nameLower.contains('pajaro') || nameLower.contains('pájaros') || nameLower.contains('pajaros') || nameLower.contains('prono') || nameLower.contains('reverse fly') || nameLower.contains('rear delt')) {
+    return _kGifBase + 'delts/band-reverse-fly.gif';
+  }
+
+  // 26d. Back Slides / Deslizamiento Dorsal Escapular en Suelo
+  if (nameLower.contains('back slide') || nameLower.contains('deslizamiento dorsal')) {
+    return _kGifBase + 'upper-back/band-one-arm-twisting-seated-row.gif';
+  }
+
+  // 26e. Retracción Escapular / Prone Y-T-W en Suelo
+  if (nameLower.contains('retraccion escapular') || nameLower.contains('retracción escapular') || nameLower.contains('y-t-w') || nameLower.contains('escapular')) {
+    return _kGifBase + 'upper-back/band-one-arm-twisting-seated-row.gif';
+  }
+
   // 26. Remos / Jalones / Dominadas
   if (nameLower.contains('remo') || nameLower.contains('row') || nameLower.contains('jalon') || nameLower.contains('jalón') || nameLower.contains('dominada') || nameLower.contains('pulldown') || nameLower.contains('espalda') || nameLower.contains('dorsal')) {
+    if (nameLower.contains('invertido') || nameLower.contains('inverted row') || nameLower.contains('bajo mesa')) {
+      return _kGifBase + (isLow ? 'upper-back/inverted-row-bent-knees.gif' : 'upper-back/inverted-row.gif');
+    }
     if (nameLower.contains('dominada') || nameLower.contains('pull up') || nameLower.contains('pull-up')) {
       return _kGifBase + 'lats/pull-up.gif';
     }
@@ -374,8 +397,26 @@ String resolveGuaranteedGifUrl({
   if (text.contains('cuadricep') || text.contains('cuádricep') || text.contains('pierna')) {
     return _kGifBase + (isLow ? 'glutes/potty-squat-with-support.gif' : 'quads/dumbbell-goblet-squat.gif');
   }
+  if (text.contains('espalda') || text.contains('dorsal') || text.contains('trapecio') || text.contains('romboide') || text.contains('back') || text.contains('lat') || text.contains('erector')) {
+    return _kGifBase + (isLow ? 'upper-back/bodyweight-standing-row-with-towel.gif' : 'upper-back/inverted-row.gif');
+  }
+  if (text.contains('pecho') || text.contains('pectoral') || text.contains('chest')) {
+    return _kGifBase + (isLow ? 'pectorals/incline-push-up.gif' : 'pectorals/push-up.gif');
+  }
+  if (text.contains('hombro') || text.contains('deltoid') || text.contains('shoulder')) {
+    return _kGifBase + (isLow ? 'delts/band-shoulder-press.gif' : 'delts/dumbbell-lateral-raise.gif');
+  }
+  if (text.contains('tricep') || text.contains('trícep')) {
+    return _kGifBase + (isLow ? 'triceps/bench-dip-knees-bent.gif' : 'triceps/bench-dip-on-floor.gif');
+  }
+  if (text.contains('bicep') || text.contains('bícep')) {
+    return _kGifBase + (isLow ? 'biceps/band-alternating-biceps-curl.gif' : 'biceps/dumbbell-biceps-curl.gif');
+  }
+  if (text.contains('core') || text.contains('abdomen') || text.contains('abdominal')) {
+    return _kGifBase + 'abs/front-plank-with-twist.gif';
+  }
 
-  return _kGifBase + 'delts/dumbbell-seated-shoulder-press.gif';
+  return _kGifBase + 'upper-back/bodyweight-standing-row-with-towel.gif';
 }
 
 /// Color del agonista: rojo brillante, como pide el diseno didactico.
