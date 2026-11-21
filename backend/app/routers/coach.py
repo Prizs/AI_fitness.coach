@@ -144,27 +144,43 @@ CLINICAL_INJURY_PROFILES = {
         ),
         "prohibited_exercise_terms": (
             "press militar", "shoulder press", "press tras nuca", "fondos en paralelas",
-            "dips", "elevacion lateral", "elevación lateral", "elevaciones lateral",
-            "pica", "pike", "press de hombros",
-            "press de banca con agarre ancho", "dominadas pronas anchas", "face pull pesado"
+            "dips", "elevacion lateral", "elevación lateral", "elevaciones lateral", "elevaciones laterales",
+            "pica", "pike", "press de hombros", "press de hombro",
+            "press de banca con agarre ancho", "dominadas pronas anchas", "face pull pesado",
+            "circulos de brazos", "círculos de brazos", "circulo de brazo", "círculo de brazo",
+            "wall slides", "wall slide", "deslizamientos en pared", "deslizamiento en pared",
+            "elevacion frontal", "elevación frontal", "elevaciones frontales", "elevaciones en t",
+            "pajaros posteriores", "pájaros posteriores", "deltoide", "deltoides", "hombro", "hombros",
+            "press arnold", "arnold"
         ),
-        "prohibited_prompt_text": "Cero press militar vertical sobre la cabeza, press tras nuca, flexiones en pica, fondos en paralelas o elevaciones laterales de hombro.",
-        "safe_prompt_text": "Prioriza RUTINA COMPLETA DE PIERNAS Y GLÚTEOS (sentadillas, prensa, zancadas, puentes de glúteo) o trabajo de brazos con codos pegados al cuerpo (curl de bíceps pegado, extensiones de tríceps en polea baja, core en colchoneta). Cero carga sobre el manguito rotador.",
+        "prohibited_prompt_text": "Cero press militar vertical sobre la cabeza, press tras nuca, flexiones en pica, fondos en paralelas, círculos de brazos, wall slides o elevaciones laterales de hombro.",
+        "safe_prompt_text": "Prioriza RUTINA COMPLETA DE PIERNAS Y GLÚTEOS (sentadillas asistidas, puentes de glúteo en suelo, curl femoral con toalla) o Core en colchoneta. Cero sobrecarga articular en la articulación glenohumeral y manguito rotador.",
         "replacements": {
             "Press militar": "Sentadilla libre asistida con peso corporal",
-            "Press de hombros": "Prensa de piernas o sentadilla goblet",
-            "Fondos en paralelas": "Puente de glúteos en suelo",
-            "Press de banca": "Remo con mancuernas con codos pegados a las costillas",
-            "Elevaciones laterales": "Curl de bíceps con codos firmes pegados al torso",
-            "Elevación lateral": "Curl de bíceps con codos firmes pegados al torso",
+            "Press de hombros": "Sentadilla isométrica en pared (Wall Sit)",
+            "Fondos en paralelas": "Puente de glúteos en suelo con control",
+            "Press de banca": "Puente de glúteos con elevación pélvica",
+            "Elevaciones laterales": "Curl femoral con toalla en piso liso",
+            "Elevación lateral": "Curl femoral con toalla en piso liso",
             "Flexiones en pica": "Puente de glúteos en suelo con control",
             "Pike": "Puente de glúteos en suelo con control",
+            "Círculos de brazos": "Plancha frontal isométrica en antebrazos",
+            "Círculo de brazo": "Plancha frontal isométrica en antebrazos",
+            "Wall Slides": "Elevación de talones de pie con apoyo en pared",
+            "Wall slide": "Elevación de talones de pie con apoyo en pared",
+            "Deslizamientos en pared": "Elevación de talones de pie con apoyo en pared",
+            "Pájaros posteriores": "Curl femoral deslizante con toalla",
+            "Elevaciones frontales": "Puente de isquiotibiales con elevación de talones",
+            "Elevaciones en T": "Plancha lateral isométrica en antebrazos",
+            "Press arnold": "Sentadilla asistida en silla",
+            "Deltoides": "Puente de glúteos en suelo con pausa de 2s",
+            "Hombro": "Sentadilla asistida con peso corporal",
         },
         "quick_replies": [
             "🦵 Rutina de Piernas y Glúteos (Cero hombro)",
-            "💪 Brazos con codos pegados al cuerpo",
-            "🧘 Descanso y Movilidad de Hombro",
-            "🧊 Protocolo de Desinflamación",
+            "🧘 Core y Abdomen en Suelo",
+            "🏃 Cardio Suave sin Impacto",
+            "📅 Añadir al Cronograma",
         ]
     },
     "lumbar": {
@@ -316,14 +332,21 @@ def _sanitize_exercise_by_injury(name: str, primary: str, secondary: str, animat
 
     profile = CLINICAL_INJURY_PROFILES[zone_key]
     lower_name = name.lower()
+    lower_prim = primary.lower()
+    lower_sec = secondary.lower()
 
     is_contraindicated = any(term in lower_name for term in profile["prohibited_exercise_terms"])
+    if not is_contraindicated and zone_key == "hombro":
+        is_contraindicated = any(t in lower_prim or t in lower_sec for t in ("deltoid", "deltoide", "deltoides", "hombro", "hombros", "manguito"))
+    elif not is_contraindicated and zone_key in ("rodilla", "tobillo"):
+        is_contraindicated = any(t in lower_prim for t in ("cuadricep", "cuádricep", "rodilla", "patela"))
+
     if not is_contraindicated:
         return name, primary, secondary, animation_key
 
     # Buscar reemplazo adecuado
     for bad_term, safe_name in profile["replacements"].items():
-        if bad_term.lower() in lower_name:
+        if bad_term.lower() in lower_name or bad_term.lower() in lower_prim:
             # Reasignar músculos acordes a la nueva variante
             if zone_key in ("tobillo", "rodilla"):
                 return safe_name, "Pectorales / Tren Superior", "Core / Estabilizadores", "bench_press"
@@ -336,7 +359,11 @@ def _sanitize_exercise_by_injury(name: str, primary: str, secondary: str, animat
 
     # Reemplazo por defecto seguro de la zona
     first_safe = list(profile["replacements"].values())[0]
-    return first_safe, "Tren Superior / Adaptado", "Core", "mobility"
+    if zone_key in ("hombro", "codo"):
+        return first_safe, "Piernas / Cuádriceps", "Glúteos", "squat"
+    elif zone_key in ("tobillo", "rodilla"):
+        return first_safe, "Pectorales / Tren Superior", "Core / Estabilizadores", "bench_press"
+    return first_safe, "General Seguro", "Core", "mobility"
 
 
 def _extract_effective_level_and_intensity(payload: ChatMessage) -> tuple[str, str]:
@@ -459,6 +486,8 @@ def _detect_requested_training_days(user_msg: str) -> list[str]:
 
 def _detect_requested_focus(payload: ChatMessage) -> str | None:
     """Detecta qué zona o combinación pidió el usuario dando prioridad al mensaje actual."""
+    detected_zone, _ = _detect_affected_joint_or_injury(payload)
+
     def _match_focus(txt: str) -> str | None:
         t = (txt or "").lower()
 
@@ -483,14 +512,16 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         )):
             return "cuerpo_completo"
 
-        # Limpieza previa de quejas y menciones de descarte para evitar falsos positivos
-        # (ej. "me está dando ejercicios como bíceps o pecho", "sin pecho", "cero bíceps")
+        # Limpieza previa de quejas, molestias, dolores y menciones de descarte para evitar falsos positivos
         t_clean = t
         for pat in (
             r"(?:me est[aá] dando|me da|arroj[oó]|incluy[oó]|puso|pusiste|metiste)\s+(?:ejercicios\s+como\s+|ejercicios\s+de\s+)?[^.,;]+",
-            r"(?:no\s+quiero|no\s+me\s+des|sin|nada\s+de|cero|evitar|evita)\s+[^.,;]+",
+            r"(?:no\s+quiero|no\s+me\s+des|sin|nada\s+de|cero|evitar|evita|excluir|excluyendo|descartar|descartando)\s+[^.,;\n]+",
+            r"(?:tengo\s+una\s+molestia\s+en|tengo\s+molestia\s+en|tengo\s+dolor\s+en|me\s+duele|me\s+duelen|dolor\s+en|molestia\s+en|lesi[oó]n\s+en|lesionado\s+en|lastimad[ao]\s+en)\s+[^.,;\n]+",
+            r"(?:instrucci[oó]n\s+para\s+la\s+ia|instruccion\s+para\s+la\s+ia)[^.,;\n]+",
+            r"(?:zona\s+afectada|articulaci[oó]n\s+afectada|articulacion\s+afectada)\s*\([^)]*\)",
         ):
-            t_clean = re.sub(pat, " ", t_clean)
+            t_clean = re.sub(pat, " ", t_clean, flags=re.IGNORECASE)
 
         # Tríceps braquial (brazo) vs Tríceps sural (pantorrilla/batata):
         is_triceps_sural = ("triceps sural" in t_clean or "tríceps sural" in t_clean)
@@ -515,6 +546,22 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         has_core = any(w in t_clean for w in ("abdomen", "abdominal", "abdominales", "core", "estabilidad lumbar", "plancha"))
         has_cardio = any(w in t_clean for w in ("aerobico", "aeróbico", "aerobicos", "aeróbicos", "movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa", "cardio", "cardiovascular", "calidad cardiovascular", "resistencia", "corazon", "corazón"))
         has_upper = any(w in t_clean for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso")) or (has_pecho and has_espalda)
+
+        # Regla clínica: si la articulación está reportada con dolor o lesión, NUNCA puede ser el foco solicitado
+        if detected_zone == "hombro":
+            has_hombros = False
+        elif detected_zone in ("rodilla", "tobillo"):
+            has_legs = False
+            has_quads = False
+            has_femorales = False
+            has_glutes = False
+            has_calves = False
+        elif detected_zone == "lumbar":
+            has_femorales = False
+        elif detected_zone in ("codo", "muneca"):
+            has_triceps = False
+            has_biceps = False
+            has_brazos = False
 
         # 1.0 Detección Universal de 3 o más Grupos Musculares:
         multi_targets = []
@@ -661,6 +708,15 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
             "hazme el plan", "arma mi semana"
         )):
             return "plan_semanal_ia"
+
+        # 5. Si no hubo ninguna zona específica solicitada pero el usuario reporta dolor/lesión y desea entrenar:
+        if detected_zone:
+            if detected_zone in ("hombro", "cuello", "codo", "muneca"):
+                return "solo_piernas"
+            elif detected_zone in ("rodilla", "tobillo"):
+                return "solo_tren_superior"
+            elif detected_zone == "lumbar":
+                return "tren_superior_core"
 
         return None
 
@@ -4360,11 +4416,27 @@ def _normalize_structured_plan(
         for d in week_order:
             if d in target_days:
                 t_title, t_exs = _get_day_content(active_day_counter)
+                # Deduplicación estricta intra-día garantizada
+                clean_day_exs = []
+                day_seen_names = set()
+                day_seen_gifs = set()
+                for ex in t_exs:
+                    e_name = re.sub(r"\(.*?\)", "", str(ex.get("name", ""))).strip().lower()
+                    e_gif = str(ex.get("gif_url", "")).strip()
+                    if e_name in day_seen_names:
+                        continue
+                    if e_gif and e_gif in day_seen_gifs:
+                        continue
+                    day_seen_names.add(e_name)
+                    if e_gif:
+                        day_seen_gifs.add(e_gif)
+                    clean_day_exs.append(ex)
+
                 days_schedule[d] = {
                     "day_name": d,
                     "is_rest": False,
                     "title": t_title,
-                    "exercises": t_exs,
+                    "exercises": clean_day_exs,
                 }
                 active_day_counter += 1
             else:
@@ -4573,13 +4645,21 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
         # CASO 1: Hay entrenamiento programado para HOY y aún no está completado
         if today_has_workout and not today_is_completed:
             ex_str = ", ".join(today_exercises[:4]) if today_exercises else "ejercicios principales del grupo muscular"
+            init_zone, init_prof = _detect_affected_joint_or_injury(payload)
+            injury_inquiry = ""
+            if init_zone and init_prof:
+                injury_inquiry = (
+                    f"\nATENCIÓN CLÍNICA OBLIGATORIA: El atleta tiene registrado dolor o molestia en: **{init_prof['label']}**.\n"
+                    f"Pregúntale empáticamente cómo sigue esa molestia antes de comenzar hoy, ofreciéndole adaptar la sesión a otra área segura o descanso activo.\n"
+                )
+
             greeting_prompt = (
                 f"""Eres un Coach de Fitness, Biomecánica y Rendimiento empático, motivador y clínico.
 El usuario {user_name} tiene programada para HOY ({today_day_name}) la sesión de:
 - Rutina: **{today_title or 'Entrenamiento del Día'}**
 - Ejercicios previstos: {ex_str}
 - Modalidad: {'En Casa (peso corporal / calistenia)' if today_is_home else 'Gimnasio / Equipo'}
-- Nivel: {effective_level} | Intensidad: {effective_intensity} | Meta Mensual: {payload.user_goal or 'Acondicionamiento físico general'}
+- Nivel: {effective_level} | Intensidad: {effective_intensity} | Meta Mensual: {payload.user_goal or 'Acondicionamiento físico general'}{injury_inquiry}
 
 INSTRUCCIONES OBLIGATORIAS:
 1. Saluda a {user_name} por su nombre y preséntale con entusiasmo la sesión programada para hoy (**{today_title or 'Entrenamiento del Día'}** y sus ejercicios).
@@ -4612,13 +4692,19 @@ Retorna EXCLUSIVAMENTE este JSON:
                 "🏠 ¿Dónde vas a entrenar? (Gimnasio o Casa)",
                 "💪 ¡Me siento al 100%, listo para entrenar!",
             ]
-            fallback_reply = (
-                f"¡Hola, {user_name}! 👋 Para hoy {today_day_name} tenemos planificada tu sesión de: "
-                f"**{today_title or 'Entrenamiento del Día'}** ({ex_str}).\n\n"
-                f"Antes de arrancar: ¿Cómo te sientes físicamente hoy? ¿Tienes alguna molestia o sobrecarga acumulada? "
-                f"¿Entrenarás en el gimnasio o en casa?\n\n"
-                f"Te recomiendo completar tu **Estado de Salud actual** para calibrar tus series y adaptar cualquier ejercicio si sientes fatiga."
-            )
+            if init_zone and init_prof:
+                fallback_reply = (
+                    f"¡Hola, {user_name}! 👋 Antes de iniciar: Noté que tienes reportada una molestia en **{init_prof['label']}**. "
+                    f"¿Cómo sigue esa molestia hoy? Cuéntame cómo te sientes para adaptar la sesión de hoy ({today_title or 'Entrenamiento'}) o enfocar en otra área segura."
+                )
+            else:
+                fallback_reply = (
+                    f"¡Hola, {user_name}! 👋 Para hoy {today_day_name} tenemos planificada tu sesión de: "
+                    f"**{today_title or 'Entrenamiento del Día'}** ({ex_str}).\n\n"
+                    f"Antes de arrancar: ¿Cómo te sientes físicamente hoy? ¿Tienes alguna molestia o sobrecarga acumulada? "
+                    f"¿Entrenarás en el gimnasio o en casa?\n\n"
+                    f"Te recomiendo completar tu **Estado de Salud actual** para calibrar tus series y adaptar cualquier ejercicio si sientes fatiga."
+                )
 
         # CASO 2: Hoy ya completó la sesión programada
         elif today_is_completed:
@@ -5116,14 +5202,17 @@ Devuelve SOLO JSON."""
     motor_disabled, motor_reason = _detect_motor_disability_or_seated_need(payload)
     affected_zone, affected_profile = _detect_affected_joint_or_injury(payload)
 
-    # Si hay articulación afectada y no hay un enfoque explícito fijado, adaptar el enfoque
-    if affected_zone and not requested_focus:
-        if affected_zone in ("tobillo", "rodilla"):
-            requested_focus = "tren_superior"
-        elif affected_zone in ("hombro", "codo"):
-            requested_focus = "piernas"
+    # Protección clínica absoluta: si hay articulación afectada, anular inmediatamente cualquier contraindicación
+    if affected_zone:
+        if affected_zone in ("hombro", "codo", "muneca", "cuello"):
+            if requested_focus in ("hombros", "hombro", "brazos_hombros", "piernas_hombros", "pecho_hombros", "espalda_hombros") or not requested_focus:
+                requested_focus = "solo_piernas"
+        elif affected_zone in ("tobillo", "rodilla"):
+            if requested_focus in ("piernas", "solo_piernas", "piernas_core", "piernas_cardio", "piernas_hombros", "piernas_tren_superior", "triceps_piernas", "cuadriceps", "femorales_isquios", "gluteos", "pantorrillas_pies") or not requested_focus:
+                requested_focus = "solo_tren_superior"
         elif affected_zone == "lumbar":
-            requested_focus = "tren_superior_core"
+            if requested_focus in ("femorales_isquios",) or not requested_focus:
+                requested_focus = "tren_superior_core"
 
     if motor_disabled:
         focus_instruction = (
@@ -5808,7 +5897,36 @@ Devuelve SOLO JSON."""
     if not isinstance(llm_quick_replies, list):
         llm_quick_replies = None
 
-    if has_plan:
+    if affected_zone:
+        if affected_zone in ("hombro", "cuello", "codo", "muneca"):
+            quick_replies = [
+                "🦵 Entrenar Piernas / Tren Inferior",
+                "🧘 Core y Abdomen en Suelo",
+                "🏃 Cardio Suave sin Impacto",
+                "📅 Añadir al Cronograma",
+            ]
+        elif affected_zone in ("rodilla", "tobillo"):
+            quick_replies = [
+                "💪 Entrenar Tren Superior Completo",
+                "🧘 Core y Abdomen en Suelo",
+                "🧊 Protocolo de Descarga y Descanso",
+                "📅 Añadir al Cronograma",
+            ]
+        elif affected_zone == "lumbar":
+            quick_replies = [
+                "🏋️ Ejercicios con Espalda Apoyada",
+                "🦵 Piernas sin Carga Axial",
+                "🧘 Descompresión y Descanso",
+                "📅 Añadir al Cronograma",
+            ]
+        else:
+            quick_replies = [
+                "🦵 Entrenar Tren Inferior",
+                "🧘 Core y Abdomen en Suelo",
+                "🏃 Cardio Suave de Bajo Impacto",
+                "📅 Añadir al Cronograma",
+            ]
+    elif has_plan:
         if requested_focus in ("perdida_grasa", "bajar_peso", "bajar_masa"):
             quick_replies = [
                 "📅 Añadir al Cronograma",
@@ -5985,6 +6103,26 @@ def chat_with_coach(payload: ChatMessage):
                     is_no_equipment=is_no_eq,
                 )
                 eq_text = " (100% en casa sin herramientas)" if is_no_eq else ""
+                rescue_zone, _ = _detect_affected_joint_or_injury(payload)
+                if rescue_zone:
+                    rescue_qr = [
+                        "📅 Añadir al Cronograma",
+                        "🦵 Rutina de Piernas / Tren Inferior",
+                        "🧘 Core y Abdomen en Suelo",
+                        "🏃 Cardio Suave de Bajo Impacto",
+                    ] if rescue_zone in ("hombro", "codo", "muneca", "cuello") else [
+                        "📅 Añadir al Cronograma",
+                        "💪 Rutina de Tren Superior",
+                        "🧘 Core y Abdomen en Suelo",
+                        "🧊 Protocolo de Descanso Activo",
+                    ]
+                else:
+                    rescue_qr = [
+                        "📅 Añadir al Cronograma",
+                        "🤝 Combinar con Core / Abdomen",
+                        "🤝 Combinar con Tren Superior",
+                        "🔥 Rutina Cardio HIIT & Core",
+                    ]
                 return {
                     "provider": "local_resilience",
                     "reply": (
@@ -6000,12 +6138,7 @@ def chat_with_coach(payload: ChatMessage):
                     "suggest_questionnaire": False,
                     "has_plan": True,
                     "structured_plan": norm_plan,
-                    "quick_replies": [
-                        "📅 Añadir al Cronograma",
-                        "🤝 Combinar con Core / Abdomen",
-                        "🤝 Combinar con Tren Superior",
-                        "🔥 Rutina Cardio HIIT & Core",
-                    ],
+                    "quick_replies": rescue_qr,
                     "recommended_intensity": eff_int,
                     "fatigue_detected": False,
                     "updated_user_goal": payload.user_goal,

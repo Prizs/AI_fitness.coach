@@ -90,7 +90,9 @@ String resolveGuaranteedGifUrl({
         // 10. Elevación de piernas mostrando gemelos
         ((nameLower.contains('elevacion de pierna') || nameLower.contains('elevación de pierna') || nameLower.contains('leg raise')) && cleanExisting.contains('calf')) ||
         // 11. Sentadilla en pared mostrando sentadilla estándar
-        ((nameLower.contains('wall sit') || nameLower.contains('en pared')) && !cleanExisting.contains('wall')) ||
+        ((nameLower.contains('wall sit') || (nameLower.contains('en pared') && !nameLower.contains('bisagra'))) && !cleanExisting.contains('wall')) ||
+        // 11b. Bisagra de Cadera mostrando Flexión de Pecho en pared o Wall Sit
+        ((nameLower.contains('bisagra') || nameLower.contains('hip hinge')) && (cleanExisting.contains('push-up') || cleanExisting.contains('wall') || cleanExisting.contains('potty') || cleanExisting.contains('chest'))) ||
         // 12. Jumping Jacks mostrando burpees
         ((nameLower.contains('jumping jack') || nameLower.contains('saltos en tijera')) && !cleanExisting.contains('jack')) ||
         // 13. Espalda / Swimmers / Pájaros / Retracción mostrando Press de Hombros o Sentadilla o Gemelos
@@ -115,8 +117,13 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + (isHigh ? 'abs/weighted-russian-twist-legs-up.gif' : 'abs/assisted-motion-russian-twist.gif');
   }
 
+  // 0_hinge. Bisagra de Cadera (Hip Hinge de pie o contra la pared)
+  if (nameLower.contains('bisagra') || nameLower.contains('hip hinge')) {
+    return _kGifBase + 'glutes/band-straight-back-stiff-leg-deadlift.gif';
+  }
+
   // 0c. Sentadilla Isométrica en Pared (Wall Sit)
-  if (nameLower.contains('wall sit') || nameLower.contains('sentadilla en pared') || nameLower.contains('en pared')) {
+  if (nameLower.contains('wall sit') || (nameLower.contains('sentadilla en pared') || (nameLower.contains('en pared') && !nameLower.contains('bisagra')))) {
     return _kGifBase + 'glutes/march-sit-wall.gif';
   }
 

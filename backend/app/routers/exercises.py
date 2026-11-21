@@ -264,7 +264,7 @@ CURATED_BY_INTENSITY = [
     # 5. Peso Muerto (Deadlift / RDL)
     {
         "match_any": ("peso muerto", "deadlift", "romanian deadlift", "rdl"),
-        "exclude_any": ("buenos dias",),
+        "exclude_any": ("buenos dias", "bisagra"),
         "gifs": {
             "baja": "glutes/band-stiff-leg-deadlift.gif",
             "media": "glutes/dumbbell-romanian-deadlift.gif",
@@ -273,6 +273,19 @@ CURATED_BY_INTENSITY = [
         "biomechanics": "Patrón de bisagra de cadera con activación de la cadena posterior completa.",
         "posture": "Escápulas retraídas, abdomen firme y columna completamente neutra.",
         "warning": "Jamás redondees la zona lumbar al descender.",
+    },
+    # 5b. Bisagra de Cadera (Hip Hinge de pie o contra la pared)
+    {
+        "match_any": ("bisagra de cadera", "hip hinge", "bisagra contra la pared", "bisagra de pie contra la pared", "bisagra en pared", "bisagra de pie", "bisagra"),
+        "exclude_any": ("flexion", "flexión", "push-up", "push up", "wall sit"),
+        "gifs": {
+            "baja": "glutes/band-straight-back-stiff-leg-deadlift.gif",
+            "media": "glutes/band-straight-back-stiff-leg-deadlift.gif",
+            "alta": "glutes/band-stiff-leg-deadlift.gif",
+        },
+        "biomechanics": "Patrón motor de bisagra de cadera manteniendo columna neutra con reclutamiento predominante de isquiotibiales y glúteos.",
+        "posture": "Lleva los glúteos hacia atrás hasta rozar la pared manteniendo las tibias casi verticales y columna neutra.",
+        "warning": "No flexiones la espalda lumbar; el movimiento se origina exclusivamente en la flexión coxofemoral.",
     },
     # 6. Sentadilla Búlgara / Split Squat
     {
@@ -1082,8 +1095,8 @@ CURATED_BY_INTENSITY = [
     },
     # 33n. Flexiones en Pared (Wall Push-ups)
     {
-        "match_any": ("flexiones en pared", "flexion en pared", "wall push up", "contra la pared"),
-        "exclude_any": ("hombro", "deltoid", "slide"),
+        "match_any": ("flexiones en pared", "flexion en pared", "wall push up", "flexiones de pecho contra pared", "push up en pared", "flexion contra pared", "flexiones contra la pared"),
+        "exclude_any": ("hombro", "deltoid", "slide", "bisagra", "hip hinge", "sentadilla", "squat", "isquio", "femoral"),
         "gifs": {
             "baja": "pectorals/push-up-wall.gif",
             "media": "pectorals/push-up-wall.gif",
