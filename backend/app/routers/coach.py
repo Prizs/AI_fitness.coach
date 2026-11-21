@@ -200,6 +200,107 @@ def _db_get_user_health(cedula: str | None = None, user_id: str | None = None) -
     return {"injuries": [], "allergies": [], "areas_to_avoid": []}
 
 
+def _db_sync_user_allergy(cedula: str | None = None, user_id: str | None = None, allergy_label: str | None = None) -> list[str]:
+    conn = _get_db_conn()
+    if not conn:
+        return []
+    try:
+        clean_ced = (cedula or "").strip()
+        digits = "".join([c for c in clean_ced if c.isdigit()])
+        with conn:
+            with conn.cursor() as cur:
+                if user_id and len(user_id) > 10 and "-" in user_id:
+                    cur.execute("SELECT id, alergias_alimentarias, patologia_o_alergias FROM usuarios WHERE id::text = %s LIMIT 1;", (user_id,))
+                elif clean_ced or digits:
+                    cur.execute("SELECT id, alergias_alimentarias, patologia_o_alergias FROM usuarios WHERE cedula = %s OR cedula = %s OR REPLACE(REPLACE(cedula, 'V-', ''), 'v', '') = %s LIMIT 1;", (clean_ced, digits, digits))
+                elif user_id:
+                    cur.execute("SELECT id, alergias_alimentarias, patologia_o_alergias FROM usuarios WHERE cedula = %s OR id::text = %s LIMIT 1;", (user_id, user_id))
+                else:
+                    return []
+                row = cur.fetchone()
+                if not row:
+                    return []
+                u_id, current_alergias, current_patologias = row[0], row[1] or "", row[2] or ""
+
+                alergias_list = [a.strip() for a in current_alergias.split(",") if a.strip()]
+
+                if allergy_label:
+                    clean_lbl = allergy_label.strip()
+                    if not any(clean_lbl.lower() in existing.lower() for existing in alergias_list):
+                        alergias_list.append(clean_lbl)
+
+                new_alergias = ", ".join(alergias_list) if alergias_list else ""
+
+                cur.execute("""
+                    UPDATE usuarios
+                    SET alergias_alimentarias = %s,
+                        patologia_o_alergias = %s,
+                        updated_at = NOW()
+                    WHERE id = %s;
+                """, (new_alergias, new_alergias, u_id))
+                conn.commit()
+                return alergias_list
+    except Exception as e:
+        print("Error in _db_sync_user_allergy:", e)
+        return []
+    finally:
+        conn.close()
+
+
+def _detect_allergy_in_message(message: str) -> str | None:
+    txt = (message or "").lower()
+    known_allergens = [
+        ("camaron", "Camarones y Mariscos"),
+        ("camarones", "Camarones y Mariscos"),
+        ("marisco", "Mariscos"),
+        ("mariscos", "Mariscos"),
+        ("lacteo", "Lácteos"),
+        ("lacteos", "Lácteos"),
+        ("lácteo", "Lácteos"),
+        ("lácteos", "Lácteos"),
+        ("lactosa", "Intolerancia a la Lactosa"),
+        ("leche", "Lácteos"),
+        ("queso", "Lácteos"),
+        ("mani", "Maní y Frutos Secos"),
+        ("maní", "Maní y Frutos Secos"),
+        ("cacahuate", "Maní y Frutos Secos"),
+        ("frutos secos", "Frutos Secos"),
+        ("nueces", "Frutos Secos"),
+        ("nuez", "Frutos Secos"),
+        ("gluten", "Gluten (Celiaquía)"),
+        ("trigo", "Gluten / Trigo"),
+        ("huevo", "Huevo"),
+        ("huevos", "Huevo"),
+        ("pescado", "Pescado"),
+        ("pescados", "Pescado"),
+        ("soya", "Soya"),
+        ("soja", "Soya")
+    ]
+    has_allergy_mention = any(k in txt for k in (
+        "alergia", "alérgico", "alergico", "alérgica", "alergica",
+        "intoleranc", "no tolero", "me hace daño", "me cae mal",
+        "no puedo comer", "excluir", "sin camarones", "sin mariscos",
+        "sin lacteos", "sin lácteos", "sin gluten", "sin mani", "sin maní"
+    ))
+
+    for key, label in known_allergens:
+        if key in txt:
+            if has_allergy_mention or "alergia" in txt:
+                return label
+            if any(term in txt for term in ("a los camarones", "al camaron", "al marisco", "a los mariscos", "al maní", "al gluten", "a los lácteos")):
+                return label
+
+    import re
+    match = re.search(r"alergia[s]?\s+(?:a\s+los|a\s+las|al|a)\s+([a-záéíóúñ\s]{3,25})", txt)
+    if match:
+        raw_found = match.group(1).strip()
+        clean = re.sub(r"\b(puedes|recomiendame|recomienda|algo|que|y|o)\b.*", "", raw_found).strip()
+        if clean and len(clean) >= 3:
+            return clean.capitalize()
+
+    return None
+
+
 AI_TIMEOUT_SEC = 25.0
 MAX_HISTORY_TURNS = 20
 
@@ -2078,14 +2179,14 @@ def _build_safe_nutrition(allergies: str | None = None, pathologies: str | None 
     lunch_protein = "150g de pechuga de pollo a la plancha o pescado blanco"
     if any(a in allergies_lower for a in ("pollo", "carne")):
         lunch_protein = "150g de atn al natural o sardinas frescas"
-    if any(a in allergies_lower for a in ("pescado", "atun", "marisco", "mariscos")) and any(a in allergies_lower for a in ("pollo", "carne")):
+    if any(a in allergies_lower for a in ("pescado", "atun", "marisco", "mariscos", "camaron", "camarones")) and any(a in allergies_lower for a in ("pollo", "carne")):
         lunch_protein = "1 taza abundante de caraotas negras con arroz y aguacate"
 
     # Cena
-    dinner_protein = "120g de atn en agua o 2 huevos sancochados"
+    dinner_protein = "120g de atún en agua o 2 huevos sancochados"
     if any(a in allergies_lower for a in ("huevo", "huevos")):
-        dinner_protein = "120g de atn al agua o pechuga de pollo a la plancha"
-    if any(a in allergies_lower for a in ("pescado", "atun", "marisco", "mariscos")):
+        dinner_protein = "120g de atún al agua o pechuga de pollo a la plancha"
+    if any(a in allergies_lower for a in ("pescado", "atun", "marisco", "mariscos", "camaron", "camarones")):
         dinner_protein = "2 huevos sancochados o 100g de carne molida magra"
 
     dairy_extra = " con queso blanco llanero rallado"
@@ -4997,6 +5098,115 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
                 "fatigue_detected": True,
             }
 
+    # 0d. Consulta Nutricional, Planes de Alimentación y Detección de Alergias
+    is_nutrition_query = any(k in u_msg_check for k in (
+        "plan de alimentacion", "planes de alimentacion", "plan de alimentación", "planes de alimentación",
+        "alimentacion", "alimentación", "dieta", "dietas", "nutricion", "nutrición", "desayuno", "almuerzo", "cena",
+        "que comer", "qué comer", "alimentos", "comidas", "calorias", "calorías", "macros", "nutricional"
+    )) or (
+        ("alergia" in u_msg_check or "alergias" in u_msg_check or "alérgico" in u_msg_check or "alergico" in u_msg_check or "intoleran" in u_msg_check)
+        and any(f in u_msg_check for f in ("camaron", "camarones", "marisco", "mariscos", "lacteo", "lácteo", "mani", "maní", "gluten", "pescado", "huevo", "comida", "alimento", "comer"))
+    )
+
+    if is_nutrition_query:
+        user_n = payload.user_name or "Freddy"
+        detected_allergy = _detect_allergy_in_message(payload.message)
+
+        # Si se detectó una alergia en el mensaje, sincronizarla inmediatamente con PostgreSQL
+        if detected_allergy:
+            _db_sync_user_allergy(cedula=payload.cedula, user_id=payload.user_id, allergy_label=detected_allergy)
+            if payload.allergies:
+                if detected_allergy.lower() not in payload.allergies.lower():
+                    payload.allergies = f"{payload.allergies}, {detected_allergy}"
+            else:
+                payload.allergies = detected_allergy
+
+        active_allergies = payload.allergies or detected_allergy or ""
+        allergy_prefix = ""
+        if detected_allergy:
+            allergy_prefix = (
+                f"He tomado nota atenta de tu alergia a **{detected_allergy}** y la he registrado automáticamente en tu **Perfil Atlético y de Salud**. "
+                f"A partir de este momento, queda rigurosamente excluida al 100% de todas tus recomendaciones nutricionales presentes y futuras.\n\n"
+            )
+        elif active_allergies:
+            allergy_prefix = (
+                f"Tomando en cuenta tus alergias alimentarias registradas en tu perfil ({active_allergies}), "
+                f"he verificado que cada alimento propuesto sea 100% seguro y libre de cualquier reacción adversa.\n\n"
+            )
+
+        current_goal = payload.user_goal or "Acondicionamiento físico general"
+        goal_lower = current_goal.lower()
+
+        if "grasa" in goal_lower or "definici" in goal_lower or "peso" in goal_lower:
+            goal_desc = "déficit calórico moderado y alta densidad de saciedad para acelerar la oxidación lipídica protegiendo tu masa muscular"
+            breakfast = "3 claras de huevo + 1 huevo entero revueltos con espinacas y tomate, 1 arepa de maíz asada mediana (sin grasa añadida) y café o té sin azúcar."
+            lunch = "160g de pechuga de pollo a la plancha o pescado blanco seguro, 1 taza pequeña de arroz blanco o batata cocida, ensalada verde fresca con vinagre y 1 cdta de aceite vegetal o de oliva."
+            dinner = "140g de atún en agua o pollo desmenuzado con vegetales salteados (calabacín, pimentón, cebolla) y 1/2 plátano maduro cocido o 1 arepa delgada."
+            snack = "1 porción de fruta fresca criolla (manzana, lechosa o guayaba) con abundante agua."
+        elif "masa" in goal_lower or "muscular" in goal_lower or "hipertrofia" in goal_lower or "volumen" in goal_lower:
+            goal_desc = "superávit calórico limpio y alta disponibilidad de aminoácidos para estimular la síntesis proteica e hipertrofia muscular"
+            breakfast = "3 huevos enteros revueltos, 1 arepa de maíz asada mediana con queso blanco bajo en sal o carne desmechada, 1 taza de avena tibia con canela y 1 cambur criollo."
+            lunch = "180g de pechuga de pollo, lomo magro o carne molida limpia, 1 taza y media de arroz blanco o pasta, 1 porción de caraotas negras o lentejas y aguacate."
+            dinner = "150g de pollo a la plancha o atún seguro, 1 taza de batata dulce o puré de papas cocidas, ensalada fresca y 1 arepa asada."
+            snack = "Batido casero de avena con cambur criollo o 2 huevos cocidos con 1 rebanada de arepa."
+        else:
+            goal_desc = "equilibrio metabólico, energía sostenida y protección articular para acondicionamiento físico integral"
+            breakfast = "2 huevos revueltos con tomate y cebolla, 1 arepa de maíz asada con un toque de queso blanco fresco y café o infusión."
+            lunch = "150g de pechuga de pollo a la plancha o carne magra, 1 taza de arroz blanco o yuca cocida, ensalada de vegetales frescos con limón y aguacate."
+            dinner = "120g de atún seguro o 2 huevos sancochados, 1/2 plátano maduro asado o 1 arepa pequeña y ensalada de hojas verdes."
+            snack = "1 fruta fresca de temporada (cambur, naranja o lechosa criolla)."
+
+        has_train = payload.today_has_workout or payload.has_active_plan
+        if has_train:
+            sync_text = (
+                "🔗 **Sincronización con tu Entrenamiento Activo:**\n"
+                "Este esquema nutricional respalda directamente el gasto energético de tus sesiones programadas, "
+                "facilitando la recuperación del glucógeno muscular y evitando el catabolismo o la fatiga central."
+            )
+        else:
+            sync_text = (
+                "🔗 **Sincronización con tus Entrenamientos:**\n"
+                "Este plan de alimentación queda establecido como tu base nutricional activa; en cuanto programes tu rutina semanal "
+                "o sesión diaria con el Coach IA, el volumen de entrenamiento y las demandas energéticas se calibrarán en exacta sincronía con estos alimentos."
+            )
+
+        reply_content = (
+            f"¡Hola, {user_n}! 🥗 Con total gusto atiendo tu consulta nutricional.\n\n"
+            f"{allergy_prefix}"
+            f"Para tu objetivo de **{current_goal}**, he estructurado una pauta alimentaria basada en {goal_desc}, "
+            f"utilizando alimentos frescos, naturales, accesibles y 100% compatibles con tu salud:\n\n"
+            f"🌅 **Desayuno:** {breakfast}\n\n"
+            f"☀️ **Almuerzo:** {lunch}\n\n"
+            f"🌙 **Cena:** {dinner}\n\n"
+            f"🍎 **Merienda / Recuperación:** {snack}\n\n"
+            f"{sync_text}\n\n"
+            f"¿Deseas que ajustemos las porciones, revisemos algún alimento sustituto o coordinemos esta nutrición con una rutina específica hoy?"
+        )
+
+        allergy_tag = detected_allergy if detected_allergy else (active_allergies if active_allergies else "Personalizado")
+        short_allergy = allergy_tag.split()[0] if allergy_tag else "Alergias"
+
+        return {
+            "provider": "coach_direct",
+            "reply": reply_content,
+            "category": f"Plan Nutricional Adaptado ({current_goal})",
+            "duration_weeks": 4,
+            "rest_between_sets_sec": 60,
+            "progression_rule": f"Nutrición balanceada libre de {allergy_tag}.",
+            "extracted_equipment": None,
+            "suggest_questionnaire": False,
+            "has_plan": False,
+            "structured_plan": None,
+            "quick_replies": [
+                f"🥗 Menú Diario 0% {short_allergy}",
+                "🥑 Calcular Macros y Calorías",
+                "🏋️ Programar Entrenamiento Compatible",
+                "📋 Mi Estado Actual para la sesión"
+            ],
+            "recommended_intensity": "Moderada",
+            "fatigue_detected": False,
+        }
+
     # 1. Saludo Contextual Hiperpersonalizado (Entrenamiento del Día, Recuperación o Planificación)
     if payload.is_initial_greeting:
         metrics = payload.weekly_metrics or {}
@@ -5591,6 +5801,15 @@ Devuelve SOLO JSON."""
     has_active_plan = bool(payload.has_active_plan)
     motor_disabled, motor_reason = _detect_motor_disability_or_seated_need(payload)
     affected_zone, affected_profile = _detect_affected_joint_or_injury(payload)
+
+    # Detección temprana de submission
+    is_submission = (
+        "mi estado actual para la sesión" in user_msg_lower
+        or "mi estado actual para la sesion" in user_msg_lower
+        or "📋 mi estado actual" in user_msg_lower
+        or ("estado físico:" in user_msg_lower and ("equipo disponible:" in user_msg_lower or "motivo" in user_msg_lower or "decisión" in user_msg_lower))
+        or ("estado fisico:" in user_msg_lower and ("equipo disponible:" in user_msg_lower or "motivo" in user_msg_lower or "decision" in user_msg_lower))
+    )
 
     # Sincronización clínica inmediata en PostgreSQL: Si el usuario reporta dolor o molestia en mensaje o estado actual:
     u_reports_pain = any(p in user_msg_lower for p in (

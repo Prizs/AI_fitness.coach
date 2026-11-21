@@ -895,6 +895,34 @@ class _CoachScreenState extends State<CoachScreen> {
             );
           }
         }
+
+        if (data['updated_allergies'] != null) {
+          final user = AuthService.instance.loggedInUser;
+          if (user != null) {
+            final List<dynamic> rawAllergies = data['updated_allergies'] as List<dynamic>;
+            final allList = rawAllergies.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+            final newAllStr = allList.join(', ');
+            AuthService.instance.loggedInUser = UserProfile(
+              cedula: user.cedula,
+              password: user.password,
+              name: user.name,
+              lastName: user.lastName,
+              age: user.age,
+              weight: user.weight,
+              gender: user.gender,
+              pathologyOrAllergies: newAllStr,
+              foodAllergies: newAllStr,
+              currentInjuries: user.currentInjuries,
+              motorDisability: user.motorDisability,
+              areasToAvoid: user.areasToAvoid,
+              role: user.role,
+              specialty: user.specialty,
+              experienceYears: user.experienceYears,
+              certifications: user.certifications,
+              archetype: user.archetype,
+            );
+          }
+        }
         if (updatedGoal != null && updatedGoal.isNotEmpty && updatedGoal != _userGoal) {
           setState(() {
             _userGoal = updatedGoal;
