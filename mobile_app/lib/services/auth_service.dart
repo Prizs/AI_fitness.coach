@@ -287,6 +287,40 @@ class AuthService {
     }
   }
 
+  Future<void> updateHealthProfileLocalAndStorage({
+    required String allergies,
+    required String injuries,
+  }) async {
+    final user = loggedInUser;
+    if (user != null) {
+      loggedInUser = UserProfile(
+        cedula: user.cedula,
+        password: user.password,
+        name: user.name,
+        lastName: user.lastName,
+        age: user.age,
+        weight: user.weight,
+        gender: user.gender,
+        pathologyOrAllergies: allergies,
+        foodAllergies: allergies,
+        currentInjuries: injuries,
+        motorDisability: user.motorDisability,
+        areasToAvoid: injuries,
+        role: user.role,
+        specialty: user.specialty,
+        experienceYears: user.experienceYears,
+        certifications: user.certifications,
+        archetype: user.archetype,
+      );
+    }
+    try {
+      await _storage.write(key: 'food_allergies', value: allergies);
+      await _storage.write(key: 'health_notes', value: allergies);
+      await _storage.write(key: 'current_injuries', value: injuries);
+      await _storage.write(key: 'areas_to_avoid', value: injuries);
+    } catch (_) {}
+  }
+
   Future<void> logout() async {
     loggedInUser = null;
     accessToken = null;

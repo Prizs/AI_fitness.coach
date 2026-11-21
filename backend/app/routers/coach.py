@@ -644,6 +644,16 @@ def _sanitize_exercise_by_injury(name: str, primary: str, secondary: str, animat
     lower_prim = primary.lower()
     lower_sec = secondary.lower()
 
+    # 0. Si la articulación afectada es de tren inferior (tobillo o rodilla) y el ejercicio es de tren superior, NUNCA es contraindicado
+    if zone_key in ("rodilla", "tobillo"):
+        if _is_chest_exercise(name, primary) or _is_back_exercise(name, primary) or _is_shoulder_exercise(name, primary) or _is_biceps_exercise(name, primary) or _is_triceps_exercise(name, primary):
+            return name, primary, secondary, animation_key
+
+    # 1. Si la articulación afectada es de tren superior (hombro, codo, muñeca, cuello) y el ejercicio es de piernas/femorales sin carga en brazos, NUNCA es contraindicado
+    if zone_key in ("hombro", "codo", "muneca", "cuello"):
+        if _is_leg_exercise(name, primary) or _is_femoral_exercise(name, primary) or ("core" in primary.lower() and "plank" not in animation_key):
+            return name, primary, secondary, animation_key
+
     is_contraindicated = any(term in lower_name for term in profile["prohibited_exercise_terms"])
     if not is_contraindicated and zone_key == "hombro":
         is_contraindicated = any(t in lower_prim or t in lower_sec for t in ("deltoid", "deltoide", "deltoides", "hombro", "hombros", "manguito"))
@@ -2226,24 +2236,28 @@ def _build_safe_nutrition(allergies: str | None = None, pathologies: str | None 
     if "asma" in pathology_lower:
         asthma_note = " ? Mantn hidratacin constante de 2.5 a 3L de agua."
 
+    no_oats = any(a in allergies_lower for a in ("avena", "oat", "avena en hojuelas"))
+    breakfast_carb_loss = "1 arepa delgada de maíz tostada (50g)" if no_oats else "1 arepa delgada de maíz (50g) o 3 cdas de avena en hojuelas con agua"
+    breakfast_carb_hyp = "1 arepa mediana rellena y 1 cambur maduro con infusión natural" if (no_oats or any(a in allergies_lower for a in ("lacteo", "leche"))) else "1 arepa mediana rellena, 1 cambur y café con leche o avena"
+
     if is_weight_loss:
-        # PLAN ORIENTADO A DFICIT CALRICO Y PRDIDA DE GRASA CORPORAL
+        # PLAN ORIENTADO A DÉFICIT CALÓRICO Y PÉRDIDA DE GRASA CORPORAL
         return {
             "meta_nutricional": "Déficit Calórico Moderado (Pérdida de Grasa & Masa Corporal)",
-            "desayuno": f"{breakfast_protein}, 1 arepa delgada de maíz pequeña (50g) o 3 cdas de avena en hojuelas con agua y café o té negro sin azúcar. [Déficit controlado: ~340 kcal, saciante y bajo en azúcares].{asthma_note}",
+            "desayuno": f"{breakfast_protein}, {breakfast_carb_loss} y café o té negro sin azúcar. [Déficit controlado: ~340 kcal, saciante y bajo en azúcares].{asthma_note}",
             "almuerzo": f"{lunch_protein}{sodium_note}, 1/2 taza de arroz blanco o batata al vapor (porción controlada) y abundante ensalada verde fresca (lechuga, tomate, pepino) con limón y 1 cdta de aceite de oliva o aguacate. [~430 kcal, alto en proteína y fibra].",
             "cena": f"{dinner_protein}{dairy_extra}, ensalada tibia de vegetales al vapor (calabacín, brócoli y zanahoria) con 1/4 de aguacate criollo. Libre de harinas refinadas nocturnas para facilitar la oxidación de grasas. [~290 kcal]."
         }
     elif is_hypertrophy:
-        # PLAN ORIENTADO A SUPERVIT Y AUMENTO DE MASA MUSCULAR
+        # PLAN ORIENTADO A SUPERÁVIT Y AUMENTO DE MASA MUSCULAR
         return {
             "meta_nutricional": "Superávit Calórico Controlado (Hipertrofia Muscular)",
-            "desayuno": f"{breakfast_protein}, 1 arepa mediana rellena, 1 cambur maduro y café con leche descremada o avena con leche. [Superávit energético: ~540 kcal, 32g proteína].{asthma_note}",
+            "desayuno": f"{breakfast_protein}, {breakfast_carb_hyp}. [Superávit energético: ~540 kcal, 32g proteína].{asthma_note}",
             "almuerzo": f"{lunch_protein}{sodium_note}, 1.5 tazas de arroz blanco con caraotas negras, tajadas de plátano asado y ensalada fresca con aguacate. [~720 kcal, 48g proteína].",
             "cena": f"{dinner_protein}{dairy_extra}, 1 taza de batata cocida o 1 arepa asada mediana y ensalada verde fresca. [~480 kcal, 36g proteína]."
         }
     else:
-        # PLAN ORIENTADO A BALANCE Y ACONDICIONAMIENTO FSICO GENERAL
+        # PLAN ORIENTADO A BALANCE Y ACONDICIONAMIENTO FÍSICO GENERAL
         carb_lunch = "1 taza de arroz blanco o batata cocida"
         carb_dinner = "1/2 plátano maduro asado o 1 arepa mediana asada"
         if "diabet" in pathology_lower:
@@ -2256,6 +2270,199 @@ def _build_safe_nutrition(allergies: str | None = None, pathologies: str | None 
             "almuerzo": f"{lunch_protein}{sodium_note}, {carb_lunch} y ensalada fresca con aceite vegetal o aguacate.",
             "cena": f"{dinner_protein}{dairy_extra} y {carb_dinner}."
         }
+
+
+def _build_daily_variant_nutrition(
+    day_name: str,
+    day_idx: int,
+    allergies: str | list | None = None,
+    pathologies: str | list | None = None,
+    goal: str | None = None
+) -> dict:
+    """Genera una combinación nutricional única por cada día de la semana (Lunes a Domingo),
+    estrictamente adaptada a las alergias del usuario, patologías clínicas y meta metabólica."""
+    if isinstance(allergies, list):
+        all_txt = " ".join([str(a).lower() for a in allergies])
+    else:
+        all_txt = (allergies or "").lower()
+
+    if isinstance(pathologies, list):
+        path_txt = " ".join([str(p).lower() for p in pathologies])
+    else:
+        path_txt = (pathologies or "").lower()
+
+    goal_txt = (goal or "").lower()
+    is_weight_loss = any(k in goal_txt for k in ("bajar", "peso", "grasa", "definici", "corporal", "adelgazar", "tonifi"))
+    is_hypertrophy = any(k in goal_txt for k in ("masa", "hipertrofia", "volumen", "aumento", "muscular"))
+
+    no_egg = any(a in all_txt for a in ("huevo", "huevos", "clara", "yema"))
+    no_dairy = any(a in all_txt for a in ("lacteo", "lácteo", "leche", "queso", "caseina", "lactosa"))
+    no_seafood = any(a in all_txt for a in ("marisco", "mariscos", "camaron", "camarones", "pescado", "atun", "atún", "sardina"))
+    no_fish = any(a in all_txt for a in ("pescado", "atun", "atún", "sardina"))
+    no_oats = any(a in all_txt for a in ("avena", "oat", "avena en hojuelas"))
+    no_gluten = any(a in all_txt for a in ("gluten", "trigo", "pan", "harina de trigo"))
+
+    # Variaciones de Desayuno (7 días)
+    if no_egg:
+        b_prots = [
+            "100g de pechuga de pollo desmechada con sofrito criollo (tomate, cebolla)",
+            "1 taza de caraotas negras guisadas con toque de comino y orégano",
+            "100g de carne molida magra salteada con pimentón",
+            "100g de pollo a la plancha en tiritas con sal marina",
+            "1 taza de frijoles rojos criollos con cilantro picadito",
+            "100g de carne magra mechada ligera",
+            "100g de jamón de pavo o pechuga de pollo desmenuzada"
+        ]
+    else:
+        b_prots = [
+            "2 huevos pericos criollos (revueltos con tomate y cebolla)",
+            "Tortilla de 2 huevos con espinacas frescas y orégano",
+            "2 huevos sancochados con sal marina y pimienta",
+            "2 huevos revueltos suaves con cilantro y cebollín",
+            "Omelette de 2 huevos relleno de calabacín rallado",
+            "2 huevos pochados o a la plancha con gotas de aceite de oliva",
+            "Revuelto de 2 huevos con champiñones frescos y tomate"
+        ]
+
+    if no_oats:
+        b_carbs = [
+            "1 arepa pequeña de maíz asada",
+            "1/2 plátano verde o maduro hervido",
+            "1 taza de batata cocida en rodajas",
+            "1 arepa delgada de maíz blanco tostada",
+            "1 trozo de yuca hervida con toque de orégano",
+            "1 arepa pequeña asada con afrecho o semillas de chía",
+            "1/2 taza de puré de auyama / calabaza criolla"
+        ]
+    else:
+        b_carbs = [
+            "1 arepa pequeña de maíz blanco asada",
+            "3 cucharadas de avena en hojuelas cocida con agua y canela",
+            "1/2 plátano maduro asado",
+            "1 arepa delgada tostada de maíz",
+            "3 cucharadas de avena tibia con agua y semillas",
+            "1 taza de batata dulce cocida",
+            "1 arepa pequeña asada al budare"
+        ]
+
+    b_fats = "1/4 de aguacate criollo en rebanadas" if no_dairy else "30g de queso blanco llanero rallado o 1/4 de aguacate criollo"
+
+    # Variaciones de Almuerzo (7 días)
+    if no_seafood:
+        l_prots = [
+            "150g de pechuga de pollo a la plancha con limón y ajo",
+            "150g de carne magra de res (bistec criollo) a la plancha",
+            "150g de pollo desmechado guisado con vegetales (pimentón, cebolla, calabacín)",
+            "140g de carne molida magra preparada con orégano y laurel",
+            "150g de pechuga de pollo al horno con romero y orégano",
+            "150g de pulpa negra o solomo magro en tiras salteado",
+            "1 taza grande de caraotas negras espesas con pechuga de pollo picadita"
+        ]
+    else:
+        l_prots = [
+            "150g de pechuga de pollo a la plancha con limón y cilantro",
+            "140g de filete de pescado blanco seguro (merluza o curvina fresca) a la plancha",
+            "150g de carne magra de res a la plancha con orégano",
+            "130g de atún al natural en agua con cebollín y limón",
+            "150g de pechuga de pollo al horno con vegetales",
+            "140g de filete de pescado blanco al vapor con limón y sal marina",
+            "150g de carne molida magra con sofrito criollo"
+        ]
+
+    l_carbs = [
+        "1/2 taza de arroz blanco al vapor con caraotas negras",
+        "1 taza de batata dulce cocida",
+        "1/2 taza de arroz blanco cocido con cilantro",
+        "1 trozo mediano de yuca hervida",
+        "1/2 taza de arroz con frijoles bayos criollos",
+        "1/2 plátano maduro horneado",
+        "1 taza de puré de batata o calabaza criolla"
+    ] if is_weight_loss else [
+        "1 taza de arroz blanco con 1/2 taza de caraotas negras y tajadas al horno",
+        "1.5 tazas de batata cocida en rodajas con aceite de oliva",
+        "1 taza de arroz blanco con lentejas criollas",
+        "1 trozo generoso de yuca hervida con toque de aceite de oliva",
+        "1 taza de arroz integral o blanco con caraotas",
+        "1 plátano maduro horneado con canela",
+        "1 taza de arroz blanco con frijoles y vegetales salteados"
+    ]
+
+    l_salads = [
+        "ensalada verde fresca (lechuga, tomate, pepino) con limón y 1 cdta de aceite",
+        "ensalada de repollo rallado, zanahoria y cilantro con vinagreta natural",
+        "ensalada de espinacas baby, tomate manzano y pepino con vinagre",
+        "ensalada mixta de lechuga, cebolla morada y rodajas de aguacate",
+        "ensalada de vainitas al vapor con tomate picado y limón",
+        "ensalada fresca de rúcula, lechuga y pepino crujiente",
+        "ensalada rallada de remolacha y zanahoria con gotas de limón"
+    ]
+
+    # Variaciones de Cena (7 días)
+    if no_seafood:
+        if no_egg:
+            d_prots = [
+                "130g de pechuga de pollo desmechada con cebolla y pimentón",
+                "120g de carne magra salteada con calabacín",
+                "130g de pollo a la plancha con orégano y ajo",
+                "120g de carne molida limpia con cilantro",
+                "130g de pollo desmenuzado en caldo ligero de vegetales",
+                "120g de bistec magro a la plancha en tiras",
+                "1 taza de caraotas negras licuadas como crema espesa"
+            ]
+        else:
+            d_prots = [
+                "2 huevos sancochados con sal marina y orégano",
+                "130g de pechuga de pollo desmechada con vegetales",
+                "Tortilla de 2 claras con espinacas y tomate",
+                "120g de carne magra salteada con calabacín",
+                "2 huevos revueltos con cilantro y cebollín",
+                "130g de pollo a la plancha con limón",
+                "Revuelto ligero de claras con champiñones criollos"
+            ]
+    else:
+        if no_egg:
+            d_prots = [
+                "120g de atún en agua con vegetales salteados",
+                "130g de pechuga de pollo a la plancha",
+                "120g de filete de pescado blanco al vapor",
+                "120g de carne magra salteada con calabacín",
+                "120g de atún al natural con limón y cilantro",
+                "130g de pollo desmechado con sofrito criollo",
+                "120g de sardinas frescas limpias a la plancha"
+            ]
+        else:
+            d_prots = [
+                "120g de atún en agua con vegetales salteados",
+                "2 huevos sancochados con 1/4 de aguacate",
+                "130g de pechuga de pollo a la plancha",
+                "Tortilla de 2 claras con vegetales al vapor",
+                "120g de pescado blanco seguro a la plancha",
+                "2 huevos revueltos suaves con cilantro",
+                "120g de atún en agua con tomate y cebolla picadita"
+            ]
+
+    d_carbs = [
+        "ensalada tibia de vegetales al vapor (calabacín, zanahoria) con aguacate criollo",
+        "1 arepa delgada pequeña de maíz asada",
+        "1/2 plátano maduro asado con vegetales verdes",
+        "crema tibia de auyama / calabaza con semillas",
+        "ensalada fresca verde abundante con vinagre y aceite de oliva",
+        "1/2 taza de batata cocida en rodajas con orégano",
+        "vegetales salteados en sartén (pimentón, cebolla, calabacín)"
+    ]
+
+    idx = day_idx % 7
+    b_desc = f"{b_prots[idx]}, {b_carbs[idx]} y {b_fats} con café negro o infusión sin azúcar."
+    l_desc = f"{l_prots[idx]}, {l_carbs[idx]} y {l_salads[idx]}."
+    d_desc = f"{d_prots[idx]} acompañado de {d_carbs[idx]}."
+
+    return {
+        "dia": day_name,
+        "meta_nutricional": "Déficit Calórico & Definición Muscular" if is_weight_loss else ("Superávit Controlado & Hipertrofia" if is_hypertrophy else "Salud & Rendimiento Funcional"),
+        "desayuno": b_desc,
+        "almuerzo": l_desc,
+        "cena": d_desc
+    }
 
 
 def _is_no_equipment(equipment_details: str | None, user_message: str, is_home: bool = False, history: list = None) -> bool:
@@ -2593,8 +2800,8 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
                 ("Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "Pectoral Mayor", "Tríceps", "pushup"),
                 ("Flexiones declinadas con pies en cama o sofá (Intermedio)", "Pectoral Clavicular", "Deltoides anterior", "pushup"),
                 ("Flexiones con agarre ancho en suelo (Intermedio)", "Pectoral Mayor", "Core", "pushup"),
-                ("Fondos de pecho y tríceps en silla firme (Intermedio)", "Pectoral inferior", "Tríceps", "pushup"),
-                ("Flexiones diamante con rodillas apoyadas para pecho cerrado (Intermedio)", "Pectoral interior, Tríceps", "Deltoides", "pushup"),
+                ("Fondos para pectoral inferior en silla o paralelas (Intermedio)", "Pectoral inferior", "Deltoides", "pushup"),
+                ("Flexiones diamante con rodillas apoyadas para pecho cerrado (Intermedio)", "Pectoral Esternal", "Tríceps", "pushup"),
                 ("Flexiones con pausa isométrica de 2s a 3cm del suelo (Intermedio)", "Pectoral Mayor", "Core", "pushup"),
                 ("Flexiones arquero asistidas alternadas en suelo (Intermedio)", "Pectoral Mayor", "Tríceps", "pushup"),
                 ("Flexiones escapulares en suelo (Push-up plus) (Intermedio)", "Serrato anterior, Pectoral", "Escápula", "pushup"),
@@ -2602,9 +2809,9 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
                 ("Fondos profundos entre dos sillas estables (Intermedio)", "Pectoral inferior", "Tríceps", "pushup"),
                 ("Flexiones con desplazamiento lateral de manos (Intermedio)", "Pectoral Mayor", "Deltoides", "pushup"),
                 ("Flexiones con elevación de un pie para mayor carga (Intermedio)", "Pectoral Mayor", "Core", "pushup"),
-                ("Flexiones diamante estrictas en suelo (Intermedio)", "Pectoral cerrado, Tríceps", "Hombros", "pushup"),
+                ("Flexiones diamante estrictas en suelo (Intermedio)", "Pectoral Esternal", "Tríceps", "pushup"),
                 ("Flexiones declinadas con manos sobre libros (Intermedio)", "Pectoral Clavicular", "Tríceps", "pushup"),
-                ("Flexiones esfinge intermedias con codos cerrados (Intermedio)", "Pectoral, Tríceps", "Core", "pushup"),
+                ("Flexiones con manos sobre toallas para aperturas excéntricas (Intermedio)", "Pectoral Mayor", "Pectoral Clavicular", "fly"),
                 ("Flexiones con toque al hombro cruzado al subir (Intermedio)", "Pectoral Mayor", "Estabilizadores", "pushup"),
                 ("Flexiones con tempo excéntrico de 4s (Intermedio)", "Pectoral Mayor", "Tríceps", "pushup"),
                 ("Aperturas profundas en suelo con toallas y control excéntrico (Intermedio)", "Pectoral Mayor", "Hombros", "fly"),
@@ -2613,12 +2820,12 @@ def _generate_diverse_session(focus_key: str, intensity_hint: str = "media", see
             ],
             "alta": [
                 ("Flexiones con palmada o salto pliométrico (Avanzado)", "Pectoral Mayor", "Tríceps, Potencia", "pushup"),
-                ("Flexiones arquero estrictas en suelo (Avanzado)", "Pectoral", "Tríceps, Estabilizadores", "pushup"),
-                ("Flexiones pseudo-planche con inclinación anterior (Avanzado)", "Pectoral, Deltoides", "Core", "pushup"),
+                ("Flexiones arquero estrictas en suelo (Avanzado)", "Pectoral Mayor", "Tríceps, Estabilizadores", "pushup"),
+                ("Flexiones pseudo-planche con inclinación anterior (Avanzado)", "Pectoral Mayor", "Core", "pushup"),
                 ("Fondos en paralelas o dos sillas firmes con pies despegados (Avanzado)", "Pectoral inferior", "Tríceps", "pushup"),
                 ("Flexiones declinadas con pies elevados a 45° en pared (Avanzado)", "Pectoral Clavicular", "Hombros", "pushup"),
                 ("Flexiones a una mano asistidas con brazo lateral (Avanzado)", "Pectoral Mayor", "Core", "pushup"),
-                ("Flexiones esfinge a flexión profunda continua (Avanzado)", "Pectoral, Tríceps", "Fuerza", "pushup"),
+                ("Flexiones con déficit profundo sobre libros gruesos o bloques (Avanzado)", "Pectoral Mayor", "Haz Esternal", "pushup"),
                 ("Flexiones pliométricas mano a mano desplazadas (Avanzado)", "Pectoral Mayor", "Potencia", "pushup"),
             ],
         }
@@ -3381,7 +3588,7 @@ CALISTHENIC_CHEST_POOL = [
     {"name": "Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
     {"name": "Flexiones declinadas con pies en cama o sofá (Intermedio)", "primary_muscle": "Pectoral Clavicular", "secondary_muscle": "Deltoides anterior", "animation_key": "pushup"},
     {"name": "Flexiones con agarre ancho en suelo (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Core", "animation_key": "pushup"},
-    {"name": "Fondos de pecho y tríceps en silla firme (Intermedio)", "primary_muscle": "Pectoral inferior", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
+    {"name": "Fondos para pectoral inferior en silla o paralelas (Intermedio)", "primary_muscle": "Pectoral inferior", "secondary_muscle": "Deltoides", "animation_key": "pushup"},
     {"name": "Flexiones diamante con rodillas apoyadas para pecho cerrado (Intermedio)", "primary_muscle": "Pectoral interior", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
     {"name": "Flexiones con pausa isométrica de 2s a 3cm del suelo (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Core", "animation_key": "pushup"},
     {"name": "Flexiones arquero asistidas alternadas en suelo (Intermedio)", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps", "animation_key": "pushup"},
@@ -3645,22 +3852,22 @@ def _normalize_exercises(
 
         # F) Si el usuario pidió Pecho
         elif requested_focus in ("pecho", "pectorales") and not _is_chest_exercise(raw_name, primary):
-            chest_pool = [e for e in all_upper if _is_chest_exercise(e["name"], e.get("primary_muscle", ""))]
+            chest_pool = CALISTHENIC_CHEST_POOL if is_no_equipment else GYM_CHEST_POOL
             fallback_ex = chest_pool[idx % len(chest_pool)]
             raw_name = fallback_ex["name"]
             primary = fallback_ex["primary_muscle"]
-            secondary = fallback_ex["secondary_muscle"]
+            secondary = fallback_ex.get("secondary_muscle", "Estabilizadores")
             sets_val = fallback_ex.get("sets", 3)
             reps_val = fallback_ex.get("reps", "10-12")
             anim_key = fallback_ex.get("animation_key", "pushup")
             replaced_from_pool = True
 
         elif requested_focus in ("espalda", "dorsales") and not _is_back_exercise(raw_name, primary):
-            back_pool = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
+            back_pool = CALISTHENIC_BACK_POOL if is_no_equipment else [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
             fallback_ex = back_pool[idx % len(back_pool)]
             raw_name = fallback_ex["name"]
             primary = fallback_ex["primary_muscle"]
-            secondary = fallback_ex["secondary_muscle"]
+            secondary = fallback_ex.get("secondary_muscle", "Estabilizadores")
             sets_val = fallback_ex.get("sets", 3)
             reps_val = fallback_ex.get("reps", "10-12")
             anim_key = fallback_ex.get("animation_key", "row")
@@ -4002,6 +4209,9 @@ def _normalize_structured_plan(
     has_active_plan: bool = False,
     history: list | None = None,
     affected_zone: str | None = None,
+    allergies: str | list | None = None,
+    pathologies: str | list | None = None,
+    goal: str | None = None,
 ) -> dict | None:
     if not isinstance(raw_plan, dict):
         return None
@@ -4036,11 +4246,11 @@ def _normalize_structured_plan(
     )
     if not exercises:
         return None
-    nutrition = raw_plan.get("nutrition")
-    if isinstance(nutrition, dict):
-        nutrition = {str(k): str(v) for k, v in nutrition.items()}
+    raw_nut = raw_plan.get("nutrition")
+    if isinstance(raw_nut, dict) and raw_nut:
+        nutrition = {str(k): str(v) for k, v in raw_nut.items()}
     else:
-        nutrition = {}
+        nutrition = _build_daily_variant_nutrition("Lunes", 0, allergies, pathologies, goal)
 
     plan_mode = _detect_plan_mode(user_message)
     int_lower = intensity.lower()
@@ -4328,61 +4538,170 @@ def _normalize_structured_plan(
         recommended_days = target_days
 
         def _get_day_content(day_idx: int) -> tuple[str, list]:
-            if affected_zone == "hombro":
+            req_parts = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
+
+            # 1. Prioridad absoluta a focos musculares específicos solicitados por el usuario
+            if requested_focus in ("pecho", "pectorales"):
                 day_titles = [
-                    f"Tren Inferior: Cuádriceps y Estabilidad (Protección Hombros) ({badge_lbl})",
-                    f"Tren Inferior: Isquiotibiales y Cadena Posterior ({badge_lbl})",
-                    f"Core y Suelo: Abdomen y Estabilidad sin Carga Articular ({badge_lbl})",
-                    f"Tren Inferior: Glúteos y Gemelos / Sóleo ({badge_lbl})",
-                    f"Tren Inferior y Core: Circuito Funcional Seguro ({badge_lbl})",
-                ]
-                day_exs_map = [
-                    legs_quads[:3] + core_front[:1],
-                    legs_hams[:3] + core_obliques[:1],
-                    core_front[:2] + core_deep[:2],
-                    legs_glutes[:2] + legs_unipodal_calves[:2],
-                    legs_power_mob[:2] + (legs_hams[3:5] if len(legs_hams) > 4 else legs_hams[:2]),
+                    f"Pecho: Fuerza Pectoral Mayor y Press ({badge_lbl})",
+                    f"Pecho: Haz Clavicular e Inclinados ({badge_lbl})",
+                    f"Pecho: Aperturas, Cruces y Haz Esternal ({badge_lbl})",
+                    f"Pecho: Fondos y Empuje Pectoral Inferior ({badge_lbl})",
+                    f"Pecho: Bombeo y Congestión Pectoral ({badge_lbl})",
                 ]
                 idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("pecho", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
                 return day_titles[idx], _normalize_exercises(
-                    day_exs_map[idx],
+                    diverse_day_exs,
                     intensity=intensity,
                     level=level,
-                    requested_focus="solo_piernas",
+                    requested_focus="pecho",
                     is_no_equipment=is_no_equipment,
                     seen_names_global=weekly_seen_names,
                     seen_gifs_global=weekly_seen_gifs,
-                    affected_zone=affected_zone,
-                )
-            elif affected_zone in ("rodilla", "tobillo"):
-                day_titles = [
-                    f"Tren Superior: Pecho y Tríceps (Cero Impacto Piernas) ({badge_lbl})",
-                    f"Tren Superior: Espalda Dorsal y Bíceps ({badge_lbl})",
-                    f"Core en Suelo: Abdomen y Estabilidad ({badge_lbl})",
-                    f"Tren Superior: Hombros y Torso ({badge_lbl})",
-                    f"Torso Completo: Fuerza Controlada sin Apoyo ({badge_lbl})",
-                ]
-                day_exs_map = [
-                    upper_chest_tri[:3] + core_front[:1],
-                    upper_back_bi[:3] + core_obliques[:1],
-                    core_front[:2] + core_deep[:2],
-                    upper_shoulders_post[:3] + core_front[:1],
-                    upper_arms_torso[:2] + upper_back_bi[:1] + core_deep[:1],
-                ]
-                idx = day_idx % len(day_titles)
-                return day_titles[idx], _normalize_exercises(
-                    day_exs_map[idx],
-                    intensity=intensity,
-                    level=level,
-                    requested_focus="solo_tren_superior",
-                    is_no_equipment=is_no_equipment,
-                    seen_names_global=weekly_seen_names,
-                    seen_gifs_global=weekly_seen_gifs,
-                    affected_zone=affected_zone,
                 )
 
-            req_parts = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
-            if requested_focus == "cuerpo_completo":
+            elif requested_focus in ("espalda", "dorsales"):
+                day_titles = [
+                    f"Espalda: Dorsal Ancho, Dominadas y Jalones ({badge_lbl})",
+                    f"Espalda: Remos Medios y Densidad ({badge_lbl})",
+                    f"Espalda: Remos Unilaterales y Trapecio ({badge_lbl})",
+                    f"Espalda: Pullover y Cadena Posterior ({badge_lbl})",
+                    f"Espalda: Postura Escapular y Romboides ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("espalda", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="espalda",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("hombros",):
+                day_titles = [
+                    f"Hombros: Deltoides Anterior y Press ({badge_lbl})",
+                    f"Hombros: Deltoides Lateral y Elevaciones ({badge_lbl})",
+                    f"Hombros: Deltoides Posterior y Escápula ({badge_lbl})",
+                    f"Hombros: Pike Push-ups y Fuerza Vertical ({badge_lbl})",
+                    f"Hombros: Deltoides 360° y Retracción ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("hombros", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="hombros",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("biceps", "solo_biceps"):
+                day_titles = [
+                    f"Bíceps: Pico Braquial y Flexión ({badge_lbl})",
+                    f"Bíceps: Curl Martillo y Braquial Anterior ({badge_lbl})",
+                    f"Bíceps: Tensión Isométrica y Antebrazos ({badge_lbl})",
+                    f"Bíceps: Curl Concentrado y Aislamiento ({badge_lbl})",
+                    f"Bíceps: Bombeo y Congestión Total ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("biceps", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="biceps",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("triceps", "solo_triceps"):
+                day_titles = [
+                    f"Tríceps: Fondos y Fuerza de Empuje ({badge_lbl})",
+                    f"Tríceps: Cabeza Larga y Extensiones ({badge_lbl})",
+                    f"Tríceps: Flexiones Diamante y Tensión ({badge_lbl})",
+                    f"Tríceps: Extensiones Unilaterales ({badge_lbl})",
+                    f"Tríceps: Congestión y Bloqueo Articular ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("triceps", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="triceps",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("femorales_isquios", "femorales"):
+                day_titles = [
+                    f"Isquiotibiales / Femoral: Curl Deslizante y Flexión ({badge_lbl})",
+                    f"Isquiotibiales / Femoral: Peso Muerto Rumano ({badge_lbl})",
+                    f"Isquiotibiales / Femoral: Buenos Días ({badge_lbl})",
+                    f"Isquiotibiales / Femoral: Puentes con Talones Alejados ({badge_lbl})",
+                    f"Isquiotibiales / Femoral: Tensión Excéntrica ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("femorales", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="femorales_isquios",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("cuadriceps",):
+                day_titles = [
+                    f"Cuádriceps: Sentadillas y Fuerza de Extensión ({badge_lbl})",
+                    f"Cuádriceps: Búlgaras y Trabajo Unilateral ({badge_lbl})",
+                    f"Cuádriceps: Isometría en Pared (Wall Sit) ({badge_lbl})",
+                    f"Cuádriceps: Step-ups y Control Excéntrico ({badge_lbl})",
+                    f"Cuádriceps: Bombeo y Congestión Vasto Medial ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("cuadriceps", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="cuadriceps",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("gluteos",):
+                day_titles = [
+                    f"Glúteos: Hip Thrust y Extensión de Cadera ({badge_lbl})",
+                    f"Glúteos: Puentes y Patadas en Cuadrupedia ({badge_lbl})",
+                    f"Glúteos: Sentadilla Sumo y Aductores ({badge_lbl})",
+                    f"Glúteos: Abducciones y Glúteo Medio ({badge_lbl})",
+                    f"Glúteos: Tensión y Activación Pélvica ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("gluteos", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="gluteos",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus == "cuerpo_completo":
                 day_titles = [
                     f"Cuerpo Completo: Piernas (Cuádriceps) + Pecho + Core ({badge_lbl})",
                     f"Cuerpo Completo: Isquiotibiales/Femoral + Espalda Dorsal + Oblicuos ({badge_lbl})",
@@ -4835,6 +5154,60 @@ def _normalize_structured_plan(
                     seen_gifs_global=weekly_seen_gifs,
                 )
 
+            # 2. Si no hubo foco específico solicitado, adaptación clínica protectora
+            elif affected_zone == "hombro":
+                day_titles = [
+                    f"Tren Inferior: Cuádriceps y Estabilidad (Protección Hombros) ({badge_lbl})",
+                    f"Tren Inferior: Isquiotibiales y Cadena Posterior ({badge_lbl})",
+                    f"Core y Suelo: Abdomen y Estabilidad sin Carga Articular ({badge_lbl})",
+                    f"Tren Inferior: Glúteos y Gemelos / Sóleo ({badge_lbl})",
+                    f"Tren Inferior y Core: Circuito Funcional Seguro ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    legs_quads[:3] + core_front[:1],
+                    legs_hams[:3] + core_obliques[:1],
+                    core_front[:2] + core_deep[:2],
+                    legs_glutes[:2] + legs_unipodal_calves[:2],
+                    legs_power_mob[:2] + (legs_hams[3:5] if len(legs_hams) > 4 else legs_hams[:2]),
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="solo_piernas",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                    affected_zone=affected_zone,
+                )
+            elif affected_zone in ("rodilla", "tobillo"):
+                day_titles = [
+                    f"Tren Superior: Pecho y Tríceps (Cero Impacto Piernas) ({badge_lbl})",
+                    f"Tren Superior: Espalda Dorsal y Bíceps ({badge_lbl})",
+                    f"Core en Suelo: Abdomen y Estabilidad ({badge_lbl})",
+                    f"Tren Superior: Hombros y Torso ({badge_lbl})",
+                    f"Torso Completo: Fuerza Controlada sin Apoyo ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    upper_chest_tri[:3] + core_front[:1],
+                    upper_back_bi[:3] + core_obliques[:1],
+                    core_front[:2] + core_deep[:2],
+                    upper_shoulders_post[:3] + core_front[:1],
+                    upper_arms_torso[:2] + upper_back_bi[:1] + core_deep[:1],
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="solo_tren_superior",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                    affected_zone=affected_zone,
+                )
+
             else:
                 default_titles = [
                     f"Piernas y Glúteos (Cuádriceps y Glúteos) · {badge_lbl}",
@@ -4886,6 +5259,7 @@ def _normalize_structured_plan(
                     "is_rest": False,
                     "title": t_title,
                     "exercises": clean_day_exs,
+                    "nutrition": _build_daily_variant_nutrition(d, active_day_counter, allergies, pathologies, goal),
                 }
                 active_day_counter += 1
             else:
@@ -4895,7 +5269,13 @@ def _normalize_structured_plan(
                     "title": f"Día de Descanso y Supercompensación Muscular ({d})",
                     "exercises": [],
                     "rest_advice": f"Hoy {d} tus fibras musculares se reparan y sintetizan nuevas proteínas. El descanso neuromuscular de 48-72h optimiza la adaptación.",
+                    "nutrition": _build_daily_variant_nutrition(d, active_day_counter, allergies, pathologies, goal),
                 }
+
+    if recommended_days and recommended_days[0] in days_schedule:
+        first_day_nut = days_schedule[recommended_days[0]].get("nutrition")
+        if first_day_nut:
+            nutrition = first_day_nut
 
     cycle_dates = _extract_cycle_dates(user_message, has_active_plan=has_active_plan, history=history)
 
@@ -5872,11 +6252,28 @@ Devuelve SOLO JSON."""
         or ("estado fisico:" in user_msg_lower and ("equipo disponible:" in user_msg_lower or "motivo" in user_msg_lower or "decision" in user_msg_lower))
     )
 
-    # Sincronización clínica inmediata en PostgreSQL: Si el usuario reporta dolor o molestia en mensaje o estado actual:
+    # Sincronización clínica inmediata en PostgreSQL: Detección bidireccional (dolor vs recuperación):
+    u_reports_recovery = any(p in user_msg_lower for p in (
+        "ya no me duele", "ya se me quito", "ya se me quitó", "ya no siento dolor",
+        "ya no tengo molestia", "estoy recuperado", "ya estoy bien", "sin dolor",
+        "quitalo del perfil", "quítalo del perfil", "borra la lesion", "borra la lesión",
+        "quitar lesion", "quitar lesión", "ya paso el dolor", "ya pasó el dolor", "recuperad"
+    ))
+    if u_reports_recovery:
+        _db_sync_user_injury(
+            cedula=payload.cedula,
+            user_id=payload.user_id,
+            injury_label=None,
+            is_active=False,
+            replace_previous=True
+        )
+        affected_zone = None
+        affected_profile = None
+
     u_reports_pain = any(p in user_msg_lower for p in (
         "duele", "duelen", "dolor", "dolores", "molest", "lesion", "lesión", "lastim", "afectad", "esguince", "inflamad", "al perfil", "añadelo", "anadelo", "agregalo"
     )) or is_submission
-    if affected_zone and affected_profile and u_reports_pain:
+    if affected_zone and affected_profile and u_reports_pain and not u_reports_recovery:
         _db_sync_user_injury(
             cedula=payload.cedula,
             user_id=payload.user_id,
@@ -6521,6 +6918,9 @@ Devuelve SOLO JSON."""
         has_active_plan=has_active_plan,
         history=payload.history,
         affected_zone=affected_zone,
+        allergies=payload.allergies,
+        pathologies=payload.pathology_or_allergies,
+        goal=payload.user_goal,
     )
     has_plan = bool(data.get("has_plan")) and structured_plan is not None and should_generate_plan
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
@@ -6903,6 +7303,9 @@ def chat_with_coach(payload: ChatMessage):
                     user_message=payload.message or "",
                     is_no_equipment=is_no_eq,
                     affected_zone=rescue_zone,
+                    allergies=payload.allergies,
+                    pathologies=payload.pathology_or_allergies,
+                    goal=payload.user_goal,
                 )
                 eq_text = " (100% en casa sin herramientas)" if is_no_eq else ""
                 if rescue_zone:

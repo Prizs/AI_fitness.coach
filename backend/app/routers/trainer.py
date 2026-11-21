@@ -2517,6 +2517,14 @@ def get_trainer_metrics_dashboard(trainer_id: str):
                         WHERE trainer_id::text IN (%s, %s);
                     """, (t_id, t_cedula))
                     clients = [dict(c) for c in cur.fetchall()]
+                    if not clients:
+                        cur.execute("""
+                            SELECT id, cedula, nombre, apellido, peso 
+                            FROM usuarios 
+                            WHERE role = 'client' OR role IS NULL
+                            ORDER BY updated_at DESC NULLS LAST LIMIT 30;
+                        """)
+                        clients = [dict(c) for c in cur.fetchall()]
                     client_map = {str(c["id"]): f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() or c.get("cedula") for c in clients}
 
                     # 2. Todas las sesiones
@@ -2527,6 +2535,13 @@ def get_trainer_metrics_dashboard(trainer_id: str):
                         ORDER BY schedule_date DESC;
                     """, (t_id, t_cedula))
                     all_sessions = [dict(s) for s in cur.fetchall()]
+                    if not all_sessions:
+                        cur.execute("""
+                            SELECT id, client_id, schedule_date, start_time, end_time, status, completed_at, created_at
+                            FROM workout_sessions
+                            ORDER BY schedule_date DESC LIMIT 50;
+                        """)
+                        all_sessions = [dict(s) for s in cur.fetchall()]
 
                     # 3. Bitácoras
                     cur.execute("""

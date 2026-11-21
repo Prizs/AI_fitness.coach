@@ -224,8 +224,8 @@ CURATED_BY_INTENSITY = [
     },
     # 3. Fondos de Tríceps (Chair Dips / Bench Dips)
     {
-        "match_any": ("fondo de triceps", "fondos de triceps", "fondos en silla", "fondo en silla", "fondos entre bancos", "bench dip", "chair dip", "triceps dip", "fondos de pecho y triceps"),
-        "exclude_any": ("paralelas con lastre",),
+        "match_any": ("fondo de triceps", "fondos de triceps", "fondos en silla", "fondo en silla", "fondos entre bancos", "bench dip", "chair dip", "triceps dip"),
+        "exclude_any": ("paralelas con lastre", "fondos en paralelas", "chest dip", "fondos de pecho", "pecho", "pectoral", "pectoral inferior", "fondos para pectoral"),
         "gifs": {
             "baja": "triceps/bench-dip-knees-bent.gif",
             "media": "triceps/bench-dip-on-floor.gif",
@@ -234,6 +234,19 @@ CURATED_BY_INTENSITY = [
         "biomechanics": "Flexión y extensión de codos con apoyo posterior en silla o banco activando las tres cabezas del tríceps.",
         "posture": "Hombros deprimidos hacia abajo y lejos de las orejas; espalda pegada al borde de apoyo.",
         "warning": "No desciendas más allá de 90° de flexión en el codo para no sobrecargar el hombro anterior.",
+    },
+    # 3b. Fondos en Paralelas para Pecho (Chest Dips)
+    {
+        "match_any": ("fondos en paralelas", "fondo en paralelas", "chest dip", "chest dips", "fondos para pecho", "fondos de pecho", "fondos para pectoral", "pectoral inferior", "fondos de pecho y triceps"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "pectorals/assisted-chest-dip-kneeling.gif",
+            "media": "pectorals/chest-dip.gif",
+            "alta": "pectorals/chest-dip.gif",
+        },
+        "biomechanics": "Empuje vertical con inclinación anterior del torso activando las fibras inferiores del pectoral mayor y deltoides anterior.",
+        "posture": "Torso inclinado ~30° hacia adelante, codos ligeramente abiertos y descenso controlado hasta 90°.",
+        "warning": "No mantengas el torso vertical para no desviar la tensión exclusivamente al tríceps.",
     },
     # 4a. Curl Femoral en Suelo con Deslizador / Toalla (Hamstring Slide)
     {
@@ -471,12 +484,12 @@ CURATED_BY_INTENSITY = [
     },
     # 17. Flexiones de Pecho Estándar (Push-ups)
     {
-        "match_any": ("flexiones de pecho", "flexion de pecho", "push up", "push-up", "pushup", "lagartija", "flexiones en suelo", "flexiones inclinadas"),
-        "exclude_any": ("pica", "pike", "diamante", "declinada", "declinadas", "decline", "pies en", "rodillas", "rodilla", "ancho", "palmada", "pliometric", "pliométrico", "una mano", "pared", "toque", "profund", "pseudo", "plus", "arquero"),
+        "match_any": ("flexiones de pecho", "flexion de pecho", "push up", "push-up", "pushup", "lagartija", "flexiones en suelo"),
+        "exclude_any": ("inclinada", "inclinadas", "pica", "pike", "diamante", "declinada", "declinadas", "decline", "pies en", "rodillas", "rodilla", "ancho", "palmada", "pliometric", "pliométrico", "una mano", "pared", "toque", "profund", "pseudo", "plus", "arquero"),
         "gifs": {
-            "baja": "pectorals/incline-push-up.gif",
+            "baja": "pectorals/push-up.gif",
             "media": "pectorals/push-up.gif",
-            "alta": "pectorals/barbell-bench-press.gif",
+            "alta": "pectorals/push-up.gif",
         },
         "biomechanics": "Empuje horizontal de cadena cerrada activando pectoral mayor, deltoides anterior y tríceps.",
         "posture": "Cuerpo en línea recta desde los talones hasta la coronilla, abdomen y glúteos activos.",
@@ -1248,6 +1261,156 @@ CURATED_BY_INTENSITY = [
         "biomechanics": "Regresión biomecánica de flexión horizontal apoyando rodillas para reducir el porcentaje de peso corporal levantado.",
         "posture": "Línea recta de rodillas a hombros, core apretado y descenso del pecho a 5cm del suelo.",
         "warning": "No dejes la cadera arriba en ángulo de 90°; el torso debe bajar completo.",
+    },
+    # 28. Flexiones Inclinadas (con manos en pared, mesa alta o banco)
+    {
+        "match_any": (
+            "flexiones inclinadas", "flexion inclinada", "incline push-up", "incline push up",
+            "manos en pared o mesa", "manos en pared o mesa alta", "manos en mesa alta",
+            "manos en banco o mesa", "apoyo en pared o mesa", "flexiones inclinadas con manos"
+        ),
+        "exclude_any": ("declinada", "declinadas", "pies en cama", "pies en sofa", "pies en silla"),
+        "gifs": {
+            "baja": "pectorals/incline-push-up.gif",
+            "media": "pectorals/incline-push-up.gif",
+            "alta": "pectorals/incline-push-up.gif",
+        },
+        "biomechanics": "Empuje horizontal inclinado con manos elevadas para reducir el porcentaje de carga corporal y enfatizar el haz clavicular y esternal inferior del pectoral.",
+        "posture": "Manos a la anchura de hombros sobre superficie firme, cuerpo alineado en una sola tabla desde talones hasta la coronilla.",
+        "warning": "No permitas que la cadera caiga ni se arquee la zona lumbar durante la flexión.",
+    },
+    # 29. Flexiones de Pecho Estándar en Suelo (Push-ups)
+    {
+        "match_any": (
+            "flexiones de pecho estandar", "flexiones de pecho estándar", "flexiones de pecho",
+            "flexiones en suelo push-ups", "flexiones en suelo (push-ups)", "push-ups", "pushups",
+            "push-up en suelo", "flexiones estandar en suelo", "flexiones estándar en suelo"
+        ),
+        "exclude_any": ("inclinada", "inclinadas", "declinada", "declinadas", "pica", "diamante", "pared"),
+        "gifs": {
+            "baja": "pectorals/push-up.gif",
+            "media": "pectorals/push-up.gif",
+            "alta": "pectorals/push-up.gif",
+        },
+        "biomechanics": "Empuje horizontal clásico en decúbito prono con máxima activación del pectoral mayor, deltoides anterior y tríceps.",
+        "posture": "Codos a 45° respecto al torso, core y glúteos contraídos, pecho toca el suelo y extensión completa arriba.",
+        "warning": "Evita abrir los codos en ángulo de 90° para no impactar la articulación glenohumeral.",
+    },
+    # 30. Flexiones Declinadas (Pies en cama, sofá o silla)
+    {
+        "match_any": (
+            "flexiones declinadas", "flexion declinada", "decline push-up", "decline push up",
+            "pies en cama", "pies en sofa", "pies en sofá", "pies en silla", "pies elevados en"
+        ),
+        "exclude_any": ("inclinada", "inclinadas", "manos en mesa", "manos en pared"),
+        "gifs": {
+            "baja": "pectorals/decline-push-up.gif",
+            "media": "pectorals/decline-push-up.gif",
+            "alta": "pectorals/decline-push-up.gif",
+        },
+        "biomechanics": "Empuje horizontal con pies elevados en ángulo que sobrecarga el haz clavicular superior del pectoral mayor.",
+        "posture": "Pies apoyados firmes en superficie elevada, manos al nivel del pecho, abdomen activo.",
+        "warning": "Mantén la vista hacia el suelo neutral para no generar hiperextensión cervical.",
+    },
+    # 31. Flexiones en Pared (Push-up against wall)
+    {
+        "match_any": (
+            "flexiones en pared", "flexion en pared", "flexiones contra pared",
+            "push-up wall", "manos en pared", "flexiones asistidas en pared"
+        ),
+        "exclude_any": ("inclinadas con manos en pared o mesa", "wall sit", "sentadilla"),
+        "gifs": {
+            "baja": "pectorals/push-up-wall.gif",
+            "media": "pectorals/push-up-wall.gif",
+            "alta": "pectorals/push-up-wall.gif",
+        },
+        "biomechanics": "Regresión de bajo impacto articular para inicio biomecánico del empuje de torso contra superficie vertical.",
+        "posture": "Pies a un metro de la pared, palmas apoyadas a la altura de los hombros, flexión y extensión controlada.",
+        "warning": "Mantén el cuerpo recto sin separar los talones abruptamente del suelo.",
+    },
+    # 32. Flexiones Diamante (Enfoque Tríceps / Pecho cerrado)
+    {
+        "match_any": (
+            "flexiones diamante", "flexion diamante", "diamond push-up", "diamond push up",
+            "diamante en suelo", "diamante con rodillas"
+        ),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "triceps/diamond-push-up.gif",
+            "media": "triceps/diamond-push-up.gif",
+            "alta": "triceps/diamond-push-up.gif",
+        },
+        "biomechanics": "Empuje con agarre cerrado uniendo pulgares e índices en diamante para enfocar el tríceps y haz medial pectoral.",
+        "posture": "Manos bajo el centro del pecho formando un triángulo, codos pegados a los costados.",
+        "warning": "Si sientes molestia en muñecas, separa ligeramente los dedos.",
+    },
+    # 33. Plancha Frontal Isométrica en Antebrazos (Plank)
+    {
+        "match_any": (
+            "plancha frontal", "plancha isometrica", "plancha isométrica", "plancha en antebrazos",
+            "plancha frontal isometrica", "plancha frontal isométrica", "front plank", "plancha frontal sobre antebrazos"
+        ),
+        "exclude_any": ("lateral", "side plank"),
+        "gifs": {
+            "baja": "abs/front-plank-with-twist.gif",
+            "media": "abs/front-plank-with-twist.gif",
+            "alta": "abs/front-plank-with-twist.gif",
+        },
+        "biomechanics": "Contracción isométrica anti-extensión de la columna lumbar reclutando transverso abdominal, recto abdominal y oblicuos.",
+        "posture": "Codos directamente bajo hombros, retroversión pélvica activa, glúteos contraídos sin hundir la cadera.",
+        "warning": "Detén la serie si la pelvis cae o sientes tensión en la zona lumbar baja.",
+    },
+    # 34. Plancha Lateral Isométrica (Side Plank)
+    {
+        "match_any": ("plancha lateral", "side plank", "plancha lateral isometrica", "plancha lateral isométrica"),
+        "exclude_any": ("frontal",),
+        "gifs": {
+            "baja": "abs/bodyweight-incline-side-plank.gif",
+            "media": "abs/bodyweight-incline-side-plank.gif",
+            "alta": "abs/bodyweight-incline-side-plank.gif",
+        },
+        "biomechanics": "Estabilidad anti-flexión lateral con reclutamiento predominante de oblicuos internos/externos y cuadrado lumbar.",
+        "posture": "Codo bajo el hombro, cadera elevada en línea recta cabeza-pies, mirada al frente.",
+        "warning": "No dejes que la cadera rote hacia adelante o descienda hacia el suelo.",
+    },
+    # 35. Crunch Abdominal Clásico en Suelo
+    {
+        "match_any": ("crunch abdominal", "crunch abdominal clasico", "crunch abdominal clásico", "crunches controlados", "crunch corto"),
+        "exclude_any": ("bicicleta", "russian", "giros"),
+        "gifs": {
+            "baja": "abs/crunch-floor.gif",
+            "media": "abs/crunch-floor.gif",
+            "alta": "abs/crunch-floor.gif",
+        },
+        "biomechanics": "Flexión toracolumbar acercando el esternón hacia la pelvis aislando el recto abdominal.",
+        "posture": "Rodillas a 90°, manos tras nuca sin tirar del cuello, elevar solo escápulas apretando el abdomen.",
+        "warning": "No jales el cuello con las manos; el esfuerzo es puramente de compresión abdominal.",
+    },
+    # 36. Giros Rusos (Russian Twists)
+    {
+        "match_any": ("giro ruso", "giros rusos", "russian twist", "russian twists", "rotacion rusa"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "abs/russian-twist.gif",
+            "media": "abs/russian-twist.gif",
+            "alta": "abs/russian-twist.gif",
+        },
+        "biomechanics": "Rotación torácica isométrica con activación dinámica de oblicuos y estabilizadores pélvicos.",
+        "posture": "Torso inclinado a 45°, pecho abierto, rotar los hombros de lado a lado tocando el suelo suavemente.",
+        "warning": "Rota desde el torso y las costillas, no únicamente con los brazos.",
+    },
+    # 37. Mountain Climbers (Escaladores en plancha)
+    {
+        "match_any": ("mountain climber", "mountain climbers", "escaladores", "escalador en plancha"),
+        "exclude_any": (),
+        "gifs": {
+            "baja": "abs/bridge-mountain-climber-cross-body.gif",
+            "media": "abs/bridge-mountain-climber-cross-body.gif",
+            "alta": "abs/bridge-mountain-climber-cross-body.gif",
+        },
+        "biomechanics": "Flexión de cadera alterna en apoyo prono combinando estabilidad de core con gasto metabólico cardiovascular.",
+        "posture": "Hombros sobre muñecas, espalda plana, llevar rodilla al pecho con control sin rebotar la cadera.",
+        "warning": "Mantén la cadera baja a nivel de los hombros en todo el rango.",
     },
 ]
 

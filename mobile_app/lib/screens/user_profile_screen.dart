@@ -180,14 +180,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               _injuries.clear();
               _injuries.addAll(dbInjuries);
             });
+            await AuthService.instance.updateHealthProfileLocalAndStorage(
+              allergies: dbAllergies.join(', '),
+              injuries: dbInjuries.join(', '),
+            );
           }
         }
       } catch (e) {
         debugPrint('Error cargando salud de perfil: $e');
-        if (_allergies.isEmpty && user.foodAllergies != null && user.foodAllergies!.isNotEmpty) {
+        if (_allergies.isEmpty && user.foodAllergies != null && user.foodAllergies!.trim().isNotEmpty) {
           _allergies.addAll(user.foodAllergies!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
         }
-        if (_injuries.isEmpty && user.currentInjuries != null && user.currentInjuries!.isNotEmpty) {
+        if (_injuries.isEmpty && user.currentInjuries != null && user.currentInjuries!.trim().isNotEmpty) {
           _injuries.addAll(user.currentInjuries!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
         }
       }
@@ -207,25 +211,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final allergiesStr = _allergies.join(', ');
     final injuriesStr = _injuries.join(', ');
 
-    // Actualizar UserProfile en memoria de la sesión
-    AuthService.instance.loggedInUser = UserProfile(
-      cedula: user.cedula,
-      password: user.password,
-      name: user.name,
-      lastName: user.lastName,
-      age: user.age,
-      weight: user.weight,
-      gender: user.gender,
-      pathologyOrAllergies: allergiesStr,
-      foodAllergies: allergiesStr,
-      currentInjuries: injuriesStr,
-      motorDisability: user.motorDisability,
-      areasToAvoid: injuriesStr,
-      role: user.role,
-      specialty: user.specialty,
-      experienceYears: user.experienceYears,
-      certifications: user.certifications,
-      archetype: user.archetype,
+    // Actualizar UserProfile en memoria de la sesión y en FlutterSecureStorage local
+    await AuthService.instance.updateHealthProfileLocalAndStorage(
+      allergies: allergiesStr,
+      injuries: injuriesStr,
     );
 
     try {

@@ -874,24 +874,9 @@ class _CoachScreenState extends State<CoachScreen> {
             final List<dynamic> rawInj = data['updated_injuries'] as List<dynamic>;
             final injList = rawInj.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
             final newInjStr = injList.join(', ');
-            AuthService.instance.loggedInUser = UserProfile(
-              cedula: user.cedula,
-              password: user.password,
-              name: user.name,
-              lastName: user.lastName,
-              age: user.age,
-              weight: user.weight,
-              gender: user.gender,
-              pathologyOrAllergies: user.pathologyOrAllergies,
-              foodAllergies: user.foodAllergies,
-              currentInjuries: newInjStr,
-              motorDisability: user.motorDisability,
-              areasToAvoid: newInjStr,
-              role: user.role,
-              specialty: user.specialty,
-              experienceYears: user.experienceYears,
-              certifications: user.certifications,
-              archetype: user.archetype,
+            await AuthService.instance.updateHealthProfileLocalAndStorage(
+              allergies: user.foodAllergies ?? '',
+              injuries: newInjStr,
             );
           }
         }
@@ -902,24 +887,9 @@ class _CoachScreenState extends State<CoachScreen> {
             final List<dynamic> rawAllergies = data['updated_allergies'] as List<dynamic>;
             final allList = rawAllergies.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
             final newAllStr = allList.join(', ');
-            AuthService.instance.loggedInUser = UserProfile(
-              cedula: user.cedula,
-              password: user.password,
-              name: user.name,
-              lastName: user.lastName,
-              age: user.age,
-              weight: user.weight,
-              gender: user.gender,
-              pathologyOrAllergies: newAllStr,
-              foodAllergies: newAllStr,
-              currentInjuries: user.currentInjuries,
-              motorDisability: user.motorDisability,
-              areasToAvoid: user.areasToAvoid,
-              role: user.role,
-              specialty: user.specialty,
-              experienceYears: user.experienceYears,
-              certifications: user.certifications,
-              archetype: user.archetype,
+            await AuthService.instance.updateHealthProfileLocalAndStorage(
+              allergies: newAllStr,
+              injuries: user.currentInjuries ?? '',
             );
           }
         }
@@ -1820,41 +1790,65 @@ class _CoachScreenState extends State<CoachScreen> {
                                 );
                               }(),
 
-                              // Plan Nutricional
-                              if (plan['nutrition'] is Map && (plan['nutrition'] as Map).isNotEmpty) ...[
-                                const SizedBox(height: 14),
-                                const Text('🥗 Plan Alimenticio Recomendado:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF16253B),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.white10),
-                                  ),
-                                  child: Column(
+                              // Plan Nutricional Dinámico y Variante por Día
+                              Builder(
+                                builder: (context) {
+                                  final List recDays = (plan['recommended_days'] is List)
+                                      ? (plan['recommended_days'] as List)
+                                      : ['Lunes'];
+                                  final String activeDay = (plan['_selected_day'] as String?) ?? (
+                                      recDays.isNotEmpty ? recDays.first.toString() : 'Lunes'
+                                  );
+                                  final Map? daysSched = plan['days_schedule'] as Map?;
+                                  final Map? dayInfo = daysSched != null ? (daysSched[activeDay] as Map?) : null;
+                                  final dynamic effNutrition = (dayInfo != null && dayInfo['nutrition'] is Map && (dayInfo['nutrition'] as Map).isNotEmpty)
+                                      ? dayInfo['nutrition']
+                                      : plan['nutrition'];
+                                  if (effNutrition is! Map || (effNutrition as Map).isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final dayLabel = dayInfo != null && dayInfo['day_name'] != null
+                                      ? ' (${dayInfo['day_name']})'
+                                      : ' ($activeDay)';
+                                  return Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      if ((plan['nutrition'] as Map)['desayuno'] != null)
-                                        Padding(
-                                          padding: const EdgeInsets.only(bottom: 6),
-                                          child: Text('🍳 Desayuno: ${(plan['nutrition'] as Map)['desayuno']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                      const SizedBox(height: 14),
+                                      Text('🥗 Plan Alimenticio Recomendado$dayLabel:', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF16253B),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.white10),
                                         ),
-                                      if ((plan['nutrition'] as Map)['almuerzo'] != null)
-                                        Padding(
-                                          padding: const EdgeInsets.only(bottom: 6),
-                                          child: Text('🍛 Almuerzo: ${(plan['nutrition'] as Map)['almuerzo']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if ((effNutrition as Map)['desayuno'] != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(bottom: 6),
+                                                child: Text('🍳 Desayuno: ${(effNutrition as Map)['desayuno']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                              ),
+                                            if ((effNutrition as Map)['almuerzo'] != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(bottom: 6),
+                                                child: Text('🍛 Almuerzo: ${(effNutrition as Map)['almuerzo']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                              ),
+                                            if ((effNutrition as Map)['cena'] != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(bottom: 2),
+                                                child: Text('🍲 Cena: ${(effNutrition as Map)['cena']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                              ),
+                                          ],
                                         ),
-                                      if ((plan['nutrition'] as Map)['cena'] != null)
-                                        Padding(
-                                          padding: const EdgeInsets.only(bottom: 2),
-                                          child: Text('🍲 Cena: ${(plan['nutrition'] as Map)['cena']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                                        ),
+                                      ),
                                     ],
-                                  ),
-                                ),
-                              ],
+                                  );
+                                },
+                              ),
 
                               const SizedBox(height: 16),
                               Row(
