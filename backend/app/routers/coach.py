@@ -3700,7 +3700,9 @@ def _normalize_exercises(
 
         elif requested_focus in ("tren_superior", "brazos_hombros", "espalda_hombros", "hombros_espalda", "espalda", "hombros") and _is_leg_exercise(raw_name, primary):
             if requested_focus in ("espalda_hombros", "hombros_espalda"):
-                cands = (CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL) if is_no_equipment else (upper_back_bi + upper_shoulders_post)
+                cands = (CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL) if is_no_equipment else [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", "")) or _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+                if not cands:
+                    cands = CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL
                 fallback_ex = cands[idx % len(cands)]
             else:
                 fallback_ex = upper_pool[idx % len(upper_pool)]
@@ -3748,7 +3750,9 @@ def _normalize_exercises(
 
         if is_dup_global_name or is_dup_today_name or is_dup_gif or has_dup_squat:
             if requested_focus in ("espalda_hombros", "hombros_espalda") or ("espalda" in (requested_focus or "") and "hombro" in (requested_focus or "")):
-                cand_pool = (CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL) if is_no_equipment else (upper_back_bi + upper_shoulders_post)
+                cand_pool = (CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL) if is_no_equipment else [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", "")) or _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+                if not cand_pool:
+                    cand_pool = CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL
             elif is_no_equipment:
                 if any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
                     cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, []) + core_pool
