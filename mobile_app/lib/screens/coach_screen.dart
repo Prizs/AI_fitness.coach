@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/screens/workout_schedule_screen.dart';
 import 'package:mobile_app/services/auth_service.dart';
+import 'package:mobile_app/models/user_profile.dart';
 import 'package:lottie/lottie.dart';
 import 'package:mobile_app/services/voice_service.dart';
 import 'package:mobile_app/models/anatomy_exercise.dart';
@@ -866,6 +867,34 @@ class _CoachScreenState extends State<CoachScreen> {
         final qReplies = data['quick_replies'] is List ? _sanitizeQuickReplies(data['quick_replies']) : null;
         final recIntensity = data['recommended_intensity'] as String?;
         final updatedGoal = data['updated_user_goal'] as String?;
+
+        if (data['updated_injuries'] != null) {
+          final user = AuthService.instance.loggedInUser;
+          if (user != null) {
+            final List<dynamic> rawInj = data['updated_injuries'] as List<dynamic>;
+            final injList = rawInj.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+            final newInjStr = injList.join(', ');
+            AuthService.instance.loggedInUser = UserProfile(
+              cedula: user.cedula,
+              password: user.password,
+              name: user.name,
+              lastName: user.lastName,
+              age: user.age,
+              weight: user.weight,
+              gender: user.gender,
+              pathologyOrAllergies: user.pathologyOrAllergies,
+              foodAllergies: user.foodAllergies,
+              currentInjuries: newInjStr,
+              motorDisability: user.motorDisability,
+              areasToAvoid: newInjStr,
+              role: user.role,
+              specialty: user.specialty,
+              experienceYears: user.experienceYears,
+              certifications: user.certifications,
+              archetype: user.archetype,
+            );
+          }
+        }
         if (updatedGoal != null && updatedGoal.isNotEmpty && updatedGoal != _userGoal) {
           setState(() {
             _userGoal = updatedGoal;

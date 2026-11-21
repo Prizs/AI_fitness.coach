@@ -102,10 +102,10 @@ def _db_get_recent_unresolved_injury(cedula: str | None = None, user_id: str | N
         conn.close()
 
 
-def _db_sync_user_injury(cedula: str | None = None, user_id: str | None = None, injury_label: str | None = None, is_active: bool = True):
+def _db_sync_user_injury(cedula: str | None = None, user_id: str | None = None, injury_label: str | None = None, is_active: bool = True, replace_previous: bool = True) -> list[str]:
     conn = _get_db_conn()
     if not conn:
-        return
+        return []
     try:
         clean_ced = (cedula or "").strip()
         digits = "".join([c for c in clean_ced if c.isdigit()])
@@ -118,10 +118,10 @@ def _db_sync_user_injury(cedula: str | None = None, user_id: str | None = None, 
                 elif user_id:
                     cur.execute("SELECT id, lesiones_actuales, zonas_a_evitar FROM usuarios WHERE cedula = %s OR id::text = %s LIMIT 1;", (user_id, user_id))
                 else:
-                    return
+                    return []
                 row = cur.fetchone()
                 if not row:
-                    return
+                    return []
                 u_id, current_lesiones, current_zonas = row[0], row[1] or "", row[2] or ""
 
                 lesiones_list = [i.strip() for i in current_lesiones.split(",") if i.strip()]
@@ -130,10 +130,14 @@ def _db_sync_user_injury(cedula: str | None = None, user_id: str | None = None, 
                 if is_active:
                     if injury_label:
                         clean_lbl = f"Molestia en {injury_label}" if not injury_label.lower().startswith("molestia") else injury_label
-                        if not any(clean_lbl.lower() in existing.lower() for existing in lesiones_list):
-                            lesiones_list.append(clean_lbl)
-                        if not any(injury_label.lower() in existing.lower() for existing in zonas_list):
-                            zonas_list.append(injury_label)
+                        if replace_previous:
+                            lesiones_list = [clean_lbl]
+                            zonas_list = [injury_label]
+                        else:
+                            if not any(clean_lbl.lower() in existing.lower() for existing in lesiones_list):
+                                lesiones_list.append(clean_lbl)
+                            if not any(injury_label.lower() in existing.lower() for existing in zonas_list):
+                                zonas_list.append(injury_label)
                 else:
                     if injury_label:
                         lesiones_list = [i for i in lesiones_list if injury_label.lower() not in i.lower()]
@@ -153,10 +157,47 @@ def _db_sync_user_injury(cedula: str | None = None, user_id: str | None = None, 
                     WHERE id = %s;
                 """, (new_lesiones, new_zonas, u_id))
                 conn.commit()
+                return lesiones_list
     except Exception as e:
         print("Error in _db_sync_user_injury:", e)
+        return []
     finally:
         conn.close()
+
+
+def _db_get_user_health(cedula: str | None = None, user_id: str | None = None) -> dict:
+    conn = _get_db_conn()
+    if not conn:
+        return {"injuries": [], "allergies": [], "areas_to_avoid": []}
+    try:
+        clean_ced = (cedula or "").strip()
+        digits = "".join([c for c in clean_ced if c.isdigit()])
+        with conn:
+            with conn.cursor() as cur:
+                if user_id and len(user_id) > 10 and "-" in user_id:
+                    cur.execute("SELECT alergias_alimentarias, patologia_o_alergias, lesiones_actuales, zonas_a_evitar FROM usuarios WHERE id::text = %s LIMIT 1;", (user_id,))
+                elif clean_ced or digits:
+                    cur.execute("SELECT alergias_alimentarias, patologia_o_alergias, lesiones_actuales, zonas_a_evitar FROM usuarios WHERE cedula = %s OR cedula = %s OR REPLACE(REPLACE(cedula, 'V-', ''), 'v', '') = %s LIMIT 1;", (clean_ced, digits, digits))
+                elif user_id:
+                    cur.execute("SELECT alergias_alimentarias, patologia_o_alergias, lesiones_actuales, zonas_a_evitar FROM usuarios WHERE cedula = %s OR id::text = %s LIMIT 1;", (user_id, user_id))
+                else:
+                    return {"injuries": [], "allergies": [], "areas_to_avoid": []}
+                row = cur.fetchone()
+                if row:
+                    alergias_raw = row[0] or row[1] or ""
+                    lesiones_raw = row[2] or ""
+                    zonas_raw = row[3] or ""
+
+                    allergies = [a.strip() for a in alergias_raw.split(",") if a.strip()] if alergias_raw else []
+                    injuries = [i.strip() for i in lesiones_raw.split(",") if i.strip()] if lesiones_raw else []
+                    areas = [z.strip() for z in zonas_raw.split(",") if z.strip()] if zonas_raw else []
+
+                    return {"allergies": allergies, "injuries": injuries, "areas_to_avoid": areas}
+    except Exception as e:
+        print("Error in _db_get_user_health:", e)
+    finally:
+        conn.close()
+    return {"injuries": [], "allergies": [], "areas_to_avoid": []}
 
 
 AI_TIMEOUT_SEC = 25.0
@@ -429,8 +470,25 @@ def _detect_affected_joint_or_injury(payload: ChatMessage) -> tuple[str | None, 
     las patologías y el historial reciente para identificar qué articulación o zona anatómica
     está afectada o con dolor.
     """
+    msg_txt = (payload.message or "").lower()
+    pain_keywords = (
+        "duele", "duelen", "dolor", "dolores", "doliend", "molest", "lesion", "lesión",
+        "lastimad", "inflamad", "hinchad", "afectad", "no puedo", "evitar", "sin tocar",
+        "sin demandar", "proteger", "cuidado con", "esguince", "tendinitis", "pinzamiento",
+        "hernia", "operad", "fractur", "contractur", "tirón", "tiron", "sobrecarga",
+        "tension", "tensión", "rigidez", "torticolis", "tortícolis", "lumbalgia", "lumbago",
+        "al perfil", "añadelo", "anadelo", "agregalo"
+    )
+
+    # 1. Prioridad: el mensaje actual del usuario menciona dolor o molestia en una articulación
+    msg_has_pain = any(p in msg_txt for p in pain_keywords)
+    for zone_key, profile in CLINICAL_INJURY_PROFILES.items():
+        if any(kw in msg_txt for kw in profile["keywords"]):
+            if msg_has_pain or any(kw in msg_txt for kw in ("tobillo", "rodilla", "hombro", "espalda", "lumbar", "muneca", "muñeca", "codo", "cuello")):
+                return zone_key, profile
+
+    # 2. Historial reciente o campos de perfil
     combined = " ".join([
-        (payload.message or ""),
         (payload.injuries or ""),
         (payload.areas_to_avoid or ""),
         (payload.pathology_or_allergies or "")
@@ -441,16 +499,7 @@ def _detect_affected_joint_or_injury(payload: ChatMessage) -> tuple[str | None, 
             content = turn.content if hasattr(turn, "content") else (turn.get("content") if isinstance(turn, dict) else str(turn))
             combined += " " + (content or "").lower()
 
-    # Si expresa dolor o molestia o pide adaptar por lesión:
-    has_pain_indicator = any(p in combined for p in (
-        "duele", "duelen", "dolor", "dolores", "doliend", "molest", "lesion", "lesión",
-        "lastimad", "inflamad", "hinchad", "afectad", "no puedo", "evitar", "sin tocar",
-        "sin demandar", "proteger", "cuidado con", "esguince", "tendinitis", "pinzamiento",
-        "hernia", "operad", "fractur", "contractur", "tirón", "tiron", "sobrecarga",
-        "tension", "tensión", "rigidez", "torticolis", "tortícolis", "lumbalgia", "lumbago"
-    ))
-
-    # También considerar si explícitamente se nombró en injuries o areas_to_avoid
+    has_pain_indicator = any(p in combined for p in pain_keywords)
     has_explicit_area = bool(payload.injuries or payload.areas_to_avoid)
 
     if not has_pain_indicator and not has_explicit_area:
@@ -5543,6 +5592,19 @@ Devuelve SOLO JSON."""
     motor_disabled, motor_reason = _detect_motor_disability_or_seated_need(payload)
     affected_zone, affected_profile = _detect_affected_joint_or_injury(payload)
 
+    # Sincronización clínica inmediata en PostgreSQL: Si el usuario reporta dolor o molestia en mensaje o estado actual:
+    u_reports_pain = any(p in user_msg_lower for p in (
+        "duele", "duelen", "dolor", "dolores", "molest", "lesion", "lesión", "lastim", "afectad", "esguince", "inflamad", "al perfil", "añadelo", "anadelo", "agregalo"
+    )) or is_submission
+    if affected_zone and affected_profile and u_reports_pain:
+        _db_sync_user_injury(
+            cedula=payload.cedula,
+            user_id=payload.user_id,
+            injury_label=affected_profile.get('label', affected_zone),
+            is_active=True,
+            replace_previous=True
+        )
+
     # Protección clínica absoluta: si hay articulación afectada, anular inmediatamente cualquier contraindicación
     if affected_zone:
         if affected_zone in ("hombro", "codo", "muneca", "cuello"):
@@ -6498,6 +6560,12 @@ def chat_with_coach(payload: ChatMessage):
                 quick_replies=result.get("quick_replies"),
                 recommended_intensity=result.get("recommended_intensity"),
             )
+
+            # Sincronizar siempre el estado clínico más reciente desde PostgreSQL
+            db_health = _db_get_user_health(cedula=payload.cedula, user_id=payload.user_id)
+            result["updated_injuries"] = db_health.get("injuries", [])
+            result["updated_allergies"] = db_health.get("allergies", [])
+            result["updated_areas_to_avoid"] = db_health.get("areas_to_avoid", [])
         return result
     except Exception as error:
         print("Coach IA chat_with_coach exception handler (activando rescate local):", error.__class__.__name__, error)

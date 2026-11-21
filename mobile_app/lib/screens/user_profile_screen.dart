@@ -356,6 +356,21 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF8BE0C0)),
+            tooltip: 'Sincronizar con Base de Datos',
+            onPressed: () async {
+              await _loadData();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Perfil de salud actualizado desde la base de datos'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.system_update_rounded, color: Color(0xFF8BE0C0)),
             tooltip: 'Actualizar App (APK Oficial)',
             onPressed: () => checkForAppUpdate(context, force: true),
@@ -374,11 +389,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ],
       ),
       body: SafeArea(
-        child: AnimatedBuilder(
-          animation: _planService,
-          builder: (context, _) => ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          color: const Color(0xFF8BE0C0),
+          backgroundColor: const Color(0xFF0F192B),
+          child: AnimatedBuilder(
+            animation: _planService,
+            builder: (context, _) => ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
               // Resumen de Métricas
               Container(
                 padding: const EdgeInsets.all(20),
@@ -874,8 +893,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _StreakCard extends StatelessWidget {
