@@ -13,20 +13,61 @@ from app.services.ai_providers import generate_json_text, configured_providers
 router = APIRouter(prefix="/api/trainer", tags=["Trainer"])
 
 
+def _get_db_conn():
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        return None
+    try:
+        import psycopg2
+        import psycopg2.extras
+        return psycopg2.connect(db_url, connect_timeout=8)
+    except Exception as e:
+        print("Database connection error in trainer:", e)
+        return None
+
+
 def _resolve_user_id(admin, identifier: str) -> Optional[dict]:
-    """Busca un usuario por UUID o por Cédula."""
+    """Busca un usuario por UUID o por Cédula con soporte prioritario a PostgreSQL directo."""
     if not identifier:
         return None
-    # 1. Intentar por id
+
+    clean_id = str(identifier).strip()
+    if clean_id in ("demo-nelvis", "nelvis"):
+        clean_id = "29977666"
+    elif clean_id in ("demo-gael", "gael"):
+        clean_id = "17294039"
+    elif clean_id in ("demo-emma", "emma"):
+        clean_id = "30557638"
+
+    # 1. Intentar primero por PostgreSQL directo (ultra rápido y sin depender de API key de Supabase)
+    conn = _get_db_conn()
+    if conn:
+        try:
+            import psycopg2.extras
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT * FROM usuarios WHERE id::text = %s OR cedula = %s LIMIT 1;",
+                        (clean_id, clean_id)
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        return dict(row)
+        except Exception as e:
+            print("Error en _resolve_user_id via Postgres:", e)
+        finally:
+            conn.close()
+
+    # 2. Intentar por id en Supabase REST
     try:
-        res = admin.table("usuarios").select("*").eq("id", identifier).execute()
+        res = admin.table("usuarios").select("*").eq("id", clean_id).execute()
         if res.data:
             return res.data[0]
     except Exception:
         pass
-    # 2. Intentar por cedula
+    # 3. Intentar por cedula en Supabase REST
     try:
-        res = admin.table("usuarios").select("*").eq("cedula", identifier).execute()
+        res = admin.table("usuarios").select("*").eq("cedula", clean_id).execute()
         if res.data:
             return res.data[0]
     except Exception:
@@ -109,21 +150,38 @@ class UpdateProfileReq(BaseModel):
 @router.get("/trainers")
 def get_all_trainers():
     """Lista todos los entrenadores disponibles registrados en el sistema."""
+    # 1. Intentar por Postgres directo (alta confiabilidad)
+    conn = _get_db_conn()
+    if conn:
+        try:
+            import psycopg2.extras
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT id, nombre, apellido, cedula, role, specialty, experience_years, certifications FROM usuarios WHERE role = 'trainer' ORDER BY nombre ASC;"
+                    )
+                    rows = cur.fetchall()
+                    if rows:
+                        return [dict(r) for r in rows]
+        except Exception as e:
+            print("Error get_all_trainers via Postgres:", e)
+        finally:
+            conn.close()
+
     admin = get_supabase_admin_client()
     try:
         res = admin.table("usuarios").select("id, nombre, apellido, cedula, role").eq("role", "trainer").execute()
         trainers = res.data or []
-        # Fallback si no hay ninguno registrado
-        if not trainers:
-            trainers = [
-                {"id": "demo-nelvis", "nombre": "Nelvis", "apellido": "Rincón", "cedula": "29977666", "role": "trainer"},
-                {"id": "demo-gael", "nombre": "Gael", "apellido": "Galindo", "cedula": "17294039", "role": "trainer"},
-            ]
-        return trainers
-    except Exception as e:
-        return [
-            {"id": "demo-nelvis", "nombre": "Nelvis", "apellido": "Rincón", "cedula": "29977666", "role": "trainer"}
-        ]
+        if trainers:
+            return trainers
+    except Exception:
+        pass
+
+    return [
+        {"id": "98460088-ac1b-49db-a0dd-f7c6d933419d", "nombre": "Nelvis", "apellido": "Rincón", "cedula": "29977666", "role": "trainer", "specialty": "Hipertrofia, Fuerza y Biomecánica"},
+        {"id": "a6c1d2a8-7e4b-4c8c-9e50-66453dddba2f", "nombre": "Gael", "apellido": "Galindo", "cedula": "17294039", "role": "trainer", "specialty": "Potencia y Fuerza Funcional"},
+        {"id": "6d5e7ab5-10cd-4806-915f-1f5051029bb7", "nombre": "Emmanuel", "apellido": "Guerra", "cedula": "30557638", "role": "trainer", "specialty": "Calistenia y Movilidad Articular"},
+    ]
 
 
 @router.get("/my-trainer/{client_id}")
@@ -138,7 +196,7 @@ def get_my_trainer(client_id: str):
     if not trainer_ref:
         return {"assigned": False, "trainer": None}
 
-    trainer = _resolve_user_id(admin, trainer_ref)
+    trainer = _resolve_user_id(admin, str(trainer_ref))
     if not trainer:
         return {"assigned": False, "trainer": None}
 
@@ -150,7 +208,7 @@ def get_my_trainer(client_id: str):
             "apellido": trainer.get("apellido"),
             "cedula": trainer.get("cedula"),
             "name": f"{trainer.get('nombre')} {trainer.get('apellido')}",
-            "specialty": "Hipertrofia, Fuerza y Biomecánica",
+            "specialty": trainer.get("specialty") or "Hipertrofia, Fuerza y Biomecánica",
         }
     }
 
@@ -168,6 +226,27 @@ def assign_trainer(req: AssignTrainerReq):
         if not client:
             raise HTTPException(status_code=400, detail="El cliente especificado no existe.")
 
+        # 1. Intentar actualizar directamente en PostgreSQL
+        conn = _get_db_conn()
+        if conn:
+            try:
+                with conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "UPDATE usuarios SET trainer_id = %s WHERE id = %s;",
+                            (str(trainer["id"]), str(client["id"]))
+                        )
+                return {
+                    "status": "ok",
+                    "message": f"Entrenador {trainer.get('nombre')} {trainer.get('apellido')} asignado con éxito.",
+                    "trainer": trainer
+                }
+            except Exception as e:
+                print("Error en assign_trainer via Postgres:", e)
+            finally:
+                conn.close()
+
+        # 2. Fallback Supabase REST
         res = admin.table("usuarios").update({"trainer_id": trainer["id"]}).eq("id", client["id"]).execute()
         return {
             "status": "ok",
@@ -178,6 +257,7 @@ def assign_trainer(req: AssignTrainerReq):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/clients/{trainer_id}")
@@ -185,19 +265,41 @@ def get_clients(trainer_id: str):
     """Lista todos los clientes asignados a un entrenador."""
     admin = get_supabase_admin_client()
     trainer = _resolve_user_id(admin, trainer_id)
-    real_trainer_id = trainer["id"] if trainer else trainer_id
+    real_trainer_id = str(trainer["id"]) if trainer else trainer_id
+    tr_cedula = str(trainer.get("cedula")) if trainer else ""
+
+    # 1. Intentar por Postgres directo
+    conn = _get_db_conn()
+    if conn:
+        try:
+            import psycopg2.extras
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT * FROM usuarios WHERE trainer_id::text = %s OR trainer_id::text = %s;",
+                        (real_trainer_id, tr_cedula)
+                    )
+                    clients = [dict(r) for r in cur.fetchall()]
+                    for c in clients:
+                        injuries = c.get("lesiones_actuales") or c.get("patologia_o_alergias") or ""
+                        c["has_risk"] = bool(injuries and injuries.lower() not in ("ninguna", "ninguno", "no", "sano"))
+                        c["risk_label"] = injuries if c["has_risk"] else "Sin lesiones reportadas"
+                    return clients
+        except Exception as e:
+            print("Error cargando clientes via Postgres:", e)
+        finally:
+            conn.close()
 
     try:
         res = admin.table("usuarios").select("*").eq("trainer_id", real_trainer_id).execute()
         clients = res.data or []
-        # Decorar con información legible de alertas/riesgos
         for c in clients:
             injuries = c.get("lesiones_actuales") or c.get("patologia_o_alergias") or ""
             c["has_risk"] = bool(injuries and injuries.lower() not in ("ninguna", "ninguno", "no", "sano"))
             c["risk_label"] = injuries if c["has_risk"] else "Sin lesiones reportadas"
         return clients
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        return []
 
 
 @router.get("/messages/{trainer_id}/{client_id}")
@@ -206,8 +308,37 @@ def get_messages(trainer_id: str, client_id: str):
     admin = get_supabase_admin_client()
     t = _resolve_user_id(admin, trainer_id)
     c = _resolve_user_id(admin, client_id)
-    t_id = t["id"] if t else trainer_id
-    c_id = c["id"] if c else client_id
+    t_id = str(t["id"]) if t else trainer_id
+    c_id = str(c["id"]) if c else client_id
+
+    t_name = f"{t.get('nombre', '')} {t.get('apellido', '')}".strip() if t else "Entrenador"
+    c_name = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() if c else "Alumno"
+
+    # 1. Intentar por Postgres directo
+    conn = _get_db_conn()
+    if conn:
+        try:
+            import psycopg2.extras
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT * FROM trainer_chat 
+                        WHERE (trainer_id::text = %s AND client_id::text = %s)
+                           OR (trainer_id::text = %s AND client_id::text = %s)
+                        ORDER BY created_at ASC;
+                    """, (t_id, c_id, c_id, t_id))
+                    messages = [dict(r) for r in cur.fetchall()]
+                    for m in messages:
+                        s_id = str(m.get("sender_id", ""))
+                        is_from_trainer = (s_id == str(t_id))
+                        m["is_from_trainer"] = is_from_trainer
+                        m["sender_role"] = "trainer" if is_from_trainer else "client"
+                        m["sender_name"] = f"Coach {t_name}" if is_from_trainer else c_name
+                    return messages
+        except Exception as e:
+            print("Error get_messages via Postgres:", e)
+        finally:
+            conn.close()
 
     try:
         res = (
@@ -218,9 +349,6 @@ def get_messages(trainer_id: str, client_id: str):
             .execute()
         )
         messages = res.data or []
-        t_name = f"{t.get('nombre', '')} {t.get('apellido', '')}".strip() if t else "Entrenador"
-        c_name = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() if c else "Alumno"
-
         for m in messages:
             s_id = str(m.get("sender_id", ""))
             is_from_trainer = (s_id == str(t_id))
@@ -228,29 +356,8 @@ def get_messages(trainer_id: str, client_id: str):
             m["sender_role"] = "trainer" if is_from_trainer else "client"
             m["sender_name"] = f"Coach {t_name}" if is_from_trainer else c_name
         return messages
-    except Exception as e:
-        # Fallback si el filtro OR falla en sintaxis PostgREST
-        try:
-            res = (
-                admin.table("trainer_chat")
-                .select("*")
-                .eq("trainer_id", t_id)
-                .eq("client_id", c_id)
-                .order("created_at", desc=False)
-                .execute()
-            )
-            messages = res.data or []
-            t_name = f"{t.get('nombre', '')} {t.get('apellido', '')}".strip() if t else "Entrenador"
-            c_name = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip() if c else "Alumno"
-            for m in messages:
-                s_id = str(m.get("sender_id", ""))
-                is_from_trainer = (s_id == str(t_id))
-                m["is_from_trainer"] = is_from_trainer
-                m["sender_role"] = "trainer" if is_from_trainer else "client"
-                m["sender_name"] = f"Coach {t_name}" if is_from_trainer else c_name
-            return messages
-        except Exception as e2:
-            raise HTTPException(status_code=500, detail=str(e2))
+    except Exception:
+        return []
 
 
 @router.get("/latest-chat-message/{user_id}")
@@ -348,9 +455,28 @@ def send_message(req: SendMessageReq):
     c = _resolve_user_id(admin, req.client_id)
     s = _resolve_user_id(admin, req.sender_id)
 
-    t_id = t["id"] if t else req.trainer_id
-    c_id = c["id"] if c else req.client_id
-    s_id = s["id"] if s else req.sender_id
+    t_id = str(t["id"]) if t else str(req.trainer_id)
+    c_id = str(c["id"]) if c else str(req.client_id)
+    s_id = str(s["id"]) if s else str(req.sender_id)
+
+    # 1. Intentar por Postgres directo
+    conn = _get_db_conn()
+    if conn:
+        try:
+            import psycopg2.extras
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute("""
+                        INSERT INTO trainer_chat (trainer_id, client_id, sender_id, message, created_at)
+                        VALUES (%s, %s, %s, %s, NOW())
+                        RETURNING *;
+                    """, (t_id, c_id, s_id, req.message.strip()))
+                    row = cur.fetchone()
+                    return {"status": "ok", "message": dict(row)}
+        except Exception as e:
+            print("Error send_message via Postgres:", e)
+        finally:
+            conn.close()
 
     try:
         new_msg = {
