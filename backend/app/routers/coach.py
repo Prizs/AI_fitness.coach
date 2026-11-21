@@ -583,12 +583,28 @@ def _detect_affected_joint_or_injury(payload: ChatMessage) -> tuple[str | None, 
 
     # 1. Prioridad: el mensaje actual del usuario menciona dolor o molestia en una articulación
     msg_has_pain = any(p in msg_txt for p in pain_keywords)
-    for zone_key, profile in CLINICAL_INJURY_PROFILES.items():
-        if any(kw in msg_txt for kw in profile["keywords"]):
-            if msg_has_pain or any(kw in msg_txt for kw in ("tobillo", "rodilla", "hombro", "espalda", "lumbar", "muneca", "muñeca", "codo", "cuello")):
+    is_explicit_training = any(w in msg_txt for w in ("quiero", "solicito", "dame", "rutina de", "ejercicio de", "ejercicios de", "solo de", "exclusivo de", "plan de", "entrenar"))
+    if msg_has_pain:
+        for zone_key, profile in CLINICAL_INJURY_PROFILES.items():
+            if any(kw in msg_txt for kw in profile["keywords"]):
                 return zone_key, profile
 
     # 2. Historial reciente o campos de perfil
+    if is_explicit_training:
+        # Si el usuario pide explícitamente entrenar una zona ("quiero ejercicio solo de hombros y espalda"),
+        # esa decisión consciente invalida registrar esa zona como lesionada en este turno
+        train_zones = set()
+        if any(w in msg_txt for w in ("hombro", "hombros", "deltoid")):
+            train_zones.add("hombro")
+        if any(w in msg_txt for w in ("espalda", "dorsal", "remo", "jalon", "dominada")):
+            train_zones.add("espalda")
+            train_zones.add("lumbar")
+        if any(w in msg_txt for w in ("pierna", "piernas", "cuadricep", "femoral", "isquio", "gluteo")):
+            train_zones.add("rodilla")
+            train_zones.add("tobillo")
+    else:
+        train_zones = set()
+
     combined = " ".join([
         (payload.injuries or ""),
         (payload.areas_to_avoid or ""),
@@ -607,6 +623,8 @@ def _detect_affected_joint_or_injury(payload: ChatMessage) -> tuple[str | None, 
         return None, None
 
     for zone_key, profile in CLINICAL_INJURY_PROFILES.items():
+        if zone_key in train_zones:
+            continue
         if any(kw in combined for kw in profile["keywords"]):
             return zone_key, profile
 
@@ -840,21 +858,28 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         has_cardio = any(w in t_clean for w in ("aerobico", "aeróbico", "aerobicos", "aeróbicos", "movilidad", "cardio suave", "bajo impacto", "estiramiento", "cardio & core", "cardio hiit", "quema grasa", "cardio", "cardiovascular", "calidad cardiovascular", "resistencia", "corazon", "corazón"))
         has_upper = any(w in t_clean for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso")) or (has_pecho and has_espalda)
 
-        # Regla clínica: si la articulación está reportada con dolor o lesión, NUNCA puede ser el foco solicitado
-        if detected_zone == "hombro":
-            has_hombros = False
-        elif detected_zone in ("rodilla", "tobillo"):
-            has_legs = False
-            has_quads = False
-            has_femorales = False
-            has_glutes = False
-            has_calves = False
-        elif detected_zone == "lumbar":
-            has_femorales = False
-        elif detected_zone in ("codo", "muneca"):
-            has_triceps = False
-            has_biceps = False
-            has_brazos = False
+        is_explicit_request = any(w in t for w in ("quiero", "solicito", "dame", "rutina de", "ejercicio de", "ejercicios de", "solo de", "exclusivo de", "plan de", "entrenar"))
+
+        # Prioridad Absoluta: Petición explícita de Hombros y Espalda
+        if (has_espalda and has_hombros) or ("hombro" in t_clean and "espalda" in t_clean):
+            return "espalda_hombros"
+
+        # Regla clínica: si la articulación está reportada con dolor o lesión, NUNCA puede ser el foco solicitado (a menos que el usuario lo pida explícitamente)
+        if not is_explicit_request:
+            if detected_zone == "hombro":
+                has_hombros = False
+            elif detected_zone in ("rodilla", "tobillo"):
+                has_legs = False
+                has_quads = False
+                has_femorales = False
+                has_glutes = False
+                has_calves = False
+            elif detected_zone == "lumbar":
+                has_femorales = False
+            elif detected_zone in ("codo", "muneca"):
+                has_triceps = False
+                has_biceps = False
+                has_brazos = False
 
         # 1.0 Detección Universal de 3 o más Grupos Musculares:
         multi_targets = []
@@ -3673,8 +3698,12 @@ def _normalize_exercises(
             anim_key = fallback_ex.get("animation_key", "plank")
             replaced_from_pool = True
 
-        elif requested_focus in ("tren_superior", "brazos_hombros") and _is_leg_exercise(raw_name, primary):
-            fallback_ex = upper_pool[idx % len(upper_pool)]
+        elif requested_focus in ("tren_superior", "brazos_hombros", "espalda_hombros", "hombros_espalda", "espalda", "hombros") and _is_leg_exercise(raw_name, primary):
+            if requested_focus in ("espalda_hombros", "hombros_espalda"):
+                cands = (CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL) if is_no_equipment else (upper_back_bi + upper_shoulders_post)
+                fallback_ex = cands[idx % len(cands)]
+            else:
+                fallback_ex = upper_pool[idx % len(upper_pool)]
             raw_name = fallback_ex["name"]
             primary = fallback_ex["primary_muscle"]
             secondary = fallback_ex["secondary_muscle"]
@@ -3718,8 +3747,12 @@ def _normalize_exercises(
         is_dup_gif = bool(gif_url and ((gif_url in seen_gifs) or (gif_url in seen_gifs_today)))
 
         if is_dup_global_name or is_dup_today_name or is_dup_gif or has_dup_squat:
-            if is_no_equipment:
-                if affected_zone == "hombro" or any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
+            if requested_focus in ("espalda_hombros", "hombros_espalda") or ("espalda" in (requested_focus or "") and "hombro" in (requested_focus or "")):
+                cand_pool = (CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL) if is_no_equipment else (upper_back_bi + upper_shoulders_post)
+            elif is_no_equipment:
+                if any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
+                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, []) + core_pool
+                elif affected_zone == "hombro":
                     cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, []) + core_pool
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
                     cand_pool = CALISTHENIC_CHEST_POOL
@@ -3732,7 +3765,9 @@ def _normalize_exercises(
                 else:
                     cand_pool = leg_pool + core_pool
             else:
-                if affected_zone == "hombro" or any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
+                if any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
+                    cand_pool = leg_pool + core_pool
+                elif affected_zone == "hombro":
                     cand_pool = leg_pool + core_pool
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
                     cand_pool = GYM_CHEST_POOL
@@ -3749,7 +3784,7 @@ def _normalize_exercises(
                 cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
                     cand["name"], cand["primary_muscle"], cand.get("animation_key", "pushup"), is_no_equipment
                 )
-                if affected_zone:
+                if affected_zone and requested_focus not in ("espalda_hombros", "hombros_espalda", "hombros", "espalda"):
                     cand_clean, cand_prim, _, cand_anim = _sanitize_exercise_by_injury(
                         cand_clean, cand_prim, cand.get("secondary_muscle", ""), cand_anim, affected_zone
                     )
@@ -4430,6 +4465,26 @@ def _normalize_structured_plan(
                     seen_gifs_global=weekly_seen_gifs,
                 )
 
+            elif requested_focus in ("espalda_hombros", "hombros_espalda") or ("espalda" in (requested_focus or "") and "hombro" in (requested_focus or "")):
+                day_titles = [
+                    f"Especialización: Espalda (Dorsal Ancho) + Hombros (Deltoides Lateral) ({badge_lbl})",
+                    f"Especialización: Espalda (Remos Medios) + Hombros (Deltoides Posterior) ({badge_lbl})",
+                    f"Especialización: Hombros (Press Vertical) + Espalda (Retracción Escapular) ({badge_lbl})",
+                    f"Especialización: Espalda (Jalones / Dominadas) + Hombros (Deltoides 360°) ({badge_lbl})",
+                    f"Especialización: Circuito Completo de Espalda y Hombros Global ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("espalda_hombros", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="espalda_hombros",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
             elif requested_focus in ("piernas_hombros", "hombros_piernas") or ("pierna" in (requested_focus or "") and "hombro" in (requested_focus or "")):
                 day_titles = [
                     f"Combinado: Piernas (Cuádriceps) + Hombros (Deltoides Anterior/Pike) ({badge_lbl})",
@@ -4846,6 +4901,8 @@ def _normalize_structured_plan(
         raw_title = f"Plan Combinado Multigrupo: {lbl_parts} ({badge_lbl})"
     elif requested_focus == "cuerpo_completo":
         raw_title = f"Plan Integral de Cuerpo Completo (Full Body) ({badge_lbl})"
+    elif requested_focus in ("espalda_hombros", "hombros_espalda"):
+        raw_title = f"Especialización en Espalda y Hombros ({badge_lbl})"
     elif requested_focus in ("piernas_hombros", "hombros_piernas"):
         raw_title = f"Especialización en Piernas y Hombros ({badge_lbl})"
     elif requested_focus in ("pecho_femorales", "femorales_pecho"):
@@ -5824,6 +5881,16 @@ Devuelve SOLO JSON."""
             replace_previous=True
         )
 
+    # Protección clínica: si el usuario pide explícitamente entrenar un grupo muscular, no anularlo por una molestia previa en ese grupo
+    is_explicit_training = any(w in user_msg_lower for w in ("quiero", "solicito", "dame", "rutina de", "ejercicio de", "ejercicios de", "solo de", "exclusivo de", "plan de", "entrenar"))
+    if is_explicit_training:
+        if requested_focus in ("espalda_hombros", "hombros", "brazos_hombros", "pecho_hombros") and affected_zone == "hombro":
+            affected_zone = None
+        if requested_focus in ("espalda_hombros", "espalda", "espalda_biceps", "espalda_triceps") and affected_zone in ("espalda", "lumbar"):
+            affected_zone = None
+        if requested_focus in ("solo_piernas", "piernas", "cuadriceps", "femorales_isquios", "gluteos") and affected_zone in ("tobillo", "rodilla"):
+            affected_zone = None
+
     # Protección clínica absoluta: si hay articulación afectada, anular inmediatamente cualquier contraindicación
     if affected_zone:
         if affected_zone in ("hombro", "codo", "muneca", "cuello"):
@@ -5844,6 +5911,12 @@ Devuelve SOLO JSON."""
         )
     else:
         focus_dict = {
+            "espalda_hombros": (
+                "ESPECIALIZACIÓN ESTRICTA EN ESPALDA Y HOMBROS: El usuario solicitó EXCLUSIVAMENTE ejercicios para ESPALDA (Dorsales, Remos, Dominadas, Pullover, Jalones, Trapecio) y HOMBROS (Deltoides anterior, lateral, posterior, press militar, elevaciones laterales, pájaros, flexiones en pica). "
+                "¡ESTÁ TERMINANTEMENTE PROHIBIDO incluir ejercicios de Piernas (cero sentadillas, cero zancadas, cero peso muerto de piernas, cero elevación de talones), CERO Glúteos (cero puentes, cero abducciones), CERO Pecho y CERO Core! "
+                "CADA EJERCICIO DEBE PERTENECER RIGUROSAMENTE A ESPALDA O A HOMBROS. CERO EJERCICIOS DE OTRAS ZONAS. "
+                "¡OBLIGATORIO: Debes incluir ejercicios de espalda y ejercicios de hombros en la misma rutina, combinándolos armónicamente!"
+            ),
             "piernas_hombros": (
                 "ESPECIALIZACIÓN ESTRICTA EN PIERNAS Y HOMBROS: El usuario solicitó EXCLUSIVAMENTE ejercicios para PIERNAS (Cuádriceps, Isquiotibiales/Femorales, Glúteos, Gemelos/Sóleo) y HOMBROS (Deltoides anterior, lateral, posterior, press militar, elevaciones laterales, flexiones en pica). "
                 "¡ESTÁ TERMINANTEMENTE PROHIBIDO incluir ejercicios de Pecho (cero flexiones comunes, cero aperturas), Espalda (cero dominadas, cero remos), Bíceps (cero curls) y Tríceps (cero fondos en silla)! "
@@ -6331,6 +6404,8 @@ Devuelve SOLO JSON."""
         focus_key = requested_focus or "semanal_completo"
         if motor_disabled:
             focus_name = "Tren Superior y Torso Sentado (Adaptado)"
+        elif focus_key in ("espalda_hombros", "hombros_espalda"):
+            focus_name = "Espalda y Hombros"
         elif focus_key in ("piernas_hombros", "hombros_piernas"):
             focus_name = "Piernas y Hombros"
         elif focus_key in ("pecho_femorales", "femorales_pecho"):
@@ -6469,6 +6544,15 @@ Devuelve SOLO JSON."""
                     f"\n\n🏋️‍♂️ **Plan Semanal de Cuerpo Completo (Full Body):** He estructurado tu programa con estímulos balanceados "
                     f"para todo el cuerpo (Piernas, Torso, Core y Capacidad Funcional), garantizando máxima variedad día tras día, "
                     f"cero ejercicios repetidos y respetando 48-72h de recuperación fisiológica."
+                )
+        elif requested_focus in ("espalda_hombros", "hombros_espalda"):
+            has_refusal = any(p in lower_reply for p in ("sin incluir hombros", "sin incluir espalda", "no incluir hombros", "no incluir espalda", "enfocaremos en piernas", "tren inferior"))
+            if has_refusal or ("hombros" not in lower_reply) or ("espalda" not in lower_reply):
+                reply_str = (
+                    f"¡Hola, atleta! He procesado con absoluta precisión tu solicitud para entrenar **Espalda y Hombros**.\n\n"
+                    f"🎯 **Rutina Especializada en Espalda y Hombros ({effective_level} · Intensidad {effective_intensity}):**\n"
+                    f"Diseñé tu plan combinando exclusivamente ejercicios de tren superior para dorsales, remos, deltoides anterior, lateral y posterior, "
+                    f"con cero carga en miembros inferiores y con 100% de aislamiento escapular y de hombros. ¡A entrenar con todo!"
                 )
         elif requested_focus in ("piernas_hombros", "hombros_piernas"):
             has_refusal = any(p in lower_reply for p in ("sin incluir hombros", "sin incluir piernas", "no incluir hombros", "no incluir piernas", "evitar solapamiento", "enfocaremos en piernas y glúteos", "enfocaremos en **piernas", "seguridad biomecánica: hoy nos enfocaremos", "seguridad biomecánica"))

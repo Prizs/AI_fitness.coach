@@ -105,11 +105,18 @@ class MuscleMap {
 
   /// Palabras clave (en español o ingles) que identifican cada grupo.
   static const Map<String, List<String>> keywords = {
-    'cuadriceps': ['cuadriceps', 'quad', 'femoral', 'pierna'],
+    'cuadriceps': ['cuadriceps', 'cuádriceps', 'quad', 'vasto', 'recto anterior', 'pierna frontal'],
     'isquiotibiales': [
       'isquio',
       'isquiotibial',
+      'isquiotibiales',
       'hamstring',
+      'femoral',
+      'femorales',
+      'biceps femoral',
+      'bíceps femoral',
+      'semitendinoso',
+      'semimembranoso',
       'femoral posterior',
       'posterior del muslo',
     ],

@@ -206,7 +206,16 @@ String resolveGuaranteedGifUrl({
   }
 
   // 9a. Curl Femoral en Suelo / con Deslizador / Toalla (Sliding Leg Curl on Floor with Towel)
-  if (nameLower.contains('deslizador') || nameLower.contains('toalla en piso') || nameLower.contains('toalla en suelo') || nameLower.contains('piso liso') || nameLower.contains('femoral en suelo') || nameLower.contains('deslizante')) {
+  if (nameLower.contains('deslizador') ||
+      nameLower.contains('toalla en piso') ||
+      nameLower.contains('toalla en suelo') ||
+      nameLower.contains('piso liso') ||
+      nameLower.contains('femoral en suelo') ||
+      nameLower.contains('deslizante') ||
+      nameLower.contains('deslizamiento de talon') ||
+      nameLower.contains('deslizamiento de talón') ||
+      nameLower.contains('deslizamiento de talones') ||
+      nameLower.contains('talones alternado')) {
     return 'https://ai-fitness-coach-wlg3.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif';
   }
 
@@ -269,7 +278,16 @@ String resolveGuaranteedGifUrl({
   }
 
   // 17. Elevación de Talones / Sóleo / Pantorrilla / Gemelos
-  if (nameLower.contains('talon') || nameLower.contains('talón') || nameLower.contains('gemelo') || nameLower.contains('pantorrilla') || nameLower.contains('calf') || nameLower.contains('soleo') || nameLower.contains('sóleo')) {
+  if ((nameLower.contains('talon') ||
+          nameLower.contains('talón') ||
+          nameLower.contains('gemelo') ||
+          nameLower.contains('pantorrilla') ||
+          nameLower.contains('calf') ||
+          nameLower.contains('soleo') ||
+          nameLower.contains('sóleo')) &&
+      !nameLower.contains('deslizamiento') &&
+      !nameLower.contains('isquio') &&
+      !nameLower.contains('femoral')) {
     if (nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated')) {
       return _kGifBase + (isLow
           ? 'calves/seated-calf-stretch-male.gif'

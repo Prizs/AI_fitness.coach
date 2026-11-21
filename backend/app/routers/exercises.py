@@ -692,8 +692,8 @@ CURATED_BY_INTENSITY = [
     },
     # 24a. Tracción Dorsal / Remo con Toalla en Marco de Puerta (Towel Door Row)
     {
-        "match_any": ("toalla en marco", "remo con toalla", "traccion dorsal con toalla", "traccion con toalla", "towel row", "bodyweight row with towel", "toalla en puerta", "con toalla"),
-        "exclude_any": ("polea", "cable", "maquina", "remo en suelo", "deslizante", "remo de pie", "jalon dorsal", "jalón dorsal", "toalla tensa"),
+        "match_any": ("toalla en marco", "remo con toalla", "traccion dorsal con toalla", "traccion con toalla", "towel row", "bodyweight row with towel", "toalla en puerta"),
+        "exclude_any": ("polea", "cable", "maquina", "remo en suelo", "deslizante", "remo de pie", "jalon dorsal", "jalón dorsal", "toalla tensa", "talon", "talones", "deslizamiento", "deslizador", "femoral", "isquio", "piso liso", "suelo", "pierna", "cadera"),
         "gifs": {
             "baja": "upper-back/bodyweight-standing-row-with-towel.gif",
             "media": "upper-back/bodyweight-standing-one-arm-row-with-towel.gif",
@@ -1225,16 +1225,16 @@ CURATED_BY_INTENSITY = [
     },
     # 26. Deslizamiento de talones alternado en suelo con toalla
     {
-        "match_any": ("deslizamiento de talones", "deslizamiento de talón", "talones alternado"),
-        "exclude_any": (),
+        "match_any": ("deslizamiento de talones", "deslizamiento de talón", "talones alternado", "deslizamiento de talones alternado"),
+        "exclude_any": ("elevacion de talon", "elevacion de talones", "elevación de talones", "soleo", "gemelo"),
         "gifs": {
-            "baja": "hamstrings/single-leg-platform-slide.gif",
-            "media": "hamstrings/single-leg-platform-slide.gif",
-            "alta": "hamstrings/self-assisted-inverse-leg-curl-on-floor.gif",
+            "baja": "https://ai-fitness-coach-wlg3.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
+            "media": "https://ai-fitness-coach-wlg3.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
+            "alta": "https://ai-fitness-coach-wlg3.onrender.com/static/sliding-leg-curl-on-floor-with-towel.gif",
         },
-        "biomechanics": "Flexión unilateral excéntrica de isquiotibiales deslizando el talón sobre toalla en suelo liso.",
-        "posture": "Cadera elevada en puente con una pierna mientras la otra desliza con control excéntrico continuo.",
-        "warning": "Controla el retorno para no generar sobretensión brusca en la inserción isquiática.",
+        "biomechanics": "Flexión activa de rodillas en decúbito supino elevando ligeramente la pelvis y deslizando talones sobre toalla, aislando los isquiotibiales (bíceps femoral y semitendinoso).",
+        "posture": "Brazos a los lados en el suelo, cadera elevada en puente y extensión-flexión controlada sin arquear la zona lumbar.",
+        "warning": "Evita tirar con la espalda baja; mantén la contracción concentrada en la corva posterior de la pierna.",
     },
     # 27. Flexiones en suelo con rodillas apoyadas
     {
