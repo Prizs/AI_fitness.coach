@@ -1166,7 +1166,10 @@ def _is_pure_greeting_or_conversation(message: str) -> bool:
             "pesas", "cardio", "deload", "descarga", "cuestionario", "estado actual",
             "bajar masa", "masa corporal", "bajar peso", "perder grasa", "quemar grasa", "quema grasa",
             "qué me toca", "que me toca", "qué hago", "que hago", "qué entreno", "que entreno",
-            "hazme", "dame", "crear", "arma", "diseña"
+            "hazme", "dame", "crear", "arma", "diseña",
+            # Triggers de perfil biomédico y clínico
+            "patologia", "patología", "patologias", "patologías", "alergia", "alergias", "alergais",
+            "perfil", "datos", "lesion", "lesión", "lesiones", "molestia", "molestias", "salud", "medico", "médico"
         )
         if not any(k in cleaned for k in routine_triggers):
             return True
@@ -5717,6 +5720,56 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
         }
 
     recent_unresolved = _db_get_recent_unresolved_injury(cedula=payload.cedula, user_id=payload.user_id)
+
+    # 0cc. Consulta Directa de Perfil, Patologías, Alergias y Datos Registrados
+    is_profile_inquiry = any(k in u_msg_check for k in (
+        "patologia", "patología", "patologias", "patologías",
+        "alergia", "alergias", "alergais", "alergico", "alérgica", "alérgico",
+        "mi perfil", "en mi perfil", "perfil registrado", "datos médicos", "datos medicos",
+        "que tengo registrado", "qué tengo registrado", "tengo registrado", "mis datos",
+        "lesion registrada", "lesiones registradas", "historial medico", "historial médico"
+    ))
+    if is_profile_inquiry:
+        user_n = payload.user_name or "Freddy"
+        allergies_lbl = payload.allergies if payload.allergies else "Ninguna alergia registrada"
+        pathologies_lbl = payload.pathology_or_allergies if payload.pathology_or_allergies else "Ninguna patología clínica registrada"
+        injuries_lbl = payload.injuries if payload.injuries else (f"{recent_unresolved.get('zone')} (en observación y recuperación 24-48h)" if recent_unresolved else "Sin lesiones ni molestias activas registradas")
+        avoid_lbl = payload.areas_to_avoid if payload.areas_to_avoid else "Ninguna restricción anatómica"
+        level_lbl = effective_level
+        intensity_lbl = effective_intensity
+        goal_lbl = payload.user_goal or "Acondicionamiento físico y salud integral"
+
+        return {
+            "provider": "coach_direct",
+            "reply": (
+                f"¡Hola, {user_n}! 👋 Me encuentro excelente y con la mejor disposición para acompañarte en cada paso.\n\n"
+                f"Como tu Coach IA oficial de fitness, salud y biomecánica, tengo acceso directo y sincronizado en tiempo real a tu **Perfil Atlético y Clínico**:\n\n"
+                f"• 🥑 **Alergias y Exclusiones Alimentarias**: {allergies_lbl}\n"
+                f"• 🩺 **Patologías y Condiciones Médicas**: {pathologies_lbl}\n"
+                f"• 🩹 **Estado Articular y Lesiones**: {injuries_lbl}\n"
+                f"• 🚫 **Zonas a Proteger / Evitar**: {avoid_lbl}\n"
+                f"• 🎯 **Nivel e Intensidad Actual**: Nivel {level_lbl} · Intensidad {intensity_lbl} (Meta: {goal_lbl})\n\n"
+                f"🛡️ **Garantía Clínica y Biomecánica**: Toda tu planificación de rutinas y planes de nutrición mensual/diaria se adapta rigurosamente a estos parámetros para garantizar tu total seguridad y evitar cualquier sobrecarga articular o alimento contraindicado.\n\n"
+                f"¿Deseas que actualicemos algún dato de tu perfil o prefieres que armemos tu plan de entrenamiento teniendo todo esto en cuenta?"
+            ),
+            "category": "Consulta de Perfil y Datos Clínicos",
+            "duration_weeks": 4,
+            "rest_between_sets_sec": 60,
+            "progression_rule": "Sincronización clínica activa con perfil.",
+            "extracted_equipment": None,
+            "suggest_questionnaire": False,
+            "has_plan": False,
+            "structured_plan": None,
+            "quick_replies": [
+                "🗓️ Plan Semanal (Lunes a Viernes)",
+                "📅 Rutina Diaria (Solo por Hoy)",
+                "🥑 Ver Plan Nutricional del Día",
+                "✏️ Actualizar Datos en Perfil"
+            ],
+            "recommended_intensity": effective_intensity,
+            "fatigue_detected": False,
+        }
+
     is_greeting_or_check = payload.is_initial_greeting or _is_pure_greeting_or_conversation(payload.message) or any(k in u_msg_check for k in ("hola", "buen dia", "buenos dias", "buenas", "que tal", "empezar", "arrancar"))
     if recent_unresolved and is_greeting_or_check:
         if not any(k in u_msg_check for k in ("ya me siento al 100", "dolor superado", "recuperado al 100", "ya no me duele", "sin dolor", "estoy al 100")):
@@ -6360,9 +6413,19 @@ Retorna SOLO JSON."""
             f"""Eres un Coach de Fitness, Biomecánica y Nutrición empático, educado, cercano y altamente profesional.
 El usuario te acaba de escribir un mensaje de saludo o cortesía: "{payload.message}".
 
+DATOS CLÍNICOS Y DE SALUD DEL USUARIO (TIENES ACCESO TOTAL Y AUTORIZADO):
+- Nombre: {payload.user_name or "Freddy"}
+- Alergias alimentarias registradas: {payload.allergies or "Ninguna alergia registrada"}
+- Patologías / Condiciones médicas: {payload.pathology_or_allergies or "Ninguna patología registrada"}
+- Lesiones o molestias actuales: {payload.injuries or "Sin molestias activas"}
+- Nivel e Intensidad: Nivel {effective_level} / Intensidad {effective_intensity}
+- Meta: {payload.user_goal or "Salud integral y acondicionamiento"}
+
 REGLAS OBLIGATORIAS:
 1. RESPONDE AL SALUDO Y A LA PREGUNTA CON NATURALIDAD, ENERGÍA Y CORTESÍA HUMANA:
    - Responde amablemente al saludo (por ejemplo: "¡Hola! Muy buen día. Me encuentro excelente, motivado y listo para apoyarte en cada paso de tu entrenamiento.").
+   - Si el usuario te pregunta por sus alergias, patologías o datos en perfil, respóndele con total precisión usando los datos de arriba.
+   - ESTÁ ESTRICTAMENTE PROHIBIDO decir "por motivos de privacidad y seguridad no tengo acceso a tus datos médicos". Como su Coach IA oficial tienes pleno acceso a su perfil.
    - Interactúa preguntándole cómo se siente el día de hoy, qué energía tiene o en qué desea que lo asesores hoy (planificar su rutina, revisar dudas de técnica o consultar su plan nutricional).
 2. ESTÁ ESTRICTAMENTE PROHIBIDO GENERAR UN PLAN DE EJERCICIOS O RUTINA EN ESTE TURNO:
    - El usuario solo te está saludando o preguntando cómo estás. NO le tires una rutina de la nada ni inventes ejercicios no pedidos.

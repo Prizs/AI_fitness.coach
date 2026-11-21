@@ -67,8 +67,12 @@ String resolveGuaranteedGifUrl({
 
   if (existingUrl != null && existingUrl.trim().isNotEmpty) {
     final cleanExisting = existingUrl.trim();
-    // Validar si existe incongruencia biomecánica conocida
+    // Validar si existe incongruencia biomecánica conocida o archivos corruptos del repositorio
     final bool hasMismatch =
+        // Archivos corruptos del repo JahelCuadrado/ExerciseGymGifsDB (incline-push-up es wall sit, inverted-row-bent-knees es máquina de pantorrillas):
+        cleanExisting.contains('incline-push-up') ||
+        cleanExisting.contains('inverted-row-bent-knees') ||
+        cleanExisting.contains('inverted-row.gif') ||
         // 1. Puentes, Buenos Días o Peso Muerto mostrando Curl de Pierna
         ((nameLower.contains('puente') || nameLower.contains('bridge') || nameLower.contains('hip thrust') || nameLower.contains('buenos d') || nameLower.contains('deadlift') || nameLower.contains('peso muerto')) && cleanExisting.contains('curl')) ||
         // 2. Fondos o Tríceps mostrando Flexiones de Pecho (Push-up)
@@ -76,7 +80,7 @@ String resolveGuaranteedGifUrl({
         // 3. Dead Bug, Plancha, Remos o Flexiones mostrando Gemelos
         ((nameLower.contains('dead bug') || nameLower.contains('plank') || nameLower.contains('plancha') || nameLower.contains('remo') || nameLower.contains('flexion') || nameLower.contains('flexión') || nameLower.contains('invertido')) && cleanExisting.contains('calf')) ||
         // 3b. Remo invertido bajo mesa mostrando Gemelos o Máquinas de pie
-        ((nameLower.contains('invertido') || nameLower.contains('bajo mesa')) && !cleanExisting.contains('inverted-row')) ||
+        ((nameLower.contains('invertido') || nameLower.contains('bajo mesa')) && !cleanExisting.contains('inverted-row-v-2')) ||
         // 3c. Superman en colchoneta mostrando peso muerto de pie
         (nameLower.contains('superman') && cleanExisting.contains('deadlift')) ||
         // 4. Talones sentado / en silla mostrando elevación de pie
@@ -296,8 +300,7 @@ String resolveGuaranteedGifUrl({
       return _kGifBase + 'upper-back/bodyweight-standing-one-arm-row-with-towel.gif';
     }
     if (nameLower.contains('invertido') || nameLower.contains('inverted row') || nameLower.contains('bajo mesa')) {
-      if (nameLower.contains('supino')) return _kGifBase + 'upper-back/inverted-row-v-2.gif';
-      return _kGifBase + (isLow ? 'upper-back/inverted-row-bent-knees.gif' : 'upper-back/inverted-row.gif');
+      return _kGifBase + 'upper-back/inverted-row-v-2.gif';
     }
     if (nameLower.contains('barra')) {
       return _kGifBase + 'upper-back/barbell-bent-over-row.gif';
@@ -359,7 +362,7 @@ String resolveGuaranteedGifUrl({
       return _kGifBase + 'pectorals/kneeling-push-up-male.gif';
     }
     if (nameLower.contains('inclinad') || nameLower.contains('pared') || nameLower.contains('mesa')) {
-      return _kGifBase + 'pectorals/incline-push-up.gif';
+      return _kGifBase + 'pectorals/kneeling-push-up-male.gif';
     }
     if (nameLower.contains('declinad')) {
       return _kGifBase + 'pectorals/decline-push-up.gif';
@@ -476,8 +479,7 @@ String resolveGuaranteedGifUrl({
       return _kGifBase + 'upper-back/bodyweight-standing-one-arm-row-with-towel.gif';
     }
     if (nameLower.contains('invertido') || nameLower.contains('inverted row') || nameLower.contains('bajo mesa')) {
-      if (nameLower.contains('supino')) return _kGifBase + 'upper-back/inverted-row-v-2.gif';
-      return _kGifBase + (isLow ? 'upper-back/inverted-row-bent-knees.gif' : 'upper-back/inverted-row.gif');
+      return _kGifBase + 'upper-back/inverted-row-v-2.gif';
     }
     if (nameLower.contains('barra')) {
       return _kGifBase + 'upper-back/barbell-bent-over-row.gif';

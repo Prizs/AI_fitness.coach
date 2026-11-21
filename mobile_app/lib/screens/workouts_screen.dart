@@ -684,7 +684,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     );
   }
 
-  void _showInjuryAdaptationSheet() {
+  void _showInjuryAdaptationSheet({Map<String, dynamic>? targetDay}) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -789,11 +789,19 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                       );
 
                       if (choice == 'suspender') {
-                        final count = await _service.adaptRemainingDaysForInjury(opt['key']!, opt['label']!);
+                        final targetWeekday = targetDay != null
+                            ? (targetDay['weekday'] as int? ?? _service.todayIndex)
+                            : _service.todayIndex;
+                        await _service.suspendCurrentDayForInjury(
+                          opt['key']!,
+                          opt['label']!,
+                          dayIndex: targetWeekday,
+                        );
                         if (mounted) {
+                          setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Sesión suspendida. Tiempo de recuperación recomendado para tu ${opt['label']}: 24 a 48 horas de reposo activo.'),
+                              content: Text('Sesión suspendida. Ejercicios tachados y reposo activo de 24 a 48 horas recomendado para tu ${opt['label']}.'),
                               backgroundColor: const Color(0xFF2D1616),
                               duration: const Duration(seconds: 5),
                             ),
@@ -997,7 +1005,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 isDone: false,
                 onToggle: () => _handleToggleCompletion(day),
                 onExerciseTap: (ex, allEx) => _openExerciseIn3D(context, ex, allEx),
-                onReportInjury: _showInjuryAdaptationSheet,
+                onReportInjury: () => _showInjuryAdaptationSheet(targetDay: day),
                 onCancelForRest: _confirmCancelTodayForRest,
               )),
         ],
@@ -1806,33 +1814,41 @@ class _DayCard extends StatelessWidget {
               );
               final estFat = MetabolicCalculator.estimateFatGrams(estKcal).toStringAsFixed(1);
 
+              final bool isSuspended = (item['is_contraindicated'] == true ||
+                  item['is_injured'] == true ||
+                  item['is_suspended'] == true ||
+                  day['is_suspended'] == true);
+              final String suspensionMsg = item['suspension_note'] as String? ??
+                  day['suspended_reason'] as String? ??
+                  'Suspendido por reposo articular (24-48h)';
+
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF173B45),
+                    color: isSuspended ? const Color(0xFF2C1515) : const Color(0xFF173B45),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.view_in_ar_rounded,
-                      color: Color(0xFF8BE0C0)),
+                  child: Icon(
+                    isSuspended ? Icons.pause_circle_outline_rounded : Icons.view_in_ar_rounded,
+                    color: isSuspended ? const Color(0xFFFF5252) : const Color(0xFF8BE0C0),
+                  ),
                 ),
                 title: Text(
                   item['name'] as String? ?? 'Ejercicio',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    decoration: (item['is_contraindicated'] == true || item['is_injured'] == true)
-                        ? TextDecoration.lineThrough
-                        : null,
-                    color: (item['is_contraindicated'] == true || item['is_injured'] == true)
-                        ? Colors.white38
-                        : Colors.white,
+                    decoration: isSuspended ? TextDecoration.lineThrough : null,
+                    decorationColor: const Color(0xFFFF5252),
+                    decorationThickness: 2.2,
+                    color: isSuspended ? Colors.white38 : Colors.white,
                   ),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (item['is_contraindicated'] == true || item['is_injured'] == true)
+                    if (isSuspended)
                       Container(
                         margin: const EdgeInsets.only(top: 3, bottom: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -1841,9 +1857,9 @@ class _DayCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.5)),
                         ),
-                        child: const Text(
-                          '⚠️ Suspendido por molestia articular · Reposo recomendado: 48-72h',
-                          style: TextStyle(color: Color(0xFFFF8A80), fontSize: 11, fontWeight: FontWeight.bold),
+                        child: Text(
+                          '⛔ $suspensionMsg',
+                          style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ),
                     const SizedBox(height: 2),
@@ -1893,13 +1909,13 @@ class _DayCard extends StatelessWidget {
                 ),
                 trailing: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF101B2D),
-                    foregroundColor: const Color(0xFF8BE0C0),
+                    backgroundColor: isSuspended ? const Color(0xFF1E1418) : const Color(0xFF101B2D),
+                    foregroundColor: isSuspended ? const Color(0xFFFF8A80) : const Color(0xFF8BE0C0),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
-                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: const Text('Ver Atlas'),
+                  icon: Icon(isSuspended ? Icons.pause_circle_rounded : Icons.play_arrow_rounded, size: 18),
+                  label: Text(isSuspended ? 'En Reposo' : 'Ver Atlas'),
                   onPressed: () => onExerciseTap(item, exercises),
                 ),
               );

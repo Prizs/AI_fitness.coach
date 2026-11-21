@@ -474,7 +474,7 @@ CURATED_BY_INTENSITY = [
         "match_any": ("flexiones declinadas", "flexion declinada", "decline push up", "decline push-up", "decline pushup", "pies en cama o sofa", "pies elevados en cama"),
         "exclude_any": ("pica", "pike", "diamante"),
         "gifs": {
-            "baja": "pectorals/incline-push-up.gif",
+            "baja": "pectorals/kneeling-push-up-male.gif",
             "media": "pectorals/decline-push-up.gif",
             "alta": "pectorals/decline-push-up.gif",
         },
@@ -500,7 +500,7 @@ CURATED_BY_INTENSITY = [
         "match_any": ("press de banca", "bench press", "press de pecho", "press plano", "press inclinado", "press declinado"),
         "exclude_any": ("flexion", "push up"),
         "gifs": {
-            "baja": "pectorals/incline-push-up.gif",
+            "baja": "pectorals/kneeling-push-up-male.gif",
             "media": "pectorals/dumbbell-bench-press.gif",
             "alta": "pectorals/barbell-bench-press.gif",
         },
@@ -721,9 +721,9 @@ CURATED_BY_INTENSITY = [
         "match_any": ("remo invertido", "inverted row", "bajo mesa"),
         "exclude_any": ("supino", "supina", "a una sola mano", "a una mano", "una mano"),
         "gifs": {
-            "baja": "upper-back/inverted-row-bent-knees.gif",
-            "media": "upper-back/inverted-row.gif",
-            "alta": "upper-back/front-lever-reps.gif",
+            "baja": "upper-back/inverted-row-v-2.gif",
+            "media": "upper-back/inverted-row-v-2.gif",
+            "alta": "upper-back/inverted-row-v-2.gif",
         },
         "biomechanics": "Tracción horizontal de cadena cerrada activando dorsal ancho, romboides, trapecio medio y bíceps.",
         "posture": "Cuerpo en plancha firme, core activo y retracción escapular al subir el pecho hacia la superficie.",
@@ -1271,9 +1271,9 @@ CURATED_BY_INTENSITY = [
         ),
         "exclude_any": ("declinada", "declinadas", "pies en cama", "pies en sofa", "pies en silla"),
         "gifs": {
-            "baja": "pectorals/incline-push-up.gif",
-            "media": "pectorals/incline-push-up.gif",
-            "alta": "pectorals/incline-push-up.gif",
+            "baja": "pectorals/kneeling-push-up-male.gif",
+            "media": "pectorals/kneeling-push-up-male.gif",
+            "alta": "pectorals/kneeling-push-up-male.gif",
         },
         "biomechanics": "Empuje horizontal inclinado con manos elevadas para reducir el porcentaje de carga corporal y enfatizar el haz clavicular y esternal inferior del pectoral.",
         "posture": "Manos a la anchura de hombros sobre superficie firme, cuerpo alineado en una sola tabla desde talones hasta la coronilla.",
@@ -1447,7 +1447,7 @@ FOLDER_DEFAULT_GIFS = {
         "alta": "adductors/lever-seated-hip-adduction.gif",
     },
     "pectorals": {
-        "baja": "pectorals/incline-push-up.gif",
+        "baja": "pectorals/kneeling-push-up-male.gif",
         "media": "pectorals/push-up.gif",
         "alta": "pectorals/barbell-bench-press.gif",
     },

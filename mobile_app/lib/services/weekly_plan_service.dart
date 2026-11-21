@@ -308,21 +308,79 @@ class WeeklyPlanService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Suspende la sesión del día seleccionado por molestia articular (24-48h de reposo).
+  /// Mantiene los ejercicios visibles pero TACHADOS (lineThrough) con insignia de suspensión por reposo,
+  /// y adapta los días restantes de la semana.
+  Future<int> suspendCurrentDayForInjury(String zoneKey, String zoneLabel, {int? dayIndex}) async {
+    if (week == null || week!['days'] is! List) return 0;
+    final targetWeekday = dayIndex ?? todayIndex;
+    final daysList = List<dynamic>.from(week!['days']);
+
+    for (int i = 0; i < daysList.length; i++) {
+      if (daysList[i] is! Map) continue;
+      final current = Map<String, dynamic>.from(daysList[i]);
+      final int w = (current['weekday'] is int) ? current['weekday'] as int : i;
+
+      if (w == targetWeekday) {
+        current['is_suspended'] = true;
+        current['suspended_zone'] = zoneLabel;
+        current['suspended_reason'] = 'Reposo activo de 24 a 48h para $zoneLabel';
+
+        final rawExs = current['exercises'];
+        if (rawExs is List) {
+          final List<Map<String, dynamic>> crossedOutList = [];
+          for (final ex in rawExs) {
+            if (ex is Map) {
+              final exMap = Map<String, dynamic>.from(ex);
+              exMap['is_suspended'] = true;
+              exMap['is_injured'] = true;
+              exMap['is_contraindicated'] = true;
+              exMap['suspension_note'] = 'Suspendido por reposo articular (24-48h)';
+              crossedOutList.add(exMap);
+            }
+          }
+          current['exercises'] = crossedOutList;
+        }
+        daysList[i] = current;
+        break;
+      }
+    }
+
+    week!['days'] = daysList;
+
+    // Persistir el reporte de molestia en almacenamiento y base de datos para seguimiento del Coach IA
+    try {
+      const storage = FlutterSecureStorage();
+      await storage.write(key: 'active_injury_zone', value: zoneKey);
+      await storage.write(key: 'active_injury_label', value: zoneLabel);
+      await storage.write(key: 'active_injury_time', value: DateTime.now().toIso8601String());
+      await DBHelper.instance.saveWeeklyPlan(jsonEncode(week!));
+      await storage.write(key: 'cached_weekly_plan_v1', value: jsonEncode(week!));
+    } catch (_) {}
+
+    notifyListeners();
+
+    // Adaptar los días subsiguientes a partir del siguiente día
+    final adaptedCount = await adaptRemainingDaysForInjury(zoneKey, zoneLabel, fromWeekday: targetWeekday + 1);
+    return adaptedCount;
+  }
+
   /// Adapta los días restantes de la semana en curso ante un reporte de molestia articular (tobillo, rodilla, hombro, lumbar, etc.).
-  Future<int> adaptRemainingDaysForInjury(String zoneKey, String zoneLabel) async {
+  Future<int> adaptRemainingDaysForInjury(String zoneKey, String zoneLabel, {int? fromWeekday}) async {
     if (week == null || week!['days'] is! List) return 0;
     final daysList = List<dynamic>.from(week!['days']);
     int adaptedCount = 0;
 
     final lowerKey = zoneKey.toLowerCase();
+    final startWeekday = fromWeekday ?? todayIndex;
 
     for (int i = 0; i < daysList.length; i++) {
       if (daysList[i] is! Map) continue;
       final current = Map<String, dynamic>.from(daysList[i]);
       final int w = (current['weekday'] is int) ? current['weekday'] as int : 0;
 
-      // Adaptar desde hoy en adelante
-      if (w >= todayIndex) {
+      // Adaptar desde el día indicado en adelante
+      if (w >= startWeekday) {
         final rawExs = current['exercises'];
         if (rawExs is List && rawExs.isNotEmpty) {
           current['original_title'] ??= current['title'];
