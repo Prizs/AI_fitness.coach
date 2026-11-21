@@ -180,6 +180,16 @@ def admin_diagnostics(pin: str | None = None) -> dict:
 
 
 
+@app.get("/download")
+@app.get("/descargar")
+@app.get("/apk")
+@app.get("/download/latest")
+@app.get("/AI_Fitness_Coach.apk")
+def direct_download_apk():
+    from app.routers.app_updates import download_apk
+    return download_apk()
+
+
 # Montar la aplicacion web de Flutter en la raiz
 web_dist = os.path.join(os.path.dirname(__file__), "web_dist")
 if os.path.exists(web_dist):

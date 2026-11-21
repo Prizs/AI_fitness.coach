@@ -7,8 +7,6 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 router = APIRouter()
 
-APK_PATH = Path(__file__).resolve().parents[3] / "releases" / "app-release.apk"
-
 def _read_pubspec_version() -> tuple[str, int]:
     pubspec_path = Path(__file__).resolve().parents[3] / "mobile_app" / "pubspec.yaml"
     if not pubspec_path.exists():
@@ -20,16 +18,21 @@ def _read_pubspec_version() -> tuple[str, int]:
                 if "+" in raw_ver:
                     name, code = raw_ver.split("+", 1)
                     return name.strip(), int(code.strip())
-                return raw_ver, 117
-    return "1.0.77", 117
+                return raw_ver, 119
+    return "1.0.79", 119
 
 def _find_apk_file() -> Path | None:
+    ver_name, _ = _read_pubspec_version()
     candidates = [
-        Path(__file__).resolve().parents[3] / "releases" / "app-release.apk",
-        Path(__file__).resolve().parents[3] / "releases" / "app-release-v1076.apk",
-        Path(__file__).resolve().parents[3] / "mobile_app" / "build" / "app" / "outputs" / "flutter-apk" / "app-release.apk",
-        Path(__file__).resolve().parents[2] / "releases" / "app-release.apk",
+        Path(__file__).resolve().parent.parent / "web_dist" / f"AI_Fitness_Coach_v{ver_name}.apk",
         Path(__file__).resolve().parent.parent / "web_dist" / "AI_Fitness_Coach.apk",
+        Path(__file__).resolve().parents[3] / "releases" / f"AI_Fitness_Coach_Oficial_v{ver_name}.apk",
+        Path(__file__).resolve().parents[3] / "releases" / "AI_Fitness_Coach_Oficial_v1.0.79.apk",
+        Path(__file__).resolve().parents[3] / "releases" / "app-release.apk",
+        Path(__file__).resolve().parents[2] / "releases" / f"AI_Fitness_Coach_Oficial_v{ver_name}.apk",
+        Path(f"releases/AI_Fitness_Coach_Oficial_v{ver_name}.apk").resolve(),
+        Path(f"backend/app/web_dist/AI_Fitness_Coach_v{ver_name}.apk").resolve(),
+        Path("backend/app/web_dist/AI_Fitness_Coach.apk").resolve(),
         Path("releases/app-release.apk").resolve(),
     ]
     for p in candidates:
@@ -40,7 +43,7 @@ def _find_apk_file() -> Path | None:
 @router.get("/latest")
 def latest_version() -> dict:
     apk = _find_apk_file()
-    size = apk.stat().st_size if apk else 63225169
+    size = apk.stat().st_size if apk else 63156898
     ver_name, ver_code = _read_pubspec_version()
     return {
         "available": True,
@@ -49,27 +52,29 @@ def latest_version() -> dict:
         "size_bytes": size,
         "released_at": datetime.now(timezone.utc).isoformat(),
         "notes": (
-            f"AI Fitness Coach v{ver_name} (Compilación Oficial):\n"
-            "• Nueva Galería Horizontal de Evolución Corporal: Desplazamiento táctil (swipe) cronológico desde el Día 1 con comparativa visual inmediata.\n"
-            "• Ficha Clínica & Fisiológica IA Dinámica: Actualización en vivo de KPIs (definición, grasa estimada, postura), biotipo y recomendaciones anatómicas bajo cada foto.\n"
-            "• Suite de Bitácora Oficial (PDF) & Rendimiento: Exportación directa y test biomecánicos adaptados.\n"
-            "• Actualización y Descarga Instantánea: Nuevo centro de sincronización directa desde el Perfil y Pantalla Principal."
+            f"AI Fitness Coach v{ver_name} (Compilación Oficial Android):\n"
+            "• Prescripción Biomecánica Preventiva 100% Adaptada: Ante molestias en tobillo o rodilla, rutinas 100% en sedestación y decúbito (cero impacto, cero bipedestación).\n"
+            "• Mapeo Anatómico de GIFs 100% Exacto: Sincronización estricta de remos bajo mesa, deltoides posterior, superman y extensiones.\n"
+            "• Filtro Dinámico de Alergias & Patologías: Menús y rutinas personalizadas que respetan alergias registradas.\n"
+            "• Auto-actualización y Descarga Instantánea: Actualización directa con un clic desde el móvil."
         ),
         "download_url": "/api/app/download",
+        "direct_download_url": "https://ai-fitness-coach-wlg3.onrender.com/download",
     }
 
 @router.get("/download")
 def download_apk():
     """Descarga directamente el APK oficial desde el servidor o redirige al APK en GitHub."""
     apk = _find_apk_file()
+    ver_name, _ = _read_pubspec_version()
     if apk and apk.exists():
         return FileResponse(
             path=str(apk),
             media_type="application/vnd.android.package-archive",
-            filename="AI_Fitness_Coach.apk",
+            filename=f"AI_Fitness_Coach_v{ver_name}.apk",
         )
     return RedirectResponse(
-        url="https://github.com/Prizs/AI_fitness.coach/raw/main/releases/app-release.apk",
+        url=f"https://github.com/Prizs/AI_fitness.coach/raw/main/releases/AI_Fitness_Coach_Oficial_v{ver_name}.apk",
         status_code=302,
     )
 
