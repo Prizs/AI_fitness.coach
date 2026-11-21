@@ -445,14 +445,14 @@ CURATED_BY_INTENSITY = [
     },
     # 15. Flexiones en Pica (Pike Push-ups)
     {
-        "match_any": ("flexiones en pica", "flexion en pica", "pike push", "pike-push", "pino asistidas", "handstand"),
-        "exclude_any": (),
+        "match_any": ("flexiones en pica", "flexion en pica", "pike push", "pike-push", "pino asistidas"),
+        "exclude_any": ("handstand", "triceps"),
         "gifs": {
-            "baja": "triceps/handstand-push-up.gif",
-            "media": "triceps/handstand-push-up.gif",
-            "alta": "triceps/handstand-push-up.gif",
+            "baja": "delts/band-shoulder-press.gif",
+            "media": "delts/band-twisting-overhead-press.gif",
+            "alta": "delts/dumbbell-seated-shoulder-press.gif",
         },
-        "biomechanics": "Empuje vertical en inversión con peso corporal estimulando deltoides anterior, superior y tríceps.",
+        "biomechanics": "Empuje vertical en inversión con peso corporal estimulando deltoides anterior, deltoides lateral y trapecio.",
         "posture": "Cadera elevada formando una V invertida; cabeza desciende suavemente por delante de las manos.",
         "warning": "Mantén los codos en ángulo de 45° sin abrirlos excesivamente hacia afuera.",
     },
@@ -822,8 +822,8 @@ CURATED_BY_INTENSITY = [
     },
     # 27a. Plancha con Rodillas Apoyadas / Suave (Kneeling Plank)
     {
-        "match_any": ("rodillas apoyadas", "plancha con rodillas", "plancha suave", "plancha abdominal suave", "kneeling plank"),
-        "exclude_any": (),
+        "match_any": ("plancha con rodillas", "plancha suave", "plancha abdominal suave", "kneeling plank"),
+        "exclude_any": ("flexion", "flexiones", "pushup", "push-up", "pecho"),
         "gifs": {
             "baja": "abs/kneeling-plank-tap-shoulder-male.gif",
             "media": "abs/kneeling-plank-tap-shoulder-male.gif",
@@ -1056,8 +1056,8 @@ CURATED_BY_INTENSITY = [
     },
     # 33j. Flexiones con Rodillas Apoyadas
     {
-        "match_any": ("flexiones en suelo con rodillas apoyadas", "rodillas apoyadas", "knee push up", "kneeling push up"),
-        "exclude_any": ("diamante", "diamond"),
+        "match_any": ("flexiones en suelo con rodillas", "flexiones con rodillas", "flexion con rodillas", "flexiones rodillas", "flexion rodillas", "knee push up", "kneeling push up", "kneeling push-up"),
+        "exclude_any": ("diamante", "diamond", "plancha", "plank"),
         "gifs": {
             "baja": "pectorals/kneeling-push-up-male.gif",
             "media": "pectorals/kneeling-push-up-male.gif",
