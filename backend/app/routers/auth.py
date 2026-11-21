@@ -714,6 +714,60 @@ def update_user_health_profile(payload: UpdateHealthProfileRequest):
                     RETURNING id;
                 """, (alergias_str, alergias_str, lesiones_str, lesiones_str, clean_cedula, digits, digits))
                 res = cur.fetchone()
+                if res and alergias_str:
+                    u_id = res[0]
+                    # Sanitización clínica reactiva inmediata de planes previos guardados
+                    try:
+                        all_low = alergias_str.lower()
+                        no_oats = any(k in all_low for k in ("avena", "oat"))
+                        no_seafood = any(k in all_low for k in ("camaron", "camarones", "marisco", "mariscos", "pescado"))
+                        no_dairy = any(k in all_low for k in ("lacteo", "lácteo", "leche", "queso"))
+                        no_egg = any(k in all_low for k in ("huevo", "huevos", "clara"))
+
+                        cur.execute("""
+                            SELECT id, plan FROM coach_mensajes
+                            WHERE (user_id::text = %s OR cedula = %s) AND plan IS NOT NULL
+                            ORDER BY created_at DESC LIMIT 5;
+                        """, (str(u_id), clean_cedula))
+                        rows = cur.fetchall()
+                        for r_id, p_json in rows:
+                            if not p_json:
+                                continue
+                            p_data = json.loads(p_json) if isinstance(p_json, str) else p_json
+                            changed = False
+                            def _clean_str(s: str) -> str:
+                                nonlocal changed
+                                res_s = s
+                                if no_oats and "avena" in res_s.lower():
+                                    res_s = re.sub(r"(?:[0-9]+\s*(?:cda|cdas|tazas?|cucharadas?)?\s*de\s+)?avena(?:\s+en\s+hojuelas|\s+tibia)?", "arepa de maíz asada", res_s, flags=re.IGNORECASE)
+                                    res_s = re.sub(r"Panquecas?\s+(?:caseras?\s+)?de\s+avena", "Arepas asadas de maíz", res_s, flags=re.IGNORECASE)
+                                    changed = True
+                                if no_seafood and any(k in res_s.lower() for k in ("camaron", "camarones", "marisco", "mariscos")):
+                                    res_s = re.sub(r"(?:camarones?|mariscos?)", "pechuga de pollo a la plancha", res_s, flags=re.IGNORECASE)
+                                    changed = True
+                                if no_dairy and any(k in res_s.lower() for k in ("queso", "leche", "lacteo", "lácteo")):
+                                    res_s = re.sub(r"(?:queso\s+blanco\s+llanero|queso\s+llanero|queso)", "aguacate criollo", res_s, flags=re.IGNORECASE)
+                                    changed = True
+                                if no_egg and "huevo" in res_s.lower():
+                                    res_s = re.sub(r"(?:[0-9]+\s+)?huevos?\s*(?:pericos?|revueltos?|sancochados?|cocidos?)?", "pechuga de pollo desmechada", res_s, flags=re.IGNORECASE)
+                                    changed = True
+                                return res_s
+
+                            if isinstance(p_data, dict):
+                                nut = p_data.get("nutrition")
+                                if isinstance(nut, dict):
+                                    for k in ("desayuno", "almuerzo", "cena"):
+                                        if nut.get(k): nut[k] = _clean_str(nut[k])
+                                days_sched = p_data.get("days_schedule")
+                                if isinstance(days_sched, dict):
+                                    for d_k, d_v in days_sched.items():
+                                        if isinstance(d_v, dict) and isinstance(d_v.get("nutrition"), dict):
+                                            for k in ("desayuno", "almuerzo", "cena"):
+                                                if d_v["nutrition"].get(k): d_v["nutrition"][k] = _clean_str(d_v["nutrition"][k])
+                                if changed:
+                                    cur.execute("UPDATE coach_mensajes SET plan = %s WHERE id = %s;", (json.dumps(p_data, ensure_ascii=False), r_id))
+                    except Exception as e_clean:
+                        print("Aviso sanitizando planes previos por alergias:", e_clean)
             if res:
                 conn.commit()
                 return {

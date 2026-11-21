@@ -1824,7 +1824,10 @@ class _CoachScreenState extends State<CoachScreen> {
                                               setState(() {
                                                 final int curVar = (((effNutrition as Map)['_variant_index'] as int?) ?? 0) + 1;
                                                 (effNutrition as Map)['_variant_index'] = curVar;
+                                                final uAllergies = (AuthService.instance.loggedInUser?.foodAllergies ?? '').toLowerCase();
+                                                final bool hasAvenaAllergy = uAllergies.contains('avena') || uAllergies.contains('oat');
                                                 final List<String> bAlt = [
+                                                  if (!hasAvenaAllergy) '3 cucharadas de avena en hojuelas cocida con canela, cambur criollo y 2 claras de huevo revueltas.',
                                                   '2 huevos pericos criollos con tomate y cebolla, 1 arepa asada de maíz y 30g de queso llanero o aguacate criollo.',
                                                   'Tortilla de 2 claras y 1 huevo entero con espinacas frescas y 1/2 plátano verde hervido.',
                                                   '100g de pechuga de pollo desmechada con sofrito criollo y 1 arepa delgada de maíz tostada.',

@@ -42,23 +42,78 @@ class NutritionDatabase {
     required String goalId,
     required int weekday, // 0 = Lunes ... 6 = Domingo
     required bool isTrainingDay,
+    String? allergies,
   }) {
     final effectiveGoal = goals.firstWhere(
       (g) => g['id'] == goalId,
       orElse: () => goals[0],
     );
 
+    Map<String, dynamic> plan;
     switch (goalId) {
       case 'musculo':
-        return _getMusclePlan(weekday, isTrainingDay, effectiveGoal);
+        plan = _getMusclePlan(weekday, isTrainingDay, effectiveGoal);
+        break;
       case 'grasa':
-        return _getFatLossPlan(weekday, isTrainingDay, effectiveGoal);
+        plan = _getFatLossPlan(weekday, isTrainingDay, effectiveGoal);
+        break;
       case 'resistencia':
-        return _getCardioPlan(weekday, isTrainingDay, effectiveGoal);
+        plan = _getCardioPlan(weekday, isTrainingDay, effectiveGoal);
+        break;
       case 'salud':
       default:
-        return _getHealthPlan(weekday, isTrainingDay, effectiveGoal);
+        plan = _getHealthPlan(weekday, isTrainingDay, effectiveGoal);
+        break;
     }
+
+    if (allergies != null && allergies.trim().isNotEmpty) {
+      final rawMeals = (plan['meals'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      plan = Map<String, dynamic>.from(plan);
+      plan['meals'] = _sanitizeMealsForUserAllergies(rawMeals, allergies);
+    }
+
+    return plan;
+  }
+
+  static List<Map<String, dynamic>> _sanitizeMealsForUserAllergies(List<Map<String, dynamic>> meals, String allergies) {
+    if (allergies.trim().isEmpty || allergies.toLowerCase() == 'ninguna' || allergies.toLowerCase() == 'ninguno') {
+      return meals;
+    }
+    final allLow = allergies.toLowerCase();
+    final noOats = allLow.contains('avena') || allLow.contains('oat');
+    final noSeafood = allLow.contains('camaron') || allLow.contains('camarones') || allLow.contains('marisco') || allLow.contains('mariscos') || allLow.contains('pescado');
+    final noDairy = allLow.contains('lacteo') || allLow.contains('lácteo') || allLow.contains('leche') || allLow.contains('queso') || allLow.contains('lactosa');
+    final noEgg = allLow.contains('huevo') || allLow.contains('huevos') || allLow.contains('clara');
+    final noPeanut = allLow.contains('mani') || allLow.contains('maní') || allLow.contains('cacahuate');
+
+    return meals.map((m) {
+      final copy = Map<String, dynamic>.from(m);
+      final rawItems = (m['items'] as List<dynamic>? ?? []);
+      final cleanItems = rawItems.map((item) {
+        String s = item.toString();
+        if (noOats && s.toLowerCase().contains('avena')) {
+          s = s.replaceAll(RegExp(r'Panquecas?\s+(?:caseras?\s+)?de\s+avena[^\n,]*', caseSensitive: false), 'Arepas asadas de maíz con semillas de chía');
+          s = s.replaceAll(RegExp(r'[^\n,]*avena[^\n,]*', caseSensitive: false), '1 arepa mediana de maíz blanco asada al budare con semillas');
+        }
+        if (noSeafood && (s.toLowerCase().contains('camaron') || s.toLowerCase().contains('marisco') || s.toLowerCase().contains('pescado') || s.toLowerCase().contains('atún') || s.toLowerCase().contains('atun'))) {
+          s = s.replaceAll(RegExp(r'[^\n,]*(?:camaron|marisco|pescado|atún|atun)[^\n,]*', caseSensitive: false), '150g de pechuga de pollo a la plancha con limón y cilantro criollo');
+        }
+        if (noDairy && (s.toLowerCase().contains('queso') || s.toLowerCase().contains('leche') || s.toLowerCase().contains('lácteo') || s.toLowerCase().contains('lacteo'))) {
+          s = s.replaceAll(RegExp(r'[^\n,]*(?:queso\s+blanco\s+llanero|queso\s+llanero|queso|leche)[^\n,]*', caseSensitive: false), '1/4 de aguacate criollo en rebanadas con sal marina');
+        }
+        if (noEgg && (s.toLowerCase().contains('huevo') || s.toLowerCase().contains('omelette') || s.toLowerCase().contains('tortilla de 2'))) {
+          s = s.replaceAll(RegExp(r'[^\n,]*(?:huevo|omelette|tortilla de 2)[^\n,]*', caseSensitive: false), '100g de carne molida magra criolla salteada con vegetales');
+        }
+        if (noPeanut && (s.toLowerCase().contains('maní') || s.toLowerCase().contains('mani') || s.toLowerCase().contains('frutos secos'))) {
+          s = s.replaceAll(RegExp(r'[^\n,]*(?:maní|mani|frutos secos)[^\n,]*', caseSensitive: false), '1 porción de fruta fresca criolla (cambur o guayaba)');
+        }
+        return s;
+      }).toList();
+      copy['items'] = cleanItems;
+      return copy;
+    }).toList();
   }
 
   // =========================================================================

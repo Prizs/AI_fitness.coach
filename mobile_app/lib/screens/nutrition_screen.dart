@@ -184,10 +184,12 @@ class _NutritionScreenState extends State<NutritionScreen> {
     if (day == null) return const SizedBox.shrink();
 
     final isTraining = day['is_training'] == true;
+    final userAllergies = AuthService.instance.loggedInUser?.foodAllergies;
     final databasePlan = NutritionDatabase.getPlanForDay(
       goalId: _selectedGoal,
       weekday: _selected,
       isTrainingDay: isTraining,
+      allergies: userAllergies,
     );
 
     // Los planes de alimentación de la semana se adaptan dinámicamente al objetivo seleccionado con ingredientes 100% de mercado venezolano

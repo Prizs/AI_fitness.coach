@@ -271,6 +271,7 @@ def _detect_allergy_in_message(message: str) -> str | None:
         ("trigo", "Gluten / Trigo"),
         ("huevo", "Huevo"),
         ("huevos", "Huevo"),
+        ("avena", "Avena"),
         ("pescado", "Pescado"),
         ("pescados", "Pescado"),
         ("soya", "Soya"),
@@ -280,7 +281,8 @@ def _detect_allergy_in_message(message: str) -> str | None:
         "alergia", "alérgico", "alergico", "alérgica", "alergica",
         "intoleranc", "no tolero", "me hace daño", "me cae mal",
         "no puedo comer", "excluir", "sin camarones", "sin mariscos",
-        "sin lacteos", "sin lácteos", "sin gluten", "sin mani", "sin maní"
+        "sin lacteos", "sin lácteos", "sin gluten", "sin mani", "sin maní",
+        "sin avena", "a la avena"
     ))
 
     for key, label in known_allergens:
@@ -869,6 +871,35 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         has_upper = any(w in t_clean for w in ("tren superior", "espalda y pecho", "pecho y espalda", "brazos y espalda", "pecho, espalda", "torso")) or (has_pecho and has_espalda)
 
         is_explicit_request = any(w in t for w in ("quiero", "solicito", "dame", "rutina de", "ejercicio de", "ejercicios de", "solo de", "exclusivo de", "plan de", "entrenar"))
+
+        # Detección de solicitud de AISLAMIENTO 100% EXCLUSIVO EN UN SOLO GRUPO
+        is_single_exclusive = any(k in t for k in (
+            "unicamente", "únicamente", "solamente", "solo de", "exclusivo", "exclusivamente",
+            "100% de", "100% solo", "nada mas", "nada más", "no quiero nada de otros", "no quiero otros",
+            "sin otros", "pura pierna", "puro pecho", "solo pierna", "solo pecho", "solo hombro",
+            "solo espalda", "solo bicep", "solo tricep", "solo core"
+        ))
+        if is_single_exclusive:
+            if has_legs and not (has_pecho or has_espalda or has_hombros):
+                return "piernas"
+            if has_pecho and not (has_espalda or has_legs or has_hombros):
+                return "pecho"
+            if has_espalda and not (has_pecho or has_legs or has_hombros):
+                return "espalda"
+            if has_hombros and not (has_pecho or has_legs or has_espalda):
+                return "hombros"
+            if has_biceps and not (has_pecho or has_espalda or has_legs):
+                return "biceps"
+            if has_triceps and not (has_pecho or has_espalda or has_legs):
+                return "triceps"
+            if has_core and not (has_pecho or has_espalda or has_legs):
+                return "core"
+            if has_quads:
+                return "cuadriceps"
+            if has_femorales:
+                return "femorales_isquios"
+            if has_glutes:
+                return "gluteos"
 
         # Prioridad Absoluta: Petición explícita de Hombros y Espalda
         if (has_espalda and has_hombros) or ("hombro" in t_clean and "espalda" in t_clean):
@@ -2324,16 +2355,27 @@ def _build_daily_variant_nutrition(
             "Revuelto de 2 huevos con champiñones frescos y tomate"
         ]
 
-    # Carbohidratos energéticos criollos saludables (CERO avena por defecto para seguridad clínica y de alergias)
-    b_carbs = [
-        "1 arepa pequeña de maíz asada al budare",
-        "1/2 plátano verde o maduro hervido",
-        "1 taza de batata dulce cocida en rodajas",
-        "1 arepa delgada de maíz blanco tostada",
-        "1 trozo de yuca hervida con toque de orégano",
-        "1 arepa pequeña asada con afrecho o semillas de chía",
-        "1/2 taza de puré de auyama / calabaza criolla"
-    ]
+    # Carbohidratos energéticos criollos saludables: avena activa salvo que el usuario tenga alergia a la avena registrada en su perfil
+    if no_oats:
+        b_carbs = [
+            "1 arepa pequeña de maíz asada al budare",
+            "1/2 plátano verde o maduro hervido",
+            "1 taza de batata dulce cocida en rodajas",
+            "1 arepa delgada de maíz blanco tostada",
+            "1 trozo de yuca hervida con toque de orégano",
+            "1 arepa pequeña asada con afrecho o semillas de chía",
+            "1/2 taza de puré de auyama / calabaza criolla"
+        ]
+    else:
+        b_carbs = [
+            "3 cucharadas de avena en hojuelas cocida con canela y rodajas de cambur",
+            "1 arepa pequeña de maíz asada al budare",
+            "1 tazón de avena tibia con semillas de chía",
+            "1/2 plátano maduro horneado con canela",
+            "Panquecas caseras de avena licuada con claras de huevo",
+            "1 taza de batata dulce cocida en rodajas",
+            "1 arepa delgada de maíz blanco tostada"
+        ]
 
     b_fats = "1/4 de aguacate criollo en rebanadas" if no_dairy else "30g de queso blanco llanero rallado o 1/4 de aguacate criollo"
 
@@ -7021,44 +7063,32 @@ Devuelve SOLO JSON."""
                     f"\n\n🫀 **Plan Aeróbico y Cardiovascular:** Sesión enfocada al 100% en capacidad aeróbica, movilidad activa "
                     f"y resistencia funcional de bajo/medio impacto."
                 )
-        elif requested_focus in ("hombros",):
-            if "deltoides" not in lower_reply and "hombros" not in lower_reply:
-                reply_str += (
-                    f"\n\n🎯 **Plan de Especialización en Hombros:** Sesión dedicada al trabajo completo de deltoides (anterior, "
-                    f"lateral y posterior) y estabilidad escapular."
-                )
-        elif requested_focus == "solo_piernas":
-            if "semana de especialización" not in lower_reply and "piernas" not in lower_reply:
-                reply_str += (
-                    f"\n\n🦵 **Especialización Semanal de Piernas:** He estructurado tu semana enfocada 100% en miembros inferiores "
-                    f"tal como lo pediste. Cada jornada trabaja un subgrupo distinto (Cuádriceps, Isquiotibiales, Glúteos, "
-                    f"Pantorrillas y Potencia Funcional) para evitar la sobrecarga y maximizar el desarrollo muscular."
-                )
-        elif requested_focus == "piernas_tren_superior":
-            if "combinando" not in lower_reply:
-                reply_str += (
-                    f"\n\n💪 **Plan Semanal Combinado:** Tu semana integra ejercicios multiarticulares de Piernas y Tren Superior "
-                    f"en cada sesión para un desarrollo muscular integral y balanceado."
-                )
-        elif requested_focus == "piernas_core":
-            if "combinando" not in lower_reply:
-                reply_str += (
-                    f"\n\n🔥 **Plan Semanal Combinado:** Tu semana integra fuerza de Piernas con estabilización de Core y Abdomen "
-                    f"en cada entrenamiento."
-                )
-        elif requested_focus == "tren_superior_core":
-            if "combinando" not in lower_reply:
-                reply_str += (
-                    f"\n\n⚡ **Plan Semanal Combinado:** Tu semana integra ejercicios de Tren Superior (Pecho, Espalda y Hombros) "
-                    f"con fortalecimiento profundo de Core."
-                )
-        elif requested_focus == "piernas":
-            if not any(w in lower_reply for w in ("martes", "combinar", "relacionar", "48", "72", "complementar")):
-                rec_days_txt = " y ".join(structured_plan.get("recommended_days", ["Lunes", "Miércoles"]))
-                reply_str += (
-                    f"\n\n💡 **Recomendación Fisiológica:** Para una sesión aislada de piernas, es ideal espaciar 48-72h ({rec_days_txt}). "
-                    f"Si deseas entrenar los días intermedios, podemos combinarlos con Tren Superior o Core."
-                )
+        elif requested_focus in ("pecho", "pectorales", "espalda", "dorsales", "hombros", "piernas", "solo_piernas", "piernas_gluteos", "cuadriceps", "femorales", "femorales_isquios", "gluteos", "biceps", "solo_biceps", "triceps", "solo_triceps", "core", "solo_core"):
+            f_label_map = {
+                "pecho": "Pecho y Pectorales", "pectorales": "Pecho y Pectorales",
+                "espalda": "Espalda y Dorsales", "dorsales": "Espalda y Dorsales",
+                "hombros": "Hombros y Deltoides",
+                "piernas": "Piernas y Tren Inferior", "solo_piernas": "Piernas y Tren Inferior", "piernas_gluteos": "Piernas y Glúteos",
+                "cuadriceps": "Cuádriceps", "femorales": "Femorales e Isquiotibiales", "femorales_isquios": "Femorales e Isquiotibiales", "gluteos": "Glúteos",
+                "biceps": "Bíceps Braquial", "solo_biceps": "Bíceps Braquial",
+                "triceps": "Tríceps", "solo_triceps": "Tríceps",
+                "core": "Core y Abdomen", "solo_core": "Core y Abdomen",
+            }
+            f_label = f_label_map.get(requested_focus, requested_focus.capitalize())
+            alt_inter = "Tren Superior o Core" if requested_focus in ("piernas", "solo_piernas", "piernas_gluteos", "cuadriceps", "femorales", "femorales_isquios", "gluteos") else ("Piernas o Core" if requested_focus in ("pecho", "espalda", "hombros", "biceps", "triceps") else "Tren Superior o Piernas")
+            
+            user_n = payload.user_name or "Freddy"
+            reply_str = (
+                f"¡Entendido al 100%, {user_n}! He programado tu rutina con **aislamiento exclusivo en {f_label}** "
+                f"para tu nivel **{effective_level}** con intensidad **{effective_intensity}**, sin ejercicios ajenos a este grupo.\n\n"
+                f"🛡️ **Protección Biomecánica y Prevención de Fatiga Neural:**\n"
+                f"Para mayor seguridad y evitar la fatiga muscular acumulada, el sobreentrenamiento y la sobrecarga articular o tendinosa, "
+                f"es preferible espaciar un día de descanso intermedio (48 a 72 horas) entre estímulos intensos del mismo grupo muscular para asegurar una supercompensación óptima. "
+                f"Por esta razón, te he distribuido el entrenamiento en **3 días clave (Lunes, Miércoles y Viernes)**, dejando Martes, Jueves, Sábado y Domingo como días de reposo y recuperación activa.\n\n"
+                f"❓ **¿Cómo prefieres estructurar tu semana?**\n"
+                f"¿Deseas mantenerte enfocado al 100% únicamente en {f_label} estos 3 días para garantizar la máxima recuperación, "
+                f"o prefieres que combinemos los días intermedios (Martes y Jueves) con otro grupo muscular (como {alt_inter})?"
+            )
 
 
 
@@ -7152,7 +7182,15 @@ Devuelve SOLO JSON."""
                 "📅 Añadir al Cronograma",
             ]
     elif has_plan:
-        if requested_focus in ("perdida_grasa", "bajar_peso", "bajar_masa"):
+        single_muscle_foci = ("pecho", "pectorales", "espalda", "dorsales", "hombros", "piernas", "solo_piernas", "piernas_gluteos", "cuadriceps", "femorales", "femorales_isquios", "gluteos", "biceps", "solo_biceps", "triceps", "solo_triceps", "core", "solo_core")
+        if requested_focus in single_muscle_foci:
+            clean_btn = {"pecho": "Pecho", "pectorales": "Pecho", "espalda": "Espalda", "dorsales": "Espalda", "hombros": "Hombros", "piernas": "Piernas", "solo_piernas": "Piernas", "piernas_gluteos": "Piernas", "cuadriceps": "Cuádriceps", "femorales": "Femorales", "femorales_isquios": "Femorales", "gluteos": "Glúteos", "biceps": "Bíceps", "solo_biceps": "Bíceps", "triceps": "Tríceps", "solo_triceps": "Tríceps", "core": "Core", "solo_core": "Core"}.get(requested_focus, requested_focus.capitalize())
+            quick_replies = [
+                f"🎯 100% Solo {clean_btn} (3 días)",
+                "⚡ Combinar días intermedios (Martes/Jueves)",
+                "📅 Añadir al Cronograma",
+            ]
+        elif requested_focus in ("perdida_grasa", "bajar_peso", "bajar_masa"):
             quick_replies = [
                 "📅 Añadir al Cronograma",
                 "💧 Pautas de déficit e hidratación",
