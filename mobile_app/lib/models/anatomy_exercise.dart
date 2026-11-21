@@ -74,7 +74,11 @@ String resolveGuaranteedGifUrl({
         // 2. Fondos o Tríceps mostrando Flexiones de Pecho (Push-up)
         (!nameLower.contains('pectoral') && !nameLower.contains('pecho') && (nameLower.contains('fondo') || nameLower.contains('dip') || nameLower.contains('tricep') || nameLower.contains('trícep')) && cleanExisting.contains('push-up')) ||
         // 3. Dead Bug, Plancha, Remos o Flexiones mostrando Gemelos
-        ((nameLower.contains('dead bug') || nameLower.contains('plank') || nameLower.contains('plancha') || nameLower.contains('remo') || nameLower.contains('flexion') || nameLower.contains('flexión')) && cleanExisting.contains('calf')) ||
+        ((nameLower.contains('dead bug') || nameLower.contains('plank') || nameLower.contains('plancha') || nameLower.contains('remo') || nameLower.contains('flexion') || nameLower.contains('flexión') || nameLower.contains('invertido')) && cleanExisting.contains('calf')) ||
+        // 3b. Remo invertido bajo mesa mostrando Gemelos o Máquinas de pie
+        ((nameLower.contains('invertido') || nameLower.contains('bajo mesa')) && !cleanExisting.contains('inverted-row')) ||
+        // 3c. Superman en colchoneta mostrando peso muerto de pie
+        (nameLower.contains('superman') && cleanExisting.contains('deadlift')) ||
         // 4. Talones sentado / en silla mostrando elevación de pie
         ((nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated')) && cleanExisting.contains('standing-calf-raise')) ||
         // 5. Talones unipodal mostrando elevación bilateral de pie
@@ -203,9 +207,12 @@ String resolveGuaranteedGifUrl({
         : (isHigh ? 'abs/hanging-leg-raise.gif' : 'abs/crunch-floor.gif'));
   }
 
-  // 8. Superman / Lumbares
-  if (nameLower.contains('superman') || nameLower.contains('lumbar') || nameLower.contains('lumbares')) {
-    return _kGifBase + 'glutes/band-straight-back-stiff-leg-deadlift.gif';
+  // 8. Superman / Hiperextensiones en Suelo (Colchoneta)
+  if (nameLower.contains('superman') || nameLower.contains('hiperextension') || nameLower.contains('hiperextensión')) {
+    return _kGifBase + 'spine/hyperextension.gif';
+  }
+  if (nameLower.contains('lumbar') || nameLower.contains('lumbares')) {
+    return _kGifBase + 'spine/hyperextension.gif';
   }
 
   // 9a. Curl Femoral en Suelo / con Deslizador / Toalla (Sliding Leg Curl on Floor with Towel)
@@ -280,6 +287,29 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + (isLow ? 'quads/resistance-band-leg-extension.gif' : 'quads/lever-leg-extension.gif');
   }
 
+  // 16b. Remos / Jalones / Tracciones de Espalda (Invertido, Mesa, Mancuerna, Polea)
+  if (nameLower.contains('remo') || nameLower.contains('row') || nameLower.contains('jalon') || nameLower.contains('jalón') || nameLower.contains('espalda') || nameLower.contains('dorsal')) {
+    if (nameLower.contains('mochila')) {
+      return _kGifBase + 'upper-back/one-arm-towel-row.gif';
+    }
+    if (nameLower.contains('a una mano') || nameLower.contains('una sola mano')) {
+      return _kGifBase + 'upper-back/bodyweight-standing-one-arm-row-with-towel.gif';
+    }
+    if (nameLower.contains('invertido') || nameLower.contains('inverted row') || nameLower.contains('bajo mesa')) {
+      if (nameLower.contains('supino')) return _kGifBase + 'upper-back/inverted-row-v-2.gif';
+      return _kGifBase + (isLow ? 'upper-back/inverted-row-bent-knees.gif' : 'upper-back/inverted-row.gif');
+    }
+    if (nameLower.contains('barra')) {
+      return _kGifBase + 'upper-back/barbell-bent-over-row.gif';
+    }
+    if (nameLower.contains('polea')) {
+      return _kGifBase + 'upper-back/cable-low-seated-row.gif';
+    }
+    return _kGifBase + (isLow
+        ? 'upper-back/band-one-arm-twisting-seated-row.gif'
+        : (isHigh ? 'upper-back/barbell-bent-over-row.gif' : 'upper-back/cable-low-seated-row.gif'));
+  }
+
   // 17. Elevación de Talones / Sóleo / Pantorrilla / Gemelos
   if ((nameLower.contains('talon') ||
           nameLower.contains('talón') ||
@@ -290,7 +320,14 @@ String resolveGuaranteedGifUrl({
           nameLower.contains('sóleo')) &&
       !nameLower.contains('deslizamiento') &&
       !nameLower.contains('isquio') &&
-      !nameLower.contains('femoral')) {
+      !nameLower.contains('femoral') &&
+      !nameLower.contains('remo') &&
+      !nameLower.contains('row') &&
+      !nameLower.contains('invertido') &&
+      !nameLower.contains('mesa') &&
+      !nameLower.contains('espalda') &&
+      !nameLower.contains('dorsal') &&
+      !nameLower.contains('toalla')) {
     if (nameLower.contains('sentado') || nameLower.contains('silla') || nameLower.contains('seated')) {
       return _kGifBase + (isLow
           ? 'calves/seated-calf-stretch-male.gif'
@@ -318,9 +355,21 @@ String resolveGuaranteedGifUrl({
 
   // 20. Flexiones de Pecho (Push-ups)
   if (nameLower.contains('flexion de pecho') || nameLower.contains('flexión de pecho') || nameLower.contains('flexiones') || nameLower.contains('push up') || nameLower.contains('pushup') || nameLower.contains('lagartija')) {
-    return _kGifBase + (isLow
-        ? 'pectorals/incline-push-up.gif'
-        : (isHigh ? 'pectorals/barbell-bench-press.gif' : 'pectorals/push-up.gif'));
+    if (nameLower.contains('rodilla') || nameLower.contains('apoyadas') || isLow) {
+      return _kGifBase + 'pectorals/kneeling-push-up-male.gif';
+    }
+    if (nameLower.contains('inclinad') || nameLower.contains('pared') || nameLower.contains('mesa')) {
+      return _kGifBase + 'pectorals/incline-push-up.gif';
+    }
+    if (nameLower.contains('declinad')) {
+      return _kGifBase + 'pectorals/decline-push-up.gif';
+    }
+    return _kGifBase + (isHigh ? 'pectorals/barbell-bench-press.gif' : 'pectorals/push-up.gif');
+  }
+
+  // 20b. Floor Press / Press en Suelo o Colchoneta (Pectorales sin apoyo de pies)
+  if (nameLower.contains('floor press') || (nameLower.contains('press') && (nameLower.contains('suelo') || nameLower.contains('colchoneta')))) {
+    return _kGifBase + 'pectorals/dumbbell-bench-press.gif';
   }
 
   // 21. Press de Banca / Pecho
@@ -402,7 +451,8 @@ String resolveGuaranteedGifUrl({
 
   // 24f. Remo / Tracción con Toalla en Marco de Puerta o Calistenia
   if (nameLower.contains('toalla') || nameLower.contains('towel')) {
-    if (nameLower.contains('pie') || nameLower.contains('pierna') || nameLower.contains('talon') || nameLower.contains('talón') || nameLower.contains('femoral') || nameLower.contains('isquio')) {
+    if ((nameLower.contains('deslizador') || nameLower.contains('slide') || nameLower.contains('femoral') || nameLower.contains('isquio')) &&
+        !nameLower.contains('bicep') && !nameLower.contains('bícep') && !nameLower.contains('tricep') && !nameLower.contains('dorsal') && !nameLower.contains('remo')) {
       return _kGifBase + 'hamstrings/single-leg-platform-slide.gif';
     }
     if (nameLower.contains('remo de pie') || nameLower.contains('squatting')) {

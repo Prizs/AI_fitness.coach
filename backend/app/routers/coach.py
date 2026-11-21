@@ -577,10 +577,13 @@ def _detect_affected_joint_or_injury(payload: ChatMessage) -> tuple[str | None, 
     pain_keywords = (
         "duele", "duelen", "dolor", "dolores", "doliend", "molest", "lesion", "lesión",
         "lastimad", "inflamad", "hinchad", "afectad", "no puedo", "evitar", "sin tocar",
-        "sin demandar", "proteger", "cuidado con", "esguince", "tendinitis", "pinzamiento",
+        "sin demandar", "no demand", "proteger", "cuidado con", "esguince", "tendinitis", "pinzamiento",
         "hernia", "operad", "fractur", "contractur", "tirón", "tiron", "sobrecarga",
         "tension", "tensión", "rigidez", "torticolis", "tortícolis", "lumbalgia", "lumbago",
-        "al perfil", "añadelo", "anadelo", "agregalo"
+        "al perfil", "añadelo", "anadelo", "agregalo", "no afecte", "no afecten", "sin afectar",
+        "no toque", "no toquen", "excluir", "excluyendo", "descartar", "sin involucrar",
+        "no involucre", "no involucren", "malestar", "incomodidad", "sin cargar", "no cargue",
+        "no carguen", "area del", "área del", "zona del"
     )
 
     # 1. Prioridad: el mensaje actual del usuario menciona dolor o molestia en una articulación
@@ -646,9 +649,9 @@ def _sanitize_exercise_by_injury(name: str, primary: str, secondary: str, animat
     lower_prim = primary.lower()
     lower_sec = secondary.lower()
 
-    # 0. Si la articulación afectada es de tren inferior (tobillo o rodilla) y el ejercicio es de tren superior, NUNCA es contraindicado
-    if zone_key in ("rodilla", "tobillo"):
-        if _is_chest_exercise(name, primary) or _is_back_exercise(name, primary) or _is_shoulder_exercise(name, primary) or _is_biceps_exercise(name, primary) or _is_triceps_exercise(name, primary):
+    # 0. Si la articulación afectada es de tren inferior (tobillo, rodilla o pie) y el ejercicio es de tren superior o core en suelo, NUNCA es contraindicado
+    if zone_key in ("rodilla", "tobillo", "pie"):
+        if _is_chest_exercise(name, primary) or _is_back_exercise(name, primary) or _is_shoulder_exercise(name, primary) or _is_biceps_exercise(name, primary) or _is_triceps_exercise(name, primary) or _is_core_exercise(name, primary):
             return name, primary, secondary, animation_key
 
     # 1. Si la articulación afectada es de tren superior (hombro, codo, muñeca, cuello) y el ejercicio es de piernas/femorales sin carga en brazos, NUNCA es contraindicado
@@ -840,6 +843,7 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
             r"\b0%\s*[\wáéíóúñ]+",
             r"(?:me est[aá] dando|me da|arroj[oó]|incluy[oó]|puso|pusiste|metiste)\s+(?:ejercicios\s+como\s+|ejercicios\s+de\s+)?[^.,;]+",
             r"(?:no\s+quiero|no\s+me\s+des|sin|nada\s+de|cero|cero%|evitar|evita|excluir|excluyendo|descartar|descartando)\s+[^.,;\n]+",
+            r"(?:que\s+no\s+afecte[n]?|no\s+afecte[n]?|sin\s+afectar|no\s+toque[n]?|sin\s+tocar|que\s+no\s+demande[n]?|no\s+demande[n]?|cuidado\s+con)\s+(?:el\s+area\s+del?|el\s+área\s+del?|la\s+zona\s+del?|el|la|los|las)?\s*[^.,;\n]+",
             r"(?:tengo\s+una\s+molestia\s+en|tengo\s+molestia\s+en|tengo\s+dolor\s+en|me\s+duele|me\s+duelen|dolor\s+en|molestia\s+en|lesi[oó]n\s+en|lesionado\s+en|lastimad[ao]\s+en)\s+[^.,;\n]+",
             r"(?:instrucci[oó]n\s+para\s+la\s+ia|instruccion\s+para\s+la\s+ia)[^.,;\n]+",
             r"(?:zona\s+afectada|articulaci[oó]n\s+afectada|articulacion\s+afectada)\s*\([^)]*\)",
@@ -905,11 +909,17 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         if (has_espalda and has_hombros) or ("hombro" in t_clean and "espalda" in t_clean):
             return "espalda_hombros"
 
-        # Regla clínica: si la articulación está reportada con dolor o lesión, NUNCA puede ser el foco solicitado (a menos que el usuario lo pida explícitamente)
-        if not is_explicit_request:
-            if detected_zone == "hombro":
+        # Regla clínica: si la articulación está reportada con dolor o lesión o exclusión preventiva, NUNCA puede ser el foco solicitado
+        # a menos que el usuario lo pida con deseo explícito afirmativo (ej: "quiero ejercitar tobillo", "rehabilitar tobillo")
+        explicit_target_joint = any(p in t for p in (
+            f"ejercitar {detected_zone}", f"entrenar {detected_zone}", f"rehabilitar {detected_zone}",
+            f"fortalecer {detected_zone}", f"solo {detected_zone}", f"pura {detected_zone}", f"puro {detected_zone}"
+        )) if detected_zone else False
+
+        if not explicit_target_joint:
+            if detected_zone in ("hombro", "cuello"):
                 has_hombros = False
-            elif detected_zone in ("rodilla", "tobillo"):
+            elif detected_zone in ("rodilla", "tobillo", "pie"):
                 has_legs = False
                 has_quads = False
                 has_femorales = False
@@ -998,11 +1008,15 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
 
         # 2. SOLICITUDES EXCLUSIVAS DE ZONA O GRUPO AISLADO
         # Sub-área anatómica AISLADA de Pierna: Pantorrillas, Batatas, Sóleo, Pies y Tobillos
-        is_pain_report = any(w in t for w in ("molestia", "dolor", "lesion", "lesión", "inflama", "no demanden", "evitar", "sin demandar"))
+        is_pain_report = any(w in t for w in (
+            "molestia", "dolor", "lesion", "lesión", "inflama", "no demanden", "no demande",
+            "evitar", "sin demandar", "no afecte", "no afecten", "sin afectar", "no toque",
+            "no toquen", "proteger", "cuidado con", "malestar", "incomodidad", "excluir", "descartar"
+        )) or (detected_zone in ("rodilla", "tobillo", "pie"))
         if has_calves and not is_pain_report and not any(w in t_clean for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen")):
             return "pantorrillas_pies"
-        if has_calves and is_pain_report:
-            return "tren_superior"
+        if (has_calves and is_pain_report) or (detected_zone in ("rodilla", "tobillo", "pie") and not (has_pecho or has_espalda or has_hombros or has_core)):
+            return "solo_tren_superior"
 
         # Sub-áreas aisladas de pierna
         if has_quads and not any(w in t_clean for w in ("pierna", "piernas", "tren inferior", "pecho", "espalda", "core", "abdomen", "brazo", "brazos")):
@@ -2179,6 +2193,15 @@ def _is_triceps_exercise(name: str, primary_muscle: str) -> bool:
     ))
 
 
+def _is_core_exercise(name: str, primary_muscle: str) -> bool:
+    nl = name.lower()
+    pm = primary_muscle.lower()
+    return any(w in nl or w in pm for w in (
+        "core", "abdomen", "abdominal", "recto abdominal", "oblicuo", "oblicuos", "transverso",
+        "dead bug", "plank", "plancha", "crunch", "abducci", "glúteo medio", "gluteo medio"
+    ))
+
+
 def _sanitize_exercise_by_intensity(name: str, intensity_hint: str) -> str:
     """Ajusta el nombre del ejercicio para que coincida de forma coherente con el nivel de intensidad solicitado."""
     lower = name.lower()
@@ -2559,10 +2582,16 @@ def _sanitize_exercise_by_equipment(name: str, primary: str, animation_key: str,
 
     # Press militar o de hombros con mancuernas / barra / sentada (DEBE IR ANTES DE PRESS DE PECHO)
     if any(w in lower for w in ("press militar", "militar", "arnold")) or ("press" in lower and any(w in lower for w in ("hombro", "hombros", "deltoide", "deltoides"))):
+        if any(w in lower for w in ("sentado", "silla", "banco", "respaldo")):
+            return "Press militar de hombros sentado con resistencia o toalla (Intermedio)", "Deltoides", "shoulder-press"
         return "Flexiones en pica en suelo para hombros (Pike Push-ups) (Intermedio)", "Deltoides", "shoulder-press"
 
     # Press de banca / con mancuernas para pecho
-    if "press" in lower and ("banca" in lower or "mancuerna" in lower or "barra" in lower or "en maquina" in lower or "en máquina" in lower) and not any(w in lower for w in ("militar", "arnold", "hombro", "hombros", "deltoide", "deltoides", "prayer", "palmas", "isométric", "isometric")):
+    if "press" in lower and ("banca" in lower or "mancuerna" in lower or "barra" in lower or "en maquina" in lower or "en máquina" in lower or "floor press" in lower) and not any(w in lower for w in ("militar", "arnold", "hombro", "hombros", "deltoide", "deltoides", "prayer", "palmas", "isométric", "isometric")):
+        if any(w in lower for w in ("floor press", "suelo", "colchoneta")):
+            return "Floor Press de pecho en colchoneta (sin apoyo plantar)", "Pectoral Mayor", "bench-press"
+        if any(w in lower for w in ("sentado", "silla")):
+            return "Press de pecho sentado con soporte y tensión isométrica", "Pectoral Mayor", "bench-press"
         if "inclinado" in lower:
             return "Flexiones declinadas con pies en cama o sofá (Intermedio)", "Pectoral Clavicular", "pushup"
         return "Flexiones de pecho estándar en suelo (Push-ups) (Intermedio)", "Pectoral Mayor", "pushup"
@@ -3988,7 +4017,16 @@ def _normalize_exercises(
         is_dup_gif = bool(gif_url and ((gif_url in seen_gifs) or (gif_url in seen_gifs_today)))
 
         if is_dup_global_name or is_dup_today_name or is_dup_gif or has_dup_squat:
-            if requested_focus in ("espalda_hombros", "hombros_espalda") or ("espalda" in (requested_focus or "") and "hombro" in (requested_focus or "")):
+            if affected_zone in ("rodilla", "tobillo", "pie"):
+                if any(k in (clean_name + " " + primary).lower() for k in ("core", "abdom", "plank", "crunch", "abduc")):
+                    cand_pool = CORE_POOLS.get(intensity_hint, [])
+                elif any(k in (clean_name + " " + primary).lower() for k in ("pecho", "pectoral", "tricep")):
+                    cand_pool = CALISTHENIC_CHEST_POOL if is_no_equipment else GYM_CHEST_POOL
+                elif any(k in (clean_name + " " + primary).lower() for k in ("espalda", "dorsal", "remo", "bicep")):
+                    cand_pool = CALISTHENIC_BACK_POOL if is_no_equipment else [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
+                else:
+                    cand_pool = CALISTHENIC_SHOULDERS_POOL if is_no_equipment else [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+            elif requested_focus in ("espalda_hombros", "hombros_espalda") or ("espalda" in (requested_focus or "") and "hombro" in (requested_focus or "")):
                 cand_pool = (CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL) if is_no_equipment else [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", "")) or _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
                 if not cand_pool:
                     cand_pool = CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL
@@ -4003,10 +4041,12 @@ def _normalize_exercises(
                     cand_pool = CALISTHENIC_BACK_POOL
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("hombro", "deltoid")):
                     cand_pool = CALISTHENIC_SHOULDERS_POOL
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("core", "abdom", "plank", "crunch")):
+                    cand_pool = CORE_POOLS.get(intensity_hint, [])
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pierna", "cuadriceps", "femoral", "gluteo")):
                     cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
                 else:
-                    cand_pool = leg_pool
+                    cand_pool = UPPER_BODY_POOLS.get(intensity_hint, []) if "superior" in (requested_focus or "") else leg_pool
             else:
                 if any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
                     cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
@@ -4018,8 +4058,10 @@ def _normalize_exercises(
                     cand_pool = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("hombro", "deltoid")):
                     cand_pool = [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("core", "abdom", "plank", "crunch")):
+                    cand_pool = CORE_POOLS.get(intensity_hint, [])
                 else:
-                    cand_pool = leg_pool
+                    cand_pool = UPPER_BODY_POOLS.get(intensity_hint, []) if "superior" in (requested_focus or "") else leg_pool
 
             # Prioridad 1: Candidato no visto globalmente en toda la semana ni hoy
             found_unique = False
@@ -4475,10 +4517,15 @@ def _normalize_structured_plan(
                     t_title = f"Rutina Complementaria: Core y Abdomen en Suelo ({level} · {badge_lbl})"
                     t_exs = core_front + core_deep[:1]
                     t_focus = "solo_core"
-                elif affected_zone in ("rodilla", "tobillo"):
-                    t_title = f"Rutina Complementaria: Tren Superior Sentado ({level} · {badge_lbl})"
-                    t_exs = upper_chest_tri[:2] + upper_back_bi[:2]
-                    t_focus = "tren_superior"
+                elif affected_zone in ("rodilla", "tobillo", "pie"):
+                    t_title = f"Rutina Complementaria: Tren Superior Sentado y en Suelo ({level} · {badge_lbl})"
+                    t_exs = [
+                        {"name": "Floor Press de pecho en colchoneta (sin apoyo plantar)", "sets": 4, "reps": "10-12", "animation_key": "bench-press", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+                        {"name": "Remo sentado en suelo con toalla o banda", "sets": 4, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho, Espalda Media", "secondary_muscle": "Bíceps"},
+                        {"name": "Extensiones de tríceps sentado en silla con respaldo", "sets": 3, "reps": "12", "animation_key": "tricep-extension", "primary_muscle": "Tríceps", "secondary_muscle": "Codos"},
+                        {"name": "Curl de bíceps concentrado sentado en silla", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
+                    ]
+                    t_focus = "solo_tren_superior"
                 else:
                     t_title = f"Rutina Complementaria: Tren Superior (Pecho y Espalda) ({level} · {badge_lbl})"
                     t_exs = upper_chest_tri + upper_back_bi
@@ -4500,9 +4547,14 @@ def _normalize_structured_plan(
                     t_title = f"Rutina Complementaria: Femorales e Isquiotibiales en Suelo ({level} · {badge_lbl})"
                     t_exs = legs_hams[:3] + core_obliques[:1]
                     t_focus = "solo_piernas"
-                elif affected_zone in ("rodilla", "tobillo"):
-                    t_title = f"Rutina Complementaria: Torso y Brazos ({level} · {badge_lbl})"
-                    t_exs = upper_shoulders_post[:2] + upper_arms_torso[:2]
+                elif affected_zone in ("rodilla", "tobillo", "pie"):
+                    t_title = f"Rutina Complementaria: Hombros Sentado y Core en Suelo ({level} · {badge_lbl})"
+                    t_exs = [
+                        {"name": "Press militar de hombros sentado en silla con respaldo", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides Anterior y Medio", "secondary_muscle": "Tríceps"},
+                        {"name": "Elevaciones laterales de hombros sentado en silla", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
+                        {"name": "Dead Bug en colchoneta (Estabilización lumbopélvica)", "sets": 3, "reps": "12", "animation_key": "crunch", "primary_muscle": "Core Profundo, Transverso", "secondary_muscle": "Estabilidad"},
+                        {"name": "Abducción de cadera tumbado de lado en colchoneta", "sets": 3, "reps": "12-15 por lado", "animation_key": "glute-bridge", "primary_muscle": "Glúteo Medio", "secondary_muscle": "Cadera"},
+                    ]
                     t_focus = "solo_tren_superior"
                 else:
                     t_title = f"Rutina Complementaria: Hombros, Brazos y Core ({level} · {badge_lbl})"
@@ -4812,23 +4864,70 @@ def _normalize_structured_plan(
                 )
 
             elif requested_focus == "solo_tren_superior":
-                day_titles = [
-                    f"Tren Superior: Pecho y Tríceps ({badge_lbl})",
-                    f"Tren Superior: Espalda y Bíceps ({badge_lbl})",
-                    f"Tren Superior: Hombros y Deltoides ({badge_lbl})",
-                    f"Tren Superior: Pecho y Espalda Antagonistas ({badge_lbl})",
-                    f"Tren Superior: Brazos y Postura Escapular ({badge_lbl})",
-                ]
-                day_exs_map = [upper_chest_tri, upper_back_bi, upper_shoulders_post, upper_chest_tri[:2] + upper_back_bi[:1], upper_arms_torso]
+                if affected_zone in ("rodilla", "tobillo", "pie"):
+                    day_titles = [
+                        f"Tren Superior Sentado y en Suelo: Pecho y Tríceps ({badge_lbl})",
+                        f"Tren Superior Sentado y en Suelo: Espalda y Bíceps ({badge_lbl})",
+                        f"Core en Colchoneta: Abdomen y Estabilidad Lumbopélvica ({badge_lbl})",
+                        f"Tren Superior Sentado: Hombros y Deltoides ({badge_lbl})",
+                        f"Torso y Brazos Sentado: Fuerza Controlada sin Apoyo ({badge_lbl})",
+                    ]
+                    day1_seated_chest = [
+                        {"name": "Floor Press de pecho en colchoneta (sin apoyo plantar)", "sets": 4, "reps": "10-12", "animation_key": "bench-press", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+                        {"name": "Flexiones en suelo con rodillas apoyadas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+                        {"name": "Extensiones de tríceps sentado en silla con respaldo", "sets": 3, "reps": "12", "animation_key": "tricep-extension", "primary_muscle": "Tríceps", "secondary_muscle": "Codos"},
+                        {"name": "Crunch abdominal clásico en suelo con pies en banco", "sets": 3, "reps": "15", "animation_key": "crunch", "primary_muscle": "Recto Abdominal", "secondary_muscle": "Core"},
+                    ]
+                    day2_seated_back = [
+                        {"name": "Remo sentado en suelo con toalla o banda", "sets": 4, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho, Espalda Media", "secondary_muscle": "Bíceps"},
+                        {"name": "Retracción escapular en suelo boca abajo (Prone Y-T-W)", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+                        {"name": "Curl de bíceps concentrado sentado en silla", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
+                        {"name": "Extensiones lumbares y dorsales Superman en colchoneta", "sets": 3, "reps": "10-12", "animation_key": "mobility", "primary_muscle": "Espalda media, Lumbar", "secondary_muscle": "Glúteos"},
+                    ]
+                    day3_floor_core = [
+                        {"name": "Dead Bug en colchoneta (Estabilización lumbopélvica)", "sets": 3, "reps": "12", "animation_key": "crunch", "primary_muscle": "Core Profundo, Transverso", "secondary_muscle": "Estabilidad"},
+                        {"name": "Crunch abdominal clásico en suelo con pies en banco", "sets": 3, "reps": "15", "animation_key": "crunch", "primary_muscle": "Recto Abdominal", "secondary_muscle": "Core"},
+                        {"name": "Plancha isométrica con rodillas apoyadas en colchoneta", "sets": 3, "reps": "25-30 seg", "animation_key": "plank", "primary_muscle": "Core, Recto Abdominal", "secondary_muscle": "Transverso"},
+                        {"name": "Abducción de cadera tumbado de lado en colchoneta", "sets": 3, "reps": "12-15 por lado", "animation_key": "glute-bridge", "primary_muscle": "Glúteo Medio", "secondary_muscle": "Cadera"},
+                    ]
+                    day4_seated_shoulders = [
+                        {"name": "Press militar de hombros sentado en silla con respaldo", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides Anterior y Medio", "secondary_muscle": "Tríceps"},
+                        {"name": "Elevaciones laterales de hombros sentado en silla", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
+                        {"name": "Pájaros posteriores sentado inclinado en silla", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+                        {"name": "Fondos de tríceps en silla con rodillas flexionadas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Tríceps", "secondary_muscle": "Pectoral"},
+                    ]
+                    day5_seated_torso = [
+                        {"name": "Press de pecho con mancuernas sentado con soporte", "sets": 4, "reps": "10-12", "animation_key": "bench-press", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+                        {"name": "Remo en polea baja sentado o con banda", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides"},
+                        {"name": "Curl de bíceps alterno con mancuernas sentado", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
+                        {"name": "Elevaciones de piernas en colchoneta con soporte lumbar", "sets": 3, "reps": "12", "animation_key": "crunch", "primary_muscle": "Abdomen inferior", "secondary_muscle": "Flexores"},
+                    ]
+                    day_exs_map = [
+                        day1_seated_chest,
+                        day2_seated_back,
+                        day3_floor_core,
+                        day4_seated_shoulders,
+                        day5_seated_torso,
+                    ]
+                else:
+                    day_titles = [
+                        f"Tren Superior: Pecho y Tríceps ({badge_lbl})",
+                        f"Tren Superior: Espalda y Bíceps ({badge_lbl})",
+                        f"Tren Superior: Hombros y Deltoides ({badge_lbl})",
+                        f"Tren Superior: Pecho y Espalda Antagonistas ({badge_lbl})",
+                        f"Tren Superior: Brazos y Postura Escapular ({badge_lbl})",
+                    ]
+                    day_exs_map = [upper_chest_tri, upper_back_bi, upper_shoulders_post, upper_chest_tri[:2] + upper_back_bi[:1], upper_arms_torso]
                 idx = day_idx % len(day_titles)
                 return day_titles[idx], _normalize_exercises(
                     day_exs_map[idx],
                     intensity=intensity,
                     level=level,
-                    requested_focus="tren_superior",
+                    requested_focus="solo_tren_superior" if affected_zone in ("rodilla", "tobillo", "pie") else "tren_superior",
                     is_no_equipment=is_no_equipment,
                     seen_names_global=weekly_seen_names,
                     seen_gifs_global=weekly_seen_gifs,
+                    affected_zone=affected_zone,
                 )
 
             elif requested_focus == "solo_core":
@@ -5264,20 +5363,50 @@ def _normalize_structured_plan(
                     seen_gifs_global=weekly_seen_gifs,
                     affected_zone=affected_zone,
                 )
-            elif affected_zone in ("rodilla", "tobillo"):
+            elif affected_zone in ("rodilla", "tobillo", "pie"):
                 day_titles = [
-                    f"Tren Superior: Pecho y Tríceps (Cero Impacto Piernas) ({badge_lbl})",
-                    f"Tren Superior: Espalda Dorsal y Bíceps ({badge_lbl})",
-                    f"Core en Suelo: Abdomen y Estabilidad ({badge_lbl})",
-                    f"Tren Superior: Hombros y Torso ({badge_lbl})",
-                    f"Torso Completo: Fuerza Controlada sin Apoyo ({badge_lbl})",
+                    f"Tren Superior Sentado y en Suelo: Pecho y Tríceps ({badge_lbl})",
+                    f"Tren Superior Sentado y en Suelo: Espalda y Bíceps ({badge_lbl})",
+                    f"Core en Colchoneta: Abdomen y Estabilidad Lumbopélvica ({badge_lbl})",
+                    f"Tren Superior Sentado: Hombros y Deltoides ({badge_lbl})",
+                    f"Torso y Brazos Sentado: Fuerza Controlada sin Apoyo ({badge_lbl})",
+                ]
+                day1_seated_chest = [
+                    {"name": "Floor Press de pecho en colchoneta (sin apoyo plantar)", "sets": 4, "reps": "10-12", "animation_key": "bench-press", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+                    {"name": "Flexiones en suelo con rodillas apoyadas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+                    {"name": "Extensiones de tríceps sentado en silla con respaldo", "sets": 3, "reps": "12", "animation_key": "tricep-extension", "primary_muscle": "Tríceps", "secondary_muscle": "Codos"},
+                    {"name": "Crunch abdominal clásico en suelo con pies en banco", "sets": 3, "reps": "15", "animation_key": "crunch", "primary_muscle": "Recto Abdominal", "secondary_muscle": "Core"},
+                ]
+                day2_seated_back = [
+                    {"name": "Remo sentado en suelo con toalla o banda", "sets": 4, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho, Espalda Media", "secondary_muscle": "Bíceps"},
+                    {"name": "Retracción escapular en suelo boca abajo (Prone Y-T-W)", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+                    {"name": "Curl de bíceps concentrado sentado en silla", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
+                    {"name": "Extensiones lumbares y dorsales Superman en colchoneta", "sets": 3, "reps": "10-12", "animation_key": "mobility", "primary_muscle": "Espalda media, Lumbar", "secondary_muscle": "Glúteos"},
+                ]
+                day3_floor_core = [
+                    {"name": "Dead Bug en colchoneta (Estabilización lumbopélvica)", "sets": 3, "reps": "12", "animation_key": "crunch", "primary_muscle": "Core Profundo, Transverso", "secondary_muscle": "Estabilidad"},
+                    {"name": "Crunch abdominal clásico en suelo con pies en banco", "sets": 3, "reps": "15", "animation_key": "crunch", "primary_muscle": "Recto Abdominal", "secondary_muscle": "Core"},
+                    {"name": "Plancha isométrica con rodillas apoyadas en colchoneta", "sets": 3, "reps": "25-30 seg", "animation_key": "plank", "primary_muscle": "Core, Recto Abdominal", "secondary_muscle": "Transverso"},
+                    {"name": "Abducción de cadera tumbado de lado en colchoneta", "sets": 3, "reps": "12-15 por lado", "animation_key": "glute-bridge", "primary_muscle": "Glúteo Medio", "secondary_muscle": "Cadera"},
+                ]
+                day4_seated_shoulders = [
+                    {"name": "Press militar de hombros sentado en silla con respaldo", "sets": 4, "reps": "10-12", "animation_key": "shoulder-press", "primary_muscle": "Deltoides Anterior y Medio", "secondary_muscle": "Tríceps"},
+                    {"name": "Elevaciones laterales de hombros sentado en silla", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides lateral", "secondary_muscle": "Trapecio"},
+                    {"name": "Pájaros posteriores sentado inclinado en silla", "sets": 3, "reps": "12-15", "animation_key": "lateral-raise", "primary_muscle": "Deltoides posterior", "secondary_muscle": "Espalda alta"},
+                    {"name": "Fondos de tríceps en silla con rodillas flexionadas", "sets": 3, "reps": "10-12", "animation_key": "pushup", "primary_muscle": "Tríceps", "secondary_muscle": "Pectoral"},
+                ]
+                day5_seated_torso = [
+                    {"name": "Press de pecho con mancuernas sentado con soporte", "sets": 4, "reps": "10-12", "animation_key": "bench-press", "primary_muscle": "Pectoral Mayor", "secondary_muscle": "Tríceps"},
+                    {"name": "Remo en polea baja sentado o con banda", "sets": 3, "reps": "10-12", "animation_key": "row", "primary_muscle": "Dorsal Ancho", "secondary_muscle": "Romboides"},
+                    {"name": "Curl de bíceps alterno con mancuernas sentado", "sets": 3, "reps": "12", "animation_key": "bicep-curl", "primary_muscle": "Bíceps Braquial", "secondary_muscle": "Antebrazo"},
+                    {"name": "Elevaciones de piernas en colchoneta con soporte lumbar", "sets": 3, "reps": "12", "animation_key": "crunch", "primary_muscle": "Abdomen inferior", "secondary_muscle": "Flexores"},
                 ]
                 day_exs_map = [
-                    upper_chest_tri[:3] + core_front[:1],
-                    upper_back_bi[:3] + core_obliques[:1],
-                    core_front[:2] + core_deep[:2],
-                    upper_shoulders_post[:3] + core_front[:1],
-                    upper_arms_torso[:2] + upper_back_bi[:1] + core_deep[:1],
+                    day1_seated_chest,
+                    day2_seated_back,
+                    day3_floor_core,
+                    day4_seated_shoulders,
+                    day5_seated_torso,
                 ]
                 idx = day_idx % len(day_titles)
                 return day_titles[idx], _normalize_exercises(
@@ -6365,14 +6494,20 @@ Devuelve SOLO JSON."""
             replace_previous=True
         )
 
-    # Protección clínica: si el usuario pide explícitamente entrenar un grupo muscular, no anularlo por una molestia previa en ese grupo
-    is_explicit_training = any(w in user_msg_lower for w in ("quiero", "solicito", "dame", "rutina de", "ejercicio de", "ejercicios de", "solo de", "exclusivo de", "plan de", "entrenar"))
+    # Protección clínica: si el usuario pide explícitamente entrenar un grupo muscular, no anularlo por una molestia previa en ese grupo (salvo que haya reporte de dolor o exclusión)
+    has_exclusion_or_pain = any(w in user_msg_lower for w in (
+        "no afecte", "no afecten", "sin afectar", "no toque", "no toquen",
+        "evitar", "sin tocar", "no demande", "no demanden", "proteger", "cuidado con",
+        "malestar", "incomodidad", "duele", "duelen", "dolor", "lesion", "lesión",
+        "lastim", "afectad", "esguince", "inflamad", "excluir", "descartar"
+    ))
+    is_explicit_training = (any(w in user_msg_lower for w in ("quiero", "solicito", "dame", "rutina de", "ejercicio de", "ejercicios de", "solo de", "exclusivo de", "plan de", "entrenar")) and not has_exclusion_or_pain)
     if is_explicit_training:
         if requested_focus in ("espalda_hombros", "hombros", "brazos_hombros", "pecho_hombros") and affected_zone == "hombro":
             affected_zone = None
         if requested_focus in ("espalda_hombros", "espalda", "espalda_biceps", "espalda_triceps") and affected_zone in ("espalda", "lumbar"):
             affected_zone = None
-        if requested_focus in ("solo_piernas", "piernas", "cuadriceps", "femorales_isquios", "gluteos") and affected_zone in ("tobillo", "rodilla"):
+        if requested_focus in ("solo_piernas", "piernas", "cuadriceps", "femorales_isquios", "gluteos") and affected_zone in ("tobillo", "rodilla", "pie"):
             affected_zone = None
 
     # Protección clínica absoluta: si hay articulación afectada, anular inmediatamente cualquier contraindicación
@@ -6380,7 +6515,7 @@ Devuelve SOLO JSON."""
         if affected_zone in ("hombro", "codo", "muneca", "cuello"):
             if requested_focus in ("hombros", "hombro", "brazos_hombros", "piernas_hombros", "pecho_hombros", "espalda_hombros") or not requested_focus:
                 requested_focus = "solo_piernas"
-        elif affected_zone in ("tobillo", "rodilla"):
+        elif affected_zone in ("tobillo", "rodilla", "pie"):
             if requested_focus in ("piernas", "solo_piernas", "piernas_core", "piernas_cardio", "piernas_hombros", "piernas_tren_superior", "triceps_piernas", "cuadriceps", "femorales_isquios", "gluteos", "pantorrillas_pies") or not requested_focus:
                 requested_focus = "solo_tren_superior"
         elif affected_zone == "lumbar":
