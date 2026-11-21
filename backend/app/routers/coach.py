@@ -1,4 +1,5 @@
 from app.services.audit_service import log_event
+import os
 import json
 import re
 import time
@@ -17,6 +18,89 @@ from app.services.ai_providers import (
 
 router = APIRouter()
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+def _get_db_conn():
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        return None
+    try:
+        import psycopg2
+        import psycopg2.extras
+        return psycopg2.connect(db_url, connect_timeout=8)
+    except Exception as e:
+        print("Database connection error in coach:", e)
+        return None
+
+
+def _db_get_user_profile(user_id: str | None = None, cedula: str | None = None) -> dict:
+    conn = _get_db_conn()
+    if not conn:
+        return {}
+    try:
+        import psycopg2.extras
+        with conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if user_id and len(user_id) > 10 and "-" in user_id:
+                    cur.execute("SELECT * FROM usuarios WHERE id::text = %s LIMIT 1;", (user_id,))
+                elif cedula:
+                    cur.execute("SELECT * FROM usuarios WHERE cedula = %s LIMIT 1;", (cedula,))
+                elif user_id:
+                    cur.execute("SELECT * FROM usuarios WHERE cedula = %s OR id::text = %s LIMIT 1;", (user_id, user_id))
+                else:
+                    return {}
+                row = cur.fetchone()
+                return dict(row) if row else {}
+    except Exception as e:
+        print("Error fetching user profile in coach:", e)
+        return {}
+    finally:
+        conn.close()
+
+
+def _db_get_recent_unresolved_injury(cedula: str | None = None, user_id: str | None = None) -> dict | None:
+    conn = _get_db_conn()
+    if not conn:
+        return None
+    try:
+        import psycopg2.extras
+        with conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT role, content, created_at, quick_replies FROM coach_mensajes
+                    WHERE (cedula = %s OR user_id::text = %s)
+                      AND created_at >= NOW() - INTERVAL '48 hours'
+                    ORDER BY created_at DESC;
+                """, (cedula or "", user_id or ""))
+                rows = cur.fetchall()
+                if not rows:
+                    return None
+
+                known_zones = {
+                    "hombro": "hombros", "hombros": "hombros",
+                    "rodilla": "rodillas", "rodillas": "rodillas",
+                    "tobillo": "tobillos", "tobillos": "tobillos",
+                    "espalda": "espalda baja", "lumbar": "zona lumbar", "lumbares": "zona lumbar",
+                    "cuello": "cuello y cervicales", "cervical": "cuello y cervicales",
+                    "codo": "codos", "codos": "codos",
+                    "muñeca": "muñecas", "muneca": "muñecas", "muñecas": "muñecas",
+                    "cadera": "cadera", "femoral": "femorales / isquiotibiales", "isquio": "isquiotibiales"
+                }
+
+                for r in rows:
+                    txt = (r.get("content") or "").lower()
+                    if r.get("role") == "user":
+                        if any(k in txt for k in ("dolor superado", "me siento al 100", "ya no me duele", "recuperado al 100", "sin dolor")):
+                            return None
+                        for z, z_label in known_zones.items():
+                            if z in txt and any(p in txt for p in ("molestia", "dolor", "duele", "duelen", "lesion", "lesión", "sobrecarga", "afectad", "evitar")):
+                                return {"zone": z_label, "reported_at": r.get("created_at"), "raw_text": txt}
+                return None
+    except Exception as e:
+        print("Error checking recent injury in coach:", e)
+        return None
+    finally:
+        conn.close()
+
 
 AI_TIMEOUT_SEC = 25.0
 MAX_HISTORY_TURNS = 20
@@ -515,8 +599,10 @@ def _detect_requested_focus(payload: ChatMessage) -> str | None:
         # Limpieza previa de quejas, molestias, dolores y menciones de descarte para evitar falsos positivos
         t_clean = t
         for pat in (
+            r"\(?\s*0%\s*[^)]*\)?",
+            r"\b0%\s*[\wáéíóúñ]+",
             r"(?:me est[aá] dando|me da|arroj[oó]|incluy[oó]|puso|pusiste|metiste)\s+(?:ejercicios\s+como\s+|ejercicios\s+de\s+)?[^.,;]+",
-            r"(?:no\s+quiero|no\s+me\s+des|sin|nada\s+de|cero|evitar|evita|excluir|excluyendo|descartar|descartando)\s+[^.,;\n]+",
+            r"(?:no\s+quiero|no\s+me\s+des|sin|nada\s+de|cero|cero%|evitar|evita|excluir|excluyendo|descartar|descartando)\s+[^.,;\n]+",
             r"(?:tengo\s+una\s+molestia\s+en|tengo\s+molestia\s+en|tengo\s+dolor\s+en|me\s+duele|me\s+duelen|dolor\s+en|molestia\s+en|lesi[oó]n\s+en|lesionado\s+en|lastimad[ao]\s+en)\s+[^.,;\n]+",
             r"(?:instrucci[oó]n\s+para\s+la\s+ia|instruccion\s+para\s+la\s+ia)[^.,;\n]+",
             r"(?:zona\s+afectada|articulaci[oó]n\s+afectada|articulacion\s+afectada)\s*\([^)]*\)",
@@ -4704,6 +4790,73 @@ def _conversation_history(history: list[ChatTurn]) -> str:
 def _call_ai_coach(payload: ChatMessage) -> dict:
     effective_level, effective_intensity = _extract_effective_level_and_intensity(payload)
 
+    # 0. Sincronizar datos clínicos y patologías del usuario desde PostgreSQL
+    db_profile = _db_get_user_profile(user_id=payload.user_id, cedula=payload.cedula)
+    if db_profile:
+        if not payload.user_name and db_profile.get("nombre"):
+            payload.user_name = f"{db_profile['nombre']} {db_profile.get('apellido', '')}".strip()
+        if db_profile.get("patologia_o_alergias"):
+            if payload.pathology_or_allergies:
+                if db_profile["patologia_o_alergias"].lower() not in payload.pathology_or_allergies.lower():
+                    payload.pathology_or_allergies = f"{payload.pathology_or_allergies}, {db_profile['patologia_o_alergias']}"
+            else:
+                payload.pathology_or_allergies = db_profile["patologia_o_alergias"]
+        if db_profile.get("alergias_alimentarias"):
+            if payload.allergies:
+                if db_profile["alergias_alimentarias"].lower() not in payload.allergies.lower():
+                    payload.allergies = f"{payload.allergies}, {db_profile['alergias_alimentarias']}"
+            else:
+                payload.allergies = db_profile["alergias_alimentarias"]
+        if db_profile.get("lesiones_actuales"):
+            if payload.injuries:
+                if db_profile["lesiones_actuales"].lower() not in payload.injuries.lower():
+                    payload.injuries = f"{payload.injuries}, {db_profile['lesiones_actuales']}"
+            else:
+                payload.injuries = db_profile["lesiones_actuales"]
+        if db_profile.get("zonas_a_evitar"):
+            if payload.areas_to_avoid:
+                if db_profile["zonas_a_evitar"].lower() not in payload.areas_to_avoid.lower():
+                    payload.areas_to_avoid = f"{payload.areas_to_avoid}, {db_profile['zonas_a_evitar']}"
+            else:
+                payload.areas_to_avoid = db_profile["zonas_a_evitar"]
+
+    # 0b. Secuencia clínica de 24-48 horas: Monitorear si reportó molestia previa y no ha confirmado recuperación
+    u_msg_check = (payload.message or "").lower()
+    recent_unresolved = _db_get_recent_unresolved_injury(cedula=payload.cedula, user_id=payload.user_id)
+    is_greeting_or_check = payload.is_initial_greeting or _is_pure_greeting_or_conversation(payload.message) or any(k in u_msg_check for k in ("hola", "buen dia", "buenos dias", "buenas", "que tal", "empezar", "arrancar"))
+    if recent_unresolved and is_greeting_or_check:
+        if not any(k in u_msg_check for k in ("ya me siento al 100", "dolor superado", "recuperado al 100", "ya no me duele", "sin dolor", "estoy al 100")):
+            inj_zone = recent_unresolved.get("zone", "la zona afectada")
+            user_n = payload.user_name or "Freddy"
+            profile_notes = ""
+            if payload.pathology_or_allergies or payload.allergies:
+                profile_notes = f"\n\nTomando en cuenta además tu historial en perfil ({payload.pathology_or_allergies or payload.allergies}), cuidaremos rigurosamente tu salud articular."
+            return {
+                "provider": "coach_direct",
+                "reply": (
+                    f"¡Hola, {user_n}! 👋 Me alegra mucho verte de nuevo.\n\n"
+                    f"En tu reporte de las últimas 24 horas me indicaste que presentabas una molestia en **{inj_zone}**. "
+                    f"Antes de continuar con la programación deportiva: **¿cómo ha seguido esa articulación hoy?** "
+                    f"¿Persiste el malestar o ya te sientes al 100% recuperado para entrenar con total normalidad?{profile_notes}"
+                ),
+                "category": "Seguimiento Clínico de Articulación (24h)",
+                "duration_weeks": 4,
+                "rest_between_sets_sec": 60,
+                "progression_rule": f"Protección y monitoreo de {inj_zone}.",
+                "extracted_equipment": None,
+                "suggest_questionnaire": False,
+                "has_plan": False,
+                "structured_plan": None,
+                "quick_replies": [
+                    "✅ Ya me siento al 100%, dolor superado",
+                    f"⚠️ Aún me molesta, cuidemos {inj_zone}",
+                    "🦵 Entrenar otra zona alternativa segura",
+                    "🗓️ Plan Semanal Recomendado por IA"
+                ],
+                "recommended_intensity": "Baja",
+                "fatigue_detected": True,
+            }
+
     # 1. Saludo Contextual Hiperpersonalizado (Entrenamiento del Día, Recuperación o Planificación)
     if payload.is_initial_greeting:
         metrics = payload.weekly_metrics or {}
@@ -5449,7 +5602,21 @@ Devuelve SOLO JSON."""
         or ("estado fisico:" in user_msg_lower and ("equipo disponible:" in user_msg_lower or "motivo" in user_msg_lower or "decision" in user_msg_lower))
     )
 
-    should_generate_plan = (is_routine_request or is_submission or is_complementary) and not is_pure_greeting and not is_rest_request
+    # Detección clínica de reporte de molestia en estado actual
+    has_injury_in_submission = bool(affected_zone and is_submission)
+    is_explicit_alternative_choice = any(k in user_msg_lower for k in (
+        "rutina de piernas", "piernas y glúteos", "piernas y gluteos",
+        "core y abdomen", "cardio suave", "plan variado seguro", "solo piernas",
+        "tren inferior", "solo core", "solo cardio", "entrenar otra zona",
+        "rutina completa de piernas", "ejercicios de piernas"
+    ))
+
+    # Si el usuario reporta molestia en su estado actual pero aún no selecciona qué zona alternativa trabajar:
+    # NO generar plan automáticamente de golpe. Consultar con empatía médica, explicar contraindicaciones y dar 4 opciones claras.
+    if has_injury_in_submission and not is_explicit_alternative_choice:
+        should_generate_plan = False
+    else:
+        should_generate_plan = (is_routine_request or is_submission or is_complementary) and not is_pure_greeting and not is_rest_request
 
     # Si el usuario NO está pidiendo explícitamente armar o ver una rutina, responder como un Coach amigo y profesional
     if not should_generate_plan:
@@ -5551,6 +5718,57 @@ Devuelve SOLO JSON."""
                         quick_replies = d["quick_replies"]
         except Exception as e:
             print("Aviso: Fallback en diálogo de Coach IA:", e)
+
+        # Interacción Didáctica Clínica por Molestia Articular en Estado Actual
+        if has_injury_in_submission and not is_explicit_alternative_choice and affected_profile:
+            category = f"Adaptación por Molestia en {affected_profile['label']}"
+            user_name_str = payload.user_name or "Freddy"
+            contraindications = affected_profile.get("prohibited_prompt_text", "cero sobrecarga en la articulación afectada.")
+
+            profile_medical = []
+            if payload.pathology_or_allergies:
+                profile_medical.append(f"patologías: {payload.pathology_or_allergies}")
+            if payload.allergies:
+                profile_medical.append(f"alergias: {payload.allergies}")
+            med_note = ""
+            if profile_medical:
+                med_note = f"\n\nAsimismo, he tomado en cuenta tus condiciones registradas en perfil ({', '.join(profile_medical)}), garantizando que las adaptaciones respeten tu salud al 100%."
+
+            if affected_zone in ("hombro", "codo", "muneca", "cuello"):
+                alt_options = [
+                    f"🦵 Rutina de Piernas y Glúteos (0% {affected_zone})",
+                    "🧘 Core y Abdomen en suelo",
+                    "🔥 Cardio Suave de bajo impacto",
+                    "🛡️ Plan variado seguro adaptado por IA"
+                ]
+                safe_scope = "enfocar la sesión al 100% en miembros inferiores (piernas y glúteos), realizar una rutina de core y abdomen en suelo, o activar tu cuerpo con cardio suave"
+            elif affected_zone in ("rodilla", "tobillo"):
+                alt_options = [
+                    f"💪 Rutina de Tren Superior (0% {affected_zone})",
+                    "🧘 Core en banco/suelo sin impacto",
+                    "🔥 Cardio adaptado de torso",
+                    "🛡️ Plan variado seguro adaptado por IA"
+                ]
+                safe_scope = "enfocar la sesión al 100% en tren superior (pecho, espalda, hombros y brazos sin apoyar peso en piernas), o realizar trabajo de core sentado o en colchoneta"
+            else:
+                alt_options = [
+                    "🦵 Piernas con soporte de espalda",
+                    "💪 Tren superior con apoyo total",
+                    "🧘 Movilidad suave de descompresión",
+                    "🛡️ Plan variado seguro adaptado por IA"
+                ]
+                safe_scope = "ejercicios con la espalda completamente apoyada para eliminar cualquier compresión en la columna"
+
+            reply_str = (
+                f"¡Hola, {user_name_str}! 👋 He recibido con atención tu reporte de estado actual.\n\n"
+                f"Entiendo perfectamente que presentas una molestia en **{affected_profile['label']}**. "
+                f"Desde el punto de vista biomecánico, la prioridad absoluta es proteger esa articulación y sus tendones: "
+                f"la indicación médica y deportiva es **{contraindications}** para evitar cualquier sobrecarga.\n\n"
+                f"Como deseas mantenerte activo entrenando de forma adaptada y segura, podemos {safe_scope}, "
+                f"manteniendo la zona afectada en reposo total.{med_note}\n\n"
+                f"Cuéntame: **¿qué área prefieres trabajar hoy?** Elige una de las siguientes opciones para prepararte la rutina perfecta de inmediato:"
+            )
+            quick_replies = alt_options
 
         if not reply_str:
             if is_rest_request:
@@ -5882,7 +6100,7 @@ Devuelve SOLO JSON."""
             if has_refusal or ("hombros" not in lower_reply) or ("piernas" not in lower_reply):
                 reply_str = (
                     f"¡Hola, atleta! He procesado con absoluta precisión tu solicitud para entrenar **Piernas y Hombros**.\n\n"
-                    f"🎯 **Rutina Especializada en Piernas y Hombros ({badge_lbl}):**\n"
+                    f"🎯 **Rutina Especializada en Piernas y Hombros ({effective_level} · Intensidad {effective_intensity}):**\n"
                     f"Diseñé tu plan combinando armónicamente ejercicios de miembros inferiores (cuádriceps, femorales, glúteos y pantorrillas) "
                     f"con ejercicios específicos para deltoides (hombros), estructurados en bloques alternados "
                     f"para maximizar el estímulo sin fatiga neuromuscular prematura y con cero interferencia de otros grupos musculares. ¡Vamos con todo!"
@@ -6113,34 +6331,44 @@ def _persist_coach_message(
     quick_replies: list[str] | None = None,
     recommended_intensity: str | None = None,
 ):
+    conn = _get_db_conn()
+    if not conn:
+        return
     try:
-        from app.services.supabase_service import get_supabase_admin_client
-        admin = get_supabase_admin_client()
-        resolved_uuid = None
-        if user_id and len(user_id) > 10 and "-" in user_id:
-            resolved_uuid = user_id
-        elif cedula:
-            u_res = admin.table("usuarios").select("id").eq("cedula", cedula).limit(1).execute()
-            if u_res.data and len(u_res.data) > 0:
-                resolved_uuid = u_res.data[0]["id"]
+        with conn:
+            with conn.cursor() as cur:
+                resolved_uuid = None
+                if user_id and len(user_id) > 10 and "-" in user_id:
+                    resolved_uuid = user_id
+                elif cedula:
+                    cur.execute("SELECT id FROM usuarios WHERE cedula = %s LIMIT 1;", (cedula,))
+                    u_row = cur.fetchone()
+                    if u_row:
+                        resolved_uuid = str(u_row[0])
 
-        row = {
-            "cedula": cedula,
-            "role": role,
-            "content": content,
-            "plan": plan,
-            "category": category,
-            "rule": rule,
-            "suggest_questionnaire": bool(suggest_questionnaire),
-            "quick_replies": quick_replies,
-            "recommended_intensity": recommended_intensity,
-        }
-        if resolved_uuid:
-            row["user_id"] = resolved_uuid
-
-        admin.table("coach_mensajes").insert(row).execute()
+                cur.execute("""
+                    INSERT INTO coach_mensajes (
+                        user_id, cedula, role, content, plan, category, rule,
+                        suggest_questionnaire, quick_replies, recommended_intensity, created_at
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                    );
+                """, (
+                    resolved_uuid,
+                    cedula,
+                    role,
+                    content,
+                    json.dumps(plan, ensure_ascii=False) if plan else None,
+                    category,
+                    rule,
+                    bool(suggest_questionnaire),
+                    json.dumps(quick_replies, ensure_ascii=False) if quick_replies else None,
+                    recommended_intensity,
+                ))
     except Exception as e:
-        print("Aviso: No se pudo persistir mensaje en coach_mensajes:", e)
+        print("Aviso: No se pudo persistir mensaje en coach_mensajes via Postgres:", e)
+    finally:
+        conn.close()
 
 
 RATE_LIMIT_ERRORS = ("ResourceExhausted", "TooManyRequests", "QuotaExceeded")
@@ -6283,36 +6511,63 @@ def get_coach_history(cedula: str | None = None, user_id: str | None = None, lim
     """Recupera el historial de conversación persistente del usuario en el Coach IA."""
     if not cedula and not user_id:
         return []
-    try:
-        from app.services.supabase_service import get_supabase_admin_client
-        admin = get_supabase_admin_client()
-        query = admin.table("coach_mensajes").select("*").or_("category.neq.body_metric,category.is.null")
-        if user_id and "-" in user_id:
-            query = query.eq("user_id", user_id)
-        elif cedula:
-            query = query.eq("cedula", cedula)
-
-        res = query.order("created_at", desc=False).limit(limit).execute()
-        rows = res.data or []
-        formatted = []
-        for r in rows:
-            formatted.append({
-                "id": str(r.get("id")),
-                "role": r.get("role", "assistant"),
-                "isUser": r.get("role") == "user",
-                "text": r.get("content", ""),
-                "plan": r.get("plan"),
-                "category": r.get("category"),
-                "rule": r.get("rule"),
-                "suggest_questionnaire": r.get("suggest_questionnaire", False),
-                "quick_replies": r.get("quick_replies"),
-                "recommended_intensity": r.get("recommended_intensity"),
-                "created_at": str(r.get("created_at")),
-            })
-        return formatted
-    except Exception as e:
-        print("Error obteniendo historial de coach_mensajes:", e)
+    conn = _get_db_conn()
+    if not conn:
         return []
+    try:
+        import psycopg2.extras
+        with conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if user_id and "-" in user_id:
+                    cur.execute("""
+                        SELECT * FROM coach_mensajes
+                        WHERE (user_id::text = %s OR cedula = %s)
+                          AND (category != 'body_metric' OR category IS NULL)
+                        ORDER BY created_at ASC LIMIT %s;
+                    """, (user_id, cedula or "", limit))
+                elif cedula:
+                    cur.execute("""
+                        SELECT * FROM coach_mensajes
+                        WHERE cedula = %s
+                          AND (category != 'body_metric' OR category IS NULL)
+                        ORDER BY created_at ASC LIMIT %s;
+                    """, (cedula, limit))
+                else:
+                    return []
+                rows = cur.fetchall()
+                formatted = []
+                for r in rows:
+                    plan_data = r.get("plan")
+                    if isinstance(plan_data, str):
+                        try:
+                            plan_data = json.loads(plan_data)
+                        except Exception:
+                            pass
+                    qr_data = r.get("quick_replies")
+                    if isinstance(qr_data, str):
+                        try:
+                            qr_data = json.loads(qr_data)
+                        except Exception:
+                            pass
+                    formatted.append({
+                        "id": str(r.get("id")),
+                        "role": r.get("role", "assistant"),
+                        "isUser": r.get("role") == "user",
+                        "text": r.get("content", ""),
+                        "plan": plan_data,
+                        "category": r.get("category"),
+                        "rule": r.get("rule"),
+                        "suggest_questionnaire": r.get("suggest_questionnaire", False),
+                        "quick_replies": qr_data,
+                        "recommended_intensity": r.get("recommended_intensity"),
+                        "created_at": str(r.get("created_at")),
+                    })
+                return formatted
+    except Exception as e:
+        print("Error obteniendo historial de coach_mensajes via Postgres:", e)
+        return []
+    finally:
+        conn.close()
 
 
 @router.delete("/history")
@@ -6320,19 +6575,22 @@ def delete_coach_history(cedula: str | None = None, user_id: str | None = None):
     """Limpia el historial de conversación del usuario para iniciar una nueva sesión activa."""
     if not cedula and not user_id:
         raise HTTPException(status_code=400, detail="Debe especificar cedula o user_id")
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database connection failed")
     try:
-        from app.services.supabase_service import get_supabase_admin_client
-        admin = get_supabase_admin_client()
-        query = admin.table("coach_mensajes")
-        if user_id and "-" in user_id:
-            query = query.delete().eq("user_id", user_id)
-        elif cedula:
-            query = query.delete().eq("cedula", cedula)
-        query.execute()
+        with conn:
+            with conn.cursor() as cur:
+                if user_id and "-" in user_id:
+                    cur.execute("DELETE FROM coach_mensajes WHERE user_id::text = %s OR cedula = %s;", (user_id, cedula or ""))
+                elif cedula:
+                    cur.execute("DELETE FROM coach_mensajes WHERE cedula = %s;", (cedula,))
         return {"status": "ok", "message": "Historial reiniciado exitosamente."}
     except Exception as e:
-        print("Error borrando historial de coach:", e)
+        print("Error borrando historial de coach via Postgres:", e)
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
 
 @router.get("/bitacora/export")

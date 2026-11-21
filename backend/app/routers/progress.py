@@ -36,34 +36,216 @@ def parse_numeric(val, default=20.0) -> float:
     return float(default)
 
 
+def _get_db_conn():
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        return None
+    try:
+        import psycopg2
+        import psycopg2.extras
+        return psycopg2.connect(db_url, connect_timeout=8)
+    except Exception as e:
+        print("Database connection error in progress:", e)
+        return None
+
+
 def resolve_user_context(user_id: str, admin):
     """
     Resuelve el UUID real de la tabla usuarios para evitar el error 22P02 de PostgreSQL
-    en columnas de tipo UUID como progress_photos.user_id.
+    en columnas de tipo UUID como progress_photos.user_id. Prioriza conexión directa a PostgreSQL.
     """
     user_info = None
     u_str = str(user_id).strip()
-    try:
-        # 1. Probar búsqueda por ID UUID directo
-        if "-" in u_str and len(u_str) >= 32:
-            res = admin.table("usuarios").select("*").eq("id", u_str).execute()
-            if res.data:
-                user_info = res.data[0]
-        
-        # 2. Si no se encontró por ID, buscar por cédula
-        if not user_info:
-            res_ced = admin.table("usuarios").select("*").eq("cedula", u_str).execute()
-            if res_ced.data:
-                user_info = res_ced.data[0]
-    except Exception as e_res:
-        print("Aviso resolviendo contexto de usuario:", e_res)
 
-    u_id = user_info["id"] if user_info else u_str
-    u_cedula = user_info.get("cedula", u_str) if user_info else u_str
+    # 1. Intentar primero por PostgreSQL directo
+    conn = _get_db_conn()
+    if conn:
+        try:
+            import psycopg2.extras
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT * FROM usuarios WHERE id::text = %s OR cedula = %s LIMIT 1;",
+                        (u_str, u_str)
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        user_info = dict(row)
+        except Exception as e_pg:
+            print("Aviso resolviendo contexto via Postgres:", e_pg)
+        finally:
+            conn.close()
+
+    # 2. Si no se encontró por Postgres, intentar con Supabase REST
+    if not user_info:
+        try:
+            if "-" in u_str and len(u_str) >= 32:
+                res = admin.table("usuarios").select("*").eq("id", u_str).execute()
+                if res.data:
+                    user_info = res.data[0]
+            if not user_info:
+                res_ced = admin.table("usuarios").select("*").eq("cedula", u_str).execute()
+                if res_ced.data:
+                    user_info = res_ced.data[0]
+        except Exception as e_res:
+            print("Aviso resolviendo contexto de usuario en Supabase:", e_res)
+
+    u_id = str(user_info["id"]) if user_info else u_str
+    u_cedula = str(user_info.get("cedula", u_str)) if user_info else u_str
     u_name = f"{user_info.get('nombre', '')} {user_info.get('apellido', '')}".strip() if user_info else "Atleta"
     u_weight = float(user_info.get("peso", 70.0) if user_info else 70.0)
     u_goal = user_info.get("objetivo", "Recomposición corporal y definición muscular") if user_info else "Recomposición corporal"
     return u_id, u_cedula, u_name, u_weight, u_goal
+
+
+def _db_get_user_info(u_str: str):
+    conn = _get_db_conn()
+    if not conn:
+        return None
+    try:
+        import psycopg2.extras
+        with conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM usuarios WHERE id::text = %s OR cedula = %s LIMIT 1;",
+                    (u_str, u_str)
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+    except Exception as e:
+        print("Error en _db_get_user_info:", e)
+        return None
+    finally:
+        conn.close()
+
+
+def _db_update_user_weight(u_id: str, weight: float):
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE usuarios SET peso = %s WHERE id::text = %s;", (weight, u_id))
+    except Exception as e:
+        print("Error en _db_update_user_weight:", e)
+    finally:
+        conn.close()
+
+
+def _db_insert_coach_message(u_id: str, u_cedula: str, role: str, category: str, content: str, plan_dict: dict):
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO coach_mensajes (user_id, cedula, role, category, content, plan, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW());
+                    """,
+                    (u_id, u_cedula, role, category, content, json.dumps(plan_dict, ensure_ascii=False))
+                )
+    except Exception as e:
+        print("Error en _db_insert_coach_message:", e)
+    finally:
+        conn.close()
+
+
+def _db_insert_progress_photo(u_id: str, photo_url: str, ai_analysis_json: str):
+    conn = _get_db_conn()
+    if not conn:
+        return None
+    try:
+        import psycopg2.extras
+        with conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO progress_photos (user_id, photo_url, ai_analysis, created_at)
+                    VALUES (%s, %s, %s, NOW())
+                    RETURNING id, user_id, photo_url, ai_analysis, created_at;
+                    """,
+                    (u_id, photo_url, ai_analysis_json)
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+    except Exception as e:
+        print("Error en _db_insert_progress_photo:", e)
+        return None
+    finally:
+        conn.close()
+
+
+def _db_get_progress_photos(u_id: str):
+    conn = _get_db_conn()
+    if not conn:
+        return []
+    try:
+        import psycopg2.extras
+        with conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT id, user_id, photo_url, ai_analysis, created_at FROM progress_photos WHERE user_id::text = %s ORDER BY created_at ASC;",
+                    (u_id,)
+                )
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
+    except Exception as e:
+        print("Error en _db_get_progress_photos:", e)
+        return []
+    finally:
+        conn.close()
+
+
+def _db_delete_demo_flash(u_id: str):
+    conn = _get_db_conn()
+    if not conn:
+        return 0
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM progress_photos
+                    WHERE user_id::text = %s
+                      AND (ai_analysis LIKE '%is_demo_flash%' OR ai_analysis LIKE '%Prueba Flash%' OR photo_url LIKE '%unsplash.com%');
+                    """,
+                    (u_id,)
+                )
+                return cur.rowcount
+    except Exception as e:
+        print("Error en _db_delete_demo_flash:", e)
+        return 0
+    finally:
+        conn.close()
+
+
+def _db_get_coach_metrics(u_id: str, u_cedula: str):
+    conn = _get_db_conn()
+    if not conn:
+        return []
+    try:
+        import psycopg2.extras
+        with conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT * FROM coach_mensajes
+                    WHERE category = 'body_metric'
+                      AND (user_id::text = %s OR cedula = %s)
+                    ORDER BY created_at ASC;
+                    """,
+                    (u_id, u_cedula)
+                )
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
+    except Exception as e:
+        print("Error en _db_get_coach_metrics:", e)
+        return []
+    finally:
+        conn.close()
 
 
 def extract_scale_weight_from_image(img_bytes: bytes, mime_type: str = "image/jpeg", model_instance=None) -> tuple[float | None, str]:
@@ -159,29 +341,22 @@ async def upload_progress_photo(
             detected_weight, scale_notes = extract_scale_weight_from_image(scale_bytes, s_mime, model)
             if detected_weight:
                 u_weight = detected_weight
-                # Actualizar peso oficial en usuarios
-                try:
-                    admin.table("usuarios").update({"peso": detected_weight}).eq("id", u_id).execute()
-                except Exception as e_wup:
-                    print("Aviso actualizando peso en usuarios:", e_wup)
-                # Registrar métrica en coach_mensajes
-                try:
-                    admin.table("coach_mensajes").insert({
-                        "user_id": u_id,
-                        "cedula": u_cedula,
-                        "role": "system",
-                        "category": "body_metric",
-                        "content": f"Balanza IA: {detected_weight} kg registrados ({scale_notes})",
-                        "plan": {
-                            "weight": detected_weight,
-                            "notes": f"Identificado por IA Vision en balanza: {scale_notes}",
-                            "source": "scale_photo",
-                            "measured_at": date.today().isoformat()
-                        },
-                        "created_at": datetime.utcnow().isoformat()
-                    }).execute()
-                except Exception as e_ms:
-                    print("Aviso insertando métrica de balanza:", e_ms)
+                # Actualizar peso oficial en usuarios via Postgres
+                _db_update_user_weight(u_id, detected_weight)
+                # Registrar métrica en coach_mensajes via Postgres
+                _db_insert_coach_message(
+                    u_id=u_id,
+                    u_cedula=u_cedula,
+                    role="system",
+                    category="body_metric",
+                    content=f"Balanza IA: {detected_weight} kg registrados ({scale_notes})",
+                    plan_dict={
+                        "weight": detected_weight,
+                        "notes": f"Identificado por IA Vision en balanza: {scale_notes}",
+                        "source": "scale_photo",
+                        "measured_at": date.today().isoformat()
+                    }
+                )
 
         # Si el usuario SOLO subió la foto de la balanza
         if photo_type == "scale" or (file is None and scale_file is not None):
@@ -212,11 +387,11 @@ async def upload_progress_photo(
                 "motivational_quote": "Cada pesaje consciente te acerca a tu meta.",
             }
 
-            admin.table("progress_photos").insert({
-                "user_id": u_id,
-                "photo_url": public_url,
-                "ai_analysis": json.dumps(analysis_dict, ensure_ascii=False)
-            }).execute()
+            _db_insert_progress_photo(
+                u_id=u_id,
+                photo_url=public_url,
+                ai_analysis_json=json.dumps(analysis_dict, ensure_ascii=False)
+            )
 
             return {
                 "status": "ok",
@@ -233,15 +408,9 @@ async def upload_progress_photo(
         if mime not in ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]:
             mime = "image/jpeg"
 
-        # Historial de fotos para contextualizar
-        photo_number = 1
-        prev_photos = []
-        try:
-            prev_photos_res = admin.table("progress_photos").select("id, created_at, photo_url, ai_analysis").eq("user_id", u_id).order("created_at", desc=False).execute()
-            prev_photos = prev_photos_res.data or []
-            photo_number = len(prev_photos) + 1
-        except Exception:
-            photo_number = 1
+        # Historial de fotos para contextualizar via Postgres
+        prev_photos = _db_get_progress_photos(u_id)
+        photo_number = len(prev_photos) + 1
 
         is_first = photo_number == 1
         prev_analysis = None
@@ -460,31 +629,26 @@ async def upload_progress_photo(
             print("Aviso storage Supabase:", storage_err)
             public_url = f"https://placehold.co/600x400/1E293B/1FAE87.png?text=Foto+Progreso+{int(time.time())}"
 
-        # Guardar en Base de Datos
-        admin.table("progress_photos").insert({
-            "user_id": u_id,
-            "photo_url": public_url,
-            "ai_analysis": analysis_raw
-        }).execute()
+        # Guardar en Base de Datos via Postgres
+        _db_insert_progress_photo(u_id, public_url, analysis_raw)
 
-        # Sincronizar automáticamente en coach_mensajes
+        # Sincronizar automáticamente en coach_mensajes via Postgres
         try:
             est_fat = structured_analysis.get("estimated_body_fat")
             if est_fat:
-                admin.table("coach_mensajes").insert({
-                    "user_id": u_id,
-                    "cedula": u_cedula,
-                    "role": "system",
-                    "category": "body_metric",
-                    "content": f"Estimación IA Vision: {u_weight} kg | {est_fat}% grasa corporal",
-                    "plan": {
+                _db_insert_coach_message(
+                    u_id=u_id,
+                    u_cedula=u_cedula,
+                    role="system",
+                    category="body_metric",
+                    content=f"Estimación IA Vision: {u_weight} kg | {est_fat}% grasa corporal",
+                    plan_dict={
                         "weight": u_weight,
                         "body_fat": est_fat,
                         "notes": f"Estimado por IA Vision ({structured_analysis.get('photo_stage')})",
                         "measured_at": date.today().isoformat()
-                    },
-                    "created_at": datetime.utcnow().isoformat()
-                }).execute()
+                    }
+                )
         except Exception as e_sync:
             print("Aviso sincronizando métricas con coach_mensajes:", e_sync)
 
@@ -508,10 +672,7 @@ def get_progress_photos(user_id: str):
     try:
         u_id, u_cedula, u_name, u_weight, u_goal = resolve_user_context(user_id, admin)
 
-        photos = []
-        if "-" in str(u_id) and len(str(u_id)) >= 32:
-            res = admin.table("progress_photos").select("*").eq("user_id", u_id).order("created_at", desc=False).execute()
-            photos = res.data or []
+        photos = _db_get_progress_photos(u_id)
 
         processed_photos = []
         evolution_chart = []
@@ -638,8 +799,7 @@ def generate_demo_flash_progress(user_id: str):
     if "-" not in str(u_id) or len(str(u_id)) < 32:
         raise HTTPException(status_code=404, detail="Usuario no encontrado. Inicie sesión para generar la prueba.")
 
-    prev_res = admin.table("progress_photos").select("*").eq("user_id", u_id).order("created_at", desc=False).execute()
-    prev_photos = prev_res.data or []
+    prev_photos = _db_get_progress_photos(u_id)
 
     base_fat = 26.0
     base_def = 3.5
@@ -706,17 +866,17 @@ def generate_demo_flash_progress(user_id: str):
         "motivational_quote": "¡30 días de disciplina transformaron tu cuerpo! Este es solo el primer escalón de tu mejor versión."
     }
 
-    insert_res = admin.table("progress_photos").insert({
-        "user_id": u_id,
-        "photo_url": demo_url,
-        "ai_analysis": json.dumps(demo_analysis, ensure_ascii=False)
-    }).execute()
+    inserted_record = _db_insert_progress_photo(
+        u_id=u_id,
+        photo_url=demo_url,
+        ai_analysis_json=json.dumps(demo_analysis, ensure_ascii=False)
+    )
 
     return {
         "status": "ok",
         "message": "Prueba flash de Mes 1 generada con éxito.",
         "analysis": demo_analysis,
-        "record": insert_res.data[0] if insert_res.data else None
+        "record": inserted_record
     }
 
 
@@ -730,14 +890,7 @@ def clear_demo_flash(user_id: str):
     if "-" not in str(u_id) or len(str(u_id)) < 32:
         return {"status": "ok", "deleted_count": 0}
 
-    res = admin.table("progress_photos").select("id, ai_analysis, photo_url").eq("user_id", u_id).execute()
-    deleted_count = 0
-    for r in res.data or []:
-        raw = r.get("ai_analysis") or ""
-        url = r.get("photo_url") or ""
-        if "is_demo_flash" in raw or "unsplash.com" in url or "Prueba Flash" in raw:
-            admin.table("progress_photos").delete().eq("id", r["id"]).execute()
-            deleted_count += 1
+    deleted_count = _db_delete_demo_flash(u_id)
 
     return {"status": "ok", "deleted_count": deleted_count}
 
@@ -770,14 +923,11 @@ def record_body_metric(req: BodyMetricReq):
     # Resolver usuario por cédula o id
     u_id, u_cedula, _, _, _ = resolve_user_context(req.user_id, admin)
 
-    # 1. Actualizar peso en tabla usuarios
+    # 1. Actualizar peso en tabla usuarios via Postgres
     if req.weight > 0:
-        try:
-            admin.table("usuarios").update({"peso": req.weight}).eq("id", u_id).execute()
-        except Exception as e_up:
-            print("Warning updating peso in usuarios:", e_up)
+        _db_update_user_weight(u_id, req.weight)
 
-    # 2. Persistir en coach_mensajes como registro métrico estructurado
+    # 2. Persistir en coach_mensajes como registro métrico estructurado via Postgres
     metric_record = {
         "weight": round(float(req.weight), 2),
         "body_fat": round(float(req.body_fat), 1) if req.body_fat is not None else None,
@@ -793,18 +943,14 @@ def record_body_metric(req: BodyMetricReq):
         "measured_at": measured_date,
     }
 
-    try:
-        admin.table("coach_mensajes").insert({
-            "user_id": u_id,
-            "cedula": u_cedula,
-            "role": "system",
-            "category": "body_metric",
-            "content": f"Registro Métrico: {req.weight} kg" + (f" | {req.body_fat}% grasa" if req.body_fat else ""),
-            "plan": metric_record,
-            "created_at": datetime.utcnow().isoformat()
-        }).execute()
-    except Exception as e_msg:
-        print("Warning saving metric to coach_mensajes:", e_msg)
+    _db_insert_coach_message(
+        u_id=u_id,
+        u_cedula=u_cedula,
+        role="system",
+        category="body_metric",
+        content=f"Registro Métrico: {req.weight} kg" + (f" | {req.body_fat}% grasa" if req.body_fat else ""),
+        plan_dict=metric_record,
+    )
 
     return {
         "status": "ok",
@@ -821,10 +967,7 @@ def get_body_metrics(user_id: str):
     admin = get_supabase_admin_client()
     try:
         u_id, u_cedula, _, _, _ = resolve_user_context(user_id, admin)
-        q = admin.table("coach_mensajes").select("*").eq("category", "body_metric")
-        q = q.or_(f"user_id.eq.{u_id},cedula.eq.{u_cedula}")
-        res = q.order("created_at", desc=False).execute()
-        raw_list = res.data or []
+        raw_list = _db_get_coach_metrics(u_id, u_cedula)
 
         metrics = []
         for r in raw_list:
@@ -840,25 +983,22 @@ def get_body_metrics(user_id: str):
                     "notes": r.get("content")
                 })
 
-        # Si no hay mediciones, buscar el peso inicial en usuarios
+        # Si no hay mediciones, buscar el peso inicial en usuarios via Postgres
         if not metrics:
-            try:
-                u_res = admin.table("usuarios").select("peso, created_at").eq("id", u_id).execute()
-                if u_res.data:
-                    init_w = float(u_res.data[0].get("peso") or 70.0)
-                    init_d = str(u_res.data[0].get("created_at") or date.today().isoformat())[:10]
-                    metrics.append({
-                        "weight": init_w,
-                        "body_fat": 18.0,
-                        "waist": 82.0,
-                        "chest": 98.0,
-                        "arm": 33.0,
-                        "thigh": 55.0,
-                        "notes": "Peso inicial de registro en plataforma",
-                        "measured_at": init_d
-                    })
-            except Exception:
-                pass
+            u_info = _db_get_user_info(u_id)
+            if u_info:
+                init_w = float(u_info.get("peso") or 70.0)
+                init_d = str(u_info.get("created_at") or date.today().isoformat())[:10]
+                metrics.append({
+                    "weight": init_w,
+                    "body_fat": 18.0,
+                    "waist": 82.0,
+                    "chest": 98.0,
+                    "arm": 33.0,
+                    "thigh": 55.0,
+                    "notes": "Peso inicial de registro en plataforma",
+                    "measured_at": init_d
+                })
 
         # Calcular evolución y deltas
         summary = {

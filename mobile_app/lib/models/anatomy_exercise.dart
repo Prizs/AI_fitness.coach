@@ -100,7 +100,9 @@ String resolveGuaranteedGifUrl({
         // 14. Piernas / Talones / Femorales mostrando Remo con Toalla o Hombros
         ((nameLower.contains('pierna') || nameLower.contains('talon') || nameLower.contains('talón') || nameLower.contains('sentadilla') || nameLower.contains('cuadricep') || nameLower.contains('femoral') || nameLower.contains('isquio') || nameLower.contains('gluteo') || nameLower.contains('glúteo')) && (cleanExisting.contains('row-with-towel') || cleanExisting.contains('upper-back') || cleanExisting.contains('shoulder-press') || cleanExisting.contains('seated-overhead'))) ||
         // 15. Hombros mostrando Remo Invertido o Gemelos o Sentadillas
-        ((nameLower.contains('hombro') || nameLower.contains('deltoid') || nameLower.contains('militar') || nameLower.contains('lateral raise') || nameLower.contains('pike') || nameLower.contains('pica')) && (cleanExisting.contains('row-bent-knees') || cleanExisting.contains('calf') || cleanExisting.contains('potty') || cleanExisting.contains('standing-calf')));
+        ((nameLower.contains('hombro') || nameLower.contains('deltoid') || nameLower.contains('militar') || nameLower.contains('lateral raise') || nameLower.contains('pike') || nameLower.contains('pica')) && (cleanExisting.contains('row-bent-knees') || cleanExisting.contains('calf') || cleanExisting.contains('potty') || cleanExisting.contains('standing-calf'))) ||
+        // 16. Círculos de brazos o Wall Slides mostrando Press con mancuernas
+        ((nameLower.contains('circulo') || nameLower.contains('círculo') || nameLower.contains('wall slide')) && (cleanExisting.contains('shoulder-press') || cleanExisting.contains('seated-overhead')));
 
     if (!hasMismatch) {
       return cleanExisting;
@@ -330,22 +332,54 @@ String resolveGuaranteedGifUrl({
         : (isHigh ? 'biceps/barbell-curl.gif' : 'biceps/dumbbell-biceps-curl.gif'));
   }
 
-  // 24. Elevaciones Laterales
-  if (nameLower.contains('lateral raise') || nameLower.contains('elevacion lateral') || nameLower.contains('elevaciones laterales') || nameLower.contains('elevación lateral')) {
-    return _kGifBase + (isLow ? 'delts/band-front-lateral-raise.gif' : 'delts/dumbbell-lateral-raise.gif');
+  // 23b. Círculos de Brazos y Movilidad Articular Escapular
+  if (nameLower.contains('circulo') || nameLower.contains('círculo') || nameLower.contains('arm circle')) {
+    return _kGifBase + 'delts/band-front-lateral-raise.gif';
   }
 
-  // 25. Press Militar / Hombros
-  if (nameLower.contains('militar') || nameLower.contains('shoulder press') || nameLower.contains('hombro') || nameLower.contains('deltoid')) {
-    if (nameLower.contains('barra')) {
-      return _kGifBase + 'delts/barbell-seated-overhead-press.gif';
+  // 23c. Deslizamientos en Pared (Wall Slides)
+  if (nameLower.contains('wall slide') || nameLower.contains('deslizamiento en pared') || nameLower.contains('deslizamientos en pared')) {
+    return _kGifBase + 'delts/band-shoulder-press.gif';
+  }
+
+  // 24. Pájaros Escapulares / Decúbito Prono / Deltoides Posterior / Romboides
+  if (nameLower.contains('pajaro') || nameLower.contains('pájaros') || nameLower.contains('pajaros') || nameLower.contains('reverse fly') || nameLower.contains('rear delt')) {
+    if (nameLower.contains('mochila') || nameLower.contains('garrafa') || nameLower.contains('pausa de 2s')) {
+      return _kGifBase + 'delts/dumbbell-rear-delt-raise.gif';
     }
-    return _kGifBase + (isLow
-        ? 'delts/band-shoulder-press.gif'
-        : (isHigh ? 'delts/barbell-seated-overhead-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif'));
+    return _kGifBase + 'delts/band-reverse-fly.gif';
   }
 
-  // 26a. Remo / Tracción con Toalla en Marco de Puerta o Calistenia
+  // 24b. Natación Estática en Suelo / Swimmers (Espalda Media / Dorsal / Erectores)
+  if (nameLower.contains('swimmer') || nameLower.contains('natacion') || nameLower.contains('natación')) {
+    return _kGifBase + 'glutes/swimmer-kicks-v-2-male.gif';
+  }
+
+  // 24c. Retracción Escapular / Prone Y-T-W en Suelo
+  if (nameLower.contains('retraccion escapular') || nameLower.contains('retracción escapular') || nameLower.contains('y-t-w') || nameLower.contains('escapular')) {
+    return _kGifBase + 'delts/band-y-raise.gif';
+  }
+
+  // 24d. Back Slides / Deslizamiento Dorsal Escapular en Suelo
+  if (nameLower.contains('back slide') || nameLower.contains('deslizamiento dorsal')) {
+    return _kGifBase + 'upper-back/bodyweight-standing-row.gif';
+  }
+
+  // 24e. Dominadas / Pull-ups / Chin-ups
+  if (nameLower.contains('chin-up') || nameLower.contains('chin up') || nameLower.contains('supino') || nameLower.contains('supina')) {
+    return _kGifBase + 'lats/chin-up.gif';
+  }
+  if (nameLower.contains('neutro') || nameLower.contains('neutra') || nameLower.contains('parallel')) {
+    return _kGifBase + 'lats/pull-up-neutral-grip.gif';
+  }
+  if (nameLower.contains('asistida') || nameLower.contains('asistidas') || nameLower.contains('silla')) {
+    return _kGifBase + 'lats/band-assisted-pull-up.gif';
+  }
+  if (nameLower.contains('dominada') || nameLower.contains('pull up') || nameLower.contains('pull-up')) {
+    return _kGifBase + 'lats/pull-up.gif';
+  }
+
+  // 24f. Remo / Tracción con Toalla en Marco de Puerta o Calistenia
   if (nameLower.contains('toalla') || nameLower.contains('towel')) {
     if (nameLower.contains('pie') || nameLower.contains('pierna') || nameLower.contains('talon') || nameLower.contains('talón') || nameLower.contains('femoral') || nameLower.contains('isquio')) {
       return _kGifBase + 'hamstrings/single-leg-platform-slide.gif';
@@ -362,44 +396,7 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + 'upper-back/bodyweight-standing-row-with-towel.gif';
   }
 
-  // 26b. Natación Estática en Suelo / Swimmers (Espalda Media / Dorsal / Erectores)
-  if (nameLower.contains('swimmer') || nameLower.contains('natacion') || nameLower.contains('natación')) {
-    return _kGifBase + 'glutes/swimmer-kicks-v-2-male.gif';
-  }
-
-  // 26c. Pájaros Escapulares / Decúbito Prono / Deltoides Posterior / Romboides
-  if (nameLower.contains('pajaro') || nameLower.contains('pájaros') || nameLower.contains('pajaros') || nameLower.contains('reverse fly') || nameLower.contains('rear delt')) {
-    if (nameLower.contains('mochila') || nameLower.contains('garrafa') || nameLower.contains('pausa de 2s')) {
-      return _kGifBase + 'delts/dumbbell-rear-delt-raise.gif';
-    }
-    return _kGifBase + 'delts/band-reverse-fly.gif';
-  }
-
-  // 26d. Back Slides / Deslizamiento Dorsal Escapular en Suelo
-  if (nameLower.contains('back slide') || nameLower.contains('deslizamiento dorsal')) {
-    return _kGifBase + 'upper-back/bodyweight-standing-row.gif';
-  }
-
-  // 26e. Retracción Escapular / Prone Y-T-W en Suelo
-  if (nameLower.contains('retraccion escapular') || nameLower.contains('retracción escapular') || nameLower.contains('y-t-w') || nameLower.contains('escapular')) {
-    return _kGifBase + 'delts/band-y-raise.gif';
-  }
-
-  // 26f. Dominadas / Pull-ups / Chin-ups
-  if (nameLower.contains('chin-up') || nameLower.contains('chin up') || nameLower.contains('supino') || nameLower.contains('supina')) {
-    return _kGifBase + 'lats/chin-up.gif';
-  }
-  if (nameLower.contains('neutro') || nameLower.contains('neutra') || nameLower.contains('parallel')) {
-    return _kGifBase + 'lats/pull-up-neutral-grip.gif';
-  }
-  if (nameLower.contains('asistida') || nameLower.contains('asistidas') || nameLower.contains('silla')) {
-    return _kGifBase + 'lats/band-assisted-pull-up.gif';
-  }
-  if (nameLower.contains('dominada') || nameLower.contains('pull up') || nameLower.contains('pull-up')) {
-    return _kGifBase + 'lats/pull-up.gif';
-  }
-
-  // 26. Remos / Jalones
+  // 24g. Remos / Jalones
   if (nameLower.contains('remo') || nameLower.contains('row') || nameLower.contains('jalon') || nameLower.contains('jalón') || nameLower.contains('espalda') || nameLower.contains('dorsal')) {
     if (nameLower.contains('mochila')) {
       return _kGifBase + 'upper-back/one-arm-towel-row.gif';
@@ -420,6 +417,21 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + (isLow
         ? 'upper-back/band-one-arm-twisting-seated-row.gif'
         : (isHigh ? 'upper-back/barbell-bent-over-row.gif' : 'upper-back/cable-low-seated-row.gif'));
+  }
+
+  // 25. Elevaciones Laterales y Frontales
+  if (nameLower.contains('lateral raise') || nameLower.contains('elevacion lateral') || nameLower.contains('elevaciones laterales') || nameLower.contains('elevación lateral') || nameLower.contains('elevacion frontal') || nameLower.contains('elevación frontal') || nameLower.contains('front raise')) {
+    return _kGifBase + (isLow ? 'delts/band-front-lateral-raise.gif' : 'delts/dumbbell-lateral-raise.gif');
+  }
+
+  // 26. Press Militar / Overhead Press Estricto (SOLO presses verticales reales)
+  if (nameLower.contains('militar') || nameLower.contains('shoulder press') || nameLower.contains('overhead press') || nameLower.contains('press vertical') || nameLower.contains('press de hombro') || nameLower.contains('press arnold')) {
+    if (nameLower.contains('barra')) {
+      return _kGifBase + 'delts/barbell-seated-overhead-press.gif';
+    }
+    return _kGifBase + (isLow
+        ? 'delts/band-shoulder-press.gif'
+        : (isHigh ? 'delts/barbell-seated-overhead-press.gif' : 'delts/dumbbell-seated-shoulder-press.gif'));
   }
 
   // 27. Abducción de Cadera
