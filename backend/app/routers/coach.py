@@ -1379,22 +1379,22 @@ CORE_POOLS = {
             "secondary_muscle": "Oblicuos",
         },
         {
-            "name": "Remo postural sentado con retracción escapular (Básico)",
+            "name": "Bird-Dog con control motor y pausa isométrica (Básico)",
             "sets": 3,
-            "reps": "12",
-            "animation_key": "row",
-            "primary_muscle": "Espalda Media, Postura Dorsal",
-            "secondary_muscle": "Romboides, Core",
+            "reps": "10 por lado",
+            "animation_key": "mobility",
+            "primary_muscle": "Core Profundo, Glúteos",
+            "secondary_muscle": "Zona Lumbar",
         },
     ],
     "media": [
         {
-            "name": "Plancha abdominal frontal con toque de hombros (Intermedio)",
+            "name": "Plancha abdominal frontal isométrica en antebrazos (Intermedio)",
             "sets": 3,
             "reps": "35-45 seg",
             "animation_key": "plank",
             "primary_muscle": "Core, Transverso Abdominal",
-            "secondary_muscle": "Oblicuos, Deltoides",
+            "secondary_muscle": "Oblicuos, Glúteos",
         },
         {
             "name": "Dead Bug alterno completo sin apoyo (Intermedio)",
@@ -3426,7 +3426,9 @@ def _normalize_exercises(
 
         if is_dup_global_name or is_dup_today_name or is_dup_gif or has_dup_squat:
             if is_no_equipment:
-                if any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
+                if affected_zone == "hombro" or any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
+                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, []) + core_pool
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
                     cand_pool = CALISTHENIC_CHEST_POOL
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("espalda", "dorsal", "remo")):
                     cand_pool = CALISTHENIC_BACK_POOL
@@ -3435,16 +3437,18 @@ def _normalize_exercises(
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pierna", "cuadriceps", "femoral", "gluteo")):
                     cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
                 else:
-                    cand_pool = CALISTHENIC_CHEST_POOL + CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL + leg_pool
+                    cand_pool = leg_pool + core_pool
             else:
-                if any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
+                if affected_zone == "hombro" or any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
+                    cand_pool = leg_pool + core_pool
+                elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
                     cand_pool = GYM_CHEST_POOL
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("espalda", "dorsal", "remo")):
                     cand_pool = [e for e in all_upper if _is_back_exercise(e["name"], e.get("primary_muscle", ""))]
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("hombro", "deltoid")):
                     cand_pool = [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
                 else:
-                    cand_pool = upper_pool + leg_pool + core_pool
+                    cand_pool = leg_pool + core_pool
 
             # Prioridad 1: Candidato no visto globalmente en toda la semana ni hoy
             found_unique = False
@@ -3452,6 +3456,10 @@ def _normalize_exercises(
                 cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
                     cand["name"], cand["primary_muscle"], cand.get("animation_key", "pushup"), is_no_equipment
                 )
+                if affected_zone:
+                    cand_clean, cand_prim, _, cand_anim = _sanitize_exercise_by_injury(
+                        cand_clean, cand_prim, cand.get("secondary_muscle", ""), cand_anim, affected_zone
+                    )
                 cand_base = re.sub(r"\(.*?\)", "", cand_clean).strip().lower()
                 cand_gif = get_exercise_gif(cand_clean, muscle=cand_prim, intensity=intensity_hint, is_no_equipment=is_no_equipment)
                 cand_url = (cand_gif.get("url") or "").strip()
@@ -3472,6 +3480,10 @@ def _normalize_exercises(
                     cand_clean, cand_prim, cand_anim = _sanitize_exercise_by_equipment(
                         cand["name"], cand["primary_muscle"], cand.get("animation_key", "pushup"), is_no_equipment
                     )
+                    if affected_zone:
+                        cand_clean, cand_prim, _, cand_anim = _sanitize_exercise_by_injury(
+                            cand_clean, cand_prim, cand.get("secondary_muscle", ""), cand_anim, affected_zone
+                        )
                     cand_base = re.sub(r"\(.*?\)", "", cand_clean).strip().lower()
                     cand_gif = get_exercise_gif(cand_clean, muscle=cand_prim, intensity=intensity_hint, is_no_equipment=is_no_equipment)
                     cand_url = (cand_gif.get("url") or "").strip()
@@ -3674,6 +3686,12 @@ def _normalize_structured_plan(
 
     weekly_seen_names: set[str] = set()
     weekly_seen_gifs: set[str] = set()
+
+    _parent_normalize_exercises = globals()["_normalize_exercises"]
+    def _normalize_exercises(*args, **kwargs):
+        if "affected_zone" not in kwargs:
+            kwargs["affected_zone"] = affected_zone
+        return _parent_normalize_exercises(*args, **kwargs)
 
     # exercises es la lista de muestra/resumen en la raíz del plan; no debe consumir candidatos semanales
     exercises = _normalize_exercises(
@@ -3879,27 +3897,53 @@ def _normalize_structured_plan(
         recommended_days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
         for d in week_order:
             if d == "Martes":
+                if affected_zone == "hombro":
+                    t_title = f"Rutina Complementaria: Core y Abdomen en Suelo ({level} · {badge_lbl})"
+                    t_exs = core_front + core_deep[:1]
+                    t_focus = "solo_core"
+                elif affected_zone in ("rodilla", "tobillo"):
+                    t_title = f"Rutina Complementaria: Tren Superior Sentado ({level} · {badge_lbl})"
+                    t_exs = upper_chest_tri[:2] + upper_back_bi[:2]
+                    t_focus = "tren_superior"
+                else:
+                    t_title = f"Rutina Complementaria: Tren Superior (Pecho y Espalda) ({level} · {badge_lbl})"
+                    t_exs = upper_chest_tri + upper_back_bi
+                    t_focus = "tren_superior"
                 days_schedule[d] = {
                     "day_name": d,
                     "is_rest": False,
-                    "title": f"Rutina Complementaria: Tren Superior (Pecho y Espalda) ({level} · {badge_lbl})",
+                    "title": t_title,
                     "exercises": _normalize_exercises(
-                        upper_chest_tri + upper_back_bi,
-                        intensity=intensity, level=level, requested_focus="tren_superior",
+                        t_exs,
+                        intensity=intensity, level=level, requested_focus=t_focus,
                         is_no_equipment=is_no_equipment,
                         seen_names_global=weekly_seen_names, seen_gifs_global=weekly_seen_gifs,
+                        affected_zone=affected_zone,
                     ),
                 }
             elif d == "Jueves":
+                if affected_zone == "hombro":
+                    t_title = f"Rutina Complementaria: Femorales e Isquiotibiales en Suelo ({level} · {badge_lbl})"
+                    t_exs = legs_hams[:3] + core_obliques[:1]
+                    t_focus = "solo_piernas"
+                elif affected_zone in ("rodilla", "tobillo"):
+                    t_title = f"Rutina Complementaria: Torso y Brazos ({level} · {badge_lbl})"
+                    t_exs = upper_shoulders_post[:2] + upper_arms_torso[:2]
+                    t_focus = "solo_tren_superior"
+                else:
+                    t_title = f"Rutina Complementaria: Hombros, Brazos y Core ({level} · {badge_lbl})"
+                    t_exs = upper_shoulders_post + upper_arms_torso[:1] + core_front[:1]
+                    t_focus = "tren_superior_core"
                 days_schedule[d] = {
                     "day_name": d,
                     "is_rest": False,
-                    "title": f"Rutina Complementaria: Hombros, Brazos y Core ({level} · {badge_lbl})",
+                    "title": t_title,
                     "exercises": _normalize_exercises(
-                        upper_shoulders_post + upper_arms_torso[:1] + core_front[:1],
-                        intensity=intensity, level=level, requested_focus="tren_superior_core",
+                        t_exs,
+                        intensity=intensity, level=level, requested_focus=t_focus,
                         is_no_equipment=is_no_equipment,
                         seen_names_global=weekly_seen_names, seen_gifs_global=weekly_seen_gifs,
+                        affected_zone=affected_zone,
                     ),
                 }
             elif d == "Lunes":
@@ -3952,6 +3996,59 @@ def _normalize_structured_plan(
         recommended_days = target_days
 
         def _get_day_content(day_idx: int) -> tuple[str, list]:
+            if affected_zone == "hombro":
+                day_titles = [
+                    f"Tren Inferior: Cuádriceps y Estabilidad (Protección Hombros) ({badge_lbl})",
+                    f"Tren Inferior: Isquiotibiales y Cadena Posterior ({badge_lbl})",
+                    f"Core y Suelo: Abdomen y Estabilidad sin Carga Articular ({badge_lbl})",
+                    f"Tren Inferior: Glúteos y Gemelos / Sóleo ({badge_lbl})",
+                    f"Tren Inferior y Core: Circuito Funcional Seguro ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    legs_quads[:3] + core_front[:1],
+                    legs_hams[:3] + core_obliques[:1],
+                    core_front[:2] + core_deep[:2],
+                    legs_glutes[:2] + legs_unipodal_calves[:2],
+                    legs_power_mob[:2] + (legs_hams[3:5] if len(legs_hams) > 4 else legs_hams[:2]),
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="solo_piernas",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                    affected_zone=affected_zone,
+                )
+            elif affected_zone in ("rodilla", "tobillo"):
+                day_titles = [
+                    f"Tren Superior: Pecho y Tríceps (Cero Impacto Piernas) ({badge_lbl})",
+                    f"Tren Superior: Espalda Dorsal y Bíceps ({badge_lbl})",
+                    f"Core en Suelo: Abdomen y Estabilidad ({badge_lbl})",
+                    f"Tren Superior: Hombros y Torso ({badge_lbl})",
+                    f"Torso Completo: Fuerza Controlada sin Apoyo ({badge_lbl})",
+                ]
+                day_exs_map = [
+                    upper_chest_tri[:3] + core_front[:1],
+                    upper_back_bi[:3] + core_obliques[:1],
+                    core_front[:2] + core_deep[:2],
+                    upper_shoulders_post[:3] + core_front[:1],
+                    upper_arms_torso[:2] + upper_back_bi[:1] + core_deep[:1],
+                ]
+                idx = day_idx % len(day_titles)
+                return day_titles[idx], _normalize_exercises(
+                    day_exs_map[idx],
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="solo_tren_superior",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                    affected_zone=affected_zone,
+                )
+
             req_parts = [p for p in (requested_focus or "").split("_") if p in ("pecho", "espalda", "hombros", "biceps", "triceps", "piernas", "core", "cardio", "femorales")]
             if requested_focus == "cuerpo_completo":
                 day_titles = [
@@ -5301,21 +5398,26 @@ Devuelve SOLO JSON."""
             f"\n8. PROTOCOLO CLÍNICO BIOMECÁNICO OBLIGATORIO POR DOLOR / LESIÓN EN {affected_profile['label'].upper()}:\n"
             f"   - El usuario presenta dolor, sobrecarga, molestia o lesión en: **{affected_profile['label']}**.\n"
             f"   - Valida el síntoma con empatía médica y explica biomecánicamente por qué debemos aislar esa articulación.\n"
+            f"   - Si el atleta tiene antecedentes en su perfil (Alergias: '{payload.allergies or 'Ninguna'}', Patologías: '{payload.pathology_or_allergies or 'Ninguna'}'), menciónalos con empatía confirmando que han sido integrados en las pautas para su total seguridad.\n"
             f"   - PROHIBICIÓN ABSOLUTA: {affected_profile['prohibited_prompt_text']}\n"
             f"   - OBLIGATORIO: {affected_profile['safe_prompt_text']}\n"
             f"   - En cada ejercicio generado, la biomecánica y postura debe confirmar explícitamente: 'Cero carga o impacto en {affected_profile['label']}'.\n"
+            f"   - Al final de tu mensaje explicativo, consúltale didácticamente qué prefiere priorizar hoy (ej. tren inferior completo, core en suelo o cardio suave sin impacto).\n"
         )
 
     is_no_equipment = _is_no_equipment(payload.equipment_details, payload.message, payload.today_is_home, payload.history)
     equip_instruction = ""
     if is_no_equipment:
+        calisthenic_examples = "Sentadilla libre profunda, Wall Sit en pared, Sentadilla búlgara en silla, Peso muerto unilateral libre, Puentes de glúteo en suelo, Curl femoral con toalla en suelo, Planchas, Dead Bug"
+        if not (affected_zone and affected_zone in ("hombro", "codo", "muneca")):
+            calisthenic_examples += ", Flexiones de pecho en suelo, Fondos en silla, Remo invertido bajo mesa, Pike push-ups"
         equip_instruction = (
             f"\n7. REGLA ESTRICTA DE CERO HERRAMIENTAS (CALISTENIA / PESO CORPORAL / EN CASA):\n"
             f"   - El atleta indicó EXPLÍCITAMENTE que NO TIENE HERRAMIENTAS NI EQUIPOS ('Sin Herramientas' / 'En Casa' / 'Sin equipo').\n"
             f"   - ESTÁ TERMINANTEMENTE PROHIBIDO prescribir máquinas de gimnasio (Prensa 45°, Máquina Smith, Camilla de femoral, Extensión de cuádriceps, Poleas, Hack, Multipower).\n"
             f"   - ESTÁ TERMINANTEMENTE PROHIBIDO prescribir mancuernas, barras olímpicas o discos.\n"
             f"   - TODOS LOS EJERCICIOS DEBEN SER 100% DE PESO CORPORAL / CALISTENIA / IMPLEMENTOS CASEROS (silla firme, pared, suelo, toalla en piso liso).\n"
-            f"   - Ejemplos obligatorios: Sentadilla libre profunda, Wall Sit en pared, Sentadilla búlgara en silla, Peso muerto unilateral libre, Puentes de glúteo en suelo, Curl femoral con toalla en suelo, Flexiones de pecho en suelo, Fondos en silla, Remo invertido bajo mesa, Pike push-ups, Planchas.\n"
+            f"   - Ejemplos obligatorios permitidos: {calisthenic_examples}.\n"
         )
     user_msg_lower = (payload.message or "").lower()
 
@@ -5746,6 +5848,7 @@ Devuelve SOLO JSON."""
         is_no_equipment=is_no_equipment,
         has_active_plan=has_active_plan,
         history=payload.history,
+        affected_zone=affected_zone,
     )
     has_plan = bool(data.get("has_plan")) and structured_plan is not None and should_generate_plan
     reply_str = str(data.get("reply") or raw or "Entendido, continuamos afinando la rutina.")
@@ -6094,6 +6197,7 @@ def chat_with_coach(payload: ChatMessage):
                     "exercises": diverse_exs,
                     "nutrition": _build_safe_nutrition(payload.allergies, payload.pathology_or_allergies, payload.user_goal)
                 }
+                rescue_zone, _ = _detect_affected_joint_or_injury(payload)
                 norm_plan = _normalize_structured_plan(
                     raw_struct,
                     intensity=eff_int,
@@ -6101,9 +6205,9 @@ def chat_with_coach(payload: ChatMessage):
                     requested_focus=focus_req,
                     user_message=payload.message or "",
                     is_no_equipment=is_no_eq,
+                    affected_zone=rescue_zone,
                 )
                 eq_text = " (100% en casa sin herramientas)" if is_no_eq else ""
-                rescue_zone, _ = _detect_affected_joint_or_injury(payload)
                 if rescue_zone:
                     rescue_qr = [
                         "📅 Añadir al Cronograma",
