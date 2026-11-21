@@ -6612,22 +6612,23 @@ def export_bitacora_report(cedula: str, print_auto: bool = True):
         "fat_grams_oxidized": 26.5,
     }
 
-    try:
-        u_res = admin.table("usuarios").select("*").eq("cedula", cedula).execute()
-        if u_res.data:
-            user_info = u_res.data[0]
-    except Exception:
-        pass
-
+    user_info = _db_get_user_profile(user_id=None, cedula=cedula)
     user_id = user_info.get("id") or cedula
     user_name = f"{user_info.get('nombre', '')} {user_info.get('apellido', '')}".strip() or "Atleta"
 
-    # Obtener sesiones registradas
-    try:
-        ses_res = admin.table("workout_sessions").select("*").eq("client_id", user_id).order("scheduled_date", desc=True).execute()
-        sessions = ses_res.data or []
-    except Exception:
-        pass
+    # Obtener sesiones registradas via PostgreSQL
+    conn = _get_db_conn()
+    if conn:
+        try:
+            import psycopg2.extras
+            with conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute("SELECT * FROM workout_sessions WHERE client_id::text = %s ORDER BY scheduled_date DESC;", (str(user_id),))
+                    sessions = [dict(r) for r in cur.fetchall()]
+        except Exception as e:
+            print("Error obteniendo workout_sessions en bitácora:", e)
+        finally:
+            conn.close()
 
     if sessions:
         stats["total_sessions"] = len(sessions)
