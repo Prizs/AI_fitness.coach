@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -82,6 +83,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final s = val.toString().replaceAll(RegExp(r'[^0-9.]'), '');
     return double.tryParse(s) ?? fallback;
   }
+
+  String _cleanPhotoUrl(String? url) {
+    if (url == null || url.isEmpty) return '';
+    if (url.startsWith('/')) {
+      return '${AuthService.apiBaseUrl}$url';
+    }
+    return url;
+  }
+
 
   Future<void> _fetchPhotos() async {
     final user = AuthService.instance.loggedInUser;
@@ -1162,6 +1172,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   void _showImageZoom(String imageUrl, String title) {
+    final targetUrl = _cleanPhotoUrl(imageUrl);
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -1190,7 +1201,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.network(
-                  imageUrl,
+                  targetUrl,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const Padding(
                     padding: EdgeInsets.all(32),
@@ -2090,7 +2101,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   },
                   itemBuilder: (context, idx) {
                     final item = photos[idx];
-                    final photoUrl = item is Map ? (item['photo_url'] ?? '') : '';
+                    final rawPhotoUrl = item is Map ? (item['photo_url'] ?? '') : '';
+                    final photoUrl = _cleanPhotoUrl(rawPhotoUrl);
                     final createdAt = item is Map && item['created_at'] != null
                         ? item['created_at'].toString().substring(0, 10)
                         : '';
@@ -2103,26 +2115,42 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     return Stack(
                       fit: StackFit.expand,
                       children: [
-                        // Imagen con soporte de red y fallback de carga
+                        // Imagen con soporte de red, desenfoque de fondo y ajuste completo
                         if (photoUrl.isNotEmpty)
                           GestureDetector(
                             onTap: () => _showImageZoom(photoUrl, stage),
-                            child: Image.network(
-                              photoUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: const Color(0xFF162338),
-                                child: const Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.broken_image_rounded, color: Colors.white24, size: 48),
-                                      SizedBox(height: 8),
-                                      Text('Error cargando fotografía', style: TextStyle(color: Colors.white38, fontSize: 12)),
-                                    ],
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.network(
+                                  photoUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const SizedBox(),
+                                ),
+                                BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                  child: Container(color: Colors.black.withOpacity(0.55)),
+                                ),
+                                Center(
+                                  child: Image.network(
+                                    photoUrl,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: const Color(0xFF162338),
+                                      child: const Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.broken_image_rounded, color: Colors.white24, size: 48),
+                                            SizedBox(height: 8),
+                                            Text('Error cargando fotografía', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
                           )
                         else
@@ -2708,6 +2736,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             Theme(
               data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
+                initiallyExpanded: true,
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: const EdgeInsets.only(bottom: 8),
                 title: const Row(
@@ -2839,6 +2868,7 @@ class _MiniProgressChartPainter extends CustomPainter {
     final s = val.toString().replaceAll(RegExp(r'[^0-9.]'), '');
     return double.tryParse(s) ?? fallback;
   }
+
 
   @override
   void paint(Canvas canvas, Size size) {

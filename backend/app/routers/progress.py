@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, date
@@ -8,6 +9,7 @@ import io
 import json
 import re
 import time
+import base64
 import httpx
 from app.services.supabase_service import get_supabase_admin_client
 
@@ -153,7 +155,7 @@ def _db_insert_coach_message(u_id: str, u_cedula: str, role: str, category: str,
         conn.close()
 
 
-def _db_insert_progress_photo(u_id: str, photo_url: str, ai_analysis_json: str):
+def _db_insert_progress_photo(u_id: str, photo_url: str, ai_analysis_json: str, photo_base64: Optional[str] = None):
     conn = _get_db_conn()
     if not conn:
         return None
@@ -163,14 +165,22 @@ def _db_insert_progress_photo(u_id: str, photo_url: str, ai_analysis_json: str):
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
                     """
-                    INSERT INTO progress_photos (user_id, photo_url, ai_analysis, created_at)
-                    VALUES (%s, %s, %s, NOW())
-                    RETURNING id, user_id, photo_url, ai_analysis, created_at;
+                    INSERT INTO progress_photos (user_id, photo_url, ai_analysis, photo_base64, created_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                    RETURNING id, user_id, photo_url, ai_analysis, photo_base64, created_at;
                     """,
-                    (u_id, photo_url, ai_analysis_json)
+                    (u_id, photo_url, ai_analysis_json, photo_base64)
                 )
                 row = cur.fetchone()
-                return dict(row) if row else None
+                if row:
+                    item = dict(row)
+                    row_id = str(item["id"])
+                    if not photo_url or "placehold.co" in photo_url:
+                        official_url = f"/api/progress/photo/{row_id}"
+                        cur.execute("UPDATE progress_photos SET photo_url = %s WHERE id = %s;", (official_url, row_id))
+                        item["photo_url"] = official_url
+                    return item
+                return None
     except Exception as e:
         print("Error en _db_insert_progress_photo:", e)
         return None
@@ -187,11 +197,22 @@ def _db_get_progress_photos(u_id: str):
         with conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    "SELECT id, user_id, photo_url, ai_analysis, created_at FROM progress_photos WHERE user_id::text = %s ORDER BY created_at ASC;",
+                    "SELECT id, user_id, photo_url, ai_analysis, photo_base64, created_at FROM progress_photos WHERE user_id::text = %s ORDER BY created_at ASC;",
                     (u_id,)
                 )
                 rows = cur.fetchall()
-                return [dict(r) for r in rows]
+                result = []
+                for r in rows:
+                    item = dict(r)
+                    row_id = str(item["id"])
+                    p_url = item.get("photo_url") or ""
+                    if item.get("photo_base64") and ("placehold.co" in p_url or not p_url):
+                        item["photo_url"] = f"/api/progress/photo/{row_id}"
+                    elif not p_url:
+                        item["photo_url"] = f"/api/progress/photo/{row_id}"
+                    item.pop("photo_base64", None)
+                    result.append(item)
+                return result
     except Exception as e:
         print("Error en _db_get_progress_photos:", e)
         return []
@@ -363,12 +384,14 @@ async def upload_progress_photo(
             sanitized_name = f"scale_{int(time.time())}.jpg"
             file_path = f"{u_id}/{sanitized_name}"
             public_url = ""
+            scale_bytes = scale_bytes if 'scale_bytes' in locals() else await target_scale_upload.read()
+            scale_b64 = base64.b64encode(scale_bytes).decode("utf-8")
             try:
-                scale_bytes = scale_bytes if 'scale_bytes' in locals() else await target_scale_upload.read()
                 admin.storage.from_("progress").upload(file_path, scale_bytes, {"content-type": "image/jpeg"})
                 public_url = admin.storage.from_("progress").get_public_url(file_path)
             except Exception as e_st:
-                public_url = f"https://placehold.co/600x400/1E293B/38BDF8.png?text=Balanza+{detected_weight or u_weight}+kg"
+                print("Aviso storage Supabase (scale):", e_st)
+                public_url = ""
 
             analysis_dict = {
                 "headline": f"⚖️ Peso de {detected_weight or u_weight} kg identificado y registrado exitosamente en balanza.",
@@ -387,11 +410,14 @@ async def upload_progress_photo(
                 "motivational_quote": "Cada pesaje consciente te acerca a tu meta.",
             }
 
-            _db_insert_progress_photo(
+            inserted_rec = _db_insert_progress_photo(
                 u_id=u_id,
                 photo_url=public_url,
-                ai_analysis_json=json.dumps(analysis_dict, ensure_ascii=False)
+                ai_analysis_json=json.dumps(analysis_dict, ensure_ascii=False),
+                photo_base64=scale_b64
             )
+            if inserted_rec and not public_url:
+                public_url = inserted_rec.get("photo_url") or f"/api/progress/photo/{inserted_rec.get('id')}"
 
             return {
                 "status": "ok",
@@ -618,7 +644,10 @@ async def upload_progress_photo(
                 }
             analysis_raw = json.dumps(structured_analysis, ensure_ascii=False)
 
-        # Subir a Supabase Storage
+        # Guardar foto en Base64 de forma infalible en PostgreSQL
+        b64_photo = base64.b64encode(file_bytes).decode("utf-8")
+
+        # Intentar respaldo en Supabase Storage
         sanitized_filename = f"{int(time.time())}_{file.filename or 'photo.jpg'}"
         file_path = f"{u_id}/{sanitized_filename}"
         public_url = ""
@@ -626,11 +655,13 @@ async def upload_progress_photo(
             admin.storage.from_("progress").upload(file_path, file_bytes, {"content-type": mime})
             public_url = admin.storage.from_("progress").get_public_url(file_path)
         except Exception as storage_err:
-            print("Aviso storage Supabase:", storage_err)
-            public_url = f"https://placehold.co/600x400/1E293B/1FAE87.png?text=Foto+Progreso+{int(time.time())}"
+            print("Aviso storage Supabase (usando PostgreSQL storage):", storage_err)
+            public_url = ""
 
-        # Guardar en Base de Datos via Postgres
-        _db_insert_progress_photo(u_id, public_url, analysis_raw)
+        # Guardar en Base de Datos via Postgres con photo_base64
+        inserted_rec = _db_insert_progress_photo(u_id, public_url, analysis_raw, photo_base64=b64_photo)
+        if inserted_rec and not public_url:
+            public_url = inserted_rec.get("photo_url") or f"/api/progress/photo/{inserted_rec.get('id')}"
 
         # Sincronizar automáticamente en coach_mensajes via Postgres
         try:
@@ -664,6 +695,42 @@ async def upload_progress_photo(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/photo/{photo_id}")
+async def get_progress_photo(photo_id: str):
+    conn = _get_db_conn()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Error conectando a la base de datos")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT photo_base64, photo_url FROM progress_photos WHERE id::text = %s LIMIT 1;", (photo_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Fotografía no encontrada")
+            b64_data, p_url = row[0], row[1]
+            if b64_data:
+                if "," in b64_data:
+                    b64_data = b64_data.split(",", 1)[1]
+                raw_bytes = base64.b64decode(b64_data)
+                media_type = "image/jpeg"
+                if raw_bytes.startswith(b"\x89PNG"):
+                    media_type = "image/png"
+                elif raw_bytes.startswith(b"RIFF") and b"WEBP" in raw_bytes[:16]:
+                    media_type = "image/webp"
+                return Response(
+                    content=raw_bytes,
+                    media_type=media_type,
+                    headers={
+                        "Cache-Control": "public, max-age=86400",
+                        "Content-Type": media_type
+                    }
+                )
+            elif p_url and p_url.startswith("http") and "placehold.co" not in p_url:
+                return RedirectResponse(url=p_url)
+            raise HTTPException(status_code=404, detail="No hay imagen disponible para esta evaluación")
+    finally:
+        conn.close()
 
 
 @router.get("/{user_id}")
