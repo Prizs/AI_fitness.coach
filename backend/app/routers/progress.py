@@ -588,8 +588,29 @@ async def upload_progress_photo(
                     comp["body_fat_delta"] = round(parse_numeric(comp.get("body_fat_delta"), parsed["estimated_body_fat"] - prev_fat), 1)
                     comp["muscle_definition_delta"] = round(parse_numeric(comp.get("muscle_definition_delta"), parsed["muscle_definition_score"] - prev_def), 1)
                     comp["posture_delta"] = round(parse_numeric(comp.get("posture_delta"), parsed["posture_score"] - prev_posture), 1)
-                    if not isinstance(comp.get("specific_anatomical_changes"), list):
-                        comp["specific_anatomical_changes"] = [str(comp.get("specific_anatomical_changes") or "Evolución anatómica positiva")]
+
+                    # Evaluación clínica objetiva de AVANCE vs RETROCESO
+                    fat_d = comp["body_fat_delta"]
+                    def_d = comp["muscle_definition_delta"]
+                    if fat_d > 0.5 or def_d < -0.3:
+                        comp["clinical_comparison"] = (
+                            f"Al contrastar con la fotografía del {prev_date}, se evidencia un retroceso físico con aumento de tejido adiposo "
+                            f"(+{fat_d}%) y pérdida de tono y definición ({def_d} pts). Es indispensable ajustar el plan nutricional hacia un "
+                            f"déficit calórico estricto y aumentar el gasto energético de los entrenamientos."
+                        )
+                        comp["specific_anatomical_changes"] = [
+                            f"Incremento notable del panículo adiposo (+{fat_d}%)",
+                            f"Atenuación del relieve muscular ({def_d} pts)",
+                            "Ajustar déficit calórico urgente y evitar excesos de carbohidratos/grasas"
+                        ]
+                        parsed["positive_changes"] = [
+                            "Mantenimiento de la alineación postural",
+                            "Disposición anatómica para revertir el retroceso con reajuste de dieta"
+                        ]
+                        parsed["headline"] = f"Alerta de Recomposición: Incremento de Grasa Corporal (+{fat_d}%) - Se requiere Déficit Calórico"
+                    else:
+                        if not isinstance(comp.get("specific_anatomical_changes"), list):
+                            comp["specific_anatomical_changes"] = [str(comp.get("specific_anatomical_changes") or "Evolución anatómica positiva")]
 
                 if isinstance(parsed.get("positive_changes"), str):
                     parsed["positive_changes"] = [parsed["positive_changes"]]
@@ -631,16 +652,37 @@ async def upload_progress_photo(
                 "motivational_quote": "Cada jornada suma hacia la mejor versión de tu físico."
             }
             if not is_first:
+                fat_d = round(cur_fat - prev_fat, 1)
+                def_d = round(cur_def - prev_def, 1)
+                if fat_d > 0.5 or def_d < -0.3:
+                    clin_comp = (
+                        f"Al comparar con el registro previo del {prev_date}, se detecta un aumento en el porcentaje graso (+{fat_d}%) "
+                        f"y menor definición muscular ({def_d} pts). Es indispensable ajustar el plan nutricional hacia un déficit calórico y "
+                        f"aumentar la intensidad del gasto calórico."
+                    )
+                    anat_changes = [
+                        f"Aumento del panículo adiposo (+{fat_d}%)",
+                        f"Reducción del tono y relieve muscular ({def_d} pts)",
+                        "Revisar adherencia a la dieta y evitar superávit calórico"
+                    ]
+                    structured_analysis["positive_changes"] = [
+                        "Mantenimiento de soporte óseo y simetría",
+                        "Oportunidad de recomposición corporal con déficit calórico"
+                    ]
+                else:
+                    clin_comp = f"Al comparar con la foto del {prev_date}, se observa progresión positiva en la reducción de grasa ({fat_d}%) y recomposición muscular (+{def_d} pts)."
+                    anat_changes = [
+                        f"Disminución del tejido graso ({fat_d}%)",
+                        f"Mayor definición y vascularización muscular (+{def_d} pts)"
+                    ]
+
                 structured_analysis["comparison_with_previous"] = {
                     "previous_date": prev_date,
-                    "body_fat_delta": round(cur_fat - prev_fat, 1),
-                    "muscle_definition_delta": round(cur_def - prev_def, 1),
+                    "body_fat_delta": fat_d,
+                    "muscle_definition_delta": def_d,
                     "posture_delta": 0.0,
-                    "clinical_comparison": f"Al comparar con la foto del {prev_date}, se observa progresión en la adaptación muscular y recomposición.",
-                    "specific_anatomical_changes": [
-                        "Avance consistente en la firmeza del tronco",
-                        "Mayor control postural durante la toma fotográfica"
-                    ]
+                    "clinical_comparison": clin_comp,
+                    "specific_anatomical_changes": anat_changes
                 }
             analysis_raw = json.dumps(structured_analysis, ensure_ascii=False)
 

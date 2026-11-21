@@ -72,7 +72,7 @@ String resolveGuaranteedGifUrl({
         // 1. Puentes, Buenos Días o Peso Muerto mostrando Curl de Pierna
         ((nameLower.contains('puente') || nameLower.contains('bridge') || nameLower.contains('hip thrust') || nameLower.contains('buenos d') || nameLower.contains('deadlift') || nameLower.contains('peso muerto')) && cleanExisting.contains('curl')) ||
         // 2. Fondos o Tríceps mostrando Flexiones de Pecho (Push-up)
-        ((nameLower.contains('fondo') || nameLower.contains('dip') || nameLower.contains('tricep') || nameLower.contains('trícep')) && cleanExisting.contains('push-up')) ||
+        (!nameLower.contains('pectoral') && !nameLower.contains('pecho') && (nameLower.contains('fondo') || nameLower.contains('dip') || nameLower.contains('tricep') || nameLower.contains('trícep')) && cleanExisting.contains('push-up')) ||
         // 3. Dead Bug, Plancha, Remos o Flexiones mostrando Gemelos
         ((nameLower.contains('dead bug') || nameLower.contains('plank') || nameLower.contains('plancha') || nameLower.contains('remo') || nameLower.contains('flexion') || nameLower.contains('flexión')) && cleanExisting.contains('calf')) ||
         // 4. Talones sentado / en silla mostrando elevación de pie
@@ -90,7 +90,7 @@ String resolveGuaranteedGifUrl({
         // 10. Elevación de piernas mostrando gemelos
         ((nameLower.contains('elevacion de pierna') || nameLower.contains('elevación de pierna') || nameLower.contains('leg raise')) && cleanExisting.contains('calf')) ||
         // 11. Sentadilla en pared mostrando sentadilla estándar
-        ((nameLower.contains('wall sit') || (nameLower.contains('en pared') && !nameLower.contains('bisagra'))) && !cleanExisting.contains('wall')) ||
+        ((nameLower.contains('wall sit') || (nameLower.contains('sentadilla en pared') && !nameLower.contains('bisagra'))) && !cleanExisting.contains('wall')) ||
         // 11b. Bisagra de Cadera mostrando Flexión de Pecho en pared o Wall Sit
         ((nameLower.contains('bisagra') || nameLower.contains('hip hinge')) && (cleanExisting.contains('push-up') || cleanExisting.contains('wall') || cleanExisting.contains('potty') || cleanExisting.contains('chest'))) ||
         // 12. Jumping Jacks mostrando burpees
@@ -125,7 +125,7 @@ String resolveGuaranteedGifUrl({
   }
 
   // 0c. Sentadilla Isométrica en Pared (Wall Sit)
-  if (nameLower.contains('wall sit') || (nameLower.contains('sentadilla en pared') || (nameLower.contains('en pared') && !nameLower.contains('bisagra')))) {
+  if ((nameLower.contains('wall sit') || nameLower.contains('sentadilla en pared') || nameLower.contains('sentadilla isometrica en pared')) && !nameLower.contains('flexion') && !nameLower.contains('push')) {
     return _kGifBase + 'glutes/march-sit-wall.gif';
   }
 
@@ -134,9 +134,9 @@ String resolveGuaranteedGifUrl({
     return _kGifBase + (isLow ? 'triceps/close-grip-push-up-on-knees.gif' : 'triceps/diamond-push-up.gif');
   }
 
-  // 0e. Flexiones en Pica (Pike Push-ups)
+  // 0e. Flexiones en Pica (Pike Push-ups) - Deltoides / Hombros
   if (nameLower.contains('pica') || nameLower.contains('pike')) {
-    return _kGifBase + (isLow ? 'delts/band-shoulder-press.gif' : 'triceps/handstand-push-up.gif');
+    return _kGifBase + 'delts/band-shoulder-press.gif';
   }
 
   // 0f. Jumping Jacks (Saltos en Tijera)
@@ -170,6 +170,9 @@ String resolveGuaranteedGifUrl({
 
   // 3. Fondos de Tríceps (Chair Dips / Bench Dips)
   if (nameLower.contains('fondo') || nameLower.contains('fondos') || nameLower.contains('dip') || nameLower.contains('chair dip') || nameLower.contains('bench dip')) {
+    if (nameLower.contains('pectoral') || nameLower.contains('pecho')) {
+      return _kGifBase + 'pectorals/assisted-chest-dip-kneeling.gif';
+    }
     return _kGifBase + (isLow
         ? 'triceps/bench-dip-knees-bent.gif'
         : (isHigh ? 'triceps/triceps-dip.gif' : 'triceps/bench-dip-on-floor.gif'));
@@ -186,7 +189,7 @@ String resolveGuaranteedGifUrl({
   }
 
   // 6. Plancha Frontal (Plank)
-  if (nameLower.contains('rodillas apoyadas') || nameLower.contains('plancha suave') || nameLower.contains('con rodillas')) {
+  if ((nameLower.contains('rodillas apoyadas') || nameLower.contains('plancha suave') || nameLower.contains('con rodillas')) && (nameLower.contains('plancha') || nameLower.contains('plank'))) {
     return _kGifBase + 'abs/kneeling-plank-tap-shoulder-male.gif';
   }
   if (nameLower.contains('plancha') || nameLower.contains('plank')) {
@@ -303,9 +306,9 @@ String resolveGuaranteedGifUrl({
         : (isHigh ? 'calves/lever-standing-calf-raise.gif' : 'calves/dumbbell-standing-calf-raise.gif'));
   }
 
-  // 18. Flexiones en Pica / Pike Push-ups
+  // 18. Flexiones en Pica / Pike Push-ups - Deltoides / Hombros
   if (nameLower.contains('pica') || nameLower.contains('pike')) {
-    return _kGifBase + (isLow ? 'delts/band-shoulder-press.gif' : 'triceps/handstand-push-up.gif');
+    return _kGifBase + 'delts/band-shoulder-press.gif';
   }
 
   // 19. Flexiones Diamante

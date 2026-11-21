@@ -756,15 +756,60 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                     trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF8BE0C0)),
                     onTap: () async {
                       Navigator.pop(ctx);
-                      final count = await _service.adaptRemainingDaysForInjury(opt['key']!, opt['label']!);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('¡Listo! Se adaptaron $count sesiones de tu semana para proteger tu ${opt['label']}.'),
-                            backgroundColor: const Color(0xFF173B45),
-                            duration: const Duration(seconds: 4),
+                      final choice = await showDialog<String>(
+                        context: context,
+                        builder: (dCtx) => AlertDialog(
+                          backgroundColor: const Color(0xFF0F192B),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          title: Row(
+                            children: [
+                              const Icon(Icons.healing_rounded, color: Color(0xFFFFB340), size: 22),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text('Molestia en ${opt['label']}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
                           ),
-                        );
+                          content: Text(
+                            '¿Deseas suspender el entrenamiento por hoy para guardar reposo articular de 24-48 horas o prefieres continuar con una rutina adaptada protegiendo tu ${opt['label']}?',
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dCtx, 'suspender'),
+                              child: const Text('Suspender por hoy (Reposo 24-48h)', style: TextStyle(color: Color(0xFFFF5252))),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF173B45)),
+                              onPressed: () => Navigator.pop(dCtx, 'adaptar'),
+                              child: const Text('Continuar sesión adaptada', style: TextStyle(color: Color(0xFF8BE0C0))),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (choice == 'suspender') {
+                        final count = await _service.adaptRemainingDaysForInjury(opt['key']!, opt['label']!);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Sesión suspendida. Tiempo de recuperación recomendado para tu ${opt['label']}: 24 a 48 horas de reposo activo.'),
+                              backgroundColor: const Color(0xFF2D1616),
+                              duration: const Duration(seconds: 5),
+                            ),
+                          );
+                        }
+                      } else if (choice == 'adaptar') {
+                        final count = await _service.adaptRemainingDaysForInjury(opt['key']!, opt['label']!);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('¡Listo! Se adaptaron $count sesiones tachando ejercicios contraindicados para tu ${opt['label']}.'),
+                              backgroundColor: const Color(0xFF173B45),
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
                       }
                     },
                   ),
@@ -1774,11 +1819,33 @@ class _DayCard extends StatelessWidget {
                 ),
                 title: Text(
                   item['name'] as String? ?? 'Ejercicio',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    decoration: (item['is_contraindicated'] == true || item['is_injured'] == true)
+                        ? TextDecoration.lineThrough
+                        : null,
+                    color: (item['is_contraindicated'] == true || item['is_injured'] == true)
+                        ? Colors.white38
+                        : Colors.white,
+                  ),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (item['is_contraindicated'] == true || item['is_injured'] == true)
+                      Container(
+                        margin: const EdgeInsets.only(top: 3, bottom: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF5252).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.5)),
+                        ),
+                        child: const Text(
+                          '⚠️ Suspendido por molestia articular · Reposo recomendado: 48-72h',
+                          style: TextStyle(color: Color(0xFFFF8A80), fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     const SizedBox(height: 2),
                     Text(
                       '${item['sets']} series · ${item['reps']} · $intensityLvl',

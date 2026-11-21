@@ -1814,7 +1814,61 @@ class _CoachScreenState extends State<CoachScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       const SizedBox(height: 14),
-                                      Text('🥗 Plan Alimenticio Recomendado$dayLabel:', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text('🥗 Plan Alimenticio Recomendado$dayLabel:', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                          InkWell(
+                                            borderRadius: BorderRadius.circular(8),
+                                            onTap: () {
+                                              setState(() {
+                                                final int curVar = (((effNutrition as Map)['_variant_index'] as int?) ?? 0) + 1;
+                                                (effNutrition as Map)['_variant_index'] = curVar;
+                                                final List<String> bAlt = [
+                                                  '2 huevos pericos criollos con tomate y cebolla, 1 arepa asada de maíz y 30g de queso llanero o aguacate criollo.',
+                                                  'Tortilla de 2 claras y 1 huevo entero con espinacas frescas y 1/2 plátano verde hervido.',
+                                                  '100g de pechuga de pollo desmechada con sofrito criollo y 1 arepa delgada de maíz tostada.',
+                                                  '2 huevos sancochados con sal marina, 1 taza de batata dulce cocida y 1/4 de aguacate criollo.',
+                                                  'Revuelto criollo de 2 huevos con cilantro y calabacín rallado y 1 trozo de yuca hervida con orégano.'
+                                                ];
+                                                final List<String> lAlt = [
+                                                  '150g de pechuga de pollo a la plancha con ajo y limón, 1 taza de arroz blanco, caraotas negras y ensalada fresca.',
+                                                  '150g de carne magra de res (bistec criollo) a la plancha, 1 taza de batata dulce cocida y ensalada de repollo con zanahoria.',
+                                                  '140g de carne molida magra guisada con pimentón y laurel, 1 taza de arroz blanco y ensalada verde con aceite de oliva.',
+                                                  '150g de pechuga de pollo desmechada con vegetales, puré de auyama criolla y 1/2 plátano maduro asado.',
+                                                  '150g de bistec de res a la plancha con rodajas de tomate y orégano, 1/2 taza de frijoles rojos y arroz al vapor.'
+                                                ];
+                                                final List<String> cAlt = [
+                                                  'Tortilla de 2 huevos con vegetales, ensalada verde con vinagreta natural y 1/2 arepa de maíz asada.',
+                                                  '120g de pollo a la plancha en tiritas con sal marina y ensalada tibia de vegetales al vapor (calabacín, zanahoria).',
+                                                  '2 huevos sancochados con sal marina y orégano acompañado de ensalada fresca verde con aguacate criollo.',
+                                                  '100g de pechuga de pollo desmechada con cilantro y 1 arepa pequeña tostada con queso llanero rallado.',
+                                                  'Omelette suave de 2 huevos relleno de calabacín y orégano acompañado de ensalada fresca de pepino y tomate.'
+                                                ];
+                                                (effNutrition as Map)['desayuno'] = bAlt[curVar % bAlt.length];
+                                                (effNutrition as Map)['almuerzo'] = lAlt[curVar % lAlt.length];
+                                                (effNutrition as Map)['cena'] = cAlt[curVar % cAlt.length];
+                                              });
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF173B45),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: const Color(0xFF8BE0C0).withValues(alpha: 0.4)),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.refresh_rounded, size: 13, color: Color(0xFF8BE0C0)),
+                                                  SizedBox(width: 4),
+                                                  Text('Variar menú', style: TextStyle(color: Color(0xFF8BE0C0), fontSize: 11, fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                       const SizedBox(height: 8),
                                       Container(
                                         width: double.infinity,

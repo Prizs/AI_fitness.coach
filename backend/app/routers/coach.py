@@ -2324,26 +2324,16 @@ def _build_daily_variant_nutrition(
             "Revuelto de 2 huevos con champiñones frescos y tomate"
         ]
 
-    if no_oats:
-        b_carbs = [
-            "1 arepa pequeña de maíz asada",
-            "1/2 plátano verde o maduro hervido",
-            "1 taza de batata cocida en rodajas",
-            "1 arepa delgada de maíz blanco tostada",
-            "1 trozo de yuca hervida con toque de orégano",
-            "1 arepa pequeña asada con afrecho o semillas de chía",
-            "1/2 taza de puré de auyama / calabaza criolla"
-        ]
-    else:
-        b_carbs = [
-            "1 arepa pequeña de maíz blanco asada",
-            "3 cucharadas de avena en hojuelas cocida con agua y canela",
-            "1/2 plátano maduro asado",
-            "1 arepa delgada tostada de maíz",
-            "3 cucharadas de avena tibia con agua y semillas",
-            "1 taza de batata dulce cocida",
-            "1 arepa pequeña asada al budare"
-        ]
+    # Carbohidratos energéticos criollos saludables (CERO avena por defecto para seguridad clínica y de alergias)
+    b_carbs = [
+        "1 arepa pequeña de maíz asada al budare",
+        "1/2 plátano verde o maduro hervido",
+        "1 taza de batata dulce cocida en rodajas",
+        "1 arepa delgada de maíz blanco tostada",
+        "1 trozo de yuca hervida con toque de orégano",
+        "1 arepa pequeña asada con afrecho o semillas de chía",
+        "1/2 taza de puré de auyama / calabaza criolla"
+    ]
 
     b_fats = "1/4 de aguacate criollo en rebanadas" if no_dairy else "30g de queso blanco llanero rallado o 1/4 de aguacate criollo"
 
@@ -3962,9 +3952,9 @@ def _normalize_exercises(
                     cand_pool = CALISTHENIC_BACK_POOL + CALISTHENIC_SHOULDERS_POOL
             elif is_no_equipment:
                 if any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
-                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, []) + core_pool
+                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, [])
                 elif affected_zone == "hombro":
-                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, []) + core_pool
+                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, []) + LEGS_DAY_B_POOLS.get(intensity_hint, [])
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
                     cand_pool = CALISTHENIC_CHEST_POOL
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("espalda", "dorsal", "remo")):
@@ -3974,12 +3964,12 @@ def _normalize_exercises(
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pierna", "cuadriceps", "femoral", "gluteo")):
                     cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
                 else:
-                    cand_pool = leg_pool + core_pool
+                    cand_pool = leg_pool
             else:
                 if any(k in (requested_focus or "").lower() for k in ("pierna", "solo_piernas")):
-                    cand_pool = leg_pool + core_pool
+                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
                 elif affected_zone == "hombro":
-                    cand_pool = leg_pool + core_pool
+                    cand_pool = leg_pool + LEGS_DAY_A_POOLS.get(intensity_hint, [])
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("pecho", "pectoral")):
                     cand_pool = GYM_CHEST_POOL
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("espalda", "dorsal", "remo")):
@@ -3987,7 +3977,7 @@ def _normalize_exercises(
                 elif any(k in (clean_name + " " + primary + " " + (requested_focus or "")).lower() for k in ("hombro", "deltoid")):
                     cand_pool = [e for e in all_upper if _is_shoulder_exercise(e["name"], e.get("primary_muscle", ""))]
                 else:
-                    cand_pool = leg_pool + core_pool
+                    cand_pool = leg_pool
 
             # Prioridad 1: Candidato no visto globalmente en toda la semana ni hoy
             found_unique = False
@@ -4535,6 +4525,17 @@ def _normalize_structured_plan(
     else:
         # PLAN SEMANAL COMPLETO o MENSUAL ADAPTADO AL USUARIO:
         target_days = _detect_requested_training_days(user_message)
+
+        # REGLA DE RECUPERACIÓN NEUROMUSCULAR (48-72h):
+        # Si el usuario solicita un foco muscular único específico (pecho, espalda, hombros, piernas, etc.),
+        # se programan exactamente 3 días a la semana (Lunes, Miércoles, Viernes) para proteger contra sobreentrenamiento,
+        # dejando Martes, Jueves, Sábado y Domingo en descanso/supercompensación neuromuscular salvo que pida 5 o 6 días expresamente.
+        single_muscle_foci = ("pecho", "pectorales", "espalda", "dorsales", "hombros", "piernas", "solo_piernas", "piernas_gluteos", "cuadriceps", "femorales", "femorales_isquios", "gluteos", "biceps", "solo_biceps", "triceps", "solo_triceps", "core", "solo_core")
+        u_msg_low = (user_message or "").lower()
+        if requested_focus in single_muscle_foci:
+            if not any(k in u_msg_low for k in ("lunes a viernes", "lunes a sabado", "lunes a sábado", "5 dias", "5 días", "6 dias", "6 días", "todos los dias", "todos los días")):
+                target_days = ["Lunes", "Miércoles", "Viernes"]
+
         recommended_days = target_days
 
         def _get_day_content(day_idx: int) -> tuple[str, list]:
@@ -4576,6 +4577,26 @@ def _normalize_structured_plan(
                     intensity=intensity,
                     level=level,
                     requested_focus="espalda",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("piernas", "solo_piernas", "piernas_gluteos"):
+                day_titles = [
+                    f"Piernas: Cuádriceps, Sentadillas y Fuerza ({badge_lbl})",
+                    f"Piernas: Isquiotibiales, Femoral y Cadena Posterior ({badge_lbl})",
+                    f"Piernas: Glúteos, Puentes y Aislamiento ({badge_lbl})",
+                    f"Piernas: Fuerza Unipodal, Búlgaras y Pantorrillas ({badge_lbl})",
+                    f"Piernas: Potencia Funcional, Bombeo y Movilidad ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("piernas", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="piernas",
                     is_no_equipment=is_no_equipment,
                     seen_names_global=weekly_seen_names,
                     seen_gifs_global=weekly_seen_gifs,
@@ -4875,6 +4896,26 @@ def _normalize_structured_plan(
                     intensity=intensity,
                     level=level,
                     requested_focus="aerobicos",
+                    is_no_equipment=is_no_equipment,
+                    seen_names_global=weekly_seen_names,
+                    seen_gifs_global=weekly_seen_gifs,
+                )
+
+            elif requested_focus in ("piernas", "solo_piernas", "piernas_gluteos"):
+                day_titles = [
+                    f"Piernas: Cuádriceps, Sentadillas y Fuerza ({badge_lbl})",
+                    f"Piernas: Isquiotibiales, Femoral y Cadena Posterior ({badge_lbl})",
+                    f"Piernas: Glúteos, Puentes y Aislamiento ({badge_lbl})",
+                    f"Piernas: Fuerza Unipodal, Búlgaras y Pantorrillas ({badge_lbl})",
+                    f"Piernas: Potencia Funcional, Bombeo y Movilidad ({badge_lbl})",
+                ]
+                idx = day_idx % len(day_titles)
+                diverse_day_exs = _generate_diverse_session("piernas", int_hint, seed=dynamic_base_seed + day_idx * 17, is_no_equipment=is_no_equipment)[:4]
+                return day_titles[idx], _normalize_exercises(
+                    diverse_day_exs,
+                    intensity=intensity,
+                    level=level,
+                    requested_focus="piernas",
                     is_no_equipment=is_no_equipment,
                     seen_names_global=weekly_seen_names,
                     seen_gifs_global=weekly_seen_gifs,
