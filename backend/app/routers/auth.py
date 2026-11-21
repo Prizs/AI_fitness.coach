@@ -650,3 +650,83 @@ def save_user_plan(payload: UpdatePlanRequest):
         return {"status": "not_found"}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+
+
+class UpdateHealthProfileRequest(BaseModel):
+    cedula: str
+    allergies: list[str] = Field(default_factory=list)
+    injuries: list[str] = Field(default_factory=list)
+
+
+@router.get("/profile/health/{cedula}")
+def get_user_health_profile(cedula: str):
+    clean_cedula = cedula.strip()
+    digits = "".join([c for c in clean_cedula if c.isdigit()])
+    conn = _get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT alergias_alimentarias, patologia_o_alergias, lesiones_actuales, zonas_a_evitar
+                    FROM public.usuarios
+                    WHERE cedula = %s OR cedula = %s OR REPLACE(REPLACE(cedula, 'V-', ''), 'v', '') = %s
+                    LIMIT 1;
+                """, (clean_cedula, digits, digits))
+                row = cur.fetchone()
+                if row:
+                    alergias_raw = row[0] or row[1] or ""
+                    lesiones_raw = row[2] or row[3] or ""
+
+                    allergies = [a.strip() for a in alergias_raw.split(",") if a.strip()] if alergias_raw else []
+                    injuries = [i.strip() for i in lesiones_raw.split(",") if i.strip()] if lesiones_raw else []
+
+                    return {
+                        "status": "ok",
+                        "allergies": allergies,
+                        "injuries": injuries,
+                    }
+        except Exception as e:
+            print("Error get_user_health_profile:", e)
+        finally:
+            conn.close()
+    return {"status": "ok", "allergies": [], "injuries": []}
+
+
+@router.post("/profile/health")
+def update_user_health_profile(payload: UpdateHealthProfileRequest):
+    clean_cedula = payload.cedula.strip()
+    digits = "".join([c for c in clean_cedula if c.isdigit()])
+    alergias_str = ", ".join([a.strip() for a in payload.allergies if a.strip()])
+    lesiones_str = ", ".join([i.strip() for i in payload.injuries if i.strip()])
+
+    conn = _get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE public.usuarios
+                    SET alergias_alimentarias = %s,
+                        patologia_o_alergias = %s,
+                        lesiones_actuales = %s,
+                        zonas_a_evitar = %s,
+                        updated_at = NOW()
+                    WHERE cedula = %s OR cedula = %s OR REPLACE(REPLACE(cedula, 'V-', ''), 'v', '') = %s
+                    RETURNING id;
+                """, (alergias_str, alergias_str, lesiones_str, lesiones_str, clean_cedula, digits, digits))
+                res = cur.fetchone()
+            if res:
+                conn.commit()
+                return {
+                    "status": "ok",
+                    "allergies": payload.allergies,
+                    "injuries": payload.injuries,
+                }
+            conn.rollback()
+        except Exception as e:
+            print("Error update_user_health_profile:", e)
+            conn.rollback()
+        finally:
+            conn.close()
+
+    return {"status": "error", "detail": "No se pudo actualizar el perfil en la base de datos"}
+

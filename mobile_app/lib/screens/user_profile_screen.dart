@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:mobile_app/widgets/app_update.dart';
 import 'package:mobile_app/widgets/performance_report_modal.dart';
 import 'package:flutter/material.dart';
@@ -22,8 +24,8 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   final WeeklyPlanService _planService = WeeklyPlanService.instance;
-  final List<String> _allergies = ['Lácteos', 'Mariscos'];
-  final List<String> _injuries = ['Molestia en manguito rotador derecho'];
+  final List<String> _allergies = [];
+  final List<String> _injuries = [];
   final _allergyController = TextEditingController();
   final _injuryController = TextEditingController();
   List<Map<String, dynamic>> _sessionHistory = [];
@@ -151,6 +153,46 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Future<void> _loadData() async {
     await _planService.refreshWorkoutStats();
     final history = await DBHelper.instance.getSessionHistory();
+
+    final user = AuthService.instance.loggedInUser;
+    if (user != null && user.cedula.isNotEmpty) {
+      try {
+        final baseUrl = AuthService.apiBaseUrl;
+        final res = await http.get(
+          Uri.parse('$baseUrl/api/auth/profile/health/${user.cedula}'),
+        ).timeout(const Duration(seconds: 8));
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body) as Map<String, dynamic>;
+          final dbAllergies = (data['allergies'] as List<dynamic>?)
+                  ?.map((e) => e.toString().trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList() ??
+              [];
+          final dbInjuries = (data['injuries'] as List<dynamic>?)
+                  ?.map((e) => e.toString().trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList() ??
+              [];
+          if (mounted) {
+            setState(() {
+              _allergies.clear();
+              _allergies.addAll(dbAllergies);
+              _injuries.clear();
+              _injuries.addAll(dbInjuries);
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error cargando salud de perfil: $e');
+        if (_allergies.isEmpty && user.foodAllergies != null && user.foodAllergies!.isNotEmpty) {
+          _allergies.addAll(user.foodAllergies!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
+        }
+        if (_injuries.isEmpty && user.currentInjuries != null && user.currentInjuries!.isNotEmpty) {
+          _injuries.addAll(user.currentInjuries!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
+        }
+      }
+    }
+
     if (mounted) {
       setState(() {
         _sessionHistory = history;
@@ -158,15 +200,68 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
-  void _addTag(List<String> list, TextEditingController ctrl) {
-    if (ctrl.text.trim().isNotEmpty) {
+  Future<void> _saveHealthProfile() async {
+    final user = AuthService.instance.loggedInUser;
+    if (user == null || user.cedula.isEmpty) return;
+
+    final allergiesStr = _allergies.join(', ');
+    final injuriesStr = _injuries.join(', ');
+
+    // Actualizar UserProfile en memoria de la sesión
+    AuthService.instance.loggedInUser = UserProfile(
+      cedula: user.cedula,
+      password: user.password,
+      name: user.name,
+      lastName: user.lastName,
+      age: user.age,
+      weight: user.weight,
+      gender: user.gender,
+      pathologyOrAllergies: allergiesStr,
+      foodAllergies: allergiesStr,
+      currentInjuries: injuriesStr,
+      motorDisability: user.motorDisability,
+      areasToAvoid: injuriesStr,
+      role: user.role,
+      specialty: user.specialty,
+      experienceYears: user.experienceYears,
+      certifications: user.certifications,
+      archetype: user.archetype,
+    );
+
+    try {
+      final baseUrl = AuthService.apiBaseUrl;
+      await http.post(
+        Uri.parse('$baseUrl/api/auth/profile/health'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'cedula': user.cedula,
+          'allergies': _allergies,
+          'injuries': _injuries,
+        }),
+      ).timeout(const Duration(seconds: 8));
+    } catch (e) {
+      debugPrint('Error persistiendo salud en base de datos: $e');
+    }
+  }
+
+  void _addTag(List<String> list, TextEditingController ctrl) async {
+    final text = ctrl.text.trim();
+    if (text.isNotEmpty) {
       setState(() {
-        list.add(ctrl.text.trim());
+        if (!list.contains(text)) {
+          list.add(text);
+        }
         ctrl.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Restricción sincronizada con el Coach IA')),
-      );
+      await _saveHealthProfile();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Guardado en base de datos y sincronizado con Coach IA'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -665,7 +760,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       children: _allergies
                           .map((a) => Chip(
                                 label: Text(a),
-                                onDeleted: () => setState(() => _allergies.remove(a)),
+                                onDeleted: () async {
+                                  setState(() => _allergies.remove(a));
+                                  await _saveHealthProfile();
+                                },
                               ))
                           .toList(),
                     ),
@@ -713,7 +811,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       children: _injuries
                           .map((i) => Chip(
                                 label: Text(i),
-                                onDeleted: () => setState(() => _injuries.remove(i)),
+                                onDeleted: () async {
+                                  setState(() => _injuries.remove(i));
+                                  await _saveHealthProfile();
+                                },
                               ))
                           .toList(),
                     ),

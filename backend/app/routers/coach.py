@@ -102,6 +102,63 @@ def _db_get_recent_unresolved_injury(cedula: str | None = None, user_id: str | N
         conn.close()
 
 
+def _db_sync_user_injury(cedula: str | None = None, user_id: str | None = None, injury_label: str | None = None, is_active: bool = True):
+    conn = _get_db_conn()
+    if not conn:
+        return
+    try:
+        clean_ced = (cedula or "").strip()
+        digits = "".join([c for c in clean_ced if c.isdigit()])
+        with conn:
+            with conn.cursor() as cur:
+                if user_id and len(user_id) > 10 and "-" in user_id:
+                    cur.execute("SELECT id, lesiones_actuales, zonas_a_evitar FROM usuarios WHERE id::text = %s LIMIT 1;", (user_id,))
+                elif clean_ced or digits:
+                    cur.execute("SELECT id, lesiones_actuales, zonas_a_evitar FROM usuarios WHERE cedula = %s OR cedula = %s OR REPLACE(REPLACE(cedula, 'V-', ''), 'v', '') = %s LIMIT 1;", (clean_ced, digits, digits))
+                elif user_id:
+                    cur.execute("SELECT id, lesiones_actuales, zonas_a_evitar FROM usuarios WHERE cedula = %s OR id::text = %s LIMIT 1;", (user_id, user_id))
+                else:
+                    return
+                row = cur.fetchone()
+                if not row:
+                    return
+                u_id, current_lesiones, current_zonas = row[0], row[1] or "", row[2] or ""
+
+                lesiones_list = [i.strip() for i in current_lesiones.split(",") if i.strip()]
+                zonas_list = [z.strip() for z in current_zonas.split(",") if z.strip()]
+
+                if is_active:
+                    if injury_label:
+                        clean_lbl = f"Molestia en {injury_label}" if not injury_label.lower().startswith("molestia") else injury_label
+                        if not any(clean_lbl.lower() in existing.lower() for existing in lesiones_list):
+                            lesiones_list.append(clean_lbl)
+                        if not any(injury_label.lower() in existing.lower() for existing in zonas_list):
+                            zonas_list.append(injury_label)
+                else:
+                    if injury_label:
+                        lesiones_list = [i for i in lesiones_list if injury_label.lower() not in i.lower()]
+                        zonas_list = [z for z in zonas_list if injury_label.lower() not in z.lower()]
+                    else:
+                        lesiones_list = []
+                        zonas_list = []
+
+                new_lesiones = ", ".join(lesiones_list) if lesiones_list else ""
+                new_zonas = ", ".join(zonas_list) if zonas_list else ""
+
+                cur.execute("""
+                    UPDATE usuarios
+                    SET lesiones_actuales = %s,
+                        zonas_a_evitar = %s,
+                        updated_at = NOW()
+                    WHERE id = %s;
+                """, (new_lesiones, new_zonas, u_id))
+                conn.commit()
+    except Exception as e:
+        print("Error in _db_sync_user_injury:", e)
+    finally:
+        conn.close()
+
+
 AI_TIMEOUT_SEC = 25.0
 MAX_HISTORY_TURNS = 20
 
@@ -4820,8 +4877,42 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
             else:
                 payload.areas_to_avoid = db_profile["zonas_a_evitar"]
 
-    # 0b. Secuencia clínica de 24-48 horas: Monitorear si reportó molestia previa y no ha confirmado recuperación
+    # 0b. Secuencia clínica de 24-48 horas y Confirmación de Recuperación
     u_msg_check = (payload.message or "").lower()
+
+    # 0c. Si el usuario confirma superación del dolor o recuperación al 100%:
+    is_recovery_confirmation = any(k in u_msg_check for k in (
+        "ya me siento al 100", "dolor superado", "recuperado al 100", 
+        "ya no me duele", "sin dolor", "estoy al 100", "totalmente recuperado", "sin molestias"
+    ))
+    if is_recovery_confirmation:
+        _db_sync_user_injury(cedula=payload.cedula, user_id=payload.user_id, injury_label=None, is_active=False)
+        user_n = payload.user_name or "Freddy"
+        return {
+            "provider": "coach_direct",
+            "reply": (
+                f"¡Excelente noticia, {user_n}! 🎉 Me alegra enormemente saber que te encuentras al 100% y que el dolor ha quedado completamente superado.\n\n"
+                f"He actualizado tu **Perfil Atlético y de Salud** en el sistema: he retirado la alerta de molestia física y liberado todas las zonas corporales para que puedas entrenar al máximo nivel sin restricciones.\n\n"
+                f"¿Cómo te gustaría estructurar tu sesión de hoy? Elige tu enfoque preferido o indícamelo para armarte el entrenamiento de inmediato:"
+            ),
+            "category": "Recuperación Articular Confirmada (100% Activo)",
+            "duration_weeks": 4,
+            "rest_between_sets_sec": 60,
+            "progression_rule": "Sin restricciones articulares.",
+            "extracted_equipment": None,
+            "suggest_questionnaire": False,
+            "has_plan": False,
+            "structured_plan": None,
+            "quick_replies": [
+                "🤖 Plan Semanal Recomendado por IA",
+                "🦵 Rutina de Piernas y Glúteos",
+                "💪 Rutina de Tren Superior",
+                "🔥 Rutina Cardio HIIT & Core"
+            ],
+            "recommended_intensity": "Moderada a Alta",
+            "fatigue_detected": False,
+        }
+
     recent_unresolved = _db_get_recent_unresolved_injury(cedula=payload.cedula, user_id=payload.user_id)
     is_greeting_or_check = payload.is_initial_greeting or _is_pure_greeting_or_conversation(payload.message) or any(k in u_msg_check for k in ("hola", "buen dia", "buenos dias", "buenas", "que tal", "empezar", "arrancar"))
     if recent_unresolved and is_greeting_or_check:
@@ -5604,6 +5695,9 @@ Devuelve SOLO JSON."""
 
     # Detección clínica de reporte de molestia en estado actual
     has_injury_in_submission = bool(affected_zone and is_submission)
+    if has_injury_in_submission and affected_profile:
+        _db_sync_user_injury(cedula=payload.cedula, user_id=payload.user_id, injury_label=affected_profile.get('label', affected_zone), is_active=True)
+
     is_explicit_alternative_choice = any(k in user_msg_lower for k in (
         "rutina de piernas", "piernas y glúteos", "piernas y gluteos",
         "core y abdomen", "cardio suave", "plan variado seguro", "solo piernas",
