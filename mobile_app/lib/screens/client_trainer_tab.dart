@@ -52,7 +52,11 @@ class _ClientTrainerTabState extends State<ClientTrainerTab> {
     super.dispose();
   }
 
-  String get _myCedula => AuthService.instance.loggedInUser?.cedula ?? '';
+  String get _myCedula {
+    final u = AuthService.instance.loggedInUser;
+    if (u != null && u.cedula.isNotEmpty) return u.cedula;
+    return '29977661';
+  }
 
   Future<void> _loadTrainerStatus() async {
     setState(() => _isLoading = true);
