@@ -15,7 +15,13 @@ class TrainerMetricsTab extends StatefulWidget {
 class _TrainerMetricsTabState extends State<TrainerMetricsTab> {
   bool _isLoading = true;
   Map<String, dynamic> _data = {};
-  String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
+  String get _trainerCedula {
+    final u = AuthService.instance.loggedInUser;
+    if (u != null && u.cedula.isNotEmpty && u.cedula != 'Desconocido') {
+      return u.cedula;
+    }
+    return '29977666';
+  }
 
   @override
   void initState() {

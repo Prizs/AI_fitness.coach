@@ -17,7 +17,13 @@ class _TrainerMessagesTabState extends State<TrainerMessagesTab> {
   bool _isLoading = true;
   List<dynamic> _conversations = [];
 
-  String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
+  String get _trainerCedula {
+    final u = AuthService.instance.loggedInUser;
+    if (u != null && u.cedula.isNotEmpty && u.cedula != 'Desconocido') {
+      return u.cedula;
+    }
+    return '29977666';
+  }
 
   Timer? _convTimer;
 
@@ -178,7 +184,13 @@ class _TrainerClientChatScreenState extends State<TrainerClientChatScreen> {
   bool _isSending = false;
   List<dynamic> _messages = [];
 
-  String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
+  String get _trainerCedula {
+    final u = AuthService.instance.loggedInUser;
+    if (u != null && u.cedula.isNotEmpty && u.cedula != 'Desconocido') {
+      return u.cedula;
+    }
+    return '29977666';
+  }
 
   Timer? _msgTimer;
 

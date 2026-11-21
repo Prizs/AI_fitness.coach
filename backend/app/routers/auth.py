@@ -674,8 +674,8 @@ def get_user_health_profile(cedula: str):
                 """, (clean_cedula, digits, digits))
                 row = cur.fetchone()
                 if row:
-                    alergias_raw = row[0] or row[1] or ""
-                    lesiones_raw = row[2] or row[3] or ""
+                    alergias_raw = row[0] or ""
+                    lesiones_raw = row[2] or ""
 
                     allergies = [a.strip() for a in alergias_raw.split(",") if a.strip()] if alergias_raw else []
                     injuries = [i.strip() for i in lesiones_raw.split(",") if i.strip()] if lesiones_raw else []
@@ -706,13 +706,12 @@ def update_user_health_profile(payload: UpdateHealthProfileRequest):
                 cur.execute("""
                     UPDATE public.usuarios
                     SET alergias_alimentarias = %s,
-                        patologia_o_alergias = %s,
                         lesiones_actuales = %s,
                         zonas_a_evitar = %s,
                         updated_at = NOW()
                     WHERE cedula = %s OR cedula = %s OR REPLACE(REPLACE(cedula, 'V-', ''), 'v', '') = %s
                     RETURNING id;
-                """, (alergias_str, alergias_str, lesiones_str, lesiones_str, clean_cedula, digits, digits))
+                """, (alergias_str, lesiones_str, lesiones_str, clean_cedula, digits, digits))
                 res = cur.fetchone()
                 if res and alergias_str:
                     u_id = res[0]

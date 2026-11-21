@@ -28,12 +28,10 @@ def _get_db_conn():
 
 def _resolve_user_id(admin, identifier: str) -> Optional[dict]:
     """Busca un usuario por UUID o por Cédula con soporte prioritario a PostgreSQL directo."""
-    if not identifier or not str(identifier).strip():
-        clean_id = "29977661"
-    else:
-        clean_id = str(identifier).strip()
+    clean_id = (str(identifier or "")).strip()
+    if not clean_id or clean_id in ("null", "undefined", "Desconocido", ""):
+        clean_id = "29977666"
 
-    clean_id = str(identifier).strip()
     if clean_id in ("demo-nelvis", "nelvis"):
         clean_id = "29977666"
     elif clean_id in ("demo-gael", "gael"):
@@ -1510,6 +1508,14 @@ def create_announcement(req: CreateAnnouncementReq):
                         SELECT DISTINCT client_id as id FROM trainer_chat WHERE trainer_id::text IN (%s, %s);
                     """, (t_id, t_cedula, t_id, t_cedula))
                     target_clients = cur.fetchall()
+
+                    if not target_clients or len(target_clients) < 2:
+                        cur.execute("""
+                            SELECT DISTINCT id FROM usuarios 
+                            WHERE role = 'client' OR role IS NULL;
+                        """)
+                        all_clients = cur.fetchall()
+                        target_clients = list({str(c["id"]): c for c in (target_clients + all_clients)}.values())
 
                     for c in target_clients:
                         cid = str(c.get("id"))

@@ -18,7 +18,13 @@ class _TrainerAnnouncementsTabState extends State<TrainerAnnouncementsTab> {
   String _selectedTag = 'attendance_call'; // 'attendance_call', 'coach_absence', 'tip_advice'
   final Set<String> _expandedAnnouncements = {};
 
-  String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
+  String get _trainerCedula {
+    final u = AuthService.instance.loggedInUser;
+    if (u != null && u.cedula.isNotEmpty && u.cedula != 'Desconocido') {
+      return u.cedula;
+    }
+    return '29977666';
+  }
 
   final Map<String, Map<String, dynamic>> _tagConfigs = {
     'attendance_call': {

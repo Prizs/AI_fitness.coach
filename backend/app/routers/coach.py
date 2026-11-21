@@ -89,10 +89,13 @@ def _db_get_recent_unresolved_injury(cedula: str | None = None, user_id: str | N
                 for r in rows:
                     txt = (r.get("content") or "").lower()
                     if r.get("role") == "user":
-                        if any(k in txt for k in ("dolor superado", "me siento al 100", "ya no me duele", "recuperado al 100", "sin dolor")):
+                        if any(k in txt for k in ("dolor superado", "me siento al 100", "ya no me duele", "recuperado al 100", "sin dolor", "no tengo", "cosa que no es", "solo tengo alergias", "no tengo lesiones", "ninguna lesion", "ninguna lesión", "sin lesiones")):
                             return None
+                        # Ignorar consultas hipotéticas, ejemplos o aclaratorias
+                        if any(h in txt for h in ("ejemplo", "prueba", "pregunto", "en caso de", "si sufro", "si tengo", "cosa que no es", "hipotetico", "hipotético", "supongamos", "no es que tenga", "asumo que")):
+                            continue
                         for z, z_label in known_zones.items():
-                            if z in txt and any(p in txt for p in ("molestia", "dolor", "duele", "duelen", "lesion", "lesión", "sobrecarga", "afectad", "evitar")):
+                            if z in txt and any(p in txt for p in ("tengo molestia", "siento molestia", "tengo dolor", "me duele", "me duelen", "tengo lesion", "tengo lesión", "sobrecarga", "estoy lesionado", "suspender por dolor", "suspender por molestia")):
                                 return {"zone": z_label, "reported_at": r.get("created_at"), "raw_text": txt}
                 return None
     except Exception as e:
@@ -5731,9 +5734,16 @@ def _call_ai_coach(payload: ChatMessage) -> dict:
     ))
     if is_profile_inquiry:
         user_n = payload.user_name or "Freddy"
-        allergies_lbl = payload.allergies if payload.allergies else "Ninguna alergia registrada"
-        pathologies_lbl = payload.pathology_or_allergies if payload.pathology_or_allergies else "Ninguna patología clínica registrada"
-        injuries_lbl = payload.injuries if payload.injuries else (f"{recent_unresolved.get('zone')} (en observación y recuperación 24-48h)" if recent_unresolved else "Sin lesiones ni molestias activas registradas")
+        allergies_lbl = payload.allergies if (payload.allergies and payload.allergies.strip()) else "Ninguna alergia registrada"
+        pathologies_lbl = payload.pathology_or_allergies if (payload.pathology_or_allergies and payload.pathology_or_allergies.strip() and payload.pathology_or_allergies.strip().lower() != (payload.allergies or "").strip().lower()) else "Ninguna patología clínica registrada"
+        
+        db_injuries = (payload.injuries or "").strip()
+        if db_injuries and db_injuries.lower() not in ("ninguna", "sin lesiones", "ninguno", "none", ""):
+            injuries_lbl = db_injuries
+        elif recent_unresolved and not any(k in u_msg_check for k in ("en mi perfil", "perfil registrado", "datos médicos", "datos medicos", "que tengo registrado")):
+            injuries_lbl = f"Sin lesiones crónicas en perfil. (Observación preventiva 24-48h: {recent_unresolved.get('zone')})"
+        else:
+            injuries_lbl = "Sin lesiones ni molestias activas registradas"
         avoid_lbl = payload.areas_to_avoid if payload.areas_to_avoid else "Ninguna restricción anatómica"
         level_lbl = effective_level
         intensity_lbl = effective_intensity

@@ -15,7 +15,13 @@ class _TrainerClientsTabState extends State<TrainerClientsTab> {
   bool _isLoading = true;
   List<dynamic> _clients = [];
 
-  String get _trainerCode => AuthService.instance.loggedInUser?.cedula ?? 'Desconocido';
+  String get _trainerCode {
+    final u = AuthService.instance.loggedInUser;
+    if (u != null && u.cedula.isNotEmpty && u.cedula != 'Desconocido') {
+      return u.cedula;
+    }
+    return '29977666';
+  }
 
   @override
   void initState() {

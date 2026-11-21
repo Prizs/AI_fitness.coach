@@ -110,7 +110,11 @@ String resolveGuaranteedGifUrl({
         // 15. Hombros mostrando Remo Invertido o Gemelos o Sentadillas
         ((nameLower.contains('hombro') || nameLower.contains('deltoid') || nameLower.contains('militar') || nameLower.contains('lateral raise') || nameLower.contains('pike') || nameLower.contains('pica')) && (cleanExisting.contains('row-bent-knees') || cleanExisting.contains('calf') || cleanExisting.contains('potty') || cleanExisting.contains('standing-calf'))) ||
         // 16. Círculos de brazos o Wall Slides mostrando Press con mancuernas
-        ((nameLower.contains('circulo') || nameLower.contains('círculo') || nameLower.contains('wall slide')) && (cleanExisting.contains('shoulder-press') || cleanExisting.contains('seated-overhead')));
+        ((nameLower.contains('circulo') || nameLower.contains('círculo') || nameLower.contains('wall slide')) && (cleanExisting.contains('shoulder-press') || cleanExisting.contains('seated-overhead'))) ||
+        // 17. Flexiones o Pecho mostrando Wall Sit / March / Calf / Piernas
+        ((nameLower.contains('flexion') || nameLower.contains('flexión') || nameLower.contains('pecho') || nameLower.contains('push-up') || nameLower.contains('pushup')) && (cleanExisting.contains('march') || cleanExisting.contains('wall') || cleanExisting.contains('calf') || cleanExisting.contains('squat') || cleanExisting.contains('potty'))) ||
+        // 18. Remos o Espalda mostrando Máquina de Gemelos / Calf / Piernas
+        ((nameLower.contains('remo') || nameLower.contains('row') || nameLower.contains('invertido') || nameLower.contains('espalda') || nameLower.contains('dorsal')) && (cleanExisting.contains('calf') || cleanExisting.contains('squat') || cleanExisting.contains('potty') || cleanExisting.contains('lunge') || cleanExisting.contains('leg-press')));
 
     if (!hasMismatch) {
       return cleanExisting;

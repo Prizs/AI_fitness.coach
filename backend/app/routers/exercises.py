@@ -762,7 +762,7 @@ CURATED_BY_INTENSITY = [
         "gifs": {
             "baja": "upper-back/bodyweight-standing-row.gif",
             "media": "upper-back/cable-low-seated-row.gif",
-            "alta": "upper-back/inverted-row.gif",
+            "alta": "upper-back/inverted-row-v-2.gif",
         },
         "biomechanics": "Aducción y depresión escapular en suelo reclutando dorsal ancho y serrato.",
         "posture": "Espalda plana contra el suelo, codos flexionados deslizándose controladamente.",

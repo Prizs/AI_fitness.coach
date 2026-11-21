@@ -26,7 +26,13 @@ class _TrainerAgendaTabState extends State<TrainerAgendaTab> {
   Timer? _pollTimer;
   String _lastBlocksHash = '';
 
-  String get _trainerCedula => AuthService.instance.loggedInUser?.cedula ?? '';
+  String get _trainerCedula {
+    final u = AuthService.instance.loggedInUser;
+    if (u != null && u.cedula.isNotEmpty && u.cedula != 'Desconocido') {
+      return u.cedula;
+    }
+    return '29977666';
+  }
 
   @override
   void initState() {

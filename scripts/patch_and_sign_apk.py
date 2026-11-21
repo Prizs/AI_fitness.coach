@@ -6,7 +6,7 @@ import shutil
 ROOT = r"C:\AI_FITNESS_COACH_PROYECTO_COMPLETO"
 SOURCE_APK = os.path.join(ROOT, "releases", "app-release.apk")
 SCRATCH_DIR = os.path.join(ROOT, "scratch_apk")
-UNSIGNED_APK = os.path.join(ROOT, "releases", "AI_Fitness_Coach_v1079_unsigned.apk")
+UNSIGNED_APK = os.path.join(ROOT, "releases", "AI_Fitness_Coach_v1080_unsigned.apk")
 OUT_DIR = os.path.join(ROOT, "releases", "latest")
 UBER_JAR = os.path.join(ROOT, "scripts", "uber-apk-signer.jar")
 
@@ -27,7 +27,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 modified_files = []
 total_replacements = 0
 
-with zipfile.ZipFile(SOURCE_APK, 'r') as zin, zipfile.ZipFile(UNSIGNED_APK, 'w', compression=zipfile.ZIP_DEFLATED) as zout:
+with zipfile.ZipFile(SOURCE_APK, 'r') as zin, zipfile.ZipFile(UNSIGNED_APK, 'w', zipfile.ZIP_DEFLATED) as zout:
     for item in zin.infolist():
         # Skip existing signature files in META-INF
         if item.filename.startswith("META-INF/") and (
@@ -66,22 +66,25 @@ res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text
 print(res.stdout)
 
 # Find generated signed APK in OUT_DIR
-signed_apks = [f for f in os.listdir(OUT_DIR) if f.endswith(".apk")]
+signed_apks = [f for f in os.listdir(OUT_DIR) if f.endswith(".apk") and "aligned" in f or "signed" in f or "1080" in f]
 print("Signed APKs:", signed_apks)
 
 if signed_apks:
-    final_signed = os.path.join(OUT_DIR, signed_apks[0])
-    target_v1079 = os.path.join(ROOT, "releases", "AI_Fitness_Coach_Oficial_v1.0.79.apk")
+    # Pick the most recently modified signed apk in OUT_DIR
+    full_signed_paths = [os.path.join(OUT_DIR, f) for f in os.listdir(OUT_DIR) if f.endswith(".apk")]
+    full_signed_paths.sort(key=os.path.getmtime, reverse=True)
+    final_signed = full_signed_paths[0]
+    print(f"Latest signed APK chosen: {final_signed}")
+
+    target_v1080 = os.path.join(ROOT, "releases", "AI_Fitness_Coach_Oficial_v1.0.80.apk")
     target_latest = os.path.join(ROOT, "releases", "app-release.apk")
     web_dist_apk = os.path.join(ROOT, "backend", "app", "web_dist", "AI_Fitness_Coach.apk")
-    web_dist_v1079 = os.path.join(ROOT, "backend", "app", "web_dist", "AI_Fitness_Coach_v1.0.79.apk")
+    web_dist_v1080 = os.path.join(ROOT, "backend", "app", "web_dist", "AI_Fitness_Coach_v1.0.80.apk")
 
-    shutil.copy2(final_signed, target_v1079)
+    shutil.copy2(final_signed, target_v1080)
     shutil.copy2(final_signed, target_latest)
     shutil.copy2(final_signed, web_dist_apk)
-    shutil.copy2(final_signed, web_dist_v1079)
-    print(f"\n✔ APK v1.0.79 Generado y Firmado con Éxito en:")
-    print(f"  1. {target_v1079} ({os.path.getsize(target_v1079)/(1024*1024):.1f} MB)")
-    print(f"  2. {target_latest} ({os.path.getsize(target_latest)/(1024*1024):.1f} MB)")
-    print(f"  3. {web_dist_apk} ({os.path.getsize(web_dist_apk)/(1024*1024):.1f} MB)")
-    print(f"  4. {web_dist_v1079} ({os.path.getsize(web_dist_v1079)/(1024*1024):.1f} MB)")
+    shutil.copy2(final_signed, web_dist_v1080)
+    print(f"Copied signed APK to:\n  {target_v1080}\n  {target_latest}\n  {web_dist_apk}\n  {web_dist_v1080}")
+else:
+    print("ERROR: No signed APK produced!")

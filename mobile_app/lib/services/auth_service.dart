@@ -83,6 +83,12 @@ class AuthService {
     final archetype = await _storage.read(key: 'biopsycho_archetype_$cedula') ??
         await _storage.read(key: 'biopsycho_archetype');
     accessToken = token;
+    final foodAllergies = await _storage.read(key: 'food_allergies');
+    final healthNotes = await _storage.read(key: 'health_notes');
+    final effectivePathology = (healthNotes != null && foodAllergies != null && healthNotes.trim().toLowerCase() == foodAllergies.trim().toLowerCase())
+        ? null
+        : healthNotes;
+
     loggedInUser = UserProfile(
       cedula: cedula,
       name: name,
@@ -90,8 +96,8 @@ class AuthService {
       age: age,
       weight: weight,
       gender: await _storage.read(key: 'gender') ?? 'masculino',
-      pathologyOrAllergies: await _storage.read(key: 'health_notes'),
-      foodAllergies: await _storage.read(key: 'food_allergies'),
+      pathologyOrAllergies: effectivePathology,
+      foodAllergies: foodAllergies,
       currentInjuries: await _storage.read(key: 'current_injuries'),
       motorDisability: await _storage.read(key: 'motor_disability'),
       areasToAvoid: await _storage.read(key: 'areas_to_avoid'),
@@ -290,8 +296,10 @@ class AuthService {
   Future<void> updateHealthProfileLocalAndStorage({
     required String allergies,
     required String injuries,
+    String? pathologies,
   }) async {
     final user = loggedInUser;
+    final cleanPathology = pathologies ?? (user?.pathologyOrAllergies != null && user!.pathologyOrAllergies!.toLowerCase() != allergies.toLowerCase() ? user.pathologyOrAllergies : '');
     if (user != null) {
       loggedInUser = UserProfile(
         cedula: user.cedula,
@@ -301,7 +309,7 @@ class AuthService {
         age: user.age,
         weight: user.weight,
         gender: user.gender,
-        pathologyOrAllergies: allergies,
+        pathologyOrAllergies: cleanPathology,
         foodAllergies: allergies,
         currentInjuries: injuries,
         motorDisability: user.motorDisability,
@@ -315,9 +323,18 @@ class AuthService {
     }
     try {
       await _storage.write(key: 'food_allergies', value: allergies);
-      await _storage.write(key: 'health_notes', value: allergies);
-      await _storage.write(key: 'current_injuries', value: injuries);
-      await _storage.write(key: 'areas_to_avoid', value: injuries);
+      if (cleanPathology != null && cleanPathology.isNotEmpty) {
+        await _storage.write(key: 'health_notes', value: cleanPathology);
+      } else {
+        await _storage.delete(key: 'health_notes');
+      }
+      if (injuries.isNotEmpty) {
+        await _storage.write(key: 'current_injuries', value: injuries);
+        await _storage.write(key: 'areas_to_avoid', value: injuries);
+      } else {
+        await _storage.delete(key: 'current_injuries');
+        await _storage.delete(key: 'areas_to_avoid');
+      }
     } catch (_) {}
   }
 
